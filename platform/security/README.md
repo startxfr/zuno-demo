@@ -36,3 +36,17 @@ guessed-at securityContext override.
 This is not wired into a CI pipeline - `.github/workflows/` doesn't exist
 yet in this repository (see `.github/README.md`) - but is written to be
 CI-usable (non-zero exit on failure) the moment one does.
+
+## check_mesh_mtls.py (ADR-0602 / WP-224)
+
+`python3 platform/security/check_mesh_mtls.py` renders every `gitops/apps`
+Application (the hermetic rendering of `platform/vault/check_secret_access.py`)
+and fails when a PeerAuthentication exists outside zuno-data, zuno-auth and
+zuno-ai-run, when one of them lacks its namespace-wide `default`, when a
+plaintext port exception has no `zuno.io/permissive-reason` (the values field
+`reason:` naming the non-mesh caller) or is not PERMISSIVE, when a workload
+PeerAuthentication overrides the namespace mode or duplicates another's
+selector, and when zuno-ai-run or zuno-unifai has no EgressFirewall ending in
+`Deny 0.0.0.0/0` (or one that allows 0.0.0.0/0). Negative cases:
+`python3 platform/security/tests/test_check_mesh_mtls.py`. Wired into
+`.github/workflows/lint.yml`.

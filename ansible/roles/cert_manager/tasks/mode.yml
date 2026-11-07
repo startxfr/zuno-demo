@@ -1,0 +1,38 @@
+---
+# ADR-0352 (WP-217): resolve zuno_cert_manager_mode for install, precheck and
+# uninstall alike (symmetric gating, clause 4). The key lives in
+# ansible/confidential.yml; absent means internal. Tier A-operator components
+# carry only the mode key (clause 2): no endpoint, no _external_* payload.
+- name: "cert_manager | check for ansible/confidential.yml (mode key)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _cert_manager_mode_confidential_file
+
+- name: "cert_manager | load ansible/confidential.yml if present (mode key)"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _cert_manager_mode_confidential_file.stat.exists
+
+- name: "cert_manager | resolve the mode and what an unmanaged operator must provide"
+  ansible.builtin.set_fact:
+    _cert_manager_mode: "{{ zuno_cert_manager_mode | default('internal') }}"
+    # What clause 7 asserts in external mode: the cert-manager CRDs, the OLM
+    # operator CSV, and the cert-manager controller that admits and signs the
+    # ClusterIssuers and Certificates our -d1 Application keeps applying.
+    _cert_manager_unmanaged:
+      crds:
+        - certificates.cert-manager.io
+        - certificaterequests.cert-manager.io
+        - issuers.cert-manager.io
+        - clusterissuers.cert-manager.io
+      csv_prefix: cert-manager-operator
+      deployment:
+        namespace: cert-manager
+        name: cert-manager
+
+- name: "cert_manager | fail on an unknown mode value"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_cert_manager_mode is '{{ _cert_manager_mode }}' - expected 'internal' or
+      'external' (ADR-0352 clause 1; absent means internal).
+  when: _cert_manager_mode not in ['internal', 'external']

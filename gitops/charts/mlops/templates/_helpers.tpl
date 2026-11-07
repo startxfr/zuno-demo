@@ -26,8 +26,27 @@ app.kubernetes.io/part-of: mlops
 {{- end -}}
 {{- end }}
 
+{{/*
+ADR-0603 M16 (WP-226): repository@digest once a release has rendered
+images.mlops.digest (platform/supply-chain/render_release_digests.py),
+repository:tag otherwise (ADR-0059). mlops.imagePullPolicy follows: a fixed
+digest needs no re-pull.
+*/}}
 {{- define "mlops.image" -}}
-{{- printf "%s:%s" .Values.images.mlops.repository .Values.images.mlops.tag -}}
+{{- with .Values.images.mlops -}}
+{{- if .digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .digest) -}}
+{{- fail (printf "images.mlops.digest %q is not sha256:<64 hex>" .digest) -}}
+{{- end -}}
+{{- printf "%s@%s" .repository .digest -}}
+{{- else -}}
+{{- printf "%s:%s" .repository .tag -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{- define "mlops.imagePullPolicy" -}}
+{{- if .Values.images.mlops.digest -}}IfNotPresent{{- else -}}{{ .Values.images.mlops.pullPolicy }}{{- end -}}
 {{- end }}
 
 {{- define "mlops.s3Endpoint" -}}

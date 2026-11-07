@@ -12,7 +12,7 @@ metadata:
     # before `nvidia_gpu` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-203"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

@@ -1,0 +1,39 @@
+---
+# ADR-0602 clause 1 / WP-223: Vault's listener certificate is issued by the
+# OpenShift service CA (gitops/charts/vault, serving-cert-secret-name on the
+# client Service). Pods trust it through the service-ca.crt mounted next to
+# their ServiceAccount token, and External Secrets stores read the
+# openshift-service-ca.crt ConfigMap directly - but a cert-manager
+# ClusterIssuer only accepts an inline base64 caBundle (or a Secret), so
+# the roles that render one (cert_manager, service_mesh, mariadb) read the
+# bundle here and pass it as the chart value vaultCaBundle.
+#
+# OpenShift publishes openshift-service-ca.crt in every namespace; zuno-vault
+# is used because it exists whenever Vault does. The service CA rotates
+# (about yearly, old and new CA overlap for a while): re-run those roles
+# after a rotation so the ClusterIssuers carry the new bundle.
+#
+# Output: vault_ca_bundle_b64. Idempotent (`is not defined` guard).
+- name: "vault-ca | read the OpenShift service CA bundle"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: zuno-vault
+    name: openshift-service-ca.crt
+  register: _vault_ca_bundle_cm
+  when: vault_ca_bundle_b64 is not defined
+
+- name: "vault-ca | fail if the service CA bundle is not published yet"
+  ansible.builtin.fail:
+    msg: >-
+      ConfigMap zuno-vault/openshift-service-ca.crt has no service-ca.crt key.
+      OpenShift's service-ca operator publishes it in every namespace; check
+      `oc get configmap openshift-service-ca.crt -n zuno-vault -o yaml` and the
+      service-ca operator (`oc get co service-ca`).
+  when:
+    - vault_ca_bundle_b64 is not defined
+    - (_vault_ca_bundle_cm.resources[0].data['service-ca.crt'] | default('')) is not search('BEGIN CERTIFICATE')
+
+- name: "vault-ca | set vault_ca_bundle_b64"
+  ansible.builtin.set_fact:
+    vault_ca_bundle_b64: "{{ _vault_ca_bundle_cm.resources[0].data['service-ca.crt'] | b64encode }}"
+  when: vault_ca_bundle_b64 is not defined

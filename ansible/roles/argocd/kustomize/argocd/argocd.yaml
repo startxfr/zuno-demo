@@ -104,10 +104,18 @@ spec:
     # role:admin line is required, not redundant: only
     # system:cluster-admins/cluster-admins mapped to role:admin before,
     # and Keycloak-derived groups never matched either name. zuno-paas-dev
-    # is a custom read+sync role for the PaaS-developer profile.
+    # is a custom read+sync role for the PaaS-developer profile, on both
+    # projects of the ADR-0602 clause 5 / WP-224 split (zuno-bootstrap,
+    # the root app-of-apps, stays admin-only).
     policy: |
       g, system:cluster-admins, role:admin
       g, cluster-admins, role:admin
+      p, role:zuno-paas-dev, applications, get, zuno-platform/*, allow
+      p, role:zuno-paas-dev, applications, sync, zuno-platform/*, allow
+      p, role:zuno-paas-dev, applications, get, zuno-apps/*, allow
+      p, role:zuno-paas-dev, applications, sync, zuno-apps/*, allow
+      # Kept until the legacy `zuno` project is gone (Applications move only
+      # when their role re-applies them).
       p, role:zuno-paas-dev, applications, get, zuno/*, allow
       p, role:zuno-paas-dev, applications, sync, zuno/*, allow
       g, ocp-paas-dev, role:zuno-paas-dev

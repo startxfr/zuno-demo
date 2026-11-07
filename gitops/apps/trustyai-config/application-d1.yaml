@@ -14,7 +14,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-91"
 spec:
-  project: zuno
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -22,6 +22,10 @@ spec:
     helm:
       releaseName: zuno-trustyai-config-d1
       values: |
+        # ADR-0602 clause 6 / WP-224: the RAGAS Job mints its persona token
+        # at https://keycloak.<this domain> (placeholder substituted by
+        # ansible/tasks/apply_gitops_app.yml).
+        clusterBaseDomain: apps.mycluster.example.com
         trustyaiConfig:
           enabled: true
         # ADR-0540/WP-120: deploy the NeMo rails server so its

@@ -1,0 +1,20 @@
+# ADR-0602 clause 1 / WP-223: the configure Job's script and the three
+# policies it applies, generated from files so the bootstrap
+# (tasks/bootstrap_auth.yml) and the Job read the SAME vault-configurator.hcl.
+# The per-namespace External Secrets policies are not here: they are
+# rendered from platform/vault/secret-access.yaml by tasks/install.yml into
+# the vault-configure-secret-access ConfigMap.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: zuno-vault
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    zuno.io/managed-by: zuno-ansible
+configMapGenerator:
+  - name: vault-configure-script
+    files:
+      - configure.sh
+      - vault-configurator.hcl
+      - ansible-seeder.hcl
+      - raft-snapshot.hcl

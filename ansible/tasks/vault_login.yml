@@ -1,0 +1,120 @@
+---
+# ADR-0602 clause 1 / WP-223: a short-lived Vault token for Ansible, in place
+# of the root token every seed task used to read from the
+# vault-bootstrap-credentials Secret (that Secret no longer exists, and the
+# root token is revoked after bootstrap).
+#
+# Logs in through Vault's Kubernetes auth as the ansible-seeder
+# ServiceAccount (zuno-vault), role ansible-seeder: create/read/update on
+# zuno/data/* and zuno/metadata/*, read on pki/cert/ca, token TTL 1h
+# (ansible/roles/vault/kustomize/configure/ansible-seeder.hcl).
+#
+# How the ServiceAccount JWT is obtained: kubernetes.core (6.x) cannot call
+# the serviceaccounts/token (TokenRequest) subresource, and `oc create
+# token` would tie this helper to a kubeconfig the AAP execution path does
+# not always have. So it uses the other API-native way to get a
+# ServiceAccount token, a `kubernetes.io/service-account-token` Secret, for
+# the seconds the login takes: created, read, used once, deleted in an
+# `always:` block. A legacy token stops validating the moment its Secret
+# is deleted, and the Vault token it was exchanged for keeps its own 1h TTL
+# (Vault does not re-review the JWT after login). A leftover from an
+# interrupted run is deleted at the start.
+#
+# Outputs (both no_log-safe facts):
+#   zuno_vault_token     - the Vault token, for VAULT_TOKEN=... in k8s_exec
+#   zuno_vault_pod_name  - the Vault server pod the login ran in
+# Callers keep their own Vault pod lookup; this helper never changes it.
+- name: "vault-login | locate the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+    field_selectors:
+      - status.phase=Running
+  register: _vault_login_pod
+
+- name: "vault-login | fail if Vault is not running"
+  ansible.builtin.fail:
+    msg: >-
+      No Running Vault server pod in zuno-vault - run `make d0 install vault`
+      first.
+  when: (_vault_login_pod.resources | default([]) | length) == 0
+
+- name: "vault-login | exchange a one-shot ansible-seeder ServiceAccount token for a Vault token"
+  block:
+    - name: "vault-login | remove a token Secret left by an interrupted run"
+      kubernetes.core.k8s:
+        state: absent
+        kind: Secret
+        namespace: zuno-vault
+        name: ansible-seeder-login-token
+        wait: true
+
+    - name: "vault-login | request a ServiceAccount token for ansible-seeder"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          type: kubernetes.io/service-account-token
+          metadata:
+            name: ansible-seeder-login-token
+            namespace: zuno-vault
+            labels:
+              zuno.io/managed-by: zuno-ansible
+            annotations:
+              kubernetes.io/service-account.name: ansible-seeder
+
+    - name: "vault-login | wait for the token controller to fill it"
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: zuno-vault
+        name: ansible-seeder-login-token
+      register: _vault_login_sa_secret
+      until: >-
+        (_vault_login_sa_secret.resources | default([]) | length) > 0 and
+        (_vault_login_sa_secret.resources[0].data.token | default('')) | length > 0
+      retries: 15
+      delay: 2
+      no_log: true
+
+    - name: "vault-login | log in to Vault as ansible-seeder"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-vault
+        pod: "{{ _vault_login_pod.resources[0].metadata.name }}"
+        container: vault
+        command: >-
+          vault write -field=token auth/kubernetes/login role=ansible-seeder
+          jwt={{ _vault_login_sa_secret.resources[0].data.token | b64decode }}
+      register: _vault_login_result
+      changed_when: false
+      failed_when: false
+      no_log: true
+  always:
+    - name: "vault-login | delete the ServiceAccount token Secret (invalidates the JWT)"
+      kubernetes.core.k8s:
+        state: absent
+        kind: Secret
+        namespace: zuno-vault
+        name: ansible-seeder-login-token
+
+- name: "vault-login | fail with a token-free message if the login did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      Vault Kubernetes-auth login as ansible-seeder failed
+      (rc={{ _vault_login_result.rc | default('?') }}; output suppressed, it
+      carries the JWT). Check that Vault is unsealed and that the
+      ansible-seeder role exists (`make d0 install vault` creates it; on a
+      Vault initialized before WP-223, run
+      ansible/playbooks/vault_migrate_kms_raft.yml first).
+  when: >-
+    (_vault_login_result.rc | default(1)) != 0
+    or (_vault_login_result.stdout | default('') | trim | length) == 0
+
+- name: "vault-login | set the Vault token and pod facts"
+  ansible.builtin.set_fact:
+    zuno_vault_token: "{{ _vault_login_result.stdout | trim }}"
+    zuno_vault_pod_name: "{{ _vault_login_pod.resources[0].metadata.name }}"
+  no_log: true

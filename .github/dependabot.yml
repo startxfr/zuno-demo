@@ -1,0 +1,44 @@
+# ADR-0603 M19/M20 (WP-226): the refresh routine for the SHA-pinned actions
+# and the hashed Python lockfiles. Dependabot covers GitHub Actions and pip
+# only (ADR-0603 "Alternatives considered"): the base images are digest-pinned
+# in ansible/roles/image_mirrors and build-publish.yml, the Galaxy collections
+# in ansible/requirements.yml, each with its own refresh note.
+#
+# pip: Dependabot reads each requirements.in and regenerates the hashed
+# requirements.txt with pip-compile. It does not read
+# platform/python/constraints.txt, so the pip updates are one grouped pull
+# request across every directory: lint.yml's check_python_locks.py fails the
+# PR if a shared library ends up at two versions, and the fix is to bump
+# constraints.txt and run platform/python/compile_locks.py on the branch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: pip
+    directories:
+      - "/components/a2a-gateway"
+      - "/components/ai-gateway"
+      - "/components/mcp-gateway"
+      - "/components/mcp-servers/*"
+      - "/components/mlops"
+      - "/components/mlops/tooling"
+      - "/components/trustyai-eval"
+      - "/components/zuno-dify-knowledge"
+      - "/components/zuno-token-proxy"
+      - "/evaluations/*"
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"

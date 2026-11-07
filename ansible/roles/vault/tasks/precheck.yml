@@ -1,14 +1,14 @@
 ---
 # State detection (never fails). Doesn't use the Application's Synced/
-# Healthy status - it's structurally never Healthy while sealed. Instead,
-# "installed" means bootstrap credentials exist, pod is Running, and unsealed.
-- name: "vault | look up the bootstrap credentials Secret"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-vault
-    name: vault-bootstrap-credentials
-  register: _vault_bootstrap_secret_lookup
-
+# Healthy status - it's structurally never Healthy while uninitialized.
+# "Installed" means the StatefulSet exists, the pod is Running, and Vault
+# reports initialized and unsealed.
+#
+# ADR-0602 clause 1 / WP-223: no longer looks up vault-bootstrap-credentials
+# (fresh installs never create it; the root token is revoked after
+# bootstrap). That lookup was also the only reason AAP's day0-check
+# credential needed Secret access in zuno-vault
+# (gitops/charts/aap-config's former rolebinding-vault-secrets.yaml).
 - name: "vault | look up the Vault server StatefulSet"
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -27,7 +27,7 @@
       - "component=server"
   register: _vault_pod_lookup
 
-- name: "vault | read current seal status"
+- name: "vault | read current init/seal status"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
     pod: "{{ _vault_pod_lookup.resources[0].metadata.name }}"
@@ -40,10 +40,32 @@
     (_vault_pod_lookup.resources | default([]) | length) > 0
     and (_vault_pod_lookup.resources[0].status.phase | default('')) == 'Running'
 
-- name: "vault | parse status (the CLI exits non-zero while sealed; stdout is still valid JSON)"
+# `vault status` exits 2 while sealed with valid JSON on stdout. Without
+# pods/exec (AAP's cluster-reader day0-check credential), stdout is empty
+# or an error: fall back to the pod's Ready condition, which is the
+# chart's readiness probe running the same `vault status` - Ready means
+# initialized AND unsealed. That closes the "vault always NOT installed
+# through AAP" gap ansible/roles/aap_config/README.md used to document.
+- name: "vault | parse status, falling back to pod readiness when exec is not allowed"
   ansible.builtin.set_fact:
-    _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
-  when: _vault_status_raw is defined and _vault_status_raw.stdout is defined
+    _vault_status: >-
+      {{
+        (_vault_status_raw.stdout | from_json)
+        if (_vault_status_raw.stdout | default('') | trim) is match('^\{')
+        else {
+          'initialized': _vault_pod_ready,
+          'sealed': not _vault_pod_ready,
+          'source': 'pod Ready condition (vault status not executable)'
+        }
+      }}
+  vars:
+    _vault_pod_ready: >-
+      {{
+        (_vault_pod_lookup.resources | default([]) | length) > 0
+        and ((_vault_pod_lookup.resources[0].status.conditions | default([])
+              | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('False')) == 'True')
+      }}
+  when: (_vault_pod_lookup.resources | default([]) | length) > 0
 
 # ADR-0112 (roadmap WP-13): "make d0 check paths assert last-backup
 # recency for their components." Diagnostic only, never gates
@@ -109,12 +131,12 @@
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        (_vault_bootstrap_secret_lookup.resources | default([]) | length) > 0
-        and (_vault_sts_lookup.resources | default([]) | length) > 0
+        (_vault_sts_lookup.resources | default([]) | length) > 0
         and (_vault_pod_lookup.resources | default([]) | length) > 0
         and (_vault_pod_lookup.resources[0].status.phase | default('')) == 'Running'
+        and ((_vault_status | default({})).initialized | default(false) | bool)
         and (_vault_status | default({})).sealed is defined
-        and not (_vault_status | default({})).sealed
+        and not ((_vault_status | default({})).sealed | bool)
       }}
 
 - name: "vault | record install state"

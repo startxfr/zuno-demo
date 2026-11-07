@@ -94,6 +94,9 @@
 - name: "mariadb | resolve the cluster's default StorageClass (WP-118 B5)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
 
+- name: "mariadb | resolve the service CA bundle Vault's listener certificate chains to (ADR-0602, WP-223)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_vault_ca_bundle.yml"
+
 - name: "mariadb | apply the MariaDB GitOps Application (d1: MariaDB/PhysicalBackup)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -103,6 +106,8 @@
     gitops_app_extra_helm_values:
       mariadbOperand:
         enabled: true
+      # vault-issuer-mariadb ClusterIssuer (ADR-0602 clause 1 / WP-223).
+      vaultCaBundle: "{{ vault_ca_bundle_b64 }}"
       # WP-118 B5.
       cluster:
         storageClassName: "{{ cluster_default_storage_class }}"

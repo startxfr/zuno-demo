@@ -11,8 +11,11 @@ Positioned right after `vault` in `day0_components` (`ansible/playbooks/
 day0_{install,check}.yml`, reversed in `day0_uninstall.yml`): the `pki/`
 secrets engine and the `cert-manager-issuer` Kubernetes-auth role/policy
 this role's `ClusterIssuer` depends on are prepared by `vault`'s own
-bootstrap script (`ansible/roles/vault/kustomize/unseal-configure/
-configmap.yaml`). This role never writes to Vault directly - it only
+configure script (`ansible/roles/vault/kustomize/configure/
+configure.sh`). Since ADR-0602/WP-223 the issuer reaches Vault over https
+with the service-ca bundle (`vaultCaBundle`, from
+`ansible/tasks/resolve_vault_ca_bundle.yml`); re-run this role after a
+service CA rotation. This role never writes to Vault directly - it only
 discovers the Vault client Service (same `app.kubernetes.io/name=vault`
 label-selector lookup `vault`/`external_secrets` already use) and applies
 a declarative `ClusterIssuer` pointing at the already-configured backend.
@@ -35,3 +38,29 @@ TLS-sync fallback.
 opt-in follow-up. See `gitops/charts/cert-manager/README.md` for the
 caveats on the operator's package/channel/catalog and its singleton
 `CertManager` config CR shape.
+
+## External mode (ADR-0352, WP-217)
+
+`zuno_cert_manager_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that cert-manager is
+installed and lifecycle-managed outside this installer. It is a Tier A-operator component: the mode key is the whole
+contract, there is no endpoint and no `_external_*` payload.
+
+| Verb | internal (default) | external |
+|---|---|---|
+| `install` | applies `zuno-cert-manager-d0` (OLM Subscription, CertManager CR), then `-d1` | skips `-d0`; asserts the CRDs (`certificates`, `certificaterequests`, `issuers`, `clusterissuers`), a `Succeeded` CSV `cert-manager-operator*` and the Ready controller `cert-manager/cert-manager`, failing fast otherwise; then applies `-d1` |
+| `check` | `-d0` and `-d1` Applications plus ClusterIssuer `vault-issuer` Ready | the assertion above replaces the `-d0` Application check (record-only); `-d1` and `vault-issuer` as in internal |
+| `uninstall` | removes `-d1`, the operator, then `-d0` | removes `-d1` only; the operator, its CSV and Subscription are never touched |
+
+The `-d1` side, the Vault-backed ClusterIssuers, the ACME (ADR-0211) configuration and the Certificates, is ours in
+both modes and always applied through ArgoCD. The seams the external operator must honour are unchanged: the Vault root
+CA reaches the issuers through `resolve_vault_ca_bundle.yml`, and the ACME DNS identity through `confidential.yml`.
+
+**Installing the operator outside this installer.** Subscribe the Red Hat `openshift-cert-manager-operator` (namespace
+`cert-manager-operator`) and let it deploy cert-manager into `cert-manager`; wait for the CSV `Succeeded` and
+`cert-manager/cert-manager` Ready. If your ACME track needs Route 53 recursive nameservers or other controller flags,
+set them on your own `CertManager` CR: in external mode this installer does not apply one. Then set the mode and run
+`make d0 install cert-manager`.
+
+**Flipping the mode** is a migration event, not a reconcile (clause 4). Internal to external: delete the
+`zuno-cert-manager-d0` Application without cascade (the Subscription, CSV and CertManager CR stay), then set `external`.
+External to internal: set `internal` and run `make d0 install cert-manager`.

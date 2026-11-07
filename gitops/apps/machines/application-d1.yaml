@@ -10,7 +10,7 @@ metadata:
     # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-207"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -19,7 +19,9 @@ spec:
       releaseName: zuno-machines-d1
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: openshift-machine-api
+    # ADR-0602 clause 5 / WP-224: was openshift-gitops; only zuno-bootstrap may
+    # write there. Every namespaced object this renders names its namespace.
   syncPolicy:
     automated:
       prune: true

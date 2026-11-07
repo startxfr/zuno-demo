@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "30"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "diagram-render.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "diagram-render") }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -19,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: diagram-render
+      {{- with include "diagram-render.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: diagram-render
       priorityClassName: zuno-workload-default
@@ -29,8 +36,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: diagram-render
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "diagram-render.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "diagram-render.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

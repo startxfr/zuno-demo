@@ -6,9 +6,49 @@ zuno_env: demo
 zuno_envId: demo
 
 # zuno_admin_password and every per-component password: passwords.yml (ADR-0595).
-zuno_admin_token: "token-{{ zuno_admin_password }}"
+#
+# ADR-0602 clause 3 / WP-223 (finding C5): which credential scheme this cluster
+# runs. One of:
+#   demo     - ADR-0595 unchanged: every admin, service and database password
+#              inherits the shared zuno_admin_mainpwd (md5 of the seed when it
+#              is unset). Convenient for a presenter, and a single leak yields
+#              every infra credential at once.
+#   hardened - infra credentials (Keycloak master accounts, AAP, every Postgres
+#              role, MariaDB, Redis, Dify admin, OpenClaw UI...) are left
+#              undefined, so each consumer's own random default applies and
+#              the value lives only in Vault; no md5 fallback is ever computed;
+#              Keycloak gets a password policy, a shorter idle session and TOTP
+#              for the console administrator. Personas keep one shared value.
+# Override per cluster in ansible/clusters/<cluster>.yml or in
+# ansible/confidential.yml. ansible/tasks/assert_security_profile.yml rejects
+# any other value. Switching an already-seeded cluster changes no Vault path
+# (seed-only-if-missing, ADR-0345): hardened is meant for fresh installs.
+zuno_security_profile: demo
+
+# WP-223: the MCP Gateway workload token (Vault mcp/gateway-workload-token) no
+# longer derives from the admin password ("token-<password>" made the token as
+# guessable as the password). It is unset here on purpose so the vault role's
+# random default applies; seeding is seed-only-if-missing, so the live value of
+# an existing cluster does not move. The unused zuno_admin_vault_token went with it.
 
 # ADR-0057: default report format for `make day2|d2 test|stresstest` -
 # text (raw table, always printed regardless) | json | csv. Override
 # per-run with EXTRA_VARS="-e report_format=<fmt>" or REPORT_FORMAT=<fmt>.
 day2_report_format: text
+
+# ADR-0603 M3 (WP-226): certificate verification of the calls Ansible makes to
+# the cluster's own Routes (*.apps.<domain>: Keycloak admin and password
+# grants, the AAP gateway, the component prechecks). Every such `uri` task
+# reads `validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"`.
+# Off by default for one lab-only reason: until ADR-0211's ACME wildcard is
+# issued (zuno_certmanager_acme_enabled, a per-cluster choice), the Routes
+# serve the router's self-signed default certificate, which no control host
+# trusts. demo333's Routes do carry the Let's Encrypt wildcard (checked
+# 2026-11-07: keycloak, aap, rh-ai, grafana verify with the system trust
+# store), so the switch to true is a WP-226 Operator pending step: one run
+# with EXTRA_VARS="-e zuno_validate_route_certs=true", then this default.
+# It lives here, not in ansible/clusters/<cluster>.yml, because most of the
+# roles concerned (aap, aap_config, kagent, dify, openclaw) do not load the
+# cluster file. Calls to in-cluster Services signed by the service CA keep
+# their own reason in place.
+zuno_validate_route_certs: false

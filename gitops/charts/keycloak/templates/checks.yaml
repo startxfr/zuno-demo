@@ -7,3 +7,7 @@
 {{- fail "operator.subscription.operator.source.name must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
 {{- end -}}
 {{- end -}}
+{{- /* ADR-0602 / WP-223: a typo would silently render the demo realm settings. */ -}}
+{{- if not (has .Values.securityProfile (list "demo" "hardened")) -}}
+{{- fail (printf "securityProfile must be demo or hardened, got %q (ADR-0602)" (toString .Values.securityProfile)) -}}
+{{- end -}}

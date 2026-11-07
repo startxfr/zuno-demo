@@ -123,7 +123,7 @@ def test_ovhcloud_candidate_forwards_max_tokens() -> None:
 
 def test_mistral_and_codestral_forward_max_tokens() -> None:
     _reset_maas_env()
-    for name, model_key in (("mistral", "mistral-large-latest"), ("mistral-codestral", "codestral-latest")):
+    for name, model_key in (("mistral", "mistral-large-4"), ("mistral-codestral", "codestral-latest")):
         candidate = ProviderCandidate(name=name, kind="saas")
         with mock.patch("langchain_mistralai.ChatMistralAI") as chat_mistral:
             providers.chat_model_for(candidate, {"model": model_key}, max_tokens=700)

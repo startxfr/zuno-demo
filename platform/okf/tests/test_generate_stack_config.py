@@ -355,5 +355,56 @@ class GuardrailsModesTest(MaasSubscriptionsTest):
         self.assertEqual(gen.build(None, None)["guardrails"], {"minimum_mode_by_classification": {}, "agents": {}})
 
 
+class ClassificationFloorsTest(unittest.TestCase):
+    """ADR-0565 clause 5 (WP-209): one floor per (agent, task), and the drift check covers the file."""
+
+    setUp = GenerateTest.setUp
+    tearDown = GenerateTest.tearDown
+
+    def floors(self):
+        return gen.classification_floors(gen.admit.agents_view(self.dir))
+
+    def test_every_task_carries_its_agents_level(self) -> None:
+        self.assertEqual(self.floors(), {"agents": {
+            "alpha": {"floor": "C2", "tasks": {"one": "C2", "two": "C2"}},
+            "beta": {"floor": "C2", "tasks": {"one": "C2", "two": "C2"}},
+        }})
+
+    def test_render_golden(self) -> None:
+        text = gen.render_classification_floors({"classificationFloors": self.floors()})
+        self.assertTrue(text.startswith(gen.CLASSIFICATION_FLOORS_HEADER))
+        self.assertIn("agents:\n  alpha:\n    floor: C2\n    tasks:\n      one: C2\n      two: C2\n", text)
+
+    def test_an_unknown_or_missing_level_is_refused(self) -> None:
+        for level in ("C7", None):
+            md = self.dir / "agents" / "alpha" / "agent.okf.md"
+            fm = yaml.safe_load(md.read_text().split("---")[1])
+            fm["zuno"]["model"] = {"preferred_classification": level} if level else {}
+            md.write_text("---\n" + yaml.safe_dump(fm) + "---\n")
+            with self.assertRaises(gen.admit.AdmissionError):
+                self.floors()
+
+    def test_no_release_pinned_gives_no_floor(self) -> None:
+        self.assertEqual(gen.build(None, None)["classificationFloors"], {"agents": {}})
+
+    def test_the_drift_check_fails_on_a_stale_floor_file(self) -> None:
+        from unittest import mock
+        out = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out)
+        paths = {name: out / f"{name.lower()}.yaml" for name in (
+            "OUTPUT_PATH", "MAAS_OUTPUT_PATH", "MODEL_ROUTING_OUTPUT_PATH", "GUARDRAILS_OUTPUT_PATH",
+            "CLASSIFICATION_FLOORS_OUTPUT_PATH")}
+        patches = [mock.patch.object(gen, "REPO_ROOT", out)] + [mock.patch.object(gen, k, v) for k, v in paths.items()]
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+        args = ["--release-dir", str(self.dir)]
+        self.assertEqual(gen.main(args), 0)
+        self.assertEqual(gen.main(["--check"] + args), 0)
+        floors = paths["CLASSIFICATION_FLOORS_OUTPUT_PATH"]
+        floors.write_text(floors.read_text().replace("one: C2", "one: C1", 1))
+        self.assertEqual(gen.main(["--check"] + args), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

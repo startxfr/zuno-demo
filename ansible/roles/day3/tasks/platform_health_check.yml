@@ -2,7 +2,7 @@
 # ADR-0057 decision 5 ("platform" component): ai-gateway and
 # mcp-gateway have no OpenShift Route - only in-cluster
 # Service DNS - so this runs as a lightweight in-cluster Job, modeled on
-# ansible/roles/vault/tasks/install.yml's unseal-configure Job
+# ansible/roles/vault/tasks/run_configure_job.yml's configure Job
 # (delete-then-recreate, inline spec, simple succeeded/failed polling)
 # rather than ansible/roles/agents/tasks/run_acceptance_gate.yml's
 # heavier ConfigMap-bundled pattern - this Job needs no bundled Python

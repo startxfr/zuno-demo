@@ -5,7 +5,8 @@
 # --api-version=policy.sigstore.dev/v1alpha1`, 2026-09-02) is the actual
 # enforcement lever ADR-0535 authorizes; `enforce` (reject) is a
 # deliberate, separate, later decision - this ADR authorizes only
-# observe/verify/audit. keyless identity matches the zuno-signer Fulcio
+# observe/verify/audit. ADR-0603 clause 4 (WP-226) authorizes the switch to
+# enforce after a warn dry run; the mode is now a value. keyless identity matches the zuno-signer Fulcio
 # certificate WP-110/WP-111 established (gitops/charts/rhtas's
 # fulcio.oidc block) exactly.
 #
@@ -28,7 +29,14 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
 spec:
-  mode: warn
+  # ADR-0603 M17 (WP-226): warn by default; enforce is a value flip
+  # (policyOperand.clusterImagePolicy.mode), rehearsed on a test namespace
+  # first - see the values file and WP-226's Operator pending steps.
+  {{- $mode := .Values.policyOperand.clusterImagePolicy.mode | default "warn" }}
+  {{- if not (has $mode (list "warn" "enforce")) }}
+  {{- fail (printf "policyOperand.clusterImagePolicy.mode must be warn or enforce, not %q" $mode) }}
+  {{- end }}
+  mode: {{ $mode }}
   images:
     - glob: {{ .Values.policyOperand.clusterImagePolicy.imageGlob | quote }}
   authorities:

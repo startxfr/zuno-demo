@@ -79,6 +79,20 @@ acme:
 # -d1 apply; clusterissuer.yaml renders nothing until it's set.
 vaultServiceName: ""
 
+# ADR-0602 clause 1 / WP-223: base64 PEM of the OpenShift service CA that
+# signs Vault's listener certificate, set by ansible (ansible/roles/cert_manager) via
+# gitops_app_extra_helm_values from ansible/tasks/resolve_vault_ca_bundle.yml.
+# Empty renders the ClusterIssuer without caBundle (https against the
+# system trust store), which fails verification - loudly, on the issuer's
+# Ready condition - rather than falling back to http.
+vaultCaBundle: ""
+
+# ADR-0602/WP-223: this namespace's own SecretStore (templates/secretstore.yaml)
+# reaches Vault over https with the service-ca bundle, like every other store
+# (gitops/charts/external-secrets secretStores.tls).
+secretStore:
+  tls: true
+
 # ASSUMPTION: not yet verified against a live cluster. If this is wrong,
 # discover the real package/channel/catalog from the cluster's PackageManifest
 # at runtime.

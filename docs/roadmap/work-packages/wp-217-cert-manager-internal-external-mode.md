@@ -1,6 +1,6 @@
 # WP-217: cert-manager internal/external mode
 
-- **State:** Not started
+- **State:** Done (2026-11-07) - external mode built and rehearsed live on demo333, both ways (see "Delivered (2026-11-07)")
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)
@@ -27,3 +27,27 @@
 
 - Internal mode renders and behaves exactly as before (no diff on a nominal cluster).
 - External mode runs the consumers unchanged against the external endpoint, with the data intact both ways, and `make d1 check` is green in both modes.
+
+## Delivered (2026-11-07)
+
+Tier A-operator contract of ADR-0352 (clauses 2, 4, 7): the mode key is the whole schema, no `_external_*` payload.
+
+- `ansible/roles/cert_manager/tasks/mode.yml` resolves `zuno_cert_manager_mode` from `confidential.yml` (absent = internal) and is included by
+  install, precheck and uninstall (symmetric gating, clause 4).
+- External mode: `zuno-cert-manager-d0` (the OLM Subscription, CertManager CR) is not applied; the shared
+  `ansible/tasks/assert_unmanaged_operator.yml` asserts the CRDs, a `Succeeded` CSV and the Ready controller instead,
+  failing fast in install and record-only in precheck. `-d1` stays ours in both modes. Uninstall removes `-d1` only.
+- `ansible/confidential.example.yml` carries the key; the role README has an "External mode" section with the
+  unmanaged-install document and the flip procedure (a migration event: hand the Subscription over by deleting `-d0`
+  without cascade).
+
+Live rehearsal on demo333, with the user's go: `day0_install` external then internal, `day0_check` after each.
+`changed=0` on every pass, the `-d0` apply skipped in external mode and re-applied in internal mode, `cert-manager is
+installed` in all four states, `zuno-cert-manager-d0`/`-d1` Synced/Healthy at the end. After every pass: `vault-issuer-istio` and
+`vault-issuer` Ready, istio-csr 2/2, ExternalSecrets 99/100 (the known `zuno-rhtas/rhtas-trillian-db`), 19/19 `vault`
+SecretStores Ready, 11/11 Certificates Ready. A negative run of the assertion (missing CRD, CSV and
+controller) reported all three and failed install with the expected message.
+
+Not done, on purpose: no live uninstall (the external path removes `-d1` only; proven by reading, not run on the
+cluster, where a mistake would remove a cluster-wide operator), and no orphaning of `-d0` (the real migration). The
+clause-10 Day-1 vital gate is not built for any component yet; this role's functional assertion passes in both modes.

@@ -1,10 +1,6 @@
 # ADR-0541: Integrate mistral and gpt-oss-120b as MaaS ExternalModels
 
-- **Status:** Proposed - blocked on a RHOAI `payload-processing` ext_proc
-  plugin defect that rejects every `ExternalModel` request as a "model
-  mismatch" (root-caused 2026-09-03, see Decision 1); the
-  originally-diagnosed Gateway-attachment defect is confirmed fixed
-  on RHOAI 3.5.0 GA (re-verified 2026-09-03, see Decision 1)
+- **Status:** Implemented (2026-11-07, WP-125: real completions through both `MaaSModelRef`s on RHOAI 3.6.0-ea.2; the ai-gateway cutover off the direct calls and the Finage negative test are carried by WP-219 under ADR-0570; the per-group quota criterion is moot since WP-157 subscribes only the ai-gateway)
 - **Target:** v0.7
 - **Date:** 2026-09-03 (extracted from ADR-0537, originally proposed
   2026-09-01; route-identity finding confirmed 2026-09-02, re-tested and
@@ -507,3 +503,19 @@ considered, Migration/evolution and Review evidence.
 - [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md)
   - the sibling ADR this one was split from 2026-09-03: the `HardwareProfile`
     decisions from the same diagnostic session, `Implemented`.
+
+## Update (2026-11-07) - Implemented on RHOAI 3.6.0-ea.2
+
+The `payload-processing` "model mismatch" of 3.5 is gone. Two things stood between the routes and a real completion,
+both fixed in the repository: the plugin's `apikey-injection` store only loads Secrets labelled
+`inference.llm-d.ai/ipp-managed` (now set by the ExternalSecret template of `gitops/charts/models`), and the Mistral
+account refuses `mistral-large-latest` (`tier_not_allowed`), so both paths use `mistral-large-4`. Evidence is in WP-125.
+
+Acceptance criteria, as they stand:
+
+- Real completion through each `MaaSModelRef`, Secret key `api-key`: **met** (both 200).
+- Finage denied `gpt-oss-120b` after cutover: **moved to WP-219** (it needs the ai-gateway cutover first; until then
+  Finage's exclusion is enforced by the ai-gateway, which still calls the provider directly).
+- Per-persona-group quota: **moot**. Since WP-157 (`maas.saasSubscriptions.gatewayOnly`) only the ai-gateway
+  ServiceAccount is subscribed to these two models, and the per-user ceilings stay in the ai-gateway (ADR-0570).
+- The direct-call branches in `providers.py` stay until WP-219's cutover.

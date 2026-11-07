@@ -117,6 +117,7 @@ jobs:
             gitops/charts/models/values.agents.generated.yaml
             gitops/charts/ai-gateway/files/model-routing.generated.yaml
             gitops/charts/ai-gateway/files/guardrails-modes.generated.yaml
+            gitops/charts/ai-gateway/files/classification-floors.generated.yaml
             gitops/charts/connectivity-link/templates/quota-ratelimitpolicies.yaml
             gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml
             components/ai-gateway/app/quota_budgets.yaml

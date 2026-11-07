@@ -436,7 +436,7 @@
         url: "https://{{ _mlops_dspa_route.resources[0].spec.host }}/apis/v2beta1/pipelines"
         headers:
           Authorization: "Bearer {{ _mlops_oc_token.stdout | trim }}"
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: [200]
         return_content: true
       register: _mlops_pipelines_list

@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "10"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "zuno-token-proxy.imageTrigger" . }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -19,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: zuno-token-proxy
+      {{- with include "zuno-token-proxy.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: zuno-token-proxy
       automountServiceAccountToken: false
@@ -28,8 +35,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: zuno-token-proxy
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "zuno-token-proxy.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "zuno-token-proxy.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

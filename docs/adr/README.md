@@ -74,6 +74,12 @@ ADR-0541 was the sole gap in the 05xx band and has since been taken (see the
 Renumbered records carry a `Renumbered:` line; a published ADR is never
 renumbered to close a cosmetic gap.
 
+A new number is reserved before the file is written: take the next free
+number from `origin` and every local branch, and tell every live working
+session (ADR-0606 clause 5, [parallel sessions](../platform/parallel-sessions.md)).
+`check_docs.py` fails when two files share a number. New records start from
+[TEMPLATE.md](TEMPLATE.md).
+
 ### Stub records
 
 Four rows marked *(stub)* have no file of their own: their text lives in
@@ -265,7 +271,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Implemented | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
 | [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Implemented | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
 | [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Superseded in part by ADR-0567 | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
-| [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Proposed | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
+| [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Implemented | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
 | [ADR-0542](0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md) | Implemented | Autoscale a served model through LLMInferenceService spec.scaling |
 | [ADR-0545](0545-scope-remaining-rhoai-kubeflow-component-adoption.md) | Implemented | Scope the remaining RHOAI/Kubeflow component adoption - finalize TrainJob, explore Kueue priority, evaluate InferenceGraph, exclude NIM |
 
@@ -300,7 +306,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Implemented | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
 | [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Implemented | Introduce agent-to-agent delegation limited to the targets an agent declares |
-| [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
+| [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Implemented | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
 | [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
 | [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Implemented | Introduce human approval for delegated operations, resumable from persisted checkpoints |
@@ -364,18 +370,28 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
-| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
-| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Implemented | Derive data classification from OKF and only allow raising it |
+| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Accepted | Gate every live demo on a golden-path check and a freeze window |
 
 ## v0.16
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0110](0110-automate-document-acl-synchronization.md) | Partially implemented | Automate document ACL synchronization |
+| [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
+| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0604](0604-introduce-an-interactive-generative-world-model-experience.md) | Accepted | Introduce an interactive generative world-model experience on OpenShift AI and NVIDIA Blackwell |
+| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Accepted | Admit new experiences with a definition of done and a WIP limit |
+| [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Accepted | Pin, gate and schedule pre-GA dependencies |
+| [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Accepted | Keep the repository the only source of cluster state |
+| [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Accepted | Rehearse on canary namespaces of demo333 |
+
+## v0.17
+
+| ADR | Status | Decision |
+|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
-| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 
 ## OKF v0.1
@@ -408,6 +424,7 @@ part of its decision is still in force.
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Superseded by ADR-0568 | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
+| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | v0.16 | Deprecated | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Superseded by ADR-0218 and ADR-0568 | Automate source-specific knowledge ingestion |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |

@@ -357,7 +357,9 @@ def chat_model_via_maas(
     if ca_bundle:
         import httpx
 
-        http_async_client = httpx.AsyncClient(verify=ca_bundle)
+        from app.tls import verify_for
+
+        http_async_client = httpx.AsyncClient(verify=verify_for(ca_bundle))
 
     from app.reasoning import with_reasoning
 

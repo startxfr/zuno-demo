@@ -36,3 +36,17 @@ added for them into `zuno-ai-run`.
 
 See `platform/architecture/agent-platform-separation.md` for the full
 platform-vs-instance split this chart is one half of.
+
+## Targeted mTLS and egress (ADR-0602 / WP-224)
+
+`templates/peerauthentication-namespace.yaml` renders, for an entry with
+`peerAuthentication` (zuno-data, zuno-auth, zuno-ai-run only), a namespace-wide
+`default` PeerAuthentication in `mode` (PERMISSIVE until the live rehearsal,
+then STRICT: a one-line flip) and one workload-scoped PeerAuthentication per
+exception, opening only the listed container ports to plaintext for a named
+non-mesh caller (`reason:`, rendered as the `zuno.io/permissive-reason`
+annotation). `templates/egressfirewall-namespace.yaml` renders the deny-all
+EgressFirewall of an entry with `egressFirewall` (zuno-ai-run), from its host
+list, once the d1 Application passes `clusterBaseDomain`. zuno-unifai's
+EgressFirewall lives in `gitops/charts/unifai`, like the other experience
+charts (ADR-0590). `platform/security/check_mesh_mtls.py` guards both.

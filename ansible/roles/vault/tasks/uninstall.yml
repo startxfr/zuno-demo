@@ -1,16 +1,18 @@
 ---
 # Reverse of install.yml: removes -d1 (real content) then -d0 (no-op), then
-# destroys the PVC-backed Vault data and vault-bootstrap-credentials -
-# unlike every other role's uninstall in this repo, this one is a genuine,
-# irreversible wipe (2026-08-26 decision, reversing this role's prior
-# "never clean up data" stance). Vault's storage backend is `file`
-# (gitops/charts/vault/values.yaml's standalone.config), so deleting this
-# one PVC destroys every secret the whole platform seeds via `vault kv
-# put` - not just the Transit signing key - with no undo short of
-# reinstalling every component that seeds Vault. Deleting the PVC is also
-# what makes "the Transit key is removed from vault" a real event (no
-# separate `vault delete transit/keys/...` call needed - the whole
-# file-backed store is gone).
+# destroys the PVC-backed Vault data - unlike every other role's uninstall
+# in this repo, this one is a genuine, irreversible wipe (2026-08-26
+# decision, reversing this role's prior "never clean up data" stance).
+# Deleting the data PVC destroys every secret the whole platform seeds via
+# `vault kv put` - not just the Transit signing key - with no undo short of
+# restoring a raft snapshot (which also needs the same KMS key) or
+# reinstalling every component that seeds Vault.
+#
+# ADR-0602 clause 1 / WP-223: the raft snapshot PVC goes with the -d1
+# Application (it is a chart resource); the recovery file on the Ansible
+# controller and the AWS KMS key are deliberately left alone - neither is a
+# cluster object, and deleting the KMS key would make every snapshot of
+# this Vault unrecoverable.
 - name: "vault | delete the vault ArgoCD Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
@@ -28,9 +30,16 @@
     namespace: zuno-vault
     name: data-zuno-vault-0
 
-- name: "vault | delete the bootstrap credentials Secret (root token + unseal key)"
+# vault-bootstrap-credentials only exists on a Vault initialized before
+# WP-223 that was never migrated; deleting an absent Secret is a no-op.
+- name: "vault | delete the KMS credentials and any pre-WP-223 bootstrap Secret"
   kubernetes.core.k8s:
     state: absent
     kind: Secret
     namespace: zuno-vault
-    name: vault-bootstrap-credentials
+    name: "{{ _vault_uninstall_secret }}"
+  loop:
+    - vault-aws-kms
+    - vault-bootstrap-credentials
+  loop_control:
+    loop_var: _vault_uninstall_secret

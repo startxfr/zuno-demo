@@ -62,6 +62,16 @@ first path and never needs anything below this note.
    make day3|d3 release TAG=v0.2.0
    ```
 
+   **Rendering the digests (ADR-0603 M16, WP-226), opt-in.** The ledger is
+   what was built and signed; `RENDER_DIGESTS=1` (or
+   `platform/supply-chain/render_release_digests.py --release <tag>` after
+   the release) writes those digests into the charts' `digest` keys, so the
+   Deployments run `repository@sha256:...` with `IfNotPresent` and no
+   `:latest` trigger. Merged to `main`, that pins what ArgoCD deploys and
+   stops ADR-0059's auto-redeploy for those components until `--clear`. It
+   is a deployment decision: it needs the user's go for that release, like
+   every pin. A chart whose `digest` is empty renders exactly as before.
+
 This project has never cut a path-2 release: every GitOps `Application`
 (`gitops/apps/*/application.yaml`, `gitops/root-app-of-apps.yaml`) still
 tracks `targetRevision: main`. ADR-0115 wants that replaced with an
@@ -97,8 +107,11 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
   [implementation-roadmap.md](docs/roadmap/implementation-roadmap.md). The earlier tags were milestones of their band and
   were cut with a gap or two still named (v0.1 still lists ADR-0110, v0.2 WP-098), so a tagged band may carry a named
   exception, written in the tag message and in versions.md.
-- **Where.** On `main`, on the commit where the band closed. Never on `devel`. `main` is what ArgoCD deploys to demo333, so a
-  tag names something that ran.
+- **Where.** On `main`, on the commit where the band closed. Never on `devel`. The Applications are applied with
+  `zuno_gitops_target_revision` (`ansible/tasks/apply_gitops_app.yml`), which is `devel` on demo333 although the manifests
+  default to `main`: a push to `devel` is a deployment to demo333, and `main` is promoted from a `devel` commit that already
+  ran there, so a tag names something that ran. Before a live demonstration, promote the commit the golden-path check
+  passed on (ADR-0605).
 - **How.** An annotated tag: `git tag -a v0.X.0 <commit> -m "v0.X.0: <what the band delivered>"`, then
   `git push origin v0.X.0`. A tag push starts no workflow: `build-publish.yml` is manual-only (path 2 above).
 - **Patch tags.** `v0.X.1` for a fix on the band after its tag, as `v0.1.1` was.

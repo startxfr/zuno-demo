@@ -128,9 +128,10 @@
           zuno.io/managed-by: zuno-ansible
       spec:
         refreshInterval: 1m
+        # ADR-0602/WP-223: this namespace's own SecretStore, which reads only the keys platform/vault/secret-access.yaml grants it.
         secretStoreRef:
-          name: vault-backend
-          kind: ClusterSecretStore
+          name: vault
+          kind: SecretStore
         target:
           name: rhtas-trillian-schema-db
         data:

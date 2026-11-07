@@ -62,7 +62,7 @@
     url: "https://{{ _oc_front_route[0].spec.host }}/"
     follow_redirects: none
     status_code: [302]
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   register: _oc_front
 
 - name: "openclaw | assert the redirect goes to the zuno realm ({{ _oc_ns }})"

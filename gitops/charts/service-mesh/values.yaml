@@ -19,6 +19,14 @@ istio:
 # -d1 apply; clusterissuer-istio.yaml renders nothing until it's set.
 vaultServiceName: ""
 
+# ADR-0602 clause 1 / WP-223: base64 PEM of the OpenShift service CA that
+# signs Vault's listener certificate, set by ansible (ansible/roles/service_mesh) via
+# gitops_app_extra_helm_values from ansible/tasks/resolve_vault_ca_bundle.yml.
+# Empty renders the ClusterIssuer without caBundle (https against the
+# system trust store), which fails verification - loudly, on the issuer's
+# Ready condition - rather than falling back to http.
+vaultCaBundle: ""
+
 istioVersion: v1.30.3
 meshNamespace: zuno-mesh
 

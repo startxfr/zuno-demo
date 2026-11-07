@@ -1,0 +1,86 @@
+{{- if and .Values.maasGateway.enabled .Values.maasGateway.portalDashboardRoute.enabled }}
+# 2026-11-07 (demo333, RHOAI 3.6.0-ea.2): the RHOAI dashboard answered 404 at
+# https://rh-ai.<apps domain>/, and so did /mlflow and /catalog/. Same cause as
+# zuno-portal-genai and zuno-portal-oauth-callback: the MaaS consumer portal's own
+# HTTPRoute (operator-owned, hostnames: rh-ai.<domain>) gives that host its own
+# Istio virtual host, and the vendor routes rhods-dashboard, mlflow and
+# model-catalog carry NO hostname, so Istio no longer serves them there. Same
+# remedy: copy their rules, unchanged, onto that hostname. Additive: the vendor
+# objects are untouched. Longer prefixes (/gen-ai, /maas-consumer-portal,
+# /oauth2) still win over "/". Authentication is the gateway's, as for every
+# other path on this host. Keep the rules in step with the vendor routes after
+# an RHOAI upgrade.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zuno-portal-dashboard
+  namespace: redhat-ods-applications
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: data-science-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - rh-ai.{{ .Values.maasGateway.clusterBaseDomain }}
+  rules:
+    # vendor route rhods-dashboard
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: rhods-dashboard
+          port: 8443
+          weight: 1
+    # vendor route mlflow
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mlflow/v1
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: mlflow
+          port: 8443
+          weight: 1
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mlflow
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: mlflow
+          port: 8443
+          weight: 1
+    # vendor route model-catalog (backend in rhoai-model-registries, allowed by the
+    # vendor's own ReferenceGrant for the model-catalog route)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /catalog/
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: model-catalog
+          namespace: rhoai-model-registries
+          port: 8443
+          weight: 1
+{{- end }}

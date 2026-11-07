@@ -1,8 +1,12 @@
 ---
 # Root App-of-Apps, for manual pure-GitOps bootstrap only - not applied by
 # any Ansible task. Each component's Application is applied by its own role.
-# Requires the "zuno" AppProject to already exist (apply
-# ansible/roles/argocd/kustomize/appproject/appproject.yaml by hand first).
+# Requires the zuno-bootstrap, zuno-platform and zuno-apps AppProjects to
+# already exist (apply ansible/roles/argocd/kustomize/appproject/ by hand
+# first: `oc apply -k`). ADR-0602 clause 5 / WP-224: this Application lives
+# in zuno-bootstrap, which may only create Application objects in
+# openshift-gitops; each child names its own project, which bounds what it
+# renders.
 # Components are auto-discovered by recursing gitops/apps/*/application-*.yaml -
 # see gitops/apps/README.md for the current component list, nothing to add here.
 apiVersion: argoproj.io/v1alpha1
@@ -13,7 +17,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: zuno
+  project: zuno-bootstrap
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -23,10 +27,13 @@ spec:
       include: "*/applicatio*.yaml"
   destination:
     server: https://kubernetes.default.svc
+    namespace: openshift-gitops
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      # openshift-gitops exists (the operator creates it); zuno-bootstrap
+      # may not create a Namespace.
+      - CreateNamespace=false
       - ServerSideApply=true

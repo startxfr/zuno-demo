@@ -10,7 +10,7 @@ FROM ${BASE_IMAGE}
 # at build time - apt upgrade picks up Debian's patched util-linux/bsdutils
 # (CVE-2026-53615), pip upgrade picks up patched pip/setuptools/wheel.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel
+    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
 
 WORKDIR /app
 COPY requirements.txt .

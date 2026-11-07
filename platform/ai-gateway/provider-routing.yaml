@@ -407,7 +407,7 @@ providers:
   - name: mistral
     kind: saas
     role: general-external
-    model: mistral-large-latest
+    model: mistral-large-4
     api_key_env: MISTRAL_API_KEY
     temperature: 0.2
     eligible_for: [C1]

@@ -8,10 +8,17 @@
 # values.yaml) because vault/redis need their mirrored images before Day 1
 # build ever runs apply_openshift_build.yml.
 #
-# The two digest-pinned images (ubi9-ubi-minimal, odh-kserve-storage-
-# initializer-rhel9) use importPolicy.scheduled: false so the mirror never
-# silently drifts from the pinned digest - ADR-0051's intent, extended to
-# the mirror itself. quay.io/modh/vllm is intentionally not mirrored here:
+# The digest-pinned images use importPolicy.scheduled: false so the mirror
+# never silently drifts from the pinned digest - ADR-0051's intent, extended
+# to the mirror itself. ADR-0603 M16 (WP-226) added the base images every
+# first-party Dockerfile builds FROM (python 3.11/3.12-slim, node 20-alpine,
+# ubi9 python-311): a build is reproducible only if its base is. Refresh
+# routine (the security fixes of a base image now arrive only through it):
+#   skopeo inspect --raw docker://docker.io/library/python:3.11-slim | sha256sum
+# then write the new digest here AND in .github/workflows/build-publish.yml's
+# BASE_IMAGE build_args, in one commit. The other mirrors (golang, vault,
+# kubectl, redis, postgres, distroless) feed no first-party build and stay on
+# their scheduled tag import. quay.io/modh/vllm is intentionally not mirrored here:
 # ADR-0048 has Ansible discover and override the real serving image from the
 # live OpenShift AI catalog at apply time, so the static values.yaml
 # fallback is never what's actually deployed.
@@ -38,18 +45,21 @@
     - name: node
       tags:
         - name: "20-alpine"
-          from: {kind: DockerImage, name: "docker.io/library/node:20-alpine"}
-          importPolicy: {scheduled: true}
+          # ADR-0603 M16: docker.io/library/node:20-alpine, digest resolved 2026-11-07.
+          from: {kind: DockerImage, name: "docker.io/library/node@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293"}
+          importPolicy: {scheduled: false}
           referencePolicy: {type: Local}
     - name: python
       tags:
         - name: "3.11-slim"
-          from: {kind: DockerImage, name: "docker.io/library/python:3.11-slim"}
-          importPolicy: {scheduled: true}
+          # ADR-0603 M16: docker.io/library/python:3.11-slim, digest resolved 2026-11-07.
+          from: {kind: DockerImage, name: "docker.io/library/python@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79"}
+          importPolicy: {scheduled: false}
           referencePolicy: {type: Local}
         - name: "3.12-slim"
-          from: {kind: DockerImage, name: "docker.io/library/python:3.12-slim"}
-          importPolicy: {scheduled: true}
+          # ADR-0603 M16: docker.io/library/python:3.12-slim, digest resolved 2026-11-07.
+          from: {kind: DockerImage, name: "docker.io/library/python@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54"}
+          importPolicy: {scheduled: false}
           referencePolicy: {type: Local}
     - name: ubi9-ubi-minimal
       tags:
@@ -62,8 +72,9 @@
     - name: ubi9-python-311
       tags:
         - name: latest
-          from: {kind: DockerImage, name: "registry.access.redhat.com/ubi9/python-311:latest"}
-          importPolicy: {scheduled: true}
+          # ADR-0603 M16: registry.access.redhat.com/ubi9/python-311:latest, digest resolved 2026-11-07.
+          from: {kind: DockerImage, name: "registry.access.redhat.com/ubi9/python-311@sha256:a0bdb55576fc5b8d6704279307817828ef027e1065533ceba133fe9516003a6c"}
+          importPolicy: {scheduled: false}
           referencePolicy: {type: Local}
     - name: distroless-static
       tags:

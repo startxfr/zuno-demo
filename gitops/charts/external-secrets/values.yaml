@@ -1,7 +1,7 @@
 # operator.enabled renders the Subscription, via the vendored startx
 # `operator` chart (into openshift-operators, AllNamespaces - no
 # OperatorGroup here, relies on OLM's own pre-existing global-operators
-# OperatorGroup there). clusterSecretStore.enabled renders the operand.
+# OperatorGroup there). secretStores.enabled renders the operand (per-namespace SecretStores, ADR-0602).
 # Both default false; each ArgoCD Application sets one.
 #
 # subscription.operator.channel/source.name are left empty by default,
@@ -31,11 +31,48 @@ operator:
         name: ""
         namespace: openshift-marketplace
 
-clusterSecretStore:
+# ADR-0602 clause 2 / WP-223: one SecretStore `vault` (plus its ServiceAccount
+# vault-reader) per namespace, replacing the ClusterSecretStore vault-backend.
+# Rendered by the d1 apply only (secretStores.enabled + vaultServiceName).
+#
+# `namespaces` is the subset of platform/vault/secret-access.yaml whose
+# namespace exists before this d1 Application syncs (created by
+# gitops/charts/namespaces at d0, or built into OpenShift). Kept as a copy
+# rather than read from that file because a Helm chart cannot read outside its
+# own directory, and ArgoCD renders the chart from git with no Ansible in the
+# loop; platform/vault/check_secret_access.py fails if a table namespace ends
+# up with no store or two, so the copy cannot silently drift. The namespaces a
+# later chart creates are deliberately absent (cert-manager: its chart, after
+# its Namespace; zuno-claw-*: gitops/charts/openclaw): ArgoCD dry-runs every
+# resource first, so one store in a missing namespace would block them all.
+secretStores:
   enabled: false
+  name: vault
+  serviceAccountName: vault-reader
+  # https + the service-ca bundle (ADR-0602 clause 1, Vault listener TLS).
+  tls: true
+  namespaces:
+    - openshift-config
+    - openshift-lightspeed
+    - redhat-ods-applications
+    - redhat-ods-monitoring
+    - zuno-aap
+    - zuno-ai-build
+    - zuno-ai-run
+    - zuno-auth
+    - zuno-data
+    - zuno-dify
+    - zuno-kagent
+    - zuno-mlops
+    - zuno-monitoring
+    - zuno-openwebui
+    - zuno-rhtas
+    - zuno-unifai
 operatorconfig:
   enabled: false
 
 # vaultServiceName is only set on the -d1 apply, after Vault sets up the
-# Kubernetes auth method + eso-reader role it depends on.
+# Kubernetes auth method and the per-namespace ns-<namespace> roles the stores
+# depend on (ADR-0602/WP-223).
 vaultServiceName: ""
+vaultNamespace: zuno-vault

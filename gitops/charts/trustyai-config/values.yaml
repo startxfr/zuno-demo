@@ -174,6 +174,12 @@ garakSecurity:
 evalHub:
   enabled: true
   name: zuno-evalhub
+  # RHOAI 3.6 (WP-115, 2026-11-07): who may use the Evaluations page against this
+  # EvalHub. The vendor grants evalhubs read only in redhat-ods-applications, and
+  # admin/edit aggregate none of the TrustyAI resources (templates/evalhub-user-rbac.yaml).
+  userGroups:
+    - ocp-ai-ops
+    - ocp-ai-dev
   # Must match the operator ConfigMaps' evalhub-collection-name /
   # evalhub-provider-name labels in redhat-ods-applications (live-checked
   # 2026-09-02; full sets: 8 collections, 6 providers).
@@ -190,6 +196,10 @@ evalHub:
 # (/api/sources/query.bearer), judged by the local qwen3.6 model. Image built
 # in-cluster (`make d2 build trustyai-eval`, components/trustyai-eval) -
 # no vendor RAGAS image exists in this release train (WP-108 finding).
+# Substituted per cluster by ansible/tasks/apply_gitops_app.yml (the
+# Application's values carry the placeholder). Only feeds the Keycloak
+# token URL default of ragasEval.
+clusterBaseDomain: apps.mycluster.example.com
 ragasEval:
   enabled: true
   image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/trustyai-eval:latest
@@ -197,7 +207,13 @@ ragasEval:
   # persona, signed in through the zuno-evaluations Keycloak client.
   unifaiRagUrl: http://unifai-rag-server.zuno-unifai.svc:13456
   ragTag: knowledge.tech
-  keycloakTokenUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/token
+  # Empty means "https://keycloak.<clusterBaseDomain>/realms/zuno/protocol/
+  # openid-connect/token" (ADR-0602 clause 6 / WP-224): the public HTTPS
+  # Route (Let's Encrypt). A token minted over the plain-HTTP in-cluster
+  # Service (http://zuno-service.zuno-auth.svc:8080) carries
+  # iss=http://zuno-service..., which every consumer pinned on the https
+  # issuer refuses - and it sends the persona password unencrypted.
+  keycloakTokenUrl: ""
   judgeBaseUrl: http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
   judgeModel: qwen3.6-27b-instruct
   # Retrieval quality must be measured as a realistic caller, not an

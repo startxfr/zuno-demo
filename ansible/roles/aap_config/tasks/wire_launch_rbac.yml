@@ -65,7 +65,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_launch_rbac_org_gw
   no_log: true
@@ -79,7 +79,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_team_lookup
   no_log: true
@@ -91,7 +91,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: "{{ aap_config_ops_team_name | default('aap-ops-team') }}"
@@ -108,7 +108,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_team_ctrl
   until: (_aap_config_ops_team_ctrl.json.count | default(0) | int) > 0
@@ -123,7 +123,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_reader_team_lookup
   no_log: true
@@ -135,7 +135,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: "{{ aap_config_reader_team_name | default('aap-reader-team') }}"
@@ -152,7 +152,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_reader_team_ctrl
   until: (_aap_config_reader_team_ctrl.json.count | default(0) | int) > 0
@@ -175,7 +175,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_jt_role_lookup
   no_log: true
@@ -187,7 +187,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-ops-jobtemplate-executor
@@ -206,7 +206,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_reader_jt_role_lookup
   no_log: true
@@ -218,7 +218,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-reader-jobtemplate-viewer
@@ -237,7 +237,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_wjt_role_lookup
   no_log: true
@@ -249,7 +249,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-ops-workflowjobtemplate-executor
@@ -278,7 +278,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_wjt_approver_role_lookup
   no_log: true
@@ -290,7 +290,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-ops-workflowjobtemplate-approver
@@ -316,7 +316,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_reader_wjt_role_lookup
   no_log: true
@@ -328,7 +328,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-reader-workflowjobtemplate-viewer
@@ -347,7 +347,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ops_proj_role_lookup
   no_log: true
@@ -359,7 +359,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-ops-project-syncer
@@ -378,7 +378,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_reader_proj_role_lookup
   no_log: true
@@ -390,7 +390,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: aap-reader-project-viewer
@@ -447,7 +447,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_gated_jt_lookup
   loop: "{{ aap_config_job_templates | selectattr('gated', 'defined') | selectattr('gated') | list }}"
@@ -470,7 +470,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_gated_wjt_lookup
   loop: "{{ aap_config_workflow_templates | selectattr('gated', 'defined') | selectattr('gated') | list }}"
@@ -499,7 +499,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ungated_jt_lookup
   loop: "{{ aap_config_job_templates | rejectattr('gated', 'defined') | list }}"
@@ -522,7 +522,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_ungated_wjt_lookup
   loop: "{{ aap_config_workflow_templates | rejectattr('gated', 'defined') | list }}"

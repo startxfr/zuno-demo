@@ -1,0 +1,36 @@
+---
+# Restart one StatefulSet pod and wait for its replacement.
+# `k8s state: absent wait: true` never returns here: the StatefulSet recreates
+# a pod with the same name at once, so "gone" is never observed (found live
+# 2026-11-07, WP-223 migration). Wait for a different UID instead.
+# Vars: vault_migrate_namespace, vault_migrate_pod.
+- name: "restart pod | read the current pod UID"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ vault_migrate_namespace }}"
+    name: "{{ vault_migrate_pod }}"
+  register: _vrp_before
+
+- name: "restart pod | delete the pod"
+  kubernetes.core.k8s:
+    state: absent
+    kind: Pod
+    namespace: "{{ vault_migrate_namespace }}"
+    name: "{{ vault_migrate_pod }}"
+    wait: false
+
+- name: "restart pod | wait for a replacement pod with a new UID and a running vault container"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ vault_migrate_namespace }}"
+    name: "{{ vault_migrate_pod }}"
+  register: _vrp_after
+  until: >-
+    (_vrp_after.resources | length) > 0
+    and (_vrp_before.resources | length == 0
+         or _vrp_after.resources[0].metadata.uid != _vrp_before.resources[0].metadata.uid)
+    and (_vrp_after.resources[0].metadata.deletionTimestamp is not defined)
+    and ((_vrp_after.resources[0].status.containerStatuses | default([])
+          | selectattr('name', 'equalto', 'vault') | selectattr('state.running', 'defined') | list | length) > 0)
+  retries: 60
+  delay: 5

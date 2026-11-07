@@ -1,9 +1,8 @@
 # WP-125: mistral and gpt-oss-120b as ExternalModel/MaaSModelRef
 
-- **State:** Repo work merged (blocked upstream - `payload-processing`
-  ext_proc plugin defect, root-caused 2026-09-03 - see Phase 1 result
-  below)
-- **ADRs:** ADR-0541 (Proposed - blocked upstream)
+- **State:** Done (2026-11-07 - real completions through both `MaaSModelRef`s on RHOAI 3.6.0-ea.2,
+  see "Live verification (2026-11-07)" below; the ai-gateway cutover and the Finage test go to WP-219)
+- **ADRs:** ADR-0541 (Implemented 2026-11-07)
 - **Depends on:** WP-27/ADR-0201 (MaaS governance plane live), WP-076/ADR-0521
   (per-group `MaaSSubscription` pattern this WP reuses); split from WP-106
   2026-09-03 (see that brief's "Related work")
@@ -203,3 +202,30 @@ one for these two providers.
 - Relaxing or patching the `credentialRef` key-name requirement upstream -
   the mirror-Secret approach is a repo-side workaround, not a fix to RHOAI
   itself.
+
+## Live verification (2026-11-07, demo333, RHOAI 3.6.0-ea.2)
+
+The 3.5 "model mismatch" rejection is gone on 3.6. Two new findings, both fixed:
+
+1. **`payload-processing` ignored our credentials.** Every call answered `500 inference error: Internal - authType
+   'apikey' credentials not found`. The plugin's `apikey-injection` Secret watcher only loads Secrets labelled
+   `inference.llm-d.ai/ipp-managed` (key read from its binary, then confirmed by its log line "Secret added/updated in
+   store" seconds after labelling). Fix: `gitops/charts/models/templates/externalmodel.yaml` puts the label on the
+   ExternalSecret target template (`mergePolicy: Merge`), so ESO keeps it.
+2. **`mistral-large-latest` is refused by the Mistral account** (`403 tier_not_allowed`, code 1910), on the direct path
+   too: the same key is behind `llm-provider-mistral`. The key's catalogue no longer lists it; `mistral-large-4` answers.
+   Fix: `targetModel` in `gitops/charts/models/values.yaml` and `model:` of the `mistral` provider in
+   `platform/ai-gateway/provider-routing.yaml` (plus the code default in `providers.py`) move to `mistral-large-4`.
+
+Evidence, `chat/completions` with `max_tokens: 5`, ai-gateway ServiceAccount token (the only subscriber,
+`maas.saasSubscriptions.gatewayOnly`), through `https://maas.apps.demo333.startx.fr/zuno-ai-run/<model>/v1`:
+
+| Model | Before | After |
+|---|---|---|
+| `gpt-oss-120b-ovhcloud` | 500 credentials not found | **200**, `model: gpt-oss-120b`, 74 tokens |
+| `mistral-large` | 500 credentials not found, then 403 tier | **200** with `targetModel: mistral-large-4` (live patch, reverted by Argo selfHeal; the chart carries the value) |
+
+Not done here, carried by [WP-219](wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md): the ai-gateway
+cutover of these two providers off their direct calls (ADR-0570 clauses 1 and 4), then the Finage negative test.
+The per-persona-group quota check is moot: since WP-157 only the ai-gateway ServiceAccount is subscribed.
+Note for that cutover: `mistral-large-4` answers `content` as a list with a `thinking` block.

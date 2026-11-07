@@ -11,6 +11,9 @@ kubeconfig
 vault-password*
 ansible/confidential.yml
 ansible/confidential*.back
+# ADR-0602 clause 1 / WP-223: Vault recovery keys + init root token, written
+# once to the Ansible controller by ansible/roles/vault (and its .bak copies).
+ansible/vault-recovery*
 
 # Real / unapproved business data
 *.dump

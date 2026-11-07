@@ -1,0 +1,133 @@
+{{- /*
+ADR-0602 clause 1 / WP-223. See values.yaml's raftSnapshot comment: an
+application-consistent `vault operator raft snapshot save`, next to (not
+instead of) the CSI VolumeSnapshot of templates/cronjob-backup.yaml. The
+token comes from a Kubernetes auth login as this CronJob's own
+ServiceAccount (role raft-snapshot, created by ansible/roles/vault's
+configure Job) and is revoked when the Job ends.
+*/ -}}
+{{- if .Values.raftSnapshot.enabled }}
+{{- $server := include "vault.serverServiceName" . }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-raft-snapshot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: raft-snapshot
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+# The token is the whole credential here (Vault's Kubernetes auth role is
+# bound to this ServiceAccount); no Kubernetes RBAC is granted to it at all.
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-raft-snapshots
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: raft-snapshot
+  # No early sync wave: the storage class binds on first use
+  # (WaitForFirstConsumer) and the only consumer is the CronJob's pod, so the
+  # claim stays Pending ("Progressing") until the first snapshot run. In wave
+  # -25 it blocked every later wave, the StatefulSet included (found live
+  # 2026-11-07 during the WP-223 migration). In the last wave it only keeps
+  # the Application health at Progressing until the first run.
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.raftSnapshot.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.raftSnapshot.pvcSize | quote }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-raft-snapshot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: raft-snapshot
+spec:
+  schedule: {{ .Values.raftSnapshot.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: vault
+            app.kubernetes.io/component: raft-snapshot
+        spec:
+          serviceAccountName: vault-raft-snapshot
+          restartPolicy: Never
+          priorityClassName: zuno-platform-weak
+          automountServiceAccountToken: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: snapshot
+              image: "{{ .Values.vault.server.image.repository }}:{{ .Values.vault.server.image.tag }}"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              env:
+                # The client Service name, the one the service-ca cert
+                # carries; a standby replica forwards the request to the
+                # raft leader, so this works unchanged at replicas: 3.
+                - name: VAULT_ADDR
+                  value: "https://{{ $server }}.{{ .Release.Namespace }}.svc:8200"
+                - name: VAULT_CACERT
+                  value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+                - name: RETENTION_COUNT
+                  value: {{ .Values.raftSnapshot.retentionCount | quote }}
+                # The vault CLI writes nothing with VAULT_TOKEN set, but
+                # keep HOME on the writable emptyDir for readOnlyRootFilesystem.
+                - name: HOME
+                  value: /tmp
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: snapshots
+                  mountPath: /snapshots
+              command:
+                - /bin/sh
+                - -ceu
+                - |
+                  VAULT_TOKEN="$(vault write -field=token auth/kubernetes/login \
+                    role=raft-snapshot jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token)"
+                  export VAULT_TOKEN
+                  FILE="/snapshots/vault-raft-$(date -u +%Y%m%d%H%M%S).snap"
+                  echo "Saving raft snapshot to ${FILE}"
+                  vault operator raft snapshot save "${FILE}"
+                  echo "Pruning to the newest ${RETENTION_COUNT} snapshot(s)"
+                  ls -1t /snapshots/vault-raft-*.snap | tail -n "+$(( RETENTION_COUNT + 1 ))" | xargs -r rm -f
+                  ls -l /snapshots
+                  vault token revoke -self >/dev/null
+                  echo "Done."
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: snapshots
+              persistentVolumeClaim:
+                claimName: vault-raft-snapshots
+{{- end }}

@@ -94,7 +94,7 @@
     url: "https://{{ _wp071_route.resources[0].spec.host }}/"
     headers:
       Authorization: "Bearer wp071-precheck-invalid-token"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: [200, 401, 403, 429, 500]
   register: _wp071_probe
   failed_when: false

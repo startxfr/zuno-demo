@@ -22,7 +22,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import model_tasks, tool_markers
+from app import classification_floor, model_tasks, tool_markers
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, require_admin, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
@@ -79,6 +79,8 @@ routing_watcher = RoutingWatcher({
     model_routing_policy.path: model_routing_policy.reload,
     # ADR-0579 (WP-164 lot 3): generated per-agent guardrail modes, when mounted.
     **({guardrails.agent_modes.path: guardrails.agent_modes.reload} if guardrails.agent_modes.path else {}),
+    # ADR-0565 clause 5 (WP-209): generated per-(agent, task) classification floors, when mounted.
+    **({classification_floor.floors.path: classification_floor.floors.reload} if classification_floor.floors.path else {}),
 })
 
 
@@ -123,6 +125,7 @@ async def reload_routing() -> Dict[str, Any]:
     image_routing_table.reload()
     model_routing_policy.reload()
     tuning_controller.reload_policy()
+    classification_floor.floors.reload()
     return {"loaded": routing_table.loaded}
 
 
@@ -350,7 +353,7 @@ async def _guardrails_refusal(
 async def chat_completions(
     payload: ChatCompletionRequest,
     identity: CallerIdentity = Depends(validate_token),
-    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_data_classification: str = Header(default="", alias="X-Zuno-Data-Classification"),
     x_zuno_local_only: str = Header(default="false", alias="X-Zuno-Local-Only"),
     # ADR-0104: optional, degrades safely to "" (the cache key still binds
     # to it, so this can never widen a hit across tasks). ADR-0303
@@ -396,7 +399,20 @@ async def chat_completions(
     # one of its tasks; the routing policy, never the name, picks the provider.
     x_zuno_task = model_tasks.task_for(identity.client, payload.model, x_zuno_task)
     set_caller_task(x_zuno_task)
-    classification = x_zuno_data_classification.upper()
+    # ADR-0565 clause 5 (WP-209): an absent header takes the configured default
+    # (C1 until the callers listed in the WP-209 brief send one), and the level
+    # is never below the calling (agent, task)'s generated floor. Routing,
+    # local_only_for, guardrails and the counters below all use the effective level.
+    floor = classification_floor.floors.effective(
+        classification_floor.declared_level(x_zuno_data_classification), x_zuno_agent, x_zuno_task,
+        identity.client,
+    )
+    if floor.raised:
+        logger.info(
+            "classification raised by floor: %s -> %s agent=%s task=%s client=%s",
+            floor.declared, floor.effective, x_zuno_agent, x_zuno_task, identity.client,
+        )
+    classification = floor.effective
     # ADR-0550: a per-(agent,task) local_only_for declaration ORs into the
     # caller's own X-Zuno-Local-Only flag - it can only ever add a
     # restriction, never lift one. Needed because a provider can be
@@ -473,9 +489,9 @@ async def chat_completions(
 
     messages = _to_langchain_messages(payload.messages)
 
-    # ADR-0567 (WP-153): guardrails mode follows the DECLARED classification.
-    # It is the same value routing uses, so a caller cannot get a laxer
-    # guardrails mode than the routing it is subject to.
+    # ADR-0567 (WP-153): guardrails mode follows the classification routing uses
+    # (since WP-209 the effective level, raised by the floor and the markers),
+    # so a caller cannot get a laxer guardrails mode than the routing it is subject to.
     # ADR-0579: the calling agent's declared mode and the corp minimum can only harden it.
     gr_mode = guardrails.mode_for(classification, x_zuno_agent)
     gr_prompt = _last_user_text(payload.messages) if gr_mode != "off" else ""
@@ -584,7 +600,7 @@ async def chat_completions(
 async def list_models(
     response: Response,
     identity: CallerIdentity = Depends(validate_token),
-    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_data_classification: str = Header(default="", alias="X-Zuno-Data-Classification"),
     x_zuno_local_only: str = Header(default="false", alias="X-Zuno-Local-Only"),
 ) -> ModelList:
     """OpenAI-standard model list: the distinct model ids of the routing-table
@@ -601,7 +617,7 @@ async def list_models(
         # ADR-0596: plus the declared models that select a task (Zuno Code).
         return ModelList(data=[ModelObject(id="auto", name=AUTO_MODEL_NAME)]
                          + [ModelObject(id=i, name=n) for i, n in model_tasks.listed_models()])
-    classification = x_zuno_data_classification.upper()
+    classification = classification_floor.declared_level(x_zuno_data_classification)
     try:
         candidates = routing_table.candidates_for(
             classification, local_only=x_zuno_local_only.strip().lower() == "true"
@@ -647,12 +663,14 @@ async def images_generations(
     # endpoint does not special-case that; it enforces eligibility exactly
     # like /v1/chat/completions does, against whatever classification the
     # caller actually declares, and fails closed the same way.
-    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_data_classification: str = Header(default="", alias="X-Zuno-Data-Classification"),
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
 ):
     set_caller_client(identity.client)  # ADR-0587
     set_caller_persona(identity.persona)  # ADR-0593
-    classification = x_zuno_data_classification.upper()
+    # WP-209: the default of a header-less call applies here too; no agent floor
+    # (ADR-0415's scoped C2 override is why this endpoint takes no X-Zuno-Agent).
+    classification = classification_floor.declared_level(x_zuno_data_classification)
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
 
     try:

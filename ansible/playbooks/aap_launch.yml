@@ -72,7 +72,7 @@
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_launch_template_lookup
       no_log: true
@@ -89,7 +89,7 @@
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           # aap_launch_extra_vars now arrives as a native dict, not a JSON
@@ -128,7 +128,7 @@
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_launch_status
       until: (_aap_launch_status.json.status | default('')) in ['successful', 'failed', 'error', 'canceled']
@@ -156,7 +156,7 @@
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
         return_content: true
       register: _aap_launch_stdout

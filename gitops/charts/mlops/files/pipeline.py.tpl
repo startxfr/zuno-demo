@@ -158,7 +158,7 @@ def configure(task, *, agent):
         config_map_name=GATE_CA_CONFIGMAP,
         config_map_key_to_env={"ca.crt": "ZUNO_INTERNAL_CA_PEM"},
     )
-    kubernetes.set_image_pull_policy(task, "{{ .Values.images.mlops.pullPolicy }}")
+    kubernetes.set_image_pull_policy(task, "{{ include "mlops.imagePullPolicy" . }}")
     return task
 
 

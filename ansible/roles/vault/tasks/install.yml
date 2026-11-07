@@ -1,7 +1,16 @@
 ---
-# Installs Vault via GitOps, then imperatively initializes and unseals it -
-# the one component that can't depend on Vault for its own bootstrap secret.
+# Installs Vault via GitOps, initializes it on first run, and configures it.
 # Operator-supplied secrets come from ansible/confidential.yml (gitignored).
+#
+# ADR-0602 clause 1 / WP-223: Vault auto-unseals with AWS KMS, stores on
+# raft and serves TLS (gitops/charts/vault). Initialization produces
+# recovery keys (3 shares, threshold 2) and a root token, written ONCE to a
+# 0600 file on the Ansible controller - never to a cluster Secret. The root
+# token is used for exactly one thing, bootstrapping the vault-configurator
+# Kubernetes auth role (tasks/bootstrap_auth.yml), and is revoked as soon as
+# the configure Job has run. Every later Vault call in ansible/ logs in as a
+# ServiceAccount (configure Job: vault-configure; seed tasks:
+# ansible-seeder through ansible/tasks/vault_login.yml).
 - name: "vault | verify ansible/confidential.yml is present"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -21,9 +30,45 @@
       afterwards - unless Vault needs to be reinstalled later.
   when: not _vault_confidential_file.stat.exists
 
+# ADR-0602 / WP-223: zuno_security_profile may be set per cluster; load that
+# file BEFORE confidential.yml so a local confidential.yml still wins.
+- name: "vault | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "vault | load ansible/confidential.yml"
   ansible.builtin.include_vars:
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+
+# vault seeds keycloak/demo-personas before the keycloak role runs, so the
+# hardened persona-password policy is asserted here too.
+- name: "vault | assert the security profile"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_security_profile.yml"
+  vars:
+    assert_security_profile_check_personas: true
+
+# A Vault initialized before WP-223 (file storage, Shamir seal, root token in
+# this Secret) must go through the migration playbook: applying the new
+# chart over it would start an EMPTY raft Vault next to the old file data.
+# The playbook sets vault_migration_in_progress itself.
+- name: "vault | look for the pre-WP-223 bootstrap credentials Secret"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _vault_legacy_bootstrap_secret
+
+- name: "vault | refuse to install over a Vault that still needs the KMS/raft migration"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-vault/vault-bootstrap-credentials exists: this Vault was initialized
+      before ADR-0602/WP-223 (file storage, Shamir seal, stored root token).
+      Migrate it first - docs/platform/vault-kms-raft-migration.md, i.e.
+      `ansible-playbook -i ansible/inventories/demo/hosts.yml
+      ansible/playbooks/vault_migrate_kms_raft.yml` - then re-run
+      `make d0 install vault`.
+  when:
+    - (_vault_legacy_bootstrap_secret.resources | default([]) | length) > 0
+    - not (vault_migration_in_progress | default(false) | bool)
 
 - name: "vault | apply the Vault GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -33,18 +78,15 @@
     # Static name, not zuno_id-derived: matches application-d0.yaml.
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
+# Resolved before the d1 Application (cluster_base_domain substitution) and
+# the configure Job (pki/roles/cert-manager allow-lists keycloak.<domain>).
+# Idempotent, `is not defined` guarded - see resolve_cluster_base_domain.yml.
+- name: "vault | resolve the cluster's real apps domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
 # Vault has no OLM operator (plain Helm deployment) - all content is -d1.
-- name: "vault | apply the Vault GitOps Application (d1)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_component_name: "vault"
-    gitops_app_phase: "d1"
-    # Static name matching application-d1.yaml - a zuno_id-derived name
-    # would create a second, independent Vault release.
-    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-    # readinessProbe runs `vault status`, which fails while sealed, so
-    # waiting for Healthy here would deadlock a fresh install.
-    gitops_app_wait: false
+- name: "vault | create the KMS credentials Secret and apply the Vault GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/apply_vault_app.yml"
 
 # Label-based, not a hardcoded release name: app.kubernetes.io/name=vault
 # is the chart's stable label regardless of release name.
@@ -60,7 +102,7 @@
   retries: 30
   delay: 10
 
-- name: "vault | wait for the Vault server pod to be Running (sealed is expected at this point)"
+- name: "vault | wait for the Vault server pod to be Running (uninitialized is expected on a fresh install)"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-vault
@@ -86,214 +128,130 @@
 
 - name: "vault | parse status (the CLI exits non-zero while sealed; stdout is still valid JSON)"
   ansible.builtin.set_fact:
-    _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
+    _vault_status: >-
+      {{ (_vault_status_raw.stdout if ((_vault_status_raw.stdout | default('')) is match('^\s*\{'))
+          else '{}') | from_json }}
 
-- name: "vault | check for an existing bootstrap credentials secret"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-vault
-    name: vault-bootstrap-credentials
-  register: _vault_bootstrap_secret
+- name: "vault | resolve the cluster name (names the recovery file)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
 
-- name: "vault | initialize Vault with a single key share (demo scope; ADR-0112 tracks HA/production hardening for v1)"
+- name: "vault | first initialization (recovery keys + one-time root token)"
+  when: not (_vault_status.initialized | default(false))
+  block:
+    # Recovery keys, not unseal keys: with the awskms seal, KMS unseals and
+    # these only authorize sensitive operations (generate-root, rekey,
+    # seal migration back). 3 shares / threshold 2, so one lost share is
+    # not a lockout and one leaked share is not a root token.
+    - name: "vault | initialize Vault (awskms seal: 3 recovery shares, threshold 2)"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        command: vault operator init -recovery-shares=3 -recovery-threshold=2 -format=json
+      register: _vault_init_raw
+      no_log: true
+
+    # Written ONCE, to the controller only: the cluster never holds a copy
+    # of the recovery keys or the root token. .gitignore covers
+    # ansible/vault-recovery*. backup: true keeps any earlier file (a
+    # reinstalled cluster) instead of overwriting it. Move it to the
+    # operators' password manager and delete it from the controller.
+    - name: "vault | write the recovery keys and root token to the Ansible controller (0600, once)"
+      ansible.builtin.copy:
+        content: "{{ _vault_init_raw.stdout | from_json | to_nice_json }}"
+        dest: "{{ zuno_repo_root }}/ansible/vault-recovery-{{ cluster_name }}.json"
+        mode: "0600"
+        backup: true
+      delegate_to: localhost
+      no_log: true
+
+    - name: "vault | set the one-time root token fact"
+      ansible.builtin.set_fact:
+        _vault_init_root_token: "{{ (_vault_init_raw.stdout | from_json).root_token }}"
+      no_log: true
+
+    - name: "vault | recovery file written"
+      ansible.builtin.debug:
+        msg: >-
+          Vault initialized. Recovery keys (3 shares, threshold 2) and the
+          root token are in {{ zuno_repo_root }}/ansible/vault-recovery-{{ cluster_name }}.json
+          (mode 0600, this controller only). The root token is revoked at the
+          end of this role; the recovery keys are the only way to generate a
+          new one - store them in the operators' password manager, split
+          across people, then delete the file.
+
+# Review finding (WP-223): the one-time root token lives only in a fact. If the
+# bootstrap or the configure Job fails after the first initialization, a re-run
+# skips the init block and has no token. With -e zuno_vault_resume_bootstrap=true
+# the token is read back from the recovery file written at init (it is revoked
+# at the end of this role, so a finished run leaves nothing to resume).
+- name: "vault | resume: read the one-time root token from the recovery file"
+  ansible.builtin.set_fact:
+    _vault_init_root_token: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root ~ '/ansible/vault-recovery-' ~ cluster_name ~ '.json')
+          | from_json).root_token | default('') }}
+  when:
+    - zuno_vault_resume_bootstrap | default(false) | bool
+    - (_vault_init_root_token | default('')) | length == 0
+  no_log: true
+
+# AWS KMS unseals on its own - right after init, and after every restart.
+- name: "vault | wait for Vault to be initialized and unsealed (AWS KMS auto-unseal)"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: vault operator init -key-shares=1 -key-threshold=1 -format=json
-  register: _vault_init_raw
-  when:
-    - not (_vault_status.initialized | default(false))
-    - (_vault_bootstrap_secret.resources | default([]) | length) == 0
-
-- name: "vault | persist the unseal key and root token to the bootstrap secret"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: vault-bootstrap-credentials
-        namespace: zuno-vault
-      type: Opaque
-      stringData:
-        unseal_key: "{{ (_vault_init_raw.stdout | from_json).unseal_keys_b64[0] }}"
-        root_token: "{{ (_vault_init_raw.stdout | from_json).root_token }}"
-  when: _vault_init_raw is defined and _vault_init_raw.stdout is defined
-  no_log: true
-
-# Runs the vault-unseal-configure Job (unseal + KV/auth/policy setup) as a Job,
-# not k8s_exec, so it can be re-run in-cluster after a pod restart reseals it.
-- name: "vault | read bootstrap credentials"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-vault
-    name: vault-bootstrap-credentials
-  register: _vault_creds
-  no_log: true
-
-- name: "vault | fail if the bootstrap credentials are missing"
-  ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found - the init step above should have created it."
-  when: (_vault_creds.resources | default([]) | length) == 0
-
-- name: "vault | set connection facts"
-  ansible.builtin.set_fact:
-    _vault_root_token: "{{ _vault_creds.resources[0].data.root_token | b64decode }}"
-  no_log: true
-
-# Discovered by label, not hardcoded: the chart creates 3 Services sharing
-# app.kubernetes.io/name=vault (client, -internal, -ui) - only the plain
-# client one is the right VAULT_ADDR target.
-- name: "vault | discover the Vault client Service"
-  kubernetes.core.k8s_info:
-    kind: Service
-    namespace: zuno-vault
-    label_selectors:
-      - "app.kubernetes.io/name=vault"
-  register: _vault_services
-
-- name: "vault | select the client Service (excludes the -internal headless and -ui variants)"
-  ansible.builtin.set_fact:
-    _vault_service_name: >-
-      {{
-        (_vault_services.resources
-         | rejectattr('metadata.labels.vault-internal', 'defined')
-         | map(attribute='metadata.name') | list)[0]
-      }}
-
-# A dedicated copy, not a direct reference to vault-bootstrap-credentials:
-# keeps the Job's dependency self-contained and separately named.
-- name: "vault | copy the unseal key/root token into a Secret the Job can mount"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: vault-unseal-configure-credentials
-        namespace: zuno-vault
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      type: Opaque
-      data:
-        unseal_key: "{{ _vault_creds.resources[0].data.unseal_key }}"
-        root_token: "{{ _vault_creds.resources[0].data.root_token }}"
-  no_log: true
-
-# Resolved early (idempotent, `is not defined` guarded - see
-# resolve_cluster_base_domain.yml) so it's available to inject into the
-# unseal-configure Job below, which needs it to allow-list
-# pki/roles/cert-manager for externally-facing hostnames like
-# keycloak.<domain>. Re-resolved/reused again later in this file for the
-# zuno/platform/cluster-domain KV write; the guard makes calling it twice
-# a no-op the second time.
-- name: "vault | resolve the cluster's real apps domain (early, for the unseal-configure Job)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
-
-# The script is static (kustomize/unseal-configure/); only the Job that
-# runs it stays inline, since it's deleted and recreated every run.
-- name: "vault | apply the unseal/configure script ConfigMap"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
-  vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/vault/kustomize/unseal-configure"
-
-- name: "vault | delete any previous unseal/configure Job (Jobs are immutable, this task is idempotent-by-recreation)"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: batch/v1
-    kind: Job
-    name: vault-unseal-configure
-    namespace: zuno-vault
-    wait: true
-
-- name: "vault | run the unseal/configure Job"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: vault-unseal-configure
-        namespace: zuno-vault
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      spec:
-        backoffLimit: 2
-        template:
-          spec:
-            restartPolicy: Never
-            priorityClassName: zuno-platform-weak
-            containers:
-              - name: vault-unseal-configure
-                image: docker.io/hashicorp/vault:1.17.2
-                command:
-                  - /bin/sh
-                  - /scripts/unseal-and-configure.sh
-                env:
-                  - name: VAULT_ADDR
-                    value: "http://{{ _vault_service_name }}.zuno-vault.svc:8200"
-                  - name: CLUSTER_BASE_DOMAIN
-                    value: "{{ cluster_base_domain }}"
-                  - name: VAULT_TOKEN
-                    valueFrom:
-                      secretKeyRef:
-                        name: vault-unseal-configure-credentials
-                        key: root_token
-                  - name: VAULT_UNSEAL_KEY
-                    valueFrom:
-                      secretKeyRef:
-                        name: vault-unseal-configure-credentials
-                        key: unseal_key
-                volumeMounts:
-                  - name: script
-                    mountPath: /scripts
-            volumes:
-              - name: script
-                configMap:
-                  name: vault-unseal-configure-script
-                  defaultMode: 0755
-
-- name: "vault | wait for the unseal/configure Job to complete"
-  kubernetes.core.k8s_info:
-    api_version: batch/v1
-    kind: Job
-    namespace: zuno-vault
-    name: vault-unseal-configure
-  register: _vault_unseal_configure_job
+    command: vault status -format=json
+  register: _vault_unsealed_raw
+  failed_when: false
+  changed_when: false
   until: >-
-    (_vault_unseal_configure_job.resources[0].status.succeeded | default(0)) > 0 or
-    (_vault_unseal_configure_job.resources[0].status.failed | default(0)) > 0
+    ((_vault_unsealed_raw.stdout | default('')) is match('^\s*\{'))
+    and (_vault_unsealed_raw.stdout | from_json).initialized | default(false)
+    and not ((_vault_unsealed_raw.stdout | from_json).sealed | default(true))
   retries: 30
   delay: 10
 
-- name: "vault | fetch the unseal/configure Job's pod"
-  kubernetes.core.k8s_info:
-    kind: Pod
-    namespace: zuno-vault
-    label_selectors:
-      - "job-name=vault-unseal-configure"
-  register: _vault_unseal_configure_pod
-
-- name: "vault | print the unseal/configure Job's output"
-  kubernetes.core.k8s_log:
-    namespace: zuno-vault
-    name: "{{ _vault_unseal_configure_pod.resources[0].metadata.name }}"
-  register: _vault_unseal_configure_log
-  when: (_vault_unseal_configure_pod.resources | default([]) | length) > 0
-
-- name: "vault | show the unseal/configure Job's output"
-  ansible.builtin.debug:
-    msg: "{{ _vault_unseal_configure_log.log_lines | default(['no pod/log found']) }}"
-
-- name: "vault | fail if the unseal/configure Job did not succeed"
+- name: "vault | fail if Vault did not unseal by itself"
   ansible.builtin.fail:
     msg: >-
-      vault-unseal-configure Job did not succeed (succeeded=
-      {{ _vault_unseal_configure_job.resources[0].status.succeeded | default(0) }}
-      failed={{ _vault_unseal_configure_job.resources[0].status.failed | default(0) }}) -
-      see the output above.
-  when: (_vault_unseal_configure_job.resources[0].status.succeeded | default(0)) == 0
+      Vault is still sealed (status: {{ _vault_unsealed_raw.stdout | default('n/a') }}).
+      With the awskms seal that means Vault cannot use the KMS key: check
+      `oc logs zuno-vault-0 -n zuno-vault` for the AWS error, the
+      vault-aws-kms Secret (zuno_vault_kms_access_key_id/_secret_access_key)
+      and the IAM policy in docs/platform/vault-kms-raft-migration.md.
+  when: >-
+    (_vault_unsealed_raw.stdout | default('{}') | from_json).sealed | default(true)
+
+- name: "vault | bootstrap the configurator identity with the one-time root token"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/bootstrap_auth.yml"
+  vars:
+    vault_bootstrap_pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    vault_bootstrap_token: "{{ _vault_init_root_token }}"
+  when: (_vault_init_root_token | default('')) | length > 0
+
+- name: "vault | run the configure Job (logs in as vault-configure)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/run_configure_job.yml"
+
+# Only after the configure Job succeeded: until then the root token (also in
+# the recovery file) is the way back if the bootstrap needs a second try.
+- name: "vault | revoke the one-time root token"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "sh -c {{ ('VAULT_TOKEN=' ~ (_vault_init_root_token | quote) ~ ' vault token revoke -self') | quote }}"
+  when: (_vault_init_root_token | default('')) | length > 0
+  no_log: true
+
+- name: "vault | forget the root token"
+  ansible.builtin.set_fact:
+    _vault_init_root_token: ""
+  when: (_vault_init_root_token | default('')) | length > 0
+  no_log: true
+
+- name: "vault | log in as ansible-seeder for the seed tasks below"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
 # ADR-0578/WP-165: the Transit public key is no longer exported into the
 # repository. It was the OKF trust anchor (agents/zuno-platform-signer.pub);
@@ -303,7 +261,7 @@
 
 # ADR-0517 live finding (demo333, 2026-09-07): publish the Vault PKI ROOT
 # certificate to a well-known in-cluster ConfigMap. The root
-# (CN=zuno-demo.internal, created by unseal-configure's
+# (CN=zuno-demo.internal, created by the configure Job's
 # pki/root/generate/internal) signs live server certs (mariadb-server-cert,
 # istiod) on EVERY cluster - but the only path that distributed it
 # cluster-wide (openshift_oauth -> openshift-config/user-ca-bundle) sourced
@@ -323,7 +281,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault read -field=certificate pki/cert/ca"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault read -field=certificate pki/cert/ca"
   register: _vault_pki_root_raw
   changed_when: false
   # Same rule as every VAULT_TOKEN task in this role: the exec command line
@@ -366,10 +324,12 @@
       # the bootstrap account only.
       keycloak/console:
         username: zuno-admin
-        password: "{{ zuno_admin_keycloak_console_password }}"
+        password: "{{ zuno_admin_keycloak_console_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       keycloak/automation:
         username: zuno-automation
-        password: "{{ zuno_admin_keycloak_automation_password }}"
+        password: "{{ zuno_admin_keycloak_automation_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       postgresql/app:
         # Lowercase letters/digits only: PGO derives an RFC 1123 Secret name
         # from this, and unquoted PostgreSQL identifiers reject hyphens.
@@ -669,7 +629,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aws/route53-dns01
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aws/route53-dns01
       access_key_id={{ zuno_aws_route53_access_key_id | quote }} secret_access_key={{ zuno_aws_route53_secret_access_key | quote }}"
   when: >-
     zuno_aws_route53_access_key_id | default('xxxxxx') != 'xxxxxx'
@@ -682,7 +642,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/google-oauth/client
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/google-oauth/client
       client_id={{ zuno_google_oauth_client_id | quote }} client_secret={{ zuno_google_oauth_client_secret | quote }}"
   when: >-
     zuno_google_oauth_client_id | default('xxxxxx') != 'xxxxxx'
@@ -695,7 +655,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/smtp/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/smtp/technical
       host={{ zuno_smtp_host | quote }} port={{ (zuno_smtp_port | default('587')) | quote }}
       username={{ zuno_smtp_username | quote }} password={{ zuno_smtp_password | quote }}"
   when: >-
@@ -715,7 +675,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/rhn
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/rhn
       username={{ zuno_aap_rhn_username | quote }} password={{ zuno_aap_rhn_password | quote }}"
   when: >-
     zuno_aap_rhn_username | default('xxxxxx') != 'xxxxxx'
@@ -730,7 +690,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/confluence/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/confluence/technical
       url={{ zuno_atlassian_confluence_url | quote }} email={{ zuno_atlassian_confluence_email | quote }}
       token={{ zuno_atlassian_confluence_token | quote }}
       enabled={{ (zuno_atlassian_confluence_enabled | default(false)) | quote }}"
@@ -750,7 +710,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/quay/registry
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/quay/registry
       username={{ zuno_quay_username | quote }} password={{ zuno_quay_password | quote }}"
   when: >-
     zuno_quay_username | default('xxxxxx') != 'xxxxxx'
@@ -767,7 +727,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/jira/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/jira/technical
       url={{ zuno_jira_url | quote }} email={{ zuno_jira_email | quote }}
       token={{ zuno_jira_token | quote }}
       enabled={{ (zuno_jira_enabled | default(false)) | quote }}"
@@ -788,7 +748,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/salesforce/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/salesforce/technical
       url={{ zuno_salesforce_url | quote }} access_token={{ zuno_salesforce_access_token | quote }}
       enabled={{ (zuno_salesforce_enabled | default(false)) | quote }}"
   when: >-
@@ -808,7 +768,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/github/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/github/technical
       token={{ zuno_github_token | quote }}
       enabled={{ (zuno_github_enabled | default(false)) | quote }}"
   when: >-
@@ -826,7 +786,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/gitlab/technical
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/gitlab/technical
       url={{ ((zuno_gitlab_url | default('xxxxxx')) == 'xxxxxx') | ternary('https://gitlab.com', zuno_gitlab_url | default('https://gitlab.com')) | quote }}
       token={{ zuno_gitlab_token | quote }}
       enabled={{ (zuno_gitlab_enabled | default(false)) | quote }}"
@@ -855,7 +815,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/maas/gateway-api-key
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/maas/gateway-api-key
       api_key={{ zuno_maas_gateway_api_key | quote }}"
   when: >-
     zuno_maas_gateway_api_key | default('xxxxxx') != 'xxxxxx'
@@ -870,7 +830,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/postgresql/backup-s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/postgresql/backup-s3
       bucket={{ zuno_postgresql_backup_s3_bucket | quote }} endpoint={{ zuno_postgresql_backup_s3_endpoint | quote }}
       region={{ zuno_postgresql_backup_s3_region | quote }} access_key={{ zuno_postgresql_backup_s3_access_key | quote }}
       secret_key={{ zuno_postgresql_backup_s3_secret_key | quote }}"
@@ -893,7 +853,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mariadb/s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/mariadb/s3
       accessKeyId={{ zuno_mariadb_backup_s3_access_key_id | quote }}
       secretAccessKey={{ zuno_mariadb_backup_s3_secret_access_key | quote }}"
   when: >-
@@ -912,7 +872,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/rag/s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/rag/s3
       accessKeyId={{ zuno_rag_s3_access_key_id | quote }}
       secretAccessKey={{ zuno_rag_s3_secret_access_key | quote }}"
   when: >-
@@ -928,7 +888,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/dify/s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/dify/s3
       bucketName={{ zuno_dify_s3_bucket_name | quote }}
       region={{ zuno_dify_s3_region | quote }}
       accessKeyId={{ zuno_dify_s3_access_key_id | quote }}
@@ -950,7 +910,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/hub-s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/hub-s3
       bucketName={{ zuno_aap_hub_s3_bucket_name | quote }}
       region={{ zuno_aap_hub_s3_region | quote }}
       accessKeyId={{ zuno_aap_hub_s3_access_key_id | quote }}
@@ -973,7 +933,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/rhoai/traces-s3
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/rhoai/traces-s3
       bucketName={{ zuno_rhoai_traces_s3_bucket_name | quote }}
       region={{ zuno_rhoai_traces_s3_region | quote }}
       accessKeyId={{ zuno_rhoai_traces_s3_access_key_id | quote }}
@@ -991,7 +951,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/{{ secret_path }}"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/{{ secret_path }}"
   loop:
     - google-oauth/client
     - smtp/technical
@@ -1015,7 +975,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ secret_result.secret_path }} _placeholder=true"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/{{ secret_result.secret_path }} _placeholder=true"
   loop: "{{ _vault_existing_secrets.results }}"
   loop_control:
     loop_var: secret_result
@@ -1046,7 +1006,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/providers/{{ provider_key.key }}
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/providers/{{ provider_key.key }}
       api_key={{ provider_key.value | quote }}"
   loop: "{{ _llm_provider_real_keys | dict2items }}"
   loop_control:
@@ -1074,7 +1034,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/providers/{{ provider }}"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/providers/{{ provider }}"
   loop:
     - openai
     - gemini
@@ -1096,7 +1056,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
   loop: "{{ _vault_existing_provider_secrets.results }}"
   loop_control:
     loop_var: provider_result
@@ -1128,7 +1088,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
-  # See the Transit-key read above: unmasked, a failure here prints the root
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
+  # See the PKI root read above: unmasked, a failure here prints the Vault
   # token via invocation.module_args.
   no_log: true

@@ -12,8 +12,8 @@ namespace: zuno-kagent
 
 externalSecrets:
   refreshInterval: 1h
-  secretStore: vault-backend
-
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStore: vault
 # Front door (ADR-0600 clause 5): oauth2-proxy admits the operations groups; kagent's own UI has
 # no login (controller.auth.mode unsecure), so this is the only gate.
 frontDoor:

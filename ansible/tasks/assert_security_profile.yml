@@ -1,0 +1,48 @@
+---
+# ADR-0602 clause 3 / WP-223: validate zuno_security_profile (main.yml,
+# overridable in ansible/clusters/<cluster>.yml or ansible/confidential.yml).
+#
+# Why an assert: passwords.yml and the keycloak chart both branch on the exact
+# string. A typo ("hardend") would silently fall into the demo branch of
+# passwords.yml and render the keycloak chart's demo realm settings - the
+# cluster would look hardened in the inventory and be demo on the wire.
+#
+# Included at the end of load_cluster_vars.yml (after the per-cluster file, so
+# its override is what gets checked) and by the keycloak role after it loads
+# confidential.yml, with assert_security_profile_check_personas: true - the
+# persona check needs confidential.yml, which load_cluster_vars.yml callers
+# only load afterwards.
+- name: "security-profile | zuno_security_profile is demo or hardened"
+  ansible.builtin.assert:
+    that:
+      - zuno_security_profile | default('demo') in ['demo', 'hardened']
+    fail_msg: >-
+      zuno_security_profile is '{{ zuno_security_profile }}'; expected 'demo' or
+      'hardened' (ADR-0602 clause 3). Fix it in
+      ansible/inventories/demo/group_vars/all/main.yml,
+      ansible/clusters/<cluster>.yml or ansible/confidential.yml.
+    quiet: true
+
+# The hardened realm policy (gitops/charts/keycloak: "length(12) and digits(1)
+# and notUsername") applies to every zuno-realm password, and the eval-personas
+# Job sets the shared persona password with `kcadm set-password` in that realm:
+# a non-compliant value makes Keycloak refuse it and the Job fail mid-sync.
+# Catch it here, before the chart syncs. No no_log: assert reports the
+# failing expression text and fail_msg, never the value, and no_log would hide
+# the message.
+- name: "security-profile | hardened: the shared persona password satisfies the realm password policy"
+  ansible.builtin.assert:
+    that:
+      - zuno_personas_humans_password is defined
+      - zuno_personas_humans_password | length >= 12
+      - zuno_personas_humans_password is search('[0-9]')
+    fail_msg: >-
+      ADR-0602 hardened profile: the shared persona password
+      (zuno_personas_mainpwd, or zuno_personas_humans_password when set) must
+      be set in ansible/confidential.yml, be at least 12 characters long and
+      contain a digit - the zuno realm's hardened passwordPolicy refuses
+      anything else.
+    quiet: true
+  when:
+    - assert_security_profile_check_personas | default(false) | bool
+    - zuno_security_profile | default('demo') == 'hardened'

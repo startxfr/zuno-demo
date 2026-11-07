@@ -1,14 +1,33 @@
 ---
 # "Installed" checks both Applications plus the ClusterIssuer's own Ready
-# signal.
+# signal. ADR-0352 (WP-217): in external mode the -d0 Application does not
+# exist (the operator is installed outside this installer), so its check is
+# replaced by the unmanaged-operator assertion (CRDs, CSV, controller),
+# record-only. The -d1 Application and the ClusterIssuer are ours in both modes.
+- name: "cert_manager | resolve the component mode (ADR-0352)"
+  ansible.builtin.include_tasks: mode.yml
+
 - name: "cert_manager | check the cert-manager Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  when: _cert_manager_mode == 'internal'
   vars:
     gitops_app_name: "zuno-cert-manager-d0"
 
+- name: "cert_manager | assert the unmanaged operator (external mode, record only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_unmanaged_operator.yml"
+  when: _cert_manager_mode == 'external'
+  vars:
+    unmanaged_operator_component: cert_manager
+    unmanaged_operator_crds: "{{ _cert_manager_unmanaged.crds }}"
+    unmanaged_operator_csv_prefix: "{{ _cert_manager_unmanaged.csv_prefix }}"
+    unmanaged_operator_deployment: "{{ _cert_manager_unmanaged.deployment }}"
+    unmanaged_operator_fail: false
+
 - name: "cert_manager | save the d0 check result"
   ansible.builtin.set_fact:
-    _cert_manager_d0_installed: "{{ _state_check_result }}"
+    _cert_manager_d0_installed: >-
+      {{ (_state_check_result | bool) if _cert_manager_mode == 'internal'
+         else (unmanaged_operator_ok | default(false) | bool) }}
 
 - name: "cert_manager | check the cert-manager Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
@@ -26,7 +45,7 @@
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        _cert_manager_d0_installed
+        (_cert_manager_d0_installed | bool)
         and _state_check_result
         and (_cert_manager_issuer_lookup.resources | default([]) | length) > 0
         and (_cert_manager_issuer_lookup.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'

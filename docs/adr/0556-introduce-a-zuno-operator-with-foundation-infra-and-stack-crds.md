@@ -1,6 +1,6 @@
 # ADR-0556: Introduce a zuno operator with Foundation, Infra and Stack CRDs
 
-- **Status:** Proposed
+- **Status:** Deprecated
 - **Target:** v0.16 (retargeted from v0.9 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-09-10
 - **Decision owners:** Zuno Demo architecture team
@@ -214,3 +214,10 @@ Migration/evolution and Review evidence.
 - [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md)
 - [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)
 - [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)
+
+## Update (2026-11-07) - Deprecated by user decision
+
+Withdrawn with no successor record. The Zuno operator with Foundation, Infra and Stack CRDs is not pursued: the
+UnifAI operator (agents and their bundles), the Ansible day roles and ArgoCD cover what it was meant to own, and the
+open external-mode and remote-management work (ADR-0352, ADR-0557) does not need it. Nothing was built. A future need
+for it is a new ADR, which can reuse this record's analysis.

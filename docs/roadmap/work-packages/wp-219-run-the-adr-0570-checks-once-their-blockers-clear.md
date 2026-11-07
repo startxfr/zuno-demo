@@ -32,3 +32,11 @@ Also tied to the same ADR (WP-177 step 5): once Kuadrant writes all limit famili
 ## Acceptance
 
 - Each of V2, V3, V5, V6 and V11 has a recorded result or a recorded decision to retire it.
+
+## Update (2026-11-07) - the vendor route blocker is cleared
+
+The vendor route defect that blocked V2, V3 and V5 is gone on RHOAI 3.6.0-ea.2 for the two ExternalModels: WP-125
+proved real completions through MaaS for `gpt-oss-120b-ovhcloud` and `mistral-large` (`mistral-large-4`), once the
+credential Secrets carry `inference.llm-d.ai/ipp-managed`. The ai-gateway cutover of these two providers (ADR-0570
+clauses 1 and 4) and the Finage negative test of ADR-0541 can now run here. V6 and V11 keep their own blockers.
+

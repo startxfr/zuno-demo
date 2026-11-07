@@ -15,7 +15,7 @@ copy would drift unvalidated).
 Derived, not maintained by hand: a version's ADRs are the ADRs whose
 `**Target:**` names it, and its work packages are those whose tracker row
 cites one of them. A WP that advances ADRs in two versions is counted under
-both, so the WP column sums to more than the 120 tracked rows. "Open ADRs"
+both, so the WP column sums to more than the tracked rows. "Open ADRs"
 counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 `Superseded*` or `Deprecated` is closed. Regenerate after any status change;
 `platform/docs/check_docs.py` verifies the table against the ADR bodies.
@@ -24,21 +24,22 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | — |
 | v0.1 | 28 | — | 18 | — |
-| v0.2 | 14 | — | 19 | WP-098 |
+| v0.2 | 14 | — | 19 | — |
 | v0.3 | 15 | — | 19 | — |
-| v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
-| v0.5 | 13 | — | 18 | WP-55, WP-101, WP-122 |
-| v0.6 | 4 | — | 6 | WP-101 |
-| v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
+| v0.4 | 30 | 4 | 31 | — |
+| v0.5 | 13 | — | 18 | — |
+| v0.6 | 4 | — | 6 | — |
+| v0.7 | 9 | 1 | 19 | — |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 1 | 28 | — |
+| v0.11 | 23 | — | 28 | — |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 4 | 4 | 8 | WP-209, WP-221, WP-223, WP-224, WP-225, WP-226, WP-227 |
-| v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
+| v0.15 | 2 | 1 | 4 | WP-238 |
+| v0.16 | 10 | 8 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-240, WP-241, WP-242, WP-243 |
+| v0.17 | 2 | 2 | 9 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -485,7 +486,7 @@ separately and added to this phase's table as they land.
 | WP-094 | [wp-094](work-packages/wp-094-generalize-aap-job-templates.md) | 0418 | WP-093 | Done (2026-08-30) - live launch/Survey/credential round-trip confirmed (jobs 180/240/244) | install-type ClusterRole check deliberately deferred (low risk, not required to close Phase 1) |
 | WP-095 | [wp-095](work-packages/wp-095-workflow-templates.md) | 0418 | WP-094 | Done (2026-08-30) - Day 1 `zuno-day1-check-workflow` full green run (job 243); Day 2 `zuno-day2-check-workflow` also full green (job 514, after WP-102) | none |
 | WP-097 | [wp-097](work-packages/wp-097-make-aap-routing.md) | 0418 | WP-095 | Done (2026-08-30) - live-verified `zuno_make_aap_mode=auto` routing both Job and Workflow Template launches, exit-code propagation confirmed | `remote` unreachable-failure and `auto` fallback branches still only offline-tested (isolated shell-logic), not re-exercised live this pass |
-| WP-098 | [wp-098](work-packages/wp-098-remove-aap-shipped-defaults.md) | 0354 | WP-073 | Repo work merged (2026-08-30) - live-verified: "Demo Project"/"Demo Job Template" confirmed gone from the Controller | none |
+| WP-098 | [wp-098](work-packages/wp-098-remove-aap-shipped-defaults.md) | 0354 | WP-073 | Done (2026-11-07; live-verified 2026-08-30: "Demo Project"/"Demo Job Template" confirmed gone from the Controller) | none |
 | WP-099 | [wp-099](work-packages/wp-099-aap-bootstrap-live-defects.md) | 0418 | WP-094, WP-095, WP-098 | Done (2026-08-30) - two consecutive `make d0 install aap-config` runs clean, all 5 defects found+fixed live | none |
 | WP-102 | [wp-102](work-packages/wp-102-aap-execution-environment-kustomize.md) | 0418 | WP-095 | Done (2026-08-30) - custom EE (`kustomize`/`oc`/`cosign`) built, registered, assigned; full green `zuno-day2-check-workflow` (job 514) | none |
 | WP-103 | [wp-103](work-packages/wp-103-aap-launch-rbac.md) | 0418 | WP-094, WP-097 | Done | model Controller RBAC for who may launch which Job/Workflow Template, ahead of Phase 3/4 (renumbered from a WP-101 draft that collided with the pre-existing Salesforce WP-101) |
@@ -534,7 +535,7 @@ changes, closing all three notes' live-pass follow-ups once a credential exists.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-101 | [wp-101](work-packages/wp-101-salesforce-sandbox-credentials.md) | 0512, 0528, 0218 | none | Not started (2026-08-30) | obtain a sandbox org + technical-user token, seed Vault, restore the salesforce-mcp install path, then run the three confirming live passes (Comage freshness read/write, ADR-0528's 404/403/503 causes, `fetch-salesforce` one-shot KFP run) |
+| WP-101 | [wp-101](work-packages/wp-101-salesforce-sandbox-credentials.md) | 0512, 0528, 0218 | none | Abandoned (2026-11-07) | user decision: no Salesforce sandbox org planned; reopen if one is brought |
 
 ### Phase 26 — adopt RHTAS as the artifact trust service (added 2026-08-30; split into WP-110/WP-111 2026-09-02)
 ADR-0535 supersedes ADR-0420, replacing Phase 12's in-cluster Vault Transit
@@ -591,7 +592,7 @@ already fixed on that build (cause unconfirmed).
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-106 | [wp-106](work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md) | 0537 | none | Done (2026-09-03) | none — both phases live-verified 2026-09-02 (Dashboard hardware-profile badges shown for all five models; the annotation-triggered rollout incident recovered manually) |
-| WP-125 | [wp-125](work-packages/wp-125-external-models-through-maas.md) | 0541 | WP-27, WP-076, WP-106 | Repo work merged (blocked upstream, 2026-09-03) | none actionable today - root-cause the Envoy-proxy timeout to the real upstream through the MaaS gateway (see ADR-0541 Decision 1's 2026-09-03 note); do not attempt the `ai-gateway` cutover before then |
+| WP-125 | [wp-125](work-packages/wp-125-external-models-through-maas.md) | 0541 | WP-27, WP-076, WP-106 | Done (2026-11-07) | real completions through both MaaSModelRefs on RHOAI 3.6 (credential label `inference.llm-d.ai/ipp-managed`, Mistral on `mistral-large-4`); the ai-gateway cutover and the Finage test go to WP-219 |
 
 ### Phase 28 — TrustyAI evaluation and guardrails (added 2026-09-02)
 ADR-0534 extends the platform's existing TrustyAI integration (already
@@ -662,7 +663,7 @@ move off KFP to a later ADR.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-115 | [wp-115](work-packages/wp-115-trustyai-dashboard-ui-flags-and-evalhub.md) | 0534 | WP-113 | Operator pending (2026-09-02) | flags patched live and the `EvalHub` instance is `Ready` (commits `932abb63`, `365c8252` — the ea build crashes on any `otel` block); remaining: one real UI-launched evaluation run end to end |
+| WP-115 | [wp-115](work-packages/wp-115-trustyai-dashboard-ui-flags-and-evalhub.md) | 0534 | WP-113 | Done (2026-11-07, vendor limitation) | UI flow proven up to the model call; the score is blocked by EvalHub job pods having no SA token in istio-proxy (KServe DR caCertificates path), recorded in the brief |
 | WP-116 | [wp-116](work-packages/wp-116-mlflow-experiment-tracking.md) | 0538, 0302, 0526 | ADR-0529 pguser mechanics | Done (2026-09-03) | none — MLflow runs PostgreSQL-backed (`Available=True`, 50 tables migrated), the pipeline logs params/metrics/gate non-fatally, and the `wesh-20260829-145123` run is visible in the Experiments page via an idempotent backfill; seven live defects fixed on the way in, including a wedged `zuno` database that had been blocking `make d0 install postgresql` for everyone |
 | WP-117 | [wp-117](work-packages/wp-117-kueue-gpu-quota-and-queued-workloads.md) | 0538, 0321, 0351 | WP-109, WP-113 | Done (2026-09-03) | GPU-MIG ResourceFlavor + ClusterQueue quota, LocalQueue and namespace enrolment for `zuno-ai-run`, queue-name labels on the garak/ragas Jobs, plus the `trainingJobs` dashboard flag. Second attempt: enrolment is namespace-wide with no per-workload opt-out, so the recreation loop had to be closed first; quota deliberately undersized to serialise multi-GiB image pulls |
 | WP-118 | [wp-118](work-packages/wp-118-demo333-portability-blockers.md) | 0517 | none | Done (9 of 9 blockers closed, 2026-09-03) | no chart default names `demo222` any more: five charts on the `apps.mycluster.example.com` token, the `machines` chart's AWS identity, four `gp3-csi` defaults and cert-manager's Route53 zone all discovered at apply time and flipped to placeholders, the Salesforce duplicate-seed and MariaDB S3 gaps closed, and the RHOAI InstallPlan drift closed as a decision (keep the gate, detect it in precheck from the PackageManifest). Every flip was applied live first and verified inert — MachineSets byte-unchanged, all 15 PVCs unchanged, ACME track intact, cert-manager's re-apply `changed=0`. Closes the known literals, not the claim that the automation bootstraps: that is ADR-0517's own run, still blocked on `demo333` being provisioned |
@@ -701,7 +702,7 @@ genuine `200` with real model output through `local-wesh-maas`.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-122 | [wp-122](work-packages/wp-122-maas-gateway-keycloak-identity-gap.md) | 0537, 0521 | none | Repo work merged (2026-09-03) | none - closed with a clean live pass; the downstream re-run it unblocked (WP-112's `img-mockup_request`/security-check) surfaced a separate, real WP-112 gap, tracked there, not here |
+| WP-122 | [wp-122](work-packages/wp-122-maas-gateway-keycloak-identity-gap.md) | 0537, 0521 | none | Done (2026-11-07; clean live pass 2026-09-03) | none - closed with a clean live pass; the downstream re-run it unblocked (WP-112's `img-mockup_request`/security-check) surfaced a separate, real WP-112 gap, tracked there, not here |
 
 ### Phase 32 — ai-gateway's external SaaS egress broken by the mesh (added 2026-09-03)
 Found while verifying WP-112's Comage fix, and far wider than that WP:
@@ -1043,25 +1044,61 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Not started | ai-gateway change plus a generated floor slice; default header C3 after the caller inventory |
-| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
+| WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Done (2026-11-07) | floors live on demo333 (image d849b322), cognos C1->C3 proven; header-less default stays C1 by user decision, so ADR-0565 stays Partially implemented |
+| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Abandoned (2026-11-07) | user decision: per-source aclGroups is the contract, page-level ACL not needed; ADR-0110 Implemented |
 | WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal there-and-back on a simulated external Keycloak |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
 | WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal |
 | WP-215 | [wp-215](work-packages/wp-215-aap-internal-external-mode.md) | 0352 | WP-143, WP-213 | Not started | cluster rehearsal; keep the Fernet key persistent |
-| WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
-| WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
+| WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-07) | external mode built, rehearsed live both ways on demo333; no live uninstall, clause-10 gate not built |
+| WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-07) | external mode built, rehearsed live both ways on demo333; no live uninstall, clause-10 gate not built |
 | WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
 | WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
 | WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can) | the fork session builds the operator part, a release with the user's go, one pilot on demo333 |
 | WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Done | portal adopted and live; MCP lifecycle operator and Workbenches V2 wait |
 | WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Done | merged to `devel` locally, not pushed; live checks waived by the user; push, gateway builds and sync wait for the user's go |
-| WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal; needs the user's choice of unseal backend |
-| WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal, namespace by namespace |
-| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603, 0565 | WP-222, WP-209 | Not started | classification itself stays with WP-209 |
-| WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Not started | every release pin needs the user's go |
+| WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Done | demo333 migrated 2026-11-07 (raft + AWS KMS + TLS, root token revoked, recovery 3/2); eso-reader kept until `main` carries WP-223 (zuno-rhtas-d1 tracks main) |
+| WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222, WP-223 | Operator pending | pushed 55ebf41f and rolled out on demo333 2026-11-07 (STRICT x3, zuno-ai-run firewall Argo-owned, three AppProjects); left: zuno-unifai firewall rehearsal, agents scaffold, GitHub settings |
+| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603 | WP-222, WP-209 | Not started | classification itself stays with WP-209 (ADR-0565) |
+| WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Operator pending | committed locally on `wp-226-supply-chain`, not pushed; rebuilds, warn dry run, enforce, first rendered release and route-cert switch wait for the user's go |
 | WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
+
+### Phase 51 — interactive world-model demo (added 2026-11-07)
+
+ADR-0604 adds a browser world-model experience (Waypoint-1.5-1B with FLUX.2 klein 4B) on one full RTX PRO 6000 in a node
+that exists only while `zuno_world_model_enabled` is on. Everything except WP-232 and WP-237 is built and verified without
+the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a world-model event within three weeks, so presentable-demo work comes first and phase-2 options wait.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Repo work in review | committed on `wm-world-model`, not pushed; push waits for the user's go |
+| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Not started | GPU Operator toleration in an announced maintenance window, with the user's go |
+| WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Repo work in review | none: copy done and verified 2026-11-07 (25 files, 19.7 GB); lock file not pushed |
+| WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Not started | build-node storage check, then the in-cluster build |
+| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Not started | one GPU window of about 3 h: enable, smoke Job, preset images, disable |
+| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Not started | none expected: no agents-release task is needed (checked 2026-11-07); a live C1 probe with the user's go |
+| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Not started | none (local end-to-end on mocks) |
+| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Not started | none until WP-237 |
+| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Not started | none |
+| WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Not started | one GPU day: full cycle, measurements, recordings, rehearsal, disable |
+
+### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)
+
+The project review of 2026-11-07 found the platform's breadth ahead of its robustness: no check sends a real turn
+through the experiences, pre-GA releases change live behaviour between two rehearsals, the cluster holds state the
+repository does not explain, and demo333 is the only cluster. It produced ADR-0605 to ADR-0609. WP-238 is the only one
+needed for the demonstration of 2026-11-09 09:00 (v0.15). WP-239 changes no live object. WP-240 to WP-243 follow the
+demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Repo work in review | first live run with the user's go, then the dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
+| WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Repo work in review | none (repository and CI only); done on branch `adr-0605-0609-review`, Done once pushed and CI is green |
+| WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Not started | regenerate the known-good file from demo333 outside a freeze |
+| WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Not started | the user decides on ECK; the nfs-provisioner role is adopted live in a window |
+| WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Not started | one rehearsal of the pattern on demo333 |
+| WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Not started | the tests run against demo333 |
 
 ### OKF stream phases
 
@@ -1092,7 +1129,7 @@ component-code package.
 | WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
 | WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Done | none |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Done (2026-08-25 — 429-exceedance run passed live with a real token: `intensive` 429 at request 11 against 10/5m, `standard` at 61 against 60/5m, zero 5xx. The run itself found three stacked defects that had left enforcement counting nothing while still reporting Accepted+Enforced — missing identity dynamic metadata, CEL error-absorption the shim does not implement, and predicate concatenation shredding an unparenthesized ternary. See ADR-0511's 2026-08-25 note) | none |
-| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Repo work merged; superseded in part 2026-08-27 | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 above |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Abandoned (2026-11-07: agent-runtime retired by ADR-0561) | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 above |
 | WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
 
 ### Phase 34 — OKF: extraction
@@ -1207,6 +1244,8 @@ moving.
 
 ## Change log
 
+- 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-07 — ADR-0605 to ADR-0609 and WP-238 to WP-243 added (Phase 52), from the project review of 2026-11-07. v0.15 becomes the demo-ready band: ADR-0565 (Implemented) and ADR-0605 (golden-path check and freeze window, WP-238), tagged before the demonstration of 2026-11-09. ADR-0584, ADR-0602 and ADR-0603 move to v0.16 with ADR-0606 (definition of done and WIP limit), ADR-0607 (pre-GA dependencies), ADR-0608 (drift) and ADR-0609 (canary rehearsals). ADR-0352 and ADR-0557 move to the new band v0.17. No decision clause of a moved record changes; each carries a dated amendment.
 - 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.
 - 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
 - 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.
@@ -1214,6 +1253,9 @@ moving.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
 - 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
+- 2026-11-07 — WP-223 Done: demo333 Vault migrated to raft + AWS KMS auto-unseal + TLS with the user's go (four playbook/chart defects found live, fixed in 5c6c396e); WP-224 pushed and rolled out (55ebf41f): STRICT mTLS in zuno-data, zuno-auth, zuno-ai-run, the zuno-ai-run EgressFirewall owned by ArgoCD, 104 Applications in the zuno-platform/zuno-apps AppProjects, legacy project deleted.
+- 2026-11-07 — WP-209 Operator pending: the ai-gateway routes and counts a chat call at `max(header, floor(agent, task))`, the floors generated from the admitted release into `classification-floors.generated.yaml` and covered by the drift check, behind `classification.floorsGenerated` (off). The caller inventory found one caller that sends no header and would change: the UnifAI shared `zuno-gateway` LLM, so the header-less default stays `C1` (user decision); `C3` is a tested chart value. Committed locally, not pushed; the live probe needs an ai-gateway build. ADR-0565 records that clause 3 is covered in practice by ADR-0594 and stays `Partially implemented`.
+- 2026-11-07 — WP-226 Operator pending: the supply-chain repo work of ADR-0603 clause 4 is committed locally on `wp-226-supply-chain`, not pushed. The first-party charts can render image digests (`render_release_digests.py`, opt-in with `make d3 release RENDER_DIGESTS=1`; empty digests render as before), base images are digest-pinned, `ClusterImagePolicy` mode is a value (still `warn`), CI images are signed keylessly with the SBOM as an attestation, the signer's cosign and oras downloads are checksum-verified, `ignore-unfixed` is dropped, 18 hashed Python lockfiles share one version per library, the Galaxy collections are pinned, Dependabot covers actions and pip, and the 121 Route `validate_certs` hits follow one switch (`zuno_validate_route_certs`, off until its live run). No release pin or ledger entry changed. The live steps (rebuilds, warn dry run, enforce, first rendered release, route-cert switch) are listed in the brief.
 - 2026-11-07 — WP-222 Done (user decision): the reviewed security quick wins (gateway audience `zuno-admin-api`, authenticated `/admin/*` routes, Confluence CQL and page-id checks, input ceilings, secret scan, SHA-pinned actions, venv out of git) are merged into `devel` locally, not pushed. Named exception: the live checks (audience, admin routes, CQL) were not run; the user closed the package without them. ADR-0602 and ADR-0603 stay `Proposed`, with WP-223 to WP-227 open.
 - 2026-11-06 — WP-220 Done: the user accepted it after a retest on demo333 of the playground shipped by the `openshift-ai` chart (chat, RAG, MCP with the user's own token as `ai-ops-01`; `ai-dev-01` sees no MCP tool by policy). The MaaS consumer portal is adopted for the three `ocp-*` groups; the MCP lifecycle operator and Workbenches V2 wait; Anthropic-format traffic stays uncounted by MaaS (accepted).
 - 2026-11-06 — ADR-0602, ADR-0603 and WP-222 to WP-227 added, all in v0.15: a read-only review of the platform's trust boundaries (identity, secrets, network, the AI and agent surface, the supply chain). Findings are not replayed on a cluster. WP-222 (quick wins) is committed locally and not pushed, because both repositories are public.

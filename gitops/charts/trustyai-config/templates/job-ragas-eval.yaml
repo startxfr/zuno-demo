@@ -9,7 +9,12 @@ lm-eval label: same eval-class NetworkPolicy identity as the other Jobs
 here - it is what the qwen predictors' policies admit. zuno.io/rag-client:
 the pod label UnifAI's RAG server admits (UnifaiStack spec.exposure.ragClients).
 */ -}}
-{{- if and .Values.trustyaiConfig.enabled .Values.ragasEval.enabled }}
+{{- /* WP-224: the token now comes from the public HTTPS issuer, so the Job needs
+the real domain. Not rendered while clusterBaseDomain is the placeholder (an
+Application applied before the role passed it): a Replace=true Job would be
+recreated and fail on DNS. The trustyai_config role passes the domain. */}}
+{{- $ragasDomainKnown := or .Values.ragasEval.keycloakTokenUrl (and .Values.clusterBaseDomain (ne .Values.clusterBaseDomain "apps.mycluster.example.com")) }}
+{{- if and .Values.trustyaiConfig.enabled .Values.ragasEval.enabled $ragasDomainKnown }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -51,7 +56,7 @@ spec:
             - name: UNIFAI_RAG_TAG
               value: {{ .Values.ragasEval.ragTag | quote }}
             - name: KEYCLOAK_TOKEN_URL
-              value: {{ .Values.ragasEval.keycloakTokenUrl | quote }}
+              value: {{ .Values.ragasEval.keycloakTokenUrl | default (printf "https://keycloak.%s/realms/zuno/protocol/openid-connect/token" .Values.clusterBaseDomain) | quote }}
             - name: EVAL_PERSONA
               value: {{ .Values.ragasEval.persona | quote }}
             - name: EVAL_CLIENT_SECRET

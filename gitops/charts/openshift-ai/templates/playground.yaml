@@ -396,6 +396,7 @@ spec:
       requests: {cpu: 250m, memory: 500Mi}
       limits: {cpu: "2", memory: 12Gi}
     overrides:
+      # ADR-0603 M3: kept - vendor OGX playground (RHOAI operand) whose vLLM backends use service-CA certs it is not given; demo-only UI.
       command: ["/bin/sh", "-c", "ogx run /etc/ogx/config.yaml --insecure"]
       env:
         - {name: VLLM_TLS_VERIFY, value: "false"}

@@ -14,7 +14,8 @@ Positioned right after `postgresql` in `day0_components`
 `day0_uninstall.yml`): the `pki/roles/istio` secrets engine and the
 `istio-issuer` Kubernetes-auth role/policy this role's `ClusterIssuer`
 depends on are prepared by `vault`'s own bootstrap script
-(`ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`). This
+(`ansible/roles/vault/kustomize/configure/configure.sh`), reached over
+https with the service-ca bundle (`vaultCaBundle`, ADR-0602/WP-223). This
 role never writes to Vault directly - it only discovers the Vault client
 Service and applies a declarative `ClusterIssuer` pointing at the
 already-configured backend.

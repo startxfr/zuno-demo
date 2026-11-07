@@ -83,7 +83,7 @@
     - name: "open-webui | probe the Route"
       ansible.builtin.uri:
         url: "https://open-webui.{{ cluster_base_domain }}/health"
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _open_webui_route
       failed_when: false

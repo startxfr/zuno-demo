@@ -117,6 +117,7 @@ NAMESPACE = "zuno-ai-build"
 # `diagram-render` added 2026-09-05 (ADR-0549) - both were wrongly absent
 # (see the docstring's corrected note).
 COMPONENTS = [
+    "a2a-gateway",
     "ai-gateway",
     "diagram-render",
     "mcp-aap",
@@ -125,6 +126,9 @@ COMPONENTS = [
     "mcp-git-forge",
     "mcp-salesforce",
     "mlops",
+    "supply-chain-signer",
+    "zuno-dify-knowledge",
+    "zuno-token-proxy",
 ]
 
 # (chart_values, path) -> component name, or a tuple of component names
@@ -139,6 +143,14 @@ CHART_FIELD_COMPONENT: Dict[Tuple[str, str], object] = {
     ("gitops/charts/mcp-salesforce/values.yaml", "image.tag"): "mcp-salesforce",
     ("gitops/charts/diagram-render/values.yaml", "image.tag"): "diagram-render",
     ("gitops/charts/mlops/values.yaml", "images.mlops.tag"): "mlops",
+    # ADR-0603 M16 (WP-226): every first-party chart field that
+    # render_release_digests.py can pin. The okf-fetch init containers run the
+    # supply-chain-signer image, so one component backs two fields.
+    ("gitops/charts/a2a-gateway/values.yaml", "image.tag"): "a2a-gateway",
+    ("gitops/charts/a2a-gateway/values.yaml", "okf.fetch.image.tag"): "supply-chain-signer",
+    ("gitops/charts/mcp-gateway/values.yaml", "okf.fetch.image.tag"): "supply-chain-signer",
+    ("gitops/charts/zuno-dify-knowledge/values.yaml", "image.tag"): "zuno-dify-knowledge",
+    ("gitops/charts/zuno-token-proxy/values.yaml", "image.tag"): "zuno-token-proxy",
 }
 
 # Deliberately out of scope - no BuildConfig exists for this one field.

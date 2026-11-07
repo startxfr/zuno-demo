@@ -90,6 +90,7 @@ def client_identity_header_refused(CheckResult: Any, unifai: Callable) -> Callab
     name = "unifai_ignores_a_client_supplied_identity_header"
 
     def check() -> Any:
+        # verify=False kept (ADR-0603 M3): the request carries no credential and asserts a refusal; lab Routes may serve the router default cert.
         with httpx.Client(follow_redirects=False, timeout=20, verify=False) as c:
             resp = c.post(
                 f"{unifai().ui_url}/api2/sessions/user.session.create",
