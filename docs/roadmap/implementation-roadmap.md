@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
-| v0.16 | 10 | 8 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-240, WP-241, WP-242, WP-243 |
+| v0.16 | 10 | 7 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-241, WP-242, WP-243 |
 | v0.17 | 3 | 3 | 9 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1095,7 +1095,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 |---|---|---|---|---|---|
 | WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Repo work in review | first live run with the user's go, then the dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
 | WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Repo work in review | none (repository and CI only); done on branch `adr-0605-0609-review`, Done once pushed and CI is green |
-| WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Not started | regenerate the known-good file from demo333 outside a freeze |
+| WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Done (2026-11-07) | none: known-good regenerated from demo333 with classes, `make d3 check operators` gate PASS live |
 | WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Not started | the user decides on ECK; the nfs-provisioner role is adopted live in a window |
 | WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Not started | one rehearsal of the pattern on demo333 |
 | WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Not started | the tests run against demo333 |

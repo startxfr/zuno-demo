@@ -1,6 +1,6 @@
 # ADR-0607: Pin, gate and schedule pre-GA dependencies
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team
@@ -27,8 +27,8 @@ has, at least once, changed live behaviour.
 **Every pre-GA dependency is classified, pinned, approved one release at a time, and upgraded only outside a freeze,
 with its rollback recorded before the upgrade.**
 
-1. **Classes.** Each operator in the known-good file carries a `class:`: `ga`, `tech-preview`, `early-access`, `alpha`
-   or `staging`. The class is read from the channel and the vendor's support statement, and reviewed when the channel
+1. **Classes.** Each operator in the known-good file carries a `class:`: `ga`, `tech-preview`, `early-access`, `alpha`,
+   `staging`, or `community` (a community catalog's operator on a stable channel: no vendor support, GA-like lifecycle). The class is read from the channel and the vendor's support statement, and reviewed when the channel
    changes.
 2. **The pin is the approval point.** A non-GA dependency is pinned by catalog digest or by `startingCSV`. Where the
    catalog is not pinned by digest, `installPlanApproval: Manual` is required and the role approves only the pinned
@@ -79,3 +79,18 @@ becomes a runbook, `docs/platform/pre-ga-upgrade.md`, per ADR-0606 clause 6.
 ## Work packages
 
 [WP-240](../roadmap/work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md).
+
+## Update 2026-11-07 (WP-240): implemented
+
+- `platform/olm/audit_operator_updates.py` gives every operator a support class (`support_class`) and gates on the
+  known-good file with `--against` (exit 3 on a FAIL finding: a pre-GA operator on another version than recorded, a
+  Subscription missing from the file, a recorded operator not installed; a GA or community operator's difference is
+  reported as INFO). Unit cases in `platform/olm/tests/`.
+- `platform/olm/known-good-demo333.yaml` regenerated from demo333 on 2026-11-07 with classes: 21 `ga`, 2 `community`,
+  2 `alpha` (unifai-operator, nfs-provisioner-operator), 2 `staging` (claw-operator, one per persona), 1 `early-access`
+  (rhods-operator 3.6.0-ea.2). It had gone stale since 2026-11-05 (unifai-operator 0.1.59 recorded, 0.1.64 running).
+- `make d3 check operators` runs the gate when the cluster's file exists; run live on demo333 on 2026-11-07: PASS.
+- The pinning paragraph of `ansible/confidential.example.yml` and the routine `docs/platform/pre-ga-upgrade.md` follow
+  clauses 2 to 6. Clause 7 (canary) relies on ADR-0609.
+- `community` was added to the classes of clause 1: grafana-operator and external-secrets-operator come from the
+  community catalog on stable channels and are neither GA-supported nor pre-GA.
