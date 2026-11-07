@@ -130,15 +130,17 @@ agentChain:
 
 # ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens the
 # gateway accepts, on top of jwtAudience. An entry ending in "*" is a prefix.
-# Empty (the default) accepts every client the audience admits. Include the admin
-# client when /admin/* is used.
+# Empty (the default) accepts every client the audience admits; a bare "*" is
+# refused. Include the admin client when /admin/* is used. An OpenShift token on
+# /mcp (TokenReview, ADR-0524) has no azp and is not subject to the list.
 jwtAllowedClients: []
 
 # WP-225 lot C (ADR-0603 M14): check the caller's entitlement to the calling agent
 # (zuno.access.groups, ADR-0040) on EVERY tool call, so the REST north side
 # (/v1/tools/{name}/invoke) refuses what /mcp already refuses. OFF by default:
-# the 2026-11-09 demo runs sale-01 in UnifAI, whose tool calls use REST. Turn on
-# after the demo, with a golden-path run right after.
+# kept off until a post-demo golden-path run, belt and braces. UnifAI calls /mcp,
+# which refuses up front either way; the only REST callers are the evaluation
+# scripts.
 restAgentEntitlement: false
 
 # ADR-0524 clause 3 (WP-085 step 3): lets OpenShift Lightspeed reach this

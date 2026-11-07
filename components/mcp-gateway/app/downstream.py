@@ -176,7 +176,7 @@ async def _invoke_streamable_http(
     # before. An unusable key fails the call: never a fallback to the bearer.
     try:
         authorization = call_assertion.authorization_for(
-            binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or ""
+            binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or "", arguments=arguments
         )
     except call_assertion.AssertionUnavailable as exc:
         logger.error("no call assertion for %s: %s", binding.backend, exc)

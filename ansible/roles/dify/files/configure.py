@@ -99,16 +99,19 @@ for m in IN["models"]:
     print("model:", m["name"], "registered")
 
 # 4. MCP tool
+MCP_PROVIDER = {
+    "server_url": IN["proxy"] + "/mcp", "name": IN["mcp_name"], "icon": "🛠️", "icon_type": "emoji",
+    "icon_background": "#FFEAD5", "server_identifier": "zuno-mcp-gateway",
+    # WP-225 lot C: the token proxy's inbound key, when it asks for one.
+    "headers": {"Authorization": "Bearer " + IN["proxy_key"]} if IN.get("proxy_key") else {},
+    "timeout": 30, "sse_read_timeout": 300,
+}
 tools = call("GET", "/workspaces/current/tools/mcp")
-if any(t.get("name") == IN["mcp_name"] for t in (tools if isinstance(tools, list) else tools.get("data", []))):
+mcp_registered = any(t.get("name") == IN["mcp_name"] for t in (tools if isinstance(tools, list) else tools.get("data", [])))
+if mcp_registered:
     print("mcp: already registered")
 else:
-    call("POST", "/workspaces/current/tool-provider/mcp", json={
-        "server_url": IN["proxy"] + "/mcp", "name": IN["mcp_name"], "icon": "🛠️", "icon_type": "emoji",
-        "icon_background": "#FFEAD5", "server_identifier": "zuno-mcp-gateway",
-        "headers": {"Authorization": "Bearer " + IN["proxy_key"]} if IN.get("proxy_key") else {},
-        "timeout": 30, "sse_read_timeout": 300,
-    })
+    call("POST", "/workspaces/current/tool-provider/mcp", json=MCP_PROVIDER)
     print("mcp: registered")
 
 # The registration leaves the server unauthorised with no tool ("Serveur Non Configuré" in the console):
@@ -120,6 +123,11 @@ mcp = next((p for p in providers if p.get("type") == "mcp" and p.get("name") == 
 if mcp is None:
     print("FAIL mcp provider not found in /tool-providers")
     sys.exit(1)
+if mcp_registered and IN.get("proxy_key"):
+    # WP-225 lot C review: a provider registered before inbound auth was turned on has no key and would get 401 from
+    # the token proxy; update it in place (same name and identifier, the key header added). Idempotent.
+    call("PUT", "/workspaces/current/tool-provider/mcp", json={**MCP_PROVIDER, "provider_id": mcp["id"]})
+    print("mcp: headers updated")
 if not mcp.get("is_team_authorization"):
     call("POST", "/workspaces/current/tool-provider/mcp/auth", json={"provider_id": mcp["id"]})
     print("mcp: authorised")

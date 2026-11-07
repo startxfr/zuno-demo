@@ -284,9 +284,9 @@ def evaluate(
     # so a caller could name an agent it may not use and reach that agent's tools.
     # Both front doors now get it from here, the one intersection (ADR-0036).
     # Gated (chart `restAgentEntitlement`, env AGENT_ENTITLEMENT_EVERY_CALL), OFF by
-    # default: the 2026-11-09 demo runs sale-01 in UnifAI, whose tool calls take
-    # the REST path, and nothing proves every agent named there entitles sale-01.
-    # /mcp keeps its own up-front refusal either way (main.py).
+    # default: kept off until a post-demo golden-path run, belt and braces. UnifAI
+    # calls /mcp, which keeps its own up-front refusal either way (main.py); the
+    # only REST callers are the evaluation scripts.
     if agent_entitlement_every_call():
         refusal = agent_entitlement_refusal(agent, caller_groups)
         if refusal:

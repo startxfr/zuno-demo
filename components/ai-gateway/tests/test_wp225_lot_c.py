@@ -79,9 +79,50 @@ def test_the_metered_paths_resolve_the_same_agent() -> None:
     identity = CallerIdentity(sub="u", groups=[], raw_claims={"azp": "unifai"}, token="t")
     with mock.patch.dict(os.environ, VERIFY):
         assert app_main._agent_identity(_chain(), "tekos", "answer-technical-question", identity) == \
-            ("cognos", "coming-soon")
-        assert app_main._agent_identity(_chain(key=OTHER_KEY), "tekos", "x", identity) == ("tekos", "x")
-        assert app_main._agent_identity("", "tekos", "x", identity) == ("tekos", "x")
+            ("cognos", "coming-soon", True)
+        assert app_main._agent_identity(_chain(key=OTHER_KEY), "tekos", "x", identity) == ("tekos", "x", False)
+        assert app_main._agent_identity("", "tekos", "x", identity) == ("tekos", "x", False)
+
+
+def test_an_unverified_low_floor_agent_cannot_drop_below_the_client_floor() -> None:
+    """Review finding: with clientFloors {unifai: C2}, a UnifAI call naming tekos (C1)
+    without a valid chain runs at C2 (the higher of the two), not C1."""
+    floors = {"CLASSIFICATION_CLIENT_FLOORS": "unifai=C2"}
+    resp, served, decisions, _ = w209._chat(CLAIMS_TEKOS, env={**VERIFY, **floors})
+    assert resp.status_code == 200, resp.text
+    assert decisions[-1]["classification"] == "C2"
+    # A verified chain for tekos keys on tekos' own floor alone.
+    chain = _chain(agent="tekos", task="answer-technical-question")
+    resp, _, decisions, _ = w209._chat({**CLAIMS_TEKOS, "X-Zuno-Agent-Chain": chain}, env={**VERIFY, **floors})
+    assert decisions[-1]["classification"] == "C1"
+
+
+def test_a_client_required_to_present_a_chain_gets_its_agent_header_ignored() -> None:
+    env = {**VERIFY, "CLASSIFICATION_CLIENT_FLOORS": "unifai=C2", "AGENT_CHAIN_REQUIRE_FOR": "unifai"}
+    claims_cognos = {"X-Zuno-Data-Classification": "C1", "X-Zuno-Agent": "cognos", "X-Zuno-Task": "coming-soon"}
+    with mock.patch.object(app_main.logger, "warning") as warning:
+        resp, _, decisions, _ = w209._chat(claims_cognos, env=env)
+    assert decisions[-1]["classification"] == "C2", "the header (cognos, C3) is ignored: only the client floor"
+    assert any("AGENT_CHAIN_REQUIRE_FOR" in (c.args[0] if c.args else "") for c in warning.call_args_list)
+    resp, _, decisions, _ = w209._chat({**claims_cognos, "X-Zuno-Agent-Chain": _chain()}, env=env)
+    assert decisions[-1]["classification"] == "C3", "a valid chain names the agent"
+    # A client not on the list keeps its header, raised to the client floor if lower.
+    resp, _, decisions, _ = w209._chat(claims_cognos, env={**env, "AGENT_CHAIN_REQUIRE_FOR": "open-webui"})
+    assert decisions[-1]["classification"] == "C3"
+
+
+def test_a_bare_star_allowlist_refuses_to_start() -> None:
+    import importlib
+
+    with mock.patch.dict(os.environ, {"JWT_ALLOWED_CLIENTS": "unifai,*"}):
+        try:
+            importlib.reload(auth)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("auth imported with a bare '*' in JWT_ALLOWED_CLIENTS")
+    importlib.reload(auth)
+    assert not auth.client_allowed("anything", ["*"]), "a bare '*' never matches"
 
 
 _RSA = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -120,6 +161,9 @@ TESTS = [
     test_without_verification_the_chain_header_is_ignored,
     test_no_chain_keeps_the_header_agent_and_its_floor,
     test_the_metered_paths_resolve_the_same_agent,
+    test_an_unverified_low_floor_agent_cannot_drop_below_the_client_floor,
+    test_a_client_required_to_present_a_chain_gets_its_agent_header_ignored,
+    test_a_bare_star_allowlist_refuses_to_start,
     test_the_allowed_clients_list_refuses_another_azp,
 ]
 

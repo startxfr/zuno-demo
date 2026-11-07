@@ -66,6 +66,8 @@ spec:
             {{- if .Values.callAssertion.publicKey }}
             - name: MCP_CALL_ASSERTION_PUBLIC_KEY
               value: {{ .Values.callAssertion.publicKey | quote }}
+            - name: MCP_CALL_ASSERTION_MAX_BODY_BYTES
+              value: {{ .Values.callAssertion.maxBodyBytes | int64 | quote }}
             {{- end }}
             {{- if .Values.callAssertion.required }}
             {{- if not .Values.callAssertion.publicKey }}

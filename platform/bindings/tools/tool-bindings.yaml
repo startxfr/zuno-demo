@@ -64,8 +64,10 @@
 #                          outboundIdentity.mode assertion. Default false: a Zuno
 #                          server (gateway_token true) then gets the gateway's
 #                          per-call assertion, a third-party backend
-#                          (gateway_token false) no Authorization at all. No
-#                          binding sets it today.
+#                          (gateway_token false) no Authorization at all.
+#                          Required (true) for auth_mode delegated-user and
+#                          provider-delegated, so assertion mode never replaces
+#                          a delegated token.
 #
 # ADR-0119: an optional top-level `backends:` map (backend name -> default
 # {env, default, path}) lets a streamable-http entry omit its own
@@ -222,6 +224,7 @@ bindings:
     handler: drive
     provider_tool: list_drive_files
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"folder": {"type": "string", "description": "Drive folder to list (default \"My Drive\")."}}}
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same in-process
@@ -237,6 +240,7 @@ bindings:
     handler: drive_create
     provider_tool: create_document
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"title": {"type": "string", "description": "Title of the new document."}, "content": {"type": "string", "description": "Text content of the new document."}}, "required": ["title"]}
 
   - capability: drive.document.update
@@ -245,6 +249,7 @@ bindings:
     handler: drive_update
     provider_tool: update_document
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"document_id": {"type": "string", "description": "Identifier of the document to update."}, "content": {"type": "string", "description": "New text content of the document."}}, "required": ["document_id"]}
 
   - capability: gmail.message.read
@@ -254,6 +259,7 @@ bindings:
     handler: gmail
     provider_tool: read_gmail
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"query": {"type": "string", "description": "Gmail search expression (default \"in:inbox\")."}}}
 
   - capability: web.page.search
@@ -293,6 +299,7 @@ bindings:
       path: /mcp
     provider_tool: get_own_profile
     auth_mode: provider-delegated
+    user_token: true
 
   - capability: workday.profile.self.update
     backend: workday
@@ -303,6 +310,7 @@ bindings:
       path: /mcp
     provider_tool: update_own_profile
     auth_mode: provider-delegated
+    user_token: true
 
   - capability: workday.profile.any.read
     backend: workday
@@ -313,6 +321,7 @@ bindings:
       path: /mcp
     provider_tool: get_staff_profile
     auth_mode: provider-delegated
+    user_token: true
 
   # --- git-forge: real MCP server (ADR-0120), streamable-HTTP transport.
   #     One server, two providers (`provider: github|gitlab` is a tool

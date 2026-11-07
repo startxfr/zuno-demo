@@ -183,9 +183,12 @@ lot C (verifiable agent identity).
 WP-225 lot C (2026-11-07, Operator pending) provides that identity: the a2a-gateway signs `X-Zuno-Agent-Chain` (the agent
 it runs, its task and the checked delegators, bound to the bearer, 60 s). With `agentChain.verify` and the public key set
 on the ai-gateway, the floor keys on the verified agent, and a disagreeing `X-Zuno-Agent` is ignored and logged. This closes
-the gap when the chain is verified, that is for the turns the a2a-gateway runs. A call without a valid chain keeps
-today's behaviour (the headers, then the per-client floor), so UnifAI's direct calls, whose headers are static, stay
-covered by `classification.clientFloors` until UnifAI signs its own calls (the follow-up in the WP-225 brief).
+the gap when the chain is verified, that is for the turns the a2a-gateway runs. Since the lot C review, a call without a
+valid chain gets the higher of the named agent's floor and the per-client floor (no longer the agent's instead of the
+client's), so claiming a low-floor agent cannot drop a UnifAI call below `classification.clientFloors` either; and
+`agentChain.requireFor` can ignore the agent header of a listed client that sends no valid chain. UnifAI's direct
+calls, whose headers are static, stay covered by the client floor until UnifAI signs its own calls (the follow-up in
+the WP-225 brief).
 
 ## Live verification (2026-11-07)
 

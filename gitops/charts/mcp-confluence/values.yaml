@@ -60,6 +60,9 @@ spaceAllowlist:
 # served. required: true refuses every request without a valid assertion; set it
 # only after the mcp-gateway runs with outboundIdentity.mode assertion. Both off by
 # default (today's behaviour).
+# maxBodyBytes: the largest request body read to check a tools/call (a larger one
+# is refused with 413); 16 MiB leaves room for a git.file.write of a large file.
 callAssertion:
   publicKey: ""
   required: false
+  maxBodyBytes: 16777216

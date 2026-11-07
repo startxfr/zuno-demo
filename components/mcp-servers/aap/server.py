@@ -585,8 +585,9 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
 # name, exp at most 60 s after iat, jti. This server holds the public key
 # (MCP_CALL_ASSERTION_PUBLIC_KEY, PEM) and verifies it here, before any MCP
 # handling. A forged, expired, too long-lived or misaddressed assertion is
-# refused (401). A tools/call whose name is not the assertion's tool, or whose
-# jti was already consumed, is refused (403). With
+# refused (401). A tools/call whose name is not the assertion's tool, whose
+# arguments do not match its `args` hash, or whose jti was already consumed, is
+# refused (403); a body that is not JSON 400, one past the size cap 413. With
 # MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
 # refused; without it a request carrying no assertion is served as before.
 # This block is byte-identical in confluence, git-forge, salesforce and aap
@@ -605,7 +606,10 @@ CALL_ASSERTION_TYPE = "zuno-call+jwt"
 CALL_ASSERTION_ISSUER = "mcp-gateway"
 CALL_ASSERTION_MAX_TTL_SECONDS = 60
 CALL_ASSERTION_LEEWAY_SECONDS = 5
-CALL_ASSERTION_MAX_BODY_BYTES = 1024 * 1024
+# The largest request body read to check a tools/call (git.file.write carries a whole
+# file): MCP_CALL_ASSERTION_MAX_BODY_BYTES, chart callAssertion.maxBodyBytes. A larger
+# body is refused with 413.
+CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024
 _CALL_ASSERTION_KEYS: Dict[str, Any] = {}
 _CALL_ASSERTION_SEEN: Dict[str, float] = {}
 
@@ -616,6 +620,22 @@ class CallAssertionError(ValueError):
 
 def _call_assertion_required() -> bool:
     return os.getenv("MCP_CALL_ASSERTION_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _call_assertion_max_body_bytes() -> int:
+    raw = os.getenv("MCP_CALL_ASSERTION_MAX_BODY_BYTES", "").strip()
+    try:
+        value = int(raw) if raw else CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+    except ValueError:
+        value = CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+    return value if value > 0 else CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+
+
+def _call_assertion_args_hash(arguments: Any) -> str:
+    """sha256 of the canonical JSON of tools/call params.arguments (the `args` claim)."""
+    canonical = json.dumps(arguments if arguments is not None else {}, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _call_assertion_public_key() -> Any:
@@ -661,10 +681,13 @@ def _verify_call_assertion(token: str, key: Any, now: Optional[float] = None) ->
         raise CallAssertionError("call assertion lifetime is not within 60 seconds")
     if iat > current + CALL_ASSERTION_LEEWAY_SECONDS or current > exp + CALL_ASSERTION_LEEWAY_SECONDS:
         raise CallAssertionError("call assertion expired or not yet valid")
-    if (claims.get("act") or {}).get("sub") != CALL_ASSERTION_ISSUER:
+    act = claims.get("act")
+    if not isinstance(act, dict) or act.get("sub") != CALL_ASSERTION_ISSUER:
         raise CallAssertionError("call assertion has no gateway actor")
     if not isinstance(claims.get("tool"), str) or not isinstance(claims.get("jti"), str):
         raise CallAssertionError("call assertion has no tool or jti")
+    if "args" in claims and not isinstance(claims["args"], str):
+        raise CallAssertionError("call assertion has a malformed args hash")
     return claims
 
 
@@ -680,18 +703,21 @@ def _consume_call_assertion(jti: str, exp: int, now: Optional[float] = None) -> 
     return True
 
 
-def _called_tools(body: bytes) -> List[str]:
-    try:
-        message = json.loads(body) if body else None
-    except (ValueError, UnicodeDecodeError):
+def _called_tools(body: bytes) -> Optional[List[Any]]:
+    """The tools/call messages of a body: [(name, arguments)]; None when the body is not JSON."""
+    if not body:
         return []
+    try:
+        message = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return None
     messages = message if isinstance(message, list) else [message]
-    names = []
+    calls = []
     for item in messages:
         if isinstance(item, dict) and item.get("method") == "tools/call":
             params = item.get("params") if isinstance(item.get("params"), dict) else {}
-            names.append(str(params.get("name") or ""))
-    return names
+            calls.append((str(params.get("name") or ""), params.get("arguments")))
+    return calls
 
 
 class CallAssertionMiddleware:
@@ -723,24 +749,32 @@ class CallAssertionMiddleware:
             _ASSERTION_LOG.warning("call assertion refused: %s", exc)
             await JSONResponse({"detail": str(exc)}, status_code=401)(scope, receive, send)
             return
-        chunks, size, more = [], 0, True
+        chunks, size, more, limit = [], 0, True, _call_assertion_max_body_bytes()
         while more:
             message = await receive()
             if message.get("type") != "http.request":
                 break
             chunk = message.get("body", b"")
             size += len(chunk)
-            if size > CALL_ASSERTION_MAX_BODY_BYTES:
+            if size > limit:
                 await JSONResponse({"detail": "request body too large"}, status_code=413)(scope, receive, send)
                 return
             chunks.append(chunk)
             more = message.get("more_body", False)
         body = b"".join(chunks)
         called = _called_tools(body)
+        if called is None:
+            await JSONResponse({"detail": "the request body is not JSON"}, status_code=400)(scope, receive, send)
+            return
         if called:
-            if len(called) != 1 or called[0] != claims["tool"]:
-                _ASSERTION_LOG.warning("call assertion for tool %r refused for tools/call %s", claims["tool"], called)
+            names = [name for name, _ in called]
+            if len(called) != 1 or names[0] != claims["tool"]:
+                _ASSERTION_LOG.warning("call assertion for tool %r refused for tools/call %s", claims["tool"], names)
                 await JSONResponse({"detail": "the call assertion was minted for another tool"}, status_code=403)(scope, receive, send)
+                return
+            if "args" in claims and claims["args"] != _call_assertion_args_hash(called[0][1]):
+                _ASSERTION_LOG.warning("call assertion for tool %r refused: the arguments differ", claims["tool"])
+                await JSONResponse({"detail": "the call assertion was minted for other arguments"}, status_code=403)(scope, receive, send)
                 return
             if not _consume_call_assertion(claims["jti"], claims["exp"]):
                 _ASSERTION_LOG.warning("call assertion replay refused (jti %s)", claims["jti"])

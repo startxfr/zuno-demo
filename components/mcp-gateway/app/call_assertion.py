@@ -13,6 +13,7 @@ a short-lived JWT it signs itself, one per tool call:
 
     {"iss": "mcp-gateway", "aud": "<the binding's backend>", "sub": "<caller sub>",
      "act": {"sub": "mcp-gateway"}, "tool": "<the backend's own tool name>",
+     "args": "<sha256 of the canonical JSON of the tool arguments>",
      "iat": ..., "exp": <iat + at most 60 s>, "jti": "<uuid>"}
 
 Only the gateway holds the private key (MCP_CALL_ASSERTION_KEY_FILE); each Zuno
@@ -20,7 +21,7 @@ server holds the public key and verifies it (`CallAssertionMiddleware`, the same
 block in confluence, git-forge, salesforce and aap). Unlike the workload token and
 the lot B caller context, a backend cannot mint one. A backend refuses an
 assertion that is forged, expired, longer-lived than 60 s, addressed to another
-backend, minted for another tool, or replayed (its `jti` is consumed by the one
+backend, minted for another tool or other arguments, or replayed (its `jti` is consumed by the one
 `tools/call` it was minted for).
 
 Per binding (platform/bindings/tools/tool-bindings.yaml), in assertion mode:
@@ -42,6 +43,8 @@ offline.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import time
@@ -108,11 +111,20 @@ def signing_key() -> Ed25519PrivateKey:
     return key
 
 
+def args_hash(arguments: Any) -> str:
+    """The `args` claim: sha256 of the canonical JSON of the tool arguments. The
+    servers compute the same over the tools/call params.arguments they receive."""
+    canonical = json.dumps(arguments if arguments is not None else {}, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def mint(
     *,
     audience: str,
     sub: str,
     tool: str,
+    arguments: Any = None,
     key: Optional[Ed25519PrivateKey] = None,
     ttl: Optional[int] = None,
     now: Optional[float] = None,
@@ -131,16 +143,21 @@ def mint(
         "exp": issued + lifetime,
         "jti": uuid.uuid4().hex,
     }
+    if tool:
+        # A schema-read assertion (no tool) carries no args; it can call nothing.
+        claims["args"] = args_hash(arguments)
     return jwt.encode(claims, key or signing_key(), algorithm=ALGORITHM, headers={"typ": TYPE})
 
 
-def authorization_for(binding: Any, bearer_token: str, *, sub: str, tool: str) -> Optional[str]:
+def authorization_for(
+    binding: Any, bearer_token: str, *, sub: str, tool: str, arguments: Any = None
+) -> Optional[str]:
     """The Authorization header of one streamable-HTTP tool call, or None for none."""
     if mode() == "bearer" or getattr(binding, "user_token", False):
         return f"Bearer {bearer_token}"
     if not getattr(binding, "gateway_token", True):
         return None  # a third-party backend: it receives no identity at all
-    return "Bearer " + mint(audience=binding.backend, sub=sub, tool=tool)
+    return "Bearer " + mint(audience=binding.backend, sub=sub, tool=tool, arguments=arguments)
 
 
 def schema_authorization_for(backend: str, gateway_token: bool) -> Optional[str]:

@@ -64,8 +64,16 @@ def allowed_clients() -> List[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
 
 
+# WP-225 lot C review: a bare "*" would turn the allowlist into "every client" while
+# looking like a control; refuse to start instead.
+if "*" in allowed_clients():
+    raise RuntimeError("JWT_ALLOWED_CLIENTS contains a bare '*'; list the clients (a prefix like 'openclaw-*' is fine).")
+
+
 def client_allowed(azp: str, patterns: List[str]) -> bool:
     for pattern in patterns:
+        if pattern == "*":
+            continue  # a bare "*" would admit every client: refused at start, never a match
         if pattern.endswith("*"):
             if azp.startswith(pattern[:-1]) and len(azp) > len(pattern) - 1:
                 return True

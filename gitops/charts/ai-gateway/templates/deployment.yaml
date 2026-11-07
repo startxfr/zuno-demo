@@ -106,6 +106,9 @@ spec:
               value: {{ .Values.jwtAudienceRequired | quote }}
             {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
             {{- with .Values.jwtAllowedClients }}
+            {{- if has "*" . }}
+            {{- fail "jwtAllowedClients must list clients; a bare \"*\" would admit every client" }}
+            {{- end }}
             - name: JWT_ALLOWED_CLIENTS
               value: {{ join "," . | quote }}
             {{- end }}
@@ -117,6 +120,13 @@ spec:
               value: "true"
             - name: AGENT_CHAIN_PUBLIC_KEY
               value: {{ .Values.agentChain.publicKey | quote }}
+            {{- end }}
+            {{- with .Values.agentChain.requireFor }}
+            {{- if not $.Values.agentChain.verify }}
+            {{- fail "agentChain.requireFor needs agentChain.verify (no chain can be valid without it)" }}
+            {{- end }}
+            - name: AGENT_CHAIN_REQUIRE_FOR
+              value: {{ join "," . | quote }}
             {{- end }}
             - name: LOCAL_MODEL_ENDPOINT
               value: {{ .Values.localModelEndpoint | quote }}

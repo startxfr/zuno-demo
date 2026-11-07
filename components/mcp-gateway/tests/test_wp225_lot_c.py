@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import importlib.util
 import logging
 import os
 import pathlib
@@ -165,8 +166,27 @@ class CallAssertionTest(unittest.TestCase):
             self.assertEqual(call_assertion.authorization_for(needing, "caller-jwt", sub="s", tool="t"),
                              "Bearer caller-jwt")
 
-    def test_no_shipped_binding_needs_the_user_token(self):
-        self.assertEqual([b.capability for b in gateway_main.binding_registry._bindings if b.user_token], [])
+    def test_only_the_delegated_bindings_keep_the_user_token(self):
+        keeping = {b.capability for b in gateway_main.binding_registry._bindings if b.user_token}
+        delegated = {b.capability for b in gateway_main.binding_registry._bindings
+                     if b.auth_mode in ("delegated-user", "provider-delegated")}
+        self.assertEqual(keeping, delegated)
+        self.assertTrue(delegated)
+
+    def test_a_delegated_binding_without_user_token_does_not_load(self):
+        binding = gateway_main.binding_registry.resolve("confluence.page.search")
+        for mode in ("delegated-user", "provider-delegated"):
+            problem = _validate(Binding(**{**binding.__dict__, "auth_mode": mode, "user_token": False}))
+            self.assertIn("user_token: true", problem or "", mode)
+            self.assertIsNone(_validate(Binding(**{**binding.__dict__, "auth_mode": mode, "user_token": True})))
+
+    def test_the_args_claim_hashes_the_arguments(self):
+        token = call_assertion.mint(audience="aap", sub="s", tool="t", arguments={"b": 1, "a": "é"}, key=GW_KEY)
+        claims = jwt.decode(token, GW_KEY.public_key(), algorithms=["EdDSA"], audience="aap")
+        self.assertEqual(claims["args"], call_assertion.args_hash({"a": "é", "b": 1}))
+        self.assertNotEqual(claims["args"], call_assertion.args_hash({"a": "é", "b": 2}))
+        schema = call_assertion.mint(audience="aap", sub="s", tool="", key=GW_KEY)
+        self.assertNotIn("args", jwt.decode(schema, GW_KEY.public_key(), algorithms=["EdDSA"], audience="aap"))
 
     def test_a_non_boolean_user_token_fails_the_binding(self):
         binding = gateway_main.binding_registry.resolve("confluence.page.search")
@@ -389,6 +409,21 @@ class AllowedClientsTest(unittest.TestCase):
         self.assertEqual(self._status(_token(azp="dify"), env), 200)
         self.assertEqual(self._status(_token(azp="aap"), env), 401)
         self.assertEqual(self._status(_token(), env), 401, "a token without azp")
+
+
+class AllowedClientsBareStarTest(unittest.TestCase):
+    def test_a_bare_star_never_matches(self):
+        self.assertFalse(auth.client_allowed("anything", ["*"]))
+        self.assertTrue(auth.client_allowed("openclaw-sale-01", ["*", "openclaw-*"]))
+
+    def test_a_bare_star_refuses_to_start(self):
+        source = (pathlib.Path(auth.__file__)).read_text()
+        self.assertIn('if "*" in allowed_clients():', source)
+        with mock.patch.dict(os.environ, {"JWT_ALLOWED_CLIENTS": "*"}):
+            spec = importlib.util.spec_from_file_location("auth_bare_star", auth.__file__)
+            module = importlib.util.module_from_spec(spec)
+            with self.assertRaises(RuntimeError):
+                spec.loader.exec_module(module)
 
 
 class RestEntitlementOffByDefaultTest(unittest.TestCase):

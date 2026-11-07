@@ -176,6 +176,9 @@ spec:
               value: "true"
             {{- end }}
             {{- with .Values.jwtAllowedClients }}
+            {{- if has "*" . }}
+            {{- fail "jwtAllowedClients must list clients; a bare \"*\" would admit every client" }}
+            {{- end }}
             - name: JWT_ALLOWED_CLIENTS
               value: {{ join "," . | quote }}
             {{- end }}

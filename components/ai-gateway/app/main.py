@@ -26,7 +26,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from app import classification_floor, model_tasks, signed_chain, tool_markers
 from app import key_ceilings, metered_paths, stream_guard
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
-from app.auth import CallerIdentity, require_admin, validate_token
+from app.auth import CallerIdentity, client_allowed, require_admin, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
 from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
@@ -389,20 +389,41 @@ async def _guardrails_refusal(
     return JSONResponse(guardrails.refusal_body(stage, detections), status_code=400)
 
 
-def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerIdentity) -> "tuple[str, str]":
-    """ADR-0603 M14 (WP-225 lot C): the (agent, task) a call is made for.
+def agent_chain_required_clients() -> List[str]:
+    """WP-225 lot C review: the Keycloak clients (`azp`, `*` suffix a prefix) that
+    must present a valid X-Zuno-Agent-Chain when they declare an agent
+    (AGENT_CHAIN_REQUIRE_FOR, chart agentChain.requireFor, read per call). Empty
+    (the default) requires it of nobody."""
+    raw = os.getenv("AGENT_CHAIN_REQUIRE_FOR", "")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerIdentity) -> "tuple[str, str, bool]":
+    """ADR-0603 M14 (WP-225 lot C): the (agent, task) a call is made for, and
+    whether it comes from a verified chain.
 
     With AGENT_CHAIN_VERIFY on and a valid X-Zuno-Agent-Chain (signed by the
     a2a-gateway, bound to this bearer, addressed to the ai-gateway;
     app/signed_chain.py), the verified pair replaces X-Zuno-Agent / X-Zuno-Task, so
     the WP-209 floor, the routing preferences and the guardrails mode key on an
     agent the caller cannot choose. A disagreeing header is ignored and logged.
-    Without a verified chain the headers apply, as before, and so does the
-    per-client floor."""
+    Without a verified chain the headers apply, as before, and the floor is the
+    higher of the agent's and the client's. A client listed in
+    AGENT_CHAIN_REQUIRE_FOR that names an agent without a valid chain gets the
+    agent header ignored (logged): only its client floor applies."""
     resolved = signed_chain.resolve(
         chain_header, agent, task, token=identity.token, audience="ai-gateway", log=logger
     )
-    return resolved.agent, resolved.task
+    if resolved.verified:
+        return resolved.agent, resolved.task, True
+    required = agent_chain_required_clients()
+    if (agent or "").strip() and required and client_allowed(identity.client, required):
+        logger.warning(
+            "X-Zuno-Agent %r ignored: client %s must present a valid agent chain (AGENT_CHAIN_REQUIRE_FOR)",
+            agent, identity.client,
+        )
+        return "", task, False
+    return resolved.agent, resolved.task, False
 
 
 @app.post("/v1/chat/completions", dependencies=[Depends(adopt_incoming_trace_context)])
@@ -452,7 +473,7 @@ async def chat_completions(
     # by _agent_identity() only when AGENT_CHAIN_VERIFY is on.
     x_zuno_agent_chain: str = Header(default="", alias=signed_chain.HEADER),
 ):
-    x_zuno_agent, x_zuno_task = _agent_identity(x_zuno_agent_chain, x_zuno_agent, x_zuno_task, identity)
+    x_zuno_agent, x_zuno_task, agent_verified = _agent_identity(x_zuno_agent_chain, x_zuno_agent, x_zuno_task, identity)
     set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
     set_caller_persona(identity.persona)  # ADR-0593: the zuno.persona span attribute and the per-user budget
     # ADR-0596: an experience client's declared model (e.g. zuno-code) selects
@@ -465,7 +486,7 @@ async def chat_completions(
     # local_only_for, guardrails and the counters below all use the effective level.
     floor = classification_floor.floors.effective(
         classification_floor.declared_level(x_zuno_data_classification), x_zuno_agent, x_zuno_task,
-        identity.client,
+        identity.client, agent_verified=agent_verified,
     )
     if floor.raised:
         logger.info(
@@ -1722,7 +1743,7 @@ async def _metered_call(
     api: str, body: Dict[str, Any], identity: CallerIdentity, *,
     classification_header: str, local_only_header: str, agent: str, task: str,
     request_id_header: str, run_id_header: str, quota_class_header: str, project_id_header: str,
-    forwarded: Dict[str, str], count_tokens: bool = False,
+    forwarded: Dict[str, str], count_tokens: bool = False, agent_verified: bool = False,
 ) -> Response:
     if not metered_paths.enabled():
         raise HTTPException(status_code=404, detail="Not Found")
@@ -1741,6 +1762,7 @@ async def _metered_call(
     set_caller_task(task)
     floor = classification_floor.floors.effective(
         classification_floor.declared_level(classification_header), agent, task, identity.client,
+        agent_verified=agent_verified,
     )
     classification = floor.effective
     local_only = local_only_header.strip().lower() == "true" or model_routing_policy.local_only_for_classification(
@@ -1996,7 +2018,7 @@ async def _metered_endpoint(api: str, request: Request, identity: CallerIdentity
     except ValueError:
         return metered_paths.error(api, 400, "invalid_request", "the request body is not valid JSON")
     h = request.headers
-    agent, task = _agent_identity(
+    agent, task, agent_verified = _agent_identity(
         h.get(signed_chain.HEADER, ""), h.get("X-Zuno-Agent", ""), h.get("X-Zuno-Task", ""), identity
     )
     return await _metered_call(
@@ -2006,7 +2028,7 @@ async def _metered_endpoint(api: str, request: Request, identity: CallerIdentity
         agent=agent, task=task,
         request_id_header=h.get("X-Zuno-Request-Id", ""), run_id_header=h.get("X-Zuno-Run-Id", ""),
         quota_class_header=h.get("X-Zuno-Quota-Class", ""), project_id_header=h.get("X-Zuno-Project-Id", ""),
-        forwarded=_forwarded(request), count_tokens=count_tokens,
+        forwarded=_forwarded(request), count_tokens=count_tokens, agent_verified=agent_verified,
     )
 
 

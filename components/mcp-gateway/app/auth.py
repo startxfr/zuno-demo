@@ -62,13 +62,23 @@ def allowed_clients() -> List[str]:
     an entry ending in `*` is a prefix). Empty, the default, accepts every client
     the audience admits, as before. Set, a token from another client, or without
     `azp`, is refused with a 401: on top of the `zuno-admin-api` audience
-    (WP-222), each experience is then admitted by name."""
+    (WP-222), each experience is then admitted by name.
+    A Kubernetes TokenReview identity (an OpenShift token on /mcp, ADR-0524) has no
+    `azp` and is not subject to this list; it never passes validate_token."""
     raw = os.getenv("JWT_ALLOWED_CLIENTS", "")
     return [c.strip() for c in raw.split(",") if c.strip()]
 
 
+# WP-225 lot C review: a bare "*" would turn the allowlist into "every client" while
+# looking like a control; refuse to start instead.
+if "*" in allowed_clients():
+    raise RuntimeError("JWT_ALLOWED_CLIENTS contains a bare '*'; list the clients (a prefix like 'openclaw-*' is fine).")
+
+
 def client_allowed(azp: str, patterns: List[str]) -> bool:
     for pattern in patterns:
+        if pattern == "*":
+            continue  # a bare "*" would admit every client: refused at start, never a match
         if pattern.endswith("*"):
             if azp.startswith(pattern[:-1]) and len(azp) > len(pattern) - 1:
                 return True

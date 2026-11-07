@@ -69,8 +69,8 @@ jwtAudience: zuno-admin-api
 jwtAudienceRequired: true
 # ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens the
 # gateway accepts, on top of jwtAudience ("*" suffix = prefix). Empty (default)
-# accepts every client the audience admits. Include the admin client when
-# /admin/* is used.
+# accepts every client the audience admits; a bare "*" is refused. Include the
+# admin client when /admin/* is used.
 jwtAllowedClients: []
 # ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
 # With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
@@ -80,6 +80,11 @@ jwtAllowedClients: []
 agentChain:
   verify: false
   publicKey: ""
+  # WP-225 lot C review: Keycloak clients (azp, "*" suffix = prefix) that must
+  # present a valid chain when they name an agent. Without one their X-Zuno-Agent
+  # is ignored (logged) and only the client floor applies. Needs verify. Empty
+  # (default) requires it of nobody.
+  requireFor: []
 localModelEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
 localModelName: qwen3.6-27b-instruct
 
@@ -219,12 +224,13 @@ classification:
   # WP-209 brief lists (the UnifAI shared `zuno-gateway` LLM above all) send a
   # header. An older image ignores it and keeps C1.
   defaultWhenAbsent: C1
-  # WP-209 review: the floor of a call that names no known agent (absent or
-  # unknown X-Zuno-Agent), per Keycloak client (`azp`), e.g. {unifai: C2}.
+  # WP-209 review: a floor per Keycloak client (`azp`), e.g. {unifai: C2}.
   # The agent and task headers are caller-set, so without it a UnifAI token
   # escapes every floor by omitting X-Zuno-Agent while the default is C1.
-  # Empty = none (today's behaviour). A caller claiming a low-floor agent is
-  # closed only by a verifiable agent identity (WP-225 lot C).
+  # WP-225 lot C review: it applies to every call whose agent is not verified
+  # by a signed a2a-gateway chain, as the higher of it and the named agent's
+  # floor, so claiming a low-floor agent cannot drop below it either. Empty =
+  # none (today's behaviour).
   clientFloors: {}
 
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set

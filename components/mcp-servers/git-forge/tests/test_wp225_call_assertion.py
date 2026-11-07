@@ -195,6 +195,49 @@ class CallAssertionTest(unittest.TestCase):
         token = "Bearer " + jwt.encode(claims, KEY, algorithm="EdDSA", headers={"typ": "zuno-call+jwt"})
         self.assertEqual(_run(token, _call("t"), env=ON)[0], 401)
 
+    def test_an_unparseable_body_with_an_assertion_is_a_400(self):
+        self.assertEqual(_run(_assertion("t"), b"{not json", env=ON)[0], 400)
+        self.assertEqual(_run(_assertion("t"), b"\xff\xfe", env=ON)[0], 400)
+
+    def test_a_body_over_the_cap_is_a_413(self):
+        big = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                          "params": {"name": "t", "arguments": {"content": "x" * 2048}}}).encode()
+        env = {**ON, "MCP_CALL_ASSERTION_MAX_BODY_BYTES": "1024"}
+        self.assertEqual(_run(_assertion("t"), big, env=env)[0], 413)
+        self.assertEqual(server._call_assertion_max_body_bytes(), 16 * 1024 * 1024, "the default is 16 MiB")
+        with mock.patch.dict(os.environ, {"MCP_CALL_ASSERTION_MAX_BODY_BYTES": "nope"}):
+            self.assertEqual(server._call_assertion_max_body_bytes(), 16 * 1024 * 1024)
+
+    def test_a_non_dict_act_is_refused_not_a_crash(self):
+        import jwt
+
+        now = int(time.time())
+        for act in ("mcp-gateway", ["mcp-gateway"], None):
+            claims = {"iss": "mcp-gateway", "aud": AUD, "sub": "s", "act": act, "tool": "t",
+                      "iat": now, "exp": now + 30, "jti": f"act-{act!r}"}
+            token = "Bearer " + jwt.encode(claims, KEY, algorithm="EdDSA", headers={"typ": "zuno-call+jwt"})
+            self.assertEqual(_run(token, _call("t"), env=ON)[0], 401, act)
+
+    def test_an_assertion_for_other_arguments_is_refused(self):
+        def call(arguments):
+            return json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                               "params": {"name": "t", "arguments": arguments}}).encode()
+
+        token = "Bearer " + ca.mint(audience=AUD, sub="s", tool="t", arguments={"repo": "a"}, key=KEY)
+        self.assertEqual(_run(token, call({"repo": "b"}), env=ON)[0], 403)
+        token = "Bearer " + ca.mint(audience=AUD, sub="s", tool="t", arguments={"repo": "a", "n": 1}, key=KEY)
+        self.assertEqual(_run(token, call({"n": 1, "repo": "a"}), env=ON)[0], 200, "key order does not matter")
+
+    def test_the_args_hash_survives_the_sdk_serialisation(self):
+        """The gateway hashes the dict it passes to ClientSession.call_tool; the server
+        hashes what the SDK put on the wire. They must agree."""
+        import mcp.types as types
+
+        arguments = {"q": "\u00e9t\u00e9", "n": 1.5, "f": 1.0, "i": 3, "nested": {"b": [1, None], "a": None}, "z": None}
+        request = types.CallToolRequest(params=types.CallToolRequestParams(name="t", arguments=arguments))
+        wire = json.loads(json.dumps(request.model_dump(by_alias=True, mode="json", exclude_none=True)))
+        self.assertEqual(server._call_assertion_args_hash(wire["params"]["arguments"]), ca.args_hash(arguments))
+
     def test_a_real_mcp_session_runs_through_the_middleware(self):
         """The server's own app (session manager, SSE) behind the middleware, with
         MCP_CALL_ASSERTION_REQUIRED: a gateway schema-read assertion lists the

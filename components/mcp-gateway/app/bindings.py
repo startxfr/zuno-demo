@@ -57,6 +57,9 @@ VALID_TRANSPORTS = {"streamable-http", "in-process"}
 # See platform/bindings/tools/README.md for what each mode means and
 # app/main.py's invoke_tool for enforcement.
 VALID_AUTH_MODES = {"delegated-user", "service-identity", "provider-delegated"}
+# WP-225 lot C review: the modes that act with the user's own credential; each must
+# declare user_token: true.
+DELEGATED_AUTH_MODES = {"delegated-user", "provider-delegated"}
 
 
 @dataclass
@@ -92,7 +95,8 @@ class Binding:
     # means the backend needs the caller's own Keycloak token (a provider-delegated
     # backend): it keeps the forwarded bearer when MCP_OUTBOUND_IDENTITY=assertion
     # replaces it with the gateway's per-call assertion everywhere else
-    # (app/call_assertion.py). No shipped binding sets it.
+    # (app/call_assertion.py). Required (true) for the delegated-user and
+    # provider-delegated modes (_validate).
     user_token: bool = False
 
     def all_names(self) -> List[str]:
@@ -228,6 +232,13 @@ def _validate(binding: Binding) -> Optional[str]:
             f"binding '{binding.capability}' has missing or unknown auth_mode "
             f"{binding.auth_mode!r} (expected one of {sorted(VALID_AUTH_MODES)}, ADR-0208) - "
             "an entry without an explicit mode never loads"
+        )
+    if binding.auth_mode in DELEGATED_AUTH_MODES and binding.user_token is not True:
+        # WP-225 lot C review: a delegated binding acts with the user's own
+        # credential, so assertion mode must never replace its token.
+        return (
+            f"binding '{binding.capability}' has auth_mode {binding.auth_mode} but not user_token: true "
+            "(a delegated binding keeps the user's token; WP-225 lot C)"
         )
     if binding.transport not in VALID_TRANSPORTS:
         return (

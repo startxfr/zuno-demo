@@ -385,14 +385,13 @@ Roll the mcp-gateway first, then confluence, git-forge, salesforce and aap (see 
 ## Lot C: identity path and the signed agent chain (Operator pending, 2026-11-07)
 
 **REST entitlement gated (2026-11-07, request of zuno-demo-59):** the per-call agent entitlement in `evaluate()` is
-behind `restAgentEntitlement` (env `AGENT_ENTITLEMENT_EVERY_CALL`), **off** by default and on demo333 until after
-the 2026-11-09 demo. That demo runs sale-01 in UnifAI, whose tool calls take the REST path, and nothing proves that
-every agent named there entitles sale-01. Switch it on in the post-demo window, with a golden-path run right after.
-`/mcp` keeps its own up-front refusal either way. With the switch off, a lot C merge changes no default behaviour.
+behind `restAgentEntitlement` (env `AGENT_ENTITLEMENT_EVERY_CALL`), **off** by default and on demo333. It is kept off
+until a post-demo golden-path run, belt and braces: UnifAI calls `/mcp`, which keeps its own up-front refusal either
+way, and the only REST callers are the evaluation scripts. Switch it on in the post-demo window, with a golden-path run
+right after. With the switch off, a lot C merge changes no default behaviour.
 
 Committed locally on `wp-225-lot-c`, cut from `wp-225-lot-b` (lots A and B). Not pushed. Not live. Every new behaviour is a
-chart value that is off by default, with one declared change: the REST tool path now refuses a caller who is not entitled
-to the agent it names (item 2). Every new variable renders only when its value is set: `helm template` of the nine touched
+chart value that is off by default, the REST entitlement of item 2 included (`restAgentEntitlement`, above). Every new variable renders only when its value is set: `helm template` of the nine touched
 charts with their defaults is byte-identical to lot B, so a merge rolls no pod.
 
 ### Design choice for item 1: a signed per-call assertion, not RFC 8693 token exchange
@@ -413,10 +412,13 @@ server holds), a backend cannot mint one.
 1. **mcp-gateway outbound identity (ADR-0602 clause 10).** With `outboundIdentity.mode: assertion`, a streamable-HTTP call
    sends `Authorization: Bearer <EdDSA JWT, typ zuno-call+jwt>`:
    - claims `iss: mcp-gateway`, `aud: <the binding's backend>`, `sub: <caller>`, `act: {sub: mcp-gateway}`, `tool: <the
-     backend's tool name>`, `iat`, `exp` (at most 60 s; `assertionTtlSeconds` lowers it), `jti`;
+     backend's tool name>`, `args` (sha256 of the canonical JSON of the arguments), `iat`, `exp` (at most 60 s;
+     `assertionTtlSeconds` lowers it), `jti`;
    - per binding: a Zuno server (`gateway_token: true`) gets the assertion; a third-party backend (kubernetes-mcp-server)
-     gets no `Authorization` at all; a binding with the new flag `user_token: true` keeps the caller's bearer (a
-     provider-delegated backend; no binding sets it, and no shipped backend uses the bearer);
+     gets no `Authorization` at all; a binding with the new flag `user_token: true` keeps the caller's bearer. The flag
+     is required for the `delegated-user` and `provider-delegated` modes (a binding without it does not load), so
+     assertion mode never replaces a delegated token; the seven drive, gmail and workday bindings set it. No
+     service-identity backend uses the bearer;
    - a tools/list schema read carries an assertion for the gateway itself (`sub: system:mcp-gateway`, no tool), so it
      can list but call nothing;
    - a missing or unreadable key fails the call with 502: the gateway never falls back to the bearer.
@@ -436,9 +438,9 @@ server holds), a backend cannot mint one.
    `zuno.access.groups` before listing; `/v1/tools/{name}/invoke` did not, so a caller could name an agent it may not use
    and reach that agent's tools wherever the tool policy allowed its groups. The check now lives in `evaluate()`
    (`policy.agent_entitlement_refusal`), the one intersection both paths call; `/mcp` keeps its early refusal through the
-   same function. Tests show a tool refused on `/mcp` is refused on REST (403, no backend called), and an entitled caller
-   is served on both. This is the declared change of the lot: a REST caller not entitled to its agent now gets 403. The
-   only REST callers in the repository are the evaluation suites (tekos, arkos), whose personas are entitled.
+   same function. With `restAgentEntitlement` on, tests show a tool refused on `/mcp` is refused on REST (403, no backend
+   called), and an entitled caller is served on both; with it off (the default), REST behaves as before. The only REST
+   callers are the evaluation scripts (tekos, arkos), whose personas are entitled.
 3. **Authenticated callers for Dify and the token proxy (ADR-0602 clause 10).** The token proxy was the namespace's
    anonymous way into both gateways: any pod of `zuno-dify` (the Dify sandbox included) reached them as the `dify` client.
    - With `inboundAuth.enabled`, the proxy requires `Authorization: Bearer <key>`, one of the keys of Vault
@@ -476,13 +478,45 @@ server holds), a backend cannot mint one.
 5. **Defaults.** Every value above is off or empty. The verifiers accept a missing chain or assertion until `required`
    is set, so any order of rollout is safe until then; the order below keeps signers ahead of verifiers.
 
+### Review findings (2026-11-07, fixed locally)
+
+- **The client floor is never dropped by an agent header (medium).** Without a verified chain the WP-209 floor is now the
+  higher of the named agent's floor and the per-client floor (`classification.clientFloors`), so a UnifAI token naming
+  `tekos` (C1) under `{unifai: C2}` runs at C2. Only an agent from a verified chain keys on its own floor alone.
+  `agentChain.requireFor` (ai-gateway, `AGENT_CHAIN_REQUIRE_FOR`, a list of `azp` clients, empty by default, needs
+  `verify`) goes further: such a client naming an agent without a valid chain gets the header ignored (logged) and only
+  its client floor. The mcp-gateway has no such list: dropping the agent there would move the call to the front-door
+  ceiling, a policy change of its own. On demo333 only `blender: C3` is set, and Blender names no agent, so nothing
+  changes there.
+- **Body cap (medium-low).** `callAssertion.maxBodyBytes` (16 MiB, `MCP_CALL_ASSERTION_MAX_BODY_BYTES`) on each server; a
+  larger body gets 413. Size it for the largest `git.file.write` before turning `required` on.
+- **Unparseable body (low).** With an assertion, a non-empty body that is not JSON gets 400.
+- **Arguments bound (low).** The assertion carries `args`, the sha256 of the canonical JSON (sorted keys, no spaces,
+  UTF-8) of the tool arguments; the middleware recomputes it over `params.arguments` and refuses a mismatch (403). A
+  test proves the hash survives the MCP SDK's own serialisation. A schema-read assertion carries none and calls nothing.
+- **Delegated bindings keep the user's token (low).** `delegated-user` and `provider-delegated` bindings must declare
+  `user_token: true` or they do not load; the seven drive, gmail and workday bindings now do.
+- **`jwtAllowedClients` (low).** A bare `*` refuses to start (both gateways, and the chart refuses to render it) and
+  never matches. An OpenShift token on `/mcp` (TokenReview, ADR-0524) has no `azp` and is not subject to the list.
+- **Dify (low).** With inbound auth on, `configure.py` updates the existing MCP provider in place (PUT, the key header
+  added) instead of skipping it. The model credentials are still not rewritten (probe 5).
+- **Keys are read at startup (low).** The servers' public key, the verifiers' `agentChain.publicKey`, the token proxy's
+  `INBOUND_KEYS_FILE` and the adapter's `PROXY_KEY_FILE` are read when the pod starts: a rotation needs a restart (a
+  changed chart value rolls the pod; a changed Vault value reaches the Secret within `refreshInterval` but the proxy
+  and the adapter must be restarted). The two signing keys (`MCP_CALL_ASSERTION_KEY_FILE`, `AGENT_CHAIN_SIGNING_KEY_FILE`)
+  are re-read when the mounted file changes. Rotate a pair verifier-side first only when the verifiers can hold two
+  keys; today they hold one, so a rotation is: new key in Vault, restart the signer and the verifiers in the same
+  window, during which calls fall back to today's behaviour (a chain is ignored) or, with `required`, are refused.
+- `AGENT_ENTITLEMENT_EVERY_CALL` (`restAgentEntitlement`, added on top of this lot) stays as it is.
+
 New chart values (defaults in brackets):
 - `mcp-gateway`: `outboundIdentity.{mode,assertionTtlSeconds,vaultKey,vaultProperty}` (`bearer`, `60`,
   `mcp/gateway-call-assertion`, `private_key`), `agentChain.{verify,publicKey}` (`false`, `""`), `jwtAllowedClients`
   (`[]`);
-- `ai-gateway`: `agentChain.{verify,publicKey}` (`false`, `""`), `jwtAllowedClients` (`[]`);
+- `ai-gateway`: `agentChain.{verify,publicKey,requireFor}` (`false`, `""`, `[]`), `jwtAllowedClients` (`[]`);
 - `a2a-gateway`: `agentChain.{sign,vaultKey,vaultProperty}` (`false`, `a2a/agent-chain`, `private_key`);
-- `mcp-confluence`, `mcp-git-forge`, `mcp-salesforce`, `mcp-aap`: `callAssertion.{publicKey,required}` (`""`, `false`);
+- `mcp-confluence`, `mcp-git-forge`, `mcp-salesforce`, `mcp-aap`: `callAssertion.{publicKey,required,maxBodyBytes}`
+  (`""`, `false`, `16777216`);
 - `zuno-token-proxy`: `inboundAuth.{enabled,vaultKey,vaultProperty}` (`false`, `""` meaning `<clientId>/token-proxy`,
   `inbound_keys`);
 - `zuno-dify-knowledge`: `proxyAuth.{enabled,vaultKey,vaultProperty}` (`false`, `dify/token-proxy`, `inbound_keys`);
@@ -492,12 +526,12 @@ A chart refuses to render `outboundIdentity.mode` other than `bearer` or `assert
 key, and `callAssertion.required` without one.
 
 Tests (all in the CI list; a new a2a-gateway step runs its suite with pytest):
-- `components/mcp-gateway/tests/test_wp225_lot_c.py` (30);
-- `components/ai-gateway/tests/test_wp225_lot_c.py` (6);
+- `components/mcp-gateway/tests/test_wp225_lot_c.py` (35 with the review fixes and the `restAgentEntitlement` tests);
+- `components/ai-gateway/tests/test_wp225_lot_c.py` (9);
 - `components/a2a-gateway/tests/test_wp225_lot_c.py` (5);
 - `components/zuno-token-proxy/tests/test_wp225_inbound_auth.py` (7);
 - `components/zuno-dify-knowledge/tests/test_dify_knowledge.py` (2 more);
-- `components/mcp-servers/{confluence,git-forge,salesforce,aap}/tests/test_wp225_call_assertion.py` (18 each, one
+- `components/mcp-servers/{confluence,git-forge,salesforce,aap}/tests/test_wp225_call_assertion.py` (23 each, one
   byte-identical file; one test runs a real MCP session of the server through the middleware).
 
 The negative tests include:
@@ -544,9 +578,12 @@ No change is needed in zuno-demo-agents.
    `agentChain.verify: true` with `agentChain.publicKey` on the mcp-gateway and the ai-gateway.
 3. **Call assertion.** First the signer: `outboundIdentity.mode: assertion` on the mcp-gateway. Then
    `callAssertion.publicKey` on the four servers, and only then `callAssertion.required: true`, one server at a time.
+   Check `callAssertion.maxBodyBytes` (16 MiB) against the largest `git.file.write` first: a larger body gets 413.
 4. **Token proxy.** `dify_token_proxy_inbound_auth: true`, `make d2 install dify`. This seeds the key, rolls the adapter
    (the client) and the proxy, and registers new providers with the key. Then re-register the stored ones (probe 5).
-5. **Client allowlist, last.** Set `jwtAllowedClients` on both gateways from the clients the last seven days of
+5. **Client allowlist and `agentChain.requireFor`, last.** For `requireFor`, list only clients whose agent calls all go
+   through the a2a-gateway; UnifAI's direct calls carry no chain yet (the follow-up above).
+   **Client allowlist.** Set `jwtAllowedClients` on both gateways from the clients the last seven days of
    `zuno_model_tokens_total{client}` show (unifai, open-webui, `openclaw-*`, dify, kagent, zuno-evaluations), plus the
    admin client used for `/admin/*`.
 
@@ -575,7 +612,8 @@ Back-out: each value back to its default, then sync; the order does not matter f
    - from the Dify sandbox pod, `curl http://zuno-token-proxy:8080/v1/models` returns 401, while the same call with the
      key returns 200;
    - a Dify chat and a knowledge retrieval still answer;
-   - on an existing Dify, the models and the MCP provider are registered without the key and get 401. Delete them in
-     the console (or through the API) and run `make d2 install dify` again, which registers them with the key.
+   - on an existing Dify, the MCP provider is updated in place with the key; the models keep the credentials they were
+     registered with and get 401. Delete them in the console (or through the API) and run `make d2 install dify` again,
+     which registers them with the key.
 6. **Client allowlist.** After step 5, a token of the `aap` client gets 401 on both gateways, and every listed client
    keeps answering (`zuno_model_tokens_total` keeps growing per client).
