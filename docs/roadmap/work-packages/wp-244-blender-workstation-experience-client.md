@@ -39,7 +39,7 @@ The Blender add-on of `docs/demo/blender-3d.md` signs in with the device flow, s
    floor is the client floor of step 2. Until the promotion the corp order answers (qwen3.6-27b first, slower).
 5. **Add-on.** `docs/demo/blender-3d.md`: device sign-in, `X-Zuno-Agent: blender`, `X-Zuno-Task: bpy`, verified TLS,
    script shown in a text block, static check, run on click.
-6. **Live, in order.** Push (Keycloak client, ai-gateway label); `make d1 install llm` (floor, NetworkPolicy peer);
+6. **Live, in order.** Push (Keycloak client, ai-gateway label); `make d2 install llm` (floor, NetworkPolicy peer);
    `make d1 install connectivity-link` (entry). Then the checks below.
 
 ## Acceptance checks
@@ -64,7 +64,15 @@ The add-on is a local file.
 
 - 2026-11-07: pushed 5fd22409; Keycloak client `blender` created by the reconcile Job (device endpoint answers, password
   grant refused with 400); ai-gateway rolled with `blender` in EXPERIENCE_CLIENTS. zuno-demo-agents b8ac031 (VERSION
-  0.14.3) pushed, CI green, release and promotion pending. `make d1 install llm` and `make d1 install connectivity-link`
+  0.14.3) pushed, CI green, release and promotion pending. `make d2 install llm` and `make d1 install connectivity-link`
   pending (the entry and the C3 floor are not live yet).
 - 2026-11-07: add-on run in Blender 4.2.3 LTS headless: five operators registered, Run builds six objects with a modifier
   and a material, `import os` refused before execution, Markdown-wrapped answers reduced to code.
+- 2026-11-07 18:30 CET (user's go): `make d2 install llm` (ok=63 failed=0; `llm` is a Day-2 component, the brief said d1)
+  rolled the ai-gateway with CLASSIFICATION_CLIENT_FLOORS=blender=C3 and the NetworkPolicy peer; `make d1 install
+  connectivity-link` (ok=48 failed=0) created the Route, HTTPRoute, AuthPolicy and RateLimitPolicy, all Accepted, the
+  Route admitted. Live: no token and a garbage token answer 401 from Authorino at the edge (`www-authenticate: Bearer
+  realm="keycloak-jwt"`), unrouted paths and methods answer 404. MaaS (AuthPolicy Accepted/Enforced, maas-api 401
+  without token) and the quota-demo routes are unchanged. The AuthPolicy did not publish the identity, so the
+  RateLimitPolicy's `auth.identity.sub` counter could not resolve (WP-54 trap 1): fixed in the template; the 429 is
+  proven only with a real token.

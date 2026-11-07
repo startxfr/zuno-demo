@@ -123,6 +123,19 @@ spec:
                   value: {{ printf "/%s" (trimPrefix "/" .) | quote }}
               {{- end }}
             {{- end }}
+    # Publish the identity for the RateLimitPolicy below: without it its auth.identity.sub counter does not
+    # resolve and the wasm shim silently skips every rate-limit call (WP-54 trap 1, same block as
+    # quota-demo-route.yaml).
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                sub:
+                  expression: auth.identity.sub
+                groups:
+                  expression: 'has(auth.identity.groups) ? auth.identity.groups : []'
 ---
 # Request rate per user on the entry; the ai-gateway's per-persona budgets bound the tokens.
 apiVersion: kuadrant.io/v1

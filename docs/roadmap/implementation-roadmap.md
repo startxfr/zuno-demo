@@ -1107,7 +1107,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Operator pending | `make d1 install llm` and `make d1 install connectivity-link` after the push; the agents release with `experience-clients/blender` and its promotion (user) |
+| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Operator pending | `make d2 install llm` and `make d1 install connectivity-link` after the push; the agents release with `experience-clients/blender` and its promotion (user) |
 
 ### OKF stream phases
 
