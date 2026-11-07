@@ -4,3 +4,5 @@ world_model_namespace: zuno-world-model
 world_model_image_pullers:
   - world-model-runtime
   - world-model-web
+# all, runtime or web: rebuild only one image (-e world_model_build_target=runtime), the runtime one is 10x the size.
+world_model_build_target: all
