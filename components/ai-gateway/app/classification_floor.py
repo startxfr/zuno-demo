@@ -63,6 +63,27 @@ def higher(a: str, b: Optional[str]) -> str:
     return b if RANK[b] > RANK[a] else a
 
 
+def client_floors() -> Dict[str, str]:
+    """Per-client floors (chart `classification.clientFloors`, env `CLASSIFICATION_CLIENT_FLOORS="unifai=C2,x=C3"`).
+
+    Read on every call. Applied only when the call names no known agent: the
+    agent and task headers are set by the caller, so a token of a client that
+    hosts hand-written workflows (UnifAI) must not escape every floor by
+    omitting X-Zuno-Agent or naming an unknown one (WP-209 review). A
+    verifiable agent identity closes the rest (WP-225 lot C)."""
+    out: Dict[str, str] = {}
+    for part in os.getenv("CLASSIFICATION_CLIENT_FLOORS", "").split(","):
+        if not part.strip():
+            continue
+        client, _, level = part.partition("=")
+        level = level.strip().upper()
+        if not client.strip() or level not in RANK:
+            logger.error("ignoring CLASSIFICATION_CLIENT_FLOORS entry %r", part)
+            continue
+        out[client.strip()] = level
+    return out
+
+
 @dataclass(frozen=True)
 class FloorDecision:
     declared: str
@@ -135,8 +156,10 @@ class ClassificationFloors:
             return None
         return entry["tasks"].get((task or "").strip().lower()) or entry["floor"]
 
-    def effective(self, declared: str, agent: str, task: str) -> FloorDecision:
+    def effective(self, declared: str, agent: str, task: str, client: str = "") -> FloorDecision:
         floor = self.floor_for(agent, task)
+        if floor is None and client:
+            floor = client_floors().get(client.strip())
         return FloorDecision(declared=declared, floor=floor, effective=higher(declared, floor))
 
 

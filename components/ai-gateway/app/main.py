@@ -404,7 +404,8 @@ async def chat_completions(
     # is never below the calling (agent, task)'s generated floor. Routing,
     # local_only_for, guardrails and the counters below all use the effective level.
     floor = classification_floor.floors.effective(
-        classification_floor.declared_level(x_zuno_data_classification), x_zuno_agent, x_zuno_task
+        classification_floor.declared_level(x_zuno_data_classification), x_zuno_agent, x_zuno_task,
+        identity.client,
     )
     if floor.raised:
         logger.info(

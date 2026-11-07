@@ -173,3 +173,9 @@ protects against a mis-rendered level on a correctly identified agent, not again
 Even after the flip to C3, claiming the lowest-floor agent still lowers the call. Closing it needs a verifiable agent
 identity (an operator-signed header in the style of the ADR-0594 markers, or the `agent_chain` of WP-225 lot C).
 Agent and task now match case-insensitively, so `Cognos` no longer escapes the `cognos` floor.
+
+User decision (2026-11-07): a **per-client floor** (`classification.clientFloors`, Ansible
+`zuno_ai_gateway_classification_client_floors`, e.g. `{unifai: C2}`) applies when a call names no known agent, so a
+UnifAI token can no longer drop below it by omitting or inventing `X-Zuno-Agent`. It ships empty (today's behaviour)
+and is switched on per cluster with the live probe. A caller that claims a known low-floor agent is closed by WP-225
+lot C (verifiable agent identity).

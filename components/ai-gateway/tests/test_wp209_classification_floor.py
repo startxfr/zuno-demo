@@ -106,6 +106,19 @@ def test_a_broken_reload_keeps_the_floors_already_loaded() -> None:
         os.unlink(fh.name)
 
 
+def test_a_client_floor_applies_only_when_no_known_agent_is_named() -> None:
+    f = _floors()
+    with mock.patch.dict(os.environ, {"CLASSIFICATION_CLIENT_FLOORS": "unifai=c2, bad=C9,=C3"}):
+        assert classification_floor.client_floors() == {"unifai": "C2"}
+        assert f.effective("C1", "", "", "unifai").effective == "C2"
+        assert f.effective("C1", "hand-built", "x", "unifai").effective == "C2"
+        # a known agent keeps its own floor, even a lower one (closed by WP-225 lot C)
+        assert f.effective("C1", "tekos", "answer-technical-question", "unifai").effective == "C1"
+        assert f.effective("C1", "cognos", "coming-soon", "unifai").effective == "C3"
+        assert f.effective("C1", "", "", "open-webui").effective == "C1"
+    assert f.effective("C1", "", "", "unifai").effective == "C1"
+
+
 def test_agent_and_task_match_case_insensitively() -> None:
     f = _floors()
     assert f.effective("C1", "Cognos", "Coming-Soon").effective == "C3"

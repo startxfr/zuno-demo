@@ -202,6 +202,13 @@ classification:
   # WP-209 brief lists (the UnifAI shared `zuno-gateway` LLM above all) send a
   # header. An older image ignores it and keeps C1.
   defaultWhenAbsent: C1
+  # WP-209 review: the floor of a call that names no known agent (absent or
+  # unknown X-Zuno-Agent), per Keycloak client (`azp`), e.g. {unifai: C2}.
+  # The agent and task headers are caller-set, so without it a UnifAI token
+  # escapes every floor by omitting X-Zuno-Agent while the default is C1.
+  # Empty = none (today's behaviour). A caller claiming a low-floor agent is
+  # closed only by a verifiable agent identity (WP-225 lot C).
+  clientFloors: {}
 
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
 # a non-standard quota class (X-Zuno-Quota-Class) and a project id

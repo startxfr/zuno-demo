@@ -66,6 +66,9 @@
       classification:
         floorsGenerated: "{{ zuno_ai_gateway_classification_floors_generated | default(false) | bool }}"
         defaultWhenAbsent: "{{ zuno_ai_gateway_classification_default_when_absent | default('C1') }}"
+        # WP-209 review: floor of a call that names no known agent, per Keycloak
+        # client (e.g. {unifai: C2}); empty = none, today's behaviour.
+        clientFloors: "{{ zuno_ai_gateway_classification_client_floors | default({}) }}"
       # ADR-0591 (WP-188): skip not-ready local models / open breakers.
       # Turned on per cluster after the image carrying them is rolled.
       availability:

@@ -270,6 +270,10 @@ spec:
             {{- end }}
             - name: CLASSIFICATION_DEFAULT_WHEN_ABSENT
               value: {{ upper (toString .Values.classification.defaultWhenAbsent) | quote }}
+            {{- with .Values.classification.clientFloors }}
+            - name: CLASSIFICATION_CLIENT_FLOORS
+              value: {{ $out := list }}{{- range $client, $level := . }}{{- if not (has (upper (toString $level)) (list "C1" "C2" "C3" "C4")) }}{{- fail (printf "classification.clientFloors.%s must be C1 to C4, not %v" $client $level) }}{{- end }}{{- $out = append $out (printf "%s=%s" $client (upper (toString $level))) }}{{- end }}{{ join "," $out | quote }}
+            {{- end }}
             {{- if .Values.classification.floorsGenerated }}
             # WP-209: the generated per-(agent, task) floors (configmap-classification-floors.yaml).
             - name: CLASSIFICATION_FLOORS_PATH
