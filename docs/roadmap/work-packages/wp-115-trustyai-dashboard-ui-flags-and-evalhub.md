@@ -2,7 +2,7 @@
 
 - **State:** Done (2026-11-07, with a recorded vendor limitation) - the Evaluations page works end to end on RHOAI
   3.6.0-ea.2 up to the call to the model (RBAC, collections, providers, tokenizer, dataset, job); the score itself is
-  blocked by an EvalHub x KServe defect, see "Closure (2026-11-07)" below
+  blocked by an EvalHub x KServe defect for meshed models; documented workaround: do not evaluate models in the mesh, see "Closure (2026-11-07)" below
 - **ADRs:** [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
 - **Depends on:** WP-113 (Done - the Grafana surface this complements)
 - **Related:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
@@ -126,7 +126,11 @@ workload Service (`<model>-kserve-workload-svc`, `tls.mode: SIMPLE`) points Envo
 `caCertificates: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, which does not exist in the job pod's
 `istio-proxy`, so the TLS origination fails and the connection is reset. A throwaway meshed pod with the same labels
 and the default token mount got HTTP 200 on `/v1/models` and `/v1/completions` three times out of three. The EvalHub
-CR offers no pod annotation, label or automount knob. To report upstream (EvalHub job pod template or KServe DR).
+CR offers no pod annotation, label or automount knob.
+
+**Documented workaround (user decision, 2026-11-07): do not evaluate models that sit in the service mesh.** The
+Evaluations page is used only against endpoints its job pods can reach without the KServe `DestinationRule` (a model
+outside the mesh, or an external OpenAI-compatible endpoint). No vendor report is filed.
 
 Benchmark parameters that work in the form: `{"tokenizer": "Qwen/Qwen3.5-9B", "num_examples": 10}`, model name
 `qwen3.5-9b`. A run behind the zuno-ai-run firewall also needs `huggingface.co`, `us.aws.cdn.hf.co` (Xet) and, for
