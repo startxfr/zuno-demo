@@ -46,13 +46,14 @@
 - name: "keycloak-endpoint | validate the external payload (fail fast, before any apply)"
   ansible.builtin.fail:
     msg: >-
-      zuno_keycloak_mode is 'external' but {{ item.name }} {{ item.why }} in ansible/confidential.yml
+      zuno_keycloak_mode is 'external' but {{ _kc.name }} {{ _kc.why }} in ansible/confidential.yml
       (ADR-0352 clause 2, see ansible/confidential.example.yml).
   when:
     - (zuno_keycloak_mode | default('internal')) == 'external'
-    - item.bad | bool
+    - _kc.bad | bool
   loop_control:
-    label: "{{ item.name }}"
+    loop_var: _kc
+    label: "{{ _kc.name }}"
   loop:
     - name: zuno_keycloak_external_url
       why: "is missing or still the 'xxxxxx' sentinel"
