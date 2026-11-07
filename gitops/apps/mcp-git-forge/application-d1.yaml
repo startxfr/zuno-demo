@@ -32,6 +32,10 @@ spec:
             consultant: ["*"]
             board: ["*"]
             cdp: ["*"]
+            sales: ["*"]
+            finance: ["*"]
+            adv: ["*"]
+            recrut: ["*"]
           scope: all
         callAssertion:
           publicKey: |

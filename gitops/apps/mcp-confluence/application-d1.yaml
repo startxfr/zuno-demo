@@ -22,7 +22,7 @@ spec:
         # is still served until callAssertion.required is switched on, one server at a time, later.
         # WP-225 lot B (user's go 2026-11-07): the dev and ops groups reach the SXSI space only. A caller whose
         # groups list no entry is refused once an allowlist is set, so the groups the tool policy already lets
-        # use Confluence keep every space ("*"): consultant, board, cdp, lightspeed_readonly. Add a group here
+        # use Confluence keep every space ("*"): consultant, board, cdp, lightspeed_readonly, and sales, finance, adv, recrut (denied by the tool policy anyway, listed so no demo persona is ever refused by this list). Add a group here
         # before it needs Confluence.
         spaceAllowlist:
           groups:
@@ -34,6 +34,10 @@ spec:
             consultant: ["*"]
             board: ["*"]
             cdp: ["*"]
+            sales: ["*"]
+            finance: ["*"]
+            adv: ["*"]
+            recrut: ["*"]
             lightspeed_readonly: ["*"]
           scope: all
         callAssertion:
