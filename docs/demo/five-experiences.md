@@ -109,6 +109,7 @@ flowchart LR
   then the controller logs. The database password trap is in the WP-207 evidence.
 - A `k8s.*` call is refused for an operations persona: check that the mcp-gateway runs agents v0.13.0 or later
   (`okf-fetch` says `VERIFIED … release 0.13.0`) and that its image carries the `k8s` bindings.
+- A Dify Workflow run shows no progress after a few seconds: it is the known stall of Dify 1.17.0 (about one run in four, 190 s to 8 minutes before the first tool call, WP-208 D1). Stop it and start it again: the next run takes about 3 seconds.
 - No series for `kagent` or `dify`: the export and scrape take about a minute, and the series live in `prometheus-k8s`
   (openshift-monitoring), not in the user-workload Prometheus.
 
