@@ -384,6 +384,12 @@ Roll the mcp-gateway first, then confluence, git-forge, salesforce and aap (see 
 
 ## Lot C: identity path and the signed agent chain (Operator pending, 2026-11-07)
 
+**REST entitlement gated (2026-11-07, request of zuno-demo-59):** the per-call agent entitlement in `evaluate()` is
+behind `restAgentEntitlement` (env `AGENT_ENTITLEMENT_EVERY_CALL`), **off** by default and on demo333 until after
+the 2026-11-09 demo. That demo runs sale-01 in UnifAI, whose tool calls take the REST path, and nothing proves that
+every agent named there entitles sale-01. Switch it on in the post-demo window, with a golden-path run right after.
+`/mcp` keeps its own up-front refusal either way. With the switch off, a lot C merge changes no default behaviour.
+
 Committed locally on `wp-225-lot-c`, cut from `wp-225-lot-b` (lots A and B). Not pushed. Not live. Every new behaviour is a
 chart value that is off by default, with one declared change: the REST tool path now refuses a caller who is not entitled
 to the agent it names (item 2). Every new variable renders only when its value is set: `helm template` of the nine touched

@@ -221,6 +221,15 @@ HEADERS = {"X-Zuno-Agent": AGENT, "X-Zuno-Task": TASK, "X-Zuno-Data-Classificati
 
 
 class RestEntitlementTest(unittest.TestCase):
+    """With the switch on (chart restAgentEntitlement: true)."""
+
+    def setUp(self):
+        self._env = mock.patch.dict(os.environ, {"AGENT_ENTITLEMENT_EVERY_CALL": "true"})
+        self._env.start()
+
+    def tearDown(self):
+        self._env.stop()
+
     def test_a_caller_not_entitled_to_the_agent_is_refused_on_both_paths(self):
         invoked: list = []
         rest, mcp = _invoke(NOT_ENTITLED, "confluence.page.search", HEADERS, invoked)
@@ -380,6 +389,18 @@ class AllowedClientsTest(unittest.TestCase):
         self.assertEqual(self._status(_token(azp="dify"), env), 200)
         self.assertEqual(self._status(_token(azp="aap"), env), 401)
         self.assertEqual(self._status(_token(), env), 401, "a token without azp")
+
+
+class RestEntitlementOffByDefaultTest(unittest.TestCase):
+    """Default (switch off, the 2026-11-09 demo state): REST keeps today's behaviour,
+    /mcp keeps its own up-front refusal."""
+
+    def test_rest_serves_a_caller_not_entitled_to_the_agent_while_off(self):
+        os.environ.pop("AGENT_ENTITLEMENT_EVERY_CALL", None)
+        invoked: list = []
+        rest, mcp = _invoke(NOT_ENTITLED, "confluence.page.search", HEADERS, invoked)
+        self.assertEqual(rest.status_code, 200, rest.text)
+        self.assertEqual(mcp.status_code, 403, mcp.text)
 
 
 if __name__ == "__main__":

@@ -207,6 +207,12 @@ class PolicyDecision:
     subject_field: Optional[str] = None
 
 
+def agent_entitlement_every_call() -> bool:
+    """WP-225 lot C: whether evaluate() (both front doors) checks the agent
+    entitlement on every tool call. Read per call; off unless set to true."""
+    return os.getenv("AGENT_ENTITLEMENT_EVERY_CALL", "false").strip().lower() == "true"
+
+
 def agent_entitlement_refusal(agent: Any, caller_groups: List[str]) -> Optional[str]:
     """None when the caller's groups include one of the agent's zuno.access.groups
     (ADR-0040), else the refusal. An agent that declares no group is refused, never
@@ -277,9 +283,14 @@ def evaluate(
     # agent it calls as. /mcp checked this before listing; the REST path did not,
     # so a caller could name an agent it may not use and reach that agent's tools.
     # Both front doors now get it from here, the one intersection (ADR-0036).
-    refusal = agent_entitlement_refusal(agent, caller_groups)
-    if refusal:
-        return PolicyDecision(allowed=False, reason=refusal)
+    # Gated (chart `restAgentEntitlement`, env AGENT_ENTITLEMENT_EVERY_CALL), OFF by
+    # default: the 2026-11-09 demo runs sale-01 in UnifAI, whose tool calls take
+    # the REST path, and nothing proves every agent named there entitles sale-01.
+    # /mcp keeps its own up-front refusal either way (main.py).
+    if agent_entitlement_every_call():
+        refusal = agent_entitlement_refusal(agent, caller_groups)
+        if refusal:
+            return PolicyDecision(allowed=False, reason=refusal)
 
     delegated = bool(chain)
     if delegated:

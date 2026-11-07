@@ -171,6 +171,10 @@ spec:
             - name: AGENT_CHAIN_PUBLIC_KEY
               value: {{ .Values.agentChain.publicKey | quote }}
             {{- end }}
+            {{- if .Values.restAgentEntitlement }}
+            - name: AGENT_ENTITLEMENT_EVERY_CALL
+              value: "true"
+            {{- end }}
             {{- with .Values.jwtAllowedClients }}
             - name: JWT_ALLOWED_CLIENTS
               value: {{ join "," . | quote }}

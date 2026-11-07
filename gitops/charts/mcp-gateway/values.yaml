@@ -134,6 +134,13 @@ agentChain:
 # client when /admin/* is used.
 jwtAllowedClients: []
 
+# WP-225 lot C (ADR-0603 M14): check the caller's entitlement to the calling agent
+# (zuno.access.groups, ADR-0040) on EVERY tool call, so the REST north side
+# (/v1/tools/{name}/invoke) refuses what /mcp already refuses. OFF by default:
+# the 2026-11-09 demo runs sale-01 in UnifAI, whose tool calls use REST. Turn on
+# after the demo, with a golden-path run right after.
+restAgentEntitlement: false
+
 # ADR-0524 clause 3 (WP-085 step 3): lets OpenShift Lightspeed reach this
 # gateway's MCP front-door (/mcp). Default false - the allow is scoped by
 # NAMESPACE rather than by pod label, because Lightspeed's pods are
