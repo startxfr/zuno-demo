@@ -61,6 +61,10 @@ stack:
   sharedStorageClass: nfs
   identity:
     realm: zuno
+    # ADR-0352/WP-211: Keycloak base URL (no realm path) and host. Empty = the
+    # built-in instance, https://keycloak.<clusterBaseDomain>.
+    keycloakUrl: ""
+    keycloakHost: ""
     clientId: unifai
     # Vault path of the client secret (seeded by ansible/roles/vault).
     clientSecretVaultPath: keycloak/unifai

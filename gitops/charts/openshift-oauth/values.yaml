@@ -5,6 +5,9 @@ oauth:
   enabled: false
   clientId: openshift
   realm: zuno
+  # ADR-0352/WP-211: Keycloak base URL (no realm path). Empty = the built-in
+  # instance, https://keycloak.<clusterBaseDomain>.
+  keycloakUrl: ""
 
   # ADR-0347 (corrects ADR-0346): name of a ConfigMap in openshift-config
   # bundling the CAs able to verify the Keycloak route, wired into the

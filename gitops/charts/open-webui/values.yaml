@@ -8,6 +8,11 @@ global:
   zuno:
     clusterBaseDomain: apps.mycluster.example.com
     routeHost: open-webui.apps.mycluster.example.com
+    # ADR-0352/WP-211: Keycloak seam. Empty = the built-in instance
+    # (https://keycloak.<clusterBaseDomain>/realms/zuno). Global so that the
+    # subchart's tpl-evaluated env can read it too.
+    keycloakIssuerUrl: ""
+    keycloakHost: ""
 
 route:
   # Non-streamed completions outlast the router's 30 s default while the
@@ -117,7 +122,7 @@ open-webui:
     - name: OAUTH_PROVIDER_NAME
       value: Zuno Keycloak
     - name: OPENID_PROVIDER_URL
-      value: 'https://keycloak.{{ .Values.global.zuno.clusterBaseDomain }}/realms/zuno/.well-known/openid-configuration'
+      value: '{{ .Values.global.zuno.keycloakIssuerUrl | default (printf "https://keycloak.%s/realms/zuno" .Values.global.zuno.clusterBaseDomain) }}/.well-known/openid-configuration'
     - name: OAUTH_CLIENT_ID
       value: open-webui
     - name: OAUTH_SCOPES

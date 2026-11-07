@@ -36,7 +36,7 @@ spec:
   {{- $extra := deepCopy ($s.extraEnv | default dict) }}
   {{- if $s.identity.oidcClaims }}
   {{- /* ADR-0583: teams may hold Keycloak groups; the identity service verifies the token against the realm JWKS. */}}
-  {{- $kc := printf "https://keycloak.%s/realms/%s" $.Values.clusterBaseDomain $s.identity.realm }}
+  {{- $kc := printf "%s/realms/%s" ($s.identity.keycloakUrl | default (printf "https://keycloak.%s" $.Values.clusterBaseDomain)) $s.identity.realm }}
   {{- $oidc := list (dict "name" "DIRECTORY_PROVIDER" "value" "oidc-claims") (dict "name" "DIRECTORY_OIDC_JWKS_URL" "value" (printf "%s/protocol/openid-connect/certs" $kc)) (dict "name" "DIRECTORY_OIDC_ISSUER" "value" $kc) }}
   {{- $_ := set $extra "identity" (concat $oidc (index $extra "identity" | default list)) }}
   {{- end }}
@@ -68,7 +68,7 @@ spec:
     {{- end }}
     forwardUserToken: {{ $s.identity.forwardUserToken }}
     external:
-      url: https://keycloak.{{ .Values.clusterBaseDomain }}
+      url: {{ $s.identity.keycloakUrl | default (printf "https://keycloak.%s" .Values.clusterBaseDomain) }}
       realm: {{ $s.identity.realm }}
       clientId: {{ $s.identity.clientId }}
       clientSecret: {name: unifai-oidc, key: client-secret}

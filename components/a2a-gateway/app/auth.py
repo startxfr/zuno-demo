@@ -18,7 +18,7 @@ from jwt import PyJWKClient
 
 logger = logging.getLogger("a2a_gateway.auth")
 
-KEYCLOAK_ISSUER = os.getenv("KEYCLOAK_ISSUER", "https://keycloak-zuno.apps.mycluster.example.com/realms/zuno")
+KEYCLOAK_ISSUER = os.getenv("KEYCLOAK_ISSUER", "https://keycloak.apps.mycluster.example.com/realms/zuno")
 KEYCLOAK_JWKS_URL = os.getenv("KEYCLOAK_JWKS_URL", f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs")
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE") or None
 JWT_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "30"))

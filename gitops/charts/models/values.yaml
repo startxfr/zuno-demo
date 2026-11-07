@@ -7,6 +7,9 @@ namespace: zuno-ai-run
 # apps.mycluster.example.com placeholder pattern as gitops/apps/mcp) -
 # feeds maas.externalOIDC's derived Keycloak issuer below.
 clusterBaseDomain: apps.mycluster.example.com
+# ADR-0352/WP-211: issuer of the MaaS AuthPolicies. Empty = the built-in
+# Keycloak, https://keycloak.<clusterBaseDomain>/realms/zuno.
+keycloakIssuerUrl: ""
 
 # WP-086: keep the three GPU predictors off the same node when the cluster has
 # more than one MIG node, so losing a node degrades inference instead of killing

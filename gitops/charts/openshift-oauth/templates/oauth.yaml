@@ -41,7 +41,7 @@ spec:
           name: ["name"]
           email: ["email"]
           groups: ["groups"]
-        issuer: "https://keycloak.{{ .Values.clusterBaseDomain }}/realms/{{ .Values.oauth.realm }}"
+        issuer: "{{ .Values.oauth.keycloakUrl | default (printf "https://keycloak.%s" .Values.clusterBaseDomain) }}/realms/{{ .Values.oauth.realm }}"
 {{- if .Values.oauth.htpasswd.enabled }}
     - name: {{ .Values.oauth.htpasswd.name }}
       mappingMethod: claim

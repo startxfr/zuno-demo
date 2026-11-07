@@ -13,6 +13,9 @@ policy:
 # apps.mycluster.example.com, which ansible/tasks/apply_gitops_app.yml
 # substitutes; empty renders no EgressFirewall.
 clusterBaseDomain: ""
+# ADR-0352/WP-211: Keycloak host the EgressFirewalls allow. Empty = the built-in
+# instance, keycloak.<clusterBaseDomain>.
+keycloakHost: ""
 
 # ADR-0329 (supersedes ADR-0023): agent workloads no longer get a
 # dedicated zuno-agent-<name> namespace. Every active agent's FE/BFF

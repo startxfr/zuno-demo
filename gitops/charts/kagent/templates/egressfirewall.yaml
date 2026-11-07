@@ -11,7 +11,7 @@ spec:
   egress:
     - type: Allow
       to:
-        dnsName: keycloak.{{ .Values.global.zuno.clusterBaseDomain }}
+        dnsName: {{ .Values.global.zuno.keycloakHost | default (printf "keycloak.%s" .Values.global.zuno.clusterBaseDomain) }}
       ports:
         - protocol: TCP
           port: 443

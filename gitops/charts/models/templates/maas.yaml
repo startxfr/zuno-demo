@@ -107,7 +107,7 @@ spec:
     name: maas-default-gateway
     namespace: openshift-ingress
   externalOIDC:
-    issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
+    issuerUrl: {{ .Values.keycloakIssuerUrl | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) }}
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
 {{- if and .Values.maas.externalOIDC.enabled (.Capabilities.APIVersions.Has "components.platform.opendatahub.io/v1alpha1/ModelsAsService") }}
@@ -176,7 +176,7 @@ spec:
     # does, is unconfirmed - do not assume the mapper fix alone unblocks
     # real persona MaaS routing until this AuthPolicy gap is separately
     # closed.
-    issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
+    issuerUrl: {{ .Values.keycloakIssuerUrl | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) }}
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
 {{- /*
