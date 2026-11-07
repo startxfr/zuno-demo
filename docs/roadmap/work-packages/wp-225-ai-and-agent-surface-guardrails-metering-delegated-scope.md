@@ -631,7 +631,8 @@ Back-out: each value back to its default, then sync; the order does not matter f
 Still off, by decision: `callAssertion.required`, `jwtAllowedClients`, `restAgentEntitlement`, `agentChain.requireFor`, token-proxy inbound auth
 (it needs Dify's stored credentials re-registered), Salesforce owner scoping (no Salesforce org), the namespace matcher and the Confluence/git
 allowlists for groups other than the five above. Lot A is exercised by an isolated clone of the ai-gateway
-(`ai-gateway-wp225probe`, C2/C3 in `block`, unreachable detector): the script is `lota-live-test.py`; its result is recorded when run.
+(`ai-gateway-wp225probe`, C2/C3 in `block`, unreachable detector): the script is `lota-live-test.py`. **Result (2026-11-07, run by the user):** C1 served (200); C2 and C3 refused with
+503 `guardrails_unavailable` (stage `prompt`). The clone was deleted afterwards; the live ai-gateway was never touched.
 
 Known residual: the two signing keys are readable by `ocp-ai-dev` and `ocp-ai-ops` (they can create ExternalSecrets in zuno-ai-run), like the
 workload token that signs the lot B context. Closing it needs the keys in a namespace those groups cannot reach.
