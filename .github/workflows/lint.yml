@@ -221,6 +221,12 @@ jobs:
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
           python3 -m pytest -q tests/test_rag_query.py
+      - name: world-model-runtime tests on the CPU mocks (ADR-0604)
+        working-directory: components/world-model-runtime
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+          python3 -m pytest -q tests
       - name: zuno-token-proxy tests (ADR-0601)
         working-directory: components/zuno-token-proxy
         run: |

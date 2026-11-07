@@ -1,0 +1,11 @@
+# ADR-0604 WP-231: the runtime service (also what the mock tests need). Versions
+# shared with other components come from platform/python/constraints.txt.
+fastapi
+uvicorn
+pydantic
+httpx
+numpy
+pillow
+# PyAV wheels bundle FFmpeg with libx264 (GPL, like this repository) and h264_nvenc.
+av
+prometheus-client

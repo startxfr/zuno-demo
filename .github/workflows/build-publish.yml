@@ -140,6 +140,13 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
+          # ADR-0604/WP-231: the world-model GPU runtime; built in-cluster by
+          # ansible/roles/world_model_build, listed here so the ADR-0324 inventory is whole.
+          - name: world-model-runtime
+            dockerfile: components/world-model-runtime/Dockerfile
+            context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0516: backs mcp-gateway's generate_diagram handler, same
           # relationship ai-gateway has to image_gen.py above - a
           # standalone entry (not context: ".") since, unlike every

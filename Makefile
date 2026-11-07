@@ -76,7 +76,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # tasks/install.yml.
 DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
 DAY2_VERBS := check install build uninstall reconcile all reinstall
 # Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
 # to them: a Day 2 reconcile never falls back to re-installing a component.

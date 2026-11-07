@@ -36,7 +36,8 @@ from packaging.requirements import InvalidRequirement, Requirement
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from compile_locks import CONSTRAINTS, SEPARATE_ENVIRONMENTS, discover, expected_python, locked_python  # noqa: E402
+from compile_locks import (  # noqa: E402
+    CONSTRAINTS, SEPARATE_ENVIRONMENTS, UV_LOCKS, discover, expected_python, locked_python)
 
 PIN_RE = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)(\[[^\]]*\])?==(?P<version>[^\s;\\]+)")
 HASH_RE = re.compile(r"--hash=sha256:[0-9a-f]{64}")
@@ -45,7 +46,21 @@ ORPHAN_GLOBS = ("components/*/requirements.txt", "components/*/*/requirements.tx
 
 # Libraries allowed at more than one version across components, each with the
 # reason. Keep this empty unless two components genuinely cannot share one.
-MULTI_VERSION_ALLOWED: Dict[str, str] = {}
+# ADR-0604 (WP-231): the world-model GPU runtime runs Overworld world_engine at commit 68b31639,
+# whose pyproject pins torch==2.11.0, triton==3.6.0 and accelerate==1.12.0 (the stack it is tested
+# with), while components/mlops trains on torch 2.15. The two never share an image or a process, so
+# the torch family (and setuptools, which world_engine's build needs below 82) may differ.
+_WORLD_MODEL_TORCH_PIN = ("world-model-runtime/gpu follows world_engine 68b31639's torch==2.11.0 stack; "
+                          "mlops runs another image (ADR-0604 WP-231)")
+MULTI_VERSION_ALLOWED: Dict[str, str] = {
+    name: _WORLD_MODEL_TORCH_PIN
+    for name in (
+        "torch", "triton", "accelerate", "setuptools", "cuda-toolkit", "nvidia-cublas", "nvidia-cuda-cupti",
+        "nvidia-cuda-nvrtc", "nvidia-cuda-runtime", "nvidia-cudnn-cu13", "nvidia-cufft", "nvidia-cufile",
+        "nvidia-cusolver", "nvidia-cusparse", "nvidia-cusparselt-cu13", "nvidia-nccl-cu13", "nvidia-nvjitlink",
+        "nvidia-nvshmem-cu13", "nvidia-nvtx",
+    )
+}
 
 
 def normalize(name: str) -> str:
@@ -134,8 +149,10 @@ def check(dirs: List[pathlib.Path], constraints_file: pathlib.Path = CONSTRAINTS
                             "(python3 platform/python/compile_locks.py " + str(rel) + ")")
             continue
         text = lock.read_text()
-        if "pip-compile" not in "\n".join(text.splitlines()[:8]):
-            problems.append(f"{rel}/requirements.txt: not a pip-compile output")
+        head = "\n".join(text.splitlines()[:8])
+        if "pip-compile" not in head and not (str(rel) in UV_LOCKS and "uv pip compile" in head):
+            problems.append(f"{rel}/requirements.txt: not a pip-compile output"
+                            + (" (this lock is compiled with uv, see compile_locks.UV_LOCKS)" if str(rel) in UV_LOCKS else ""))
         if locked_python(text) != expected_python(str(rel)):
             problems.append(f"{rel}/requirements.txt: resolved with Python {locked_python(text) or '?'}, "
                             f"expected {expected_python(str(rel))} (the interpreter that installs it)")
