@@ -12,8 +12,10 @@ One probe per demonstration moment, each a real call that must get a real answer
   open-webui           one answer through Open WebUI's API, signed in as a persona (OIDC through Keycloak)
   zuno-code            the same, with the declared code model `zuno-code` (ADR-0596, Codestral first)
   dify, kagent         one answer through the experience's own token proxy, from inside its pod (ADR-0601)
-  openclaw             the per-persona assistants are Running; the answer itself is a manual checklist step
-  lightspeed           the OLSConfig is Ready; the question itself is a manual checklist step
+  openclaw             for each persona assistant, one answer from inside its pod through the operator's egress proxy,
+                       which injects the openclaw-<persona> token (the path every OpenClaw model call takes)
+  lightspeed           the OLSConfig is Ready, then one question to its API (temporary port-forward, the operator's
+                       OpenShift token)
   world-model          roadmap until ADR-0604 ships a probe (WP-235)
 
 Read-only with respect to the platform: the UnifAI sessions it creates are deleted, the approval request is rejected
@@ -336,28 +338,94 @@ def probe_kagent(ctx: Context) -> Result:
     return _proxy_answer("kagent", "zuno-kagent")
 
 
+_OPENCLAW_CURL = (
+    'curl -s -m 150 -w "\\nhttp=%{http_code}\\n" -H "Content-Type: application/json" -H "Authorization: Bearer placeholder" '
+    '-d \'{"model":"auto","max_tokens":64,"messages":[{"role":"user","content":"Say OK."}]}\' '
+    "http://ai-gateway.zuno-ai-run.svc:8080/v1/chat/completions"
+)
+
+
+def judge_openclaw_call(namespace: str, stdout: str) -> Optional[str]:
+    """None when the assistant's model path answered, else why not."""
+    body, _, code = (stdout or "").rpartition("http=")
+    code = code.strip()
+    if code != "200":
+        return f"{namespace}: HTTP {code or '?'} {body.strip()[:120]}"
+    try:
+        d = json.loads(body.strip())
+    except ValueError:
+        return f"{namespace}: HTTP 200 but no JSON answer"
+    m = (d.get("choices") or [{}])[0].get("message") or {}
+    if not ((m.get("content") or "") + (m.get("reasoning_content") or "")).strip():
+        return f"{namespace}: HTTP 200 but an empty answer"
+    return None
+
+
 def probe_openclaw(ctx: Context) -> Result:
     out = oc("get", "pods", "-A", "-o", "json")
     pods = json.loads(out.stdout).get("items", []) if out.returncode == 0 else []
-    claw = [p for p in pods if p["metadata"]["namespace"].startswith("zuno-claw-")]
-    by_ns: Dict[str, List[str]] = {}
-    for p in claw:
-        ready = all(cs.get("ready") for cs in p.get("status", {}).get("containerStatuses", []) or [{}])
-        by_ns.setdefault(p["metadata"]["namespace"], []).append("ok" if ready else p["metadata"]["name"])
-    not_ready = {ns: [n for n in v if n != "ok"] for ns, v in by_ns.items() if any(n != "ok" for n in v)}
-    if not by_ns:
-        return Result("openclaw", FAIL, "no zuno-claw-* pod found", required=False)
-    if not_ready:
-        return Result("openclaw", FAIL, f"pods not ready: {not_ready}", required=False)
-    return Result("openclaw", MANUAL, f"{len(by_ns)} persona namespace(s) all Ready ({', '.join(sorted(by_ns))}); "
-                                      "ask the question on screen (checklist)", required=False)
+    namespaces = sorted({p["metadata"]["namespace"] for p in pods if p["metadata"]["namespace"].startswith("zuno-claw-")})
+    if not namespaces:
+        return Result("openclaw", FAIL, "no zuno-claw-* namespace with pods")
+    problems = []
+    for ns in namespaces:
+        call = oc("-n", ns, "exec", "deploy/assistant", "-c", "gateway", "--", "sh", "-c", _OPENCLAW_CURL, timeout=200)
+        why = judge_openclaw_call(ns, call.stdout) if call.returncode == 0 else f"{ns}: exec failed {call.stderr.strip()[:120]}"
+        if why:
+            problems.append(why)
+    if problems:
+        return Result("openclaw", FAIL, "; ".join(problems))
+    return Result("openclaw", PASS, f"every assistant answered through its egress proxy ({', '.join(namespaces)})")
+
+
+def _free_port() -> int:
+    import socket
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
 
 def probe_lightspeed(ctx: Context) -> Result:
     out = oc("get", "olsconfig", "cluster", "-o", "json")
     if out.returncode != 0:
-        return Result("lightspeed", FAIL, f"OLSConfig not readable: {out.stderr.strip()[:160]}", required=False)
-    return judge_lightspeed(json.loads(out.stdout).get("status", {}).get("conditions", []) or [])
+        return Result("lightspeed", FAIL, f"OLSConfig not readable: {out.stderr.strip()[:160]}")
+    ready = judge_lightspeed(json.loads(out.stdout).get("status", {}).get("conditions", []) or [])
+    if ready.status == FAIL:
+        return ready
+    token = oc("whoami", "-t")
+    if token.returncode != 0 or not token.stdout.strip():
+        return Result("lightspeed", MANUAL, "OLSConfig Ready; no OpenShift token in this oc session (certificate "
+                                            "login): ask the question in the console (checklist)")
+    import socket
+    import httpx
+
+    port = _free_port()
+    cmd = ["oc"] + (["--context", os.environ["OC_CONTEXT"]] if os.getenv("OC_CONTEXT") else []) + [
+        "-n", "openshift-lightspeed", "port-forward", "svc/lightspeed-app-server", f"{port}:8443"]
+    forward = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            with socket.socket() as sock:
+                if sock.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            time.sleep(0.5)
+        r = httpx.post(f"https://127.0.0.1:{port}/v1/query", verify=False, timeout=150,
+                       headers={"Authorization": f"Bearer {token.stdout.strip()}"},
+                       json={"query": "In one sentence, what is a Pod in OpenShift?"})
+    finally:
+        forward.terminate()
+        forward.wait(timeout=10)
+    return judge_lightspeed_answer(r.status_code, r.json() if r.headers.get("content-type", "").startswith("application/json") else {})
+
+
+def judge_lightspeed_answer(status: int, body: Dict) -> Result:
+    answer = (body or {}).get("response") or ""
+    if status == 200 and answer.strip():
+        return Result("lightspeed", PASS, f"Lightspeed answered ({len(answer)} chars, "
+                                          f"{body.get('output_tokens', '?')} output tokens)")
+    return Result("lightspeed", FAIL, f"Lightspeed query: HTTP {status} {str(body)[:160]}")
 
 
 # The conditions the console chat needs. The others (agentic console plugin, alerts adapter) are features the
@@ -369,11 +437,10 @@ def judge_lightspeed(conds: List[Dict]) -> Result:
     state = {c.get("type"): c.get("status") for c in conds}
     missing = [t for t in LIGHTSPEED_NEEDED if state.get(t) != "True"]
     if missing:
-        return Result("lightspeed", FAIL, f"OLSConfig not ready for the console chat: {missing}", required=False)
+        return Result("lightspeed", FAIL, f"OLSConfig not ready for the console chat: {missing}")
     other = sorted(t for t, v in state.items() if v != "True" and t not in LIGHTSPEED_NEEDED)
     note = f" (not used by the demo, not True: {', '.join(other)})" if other else ""
-    return Result("lightspeed", MANUAL, f"API and console plugin Ready{note}; ask the question in the console "
-                                        "(checklist)", required=False)
+    return Result("lightspeed", PASS, f"API and console plugin Ready{note}")
 
 
 def probe_world_model(ctx: Context) -> Result:
@@ -392,7 +459,7 @@ PROBES: Dict[str, Callable[[Context], Result]] = {
     "delegation-approval": probe_delegation_approval,
     "world-model": probe_world_model,
 }
-OPTIONAL = {"openclaw", "lightspeed", "world-model"}
+OPTIONAL = {"world-model"}
 
 
 def run_one(name: str, ctx: Context) -> Result:

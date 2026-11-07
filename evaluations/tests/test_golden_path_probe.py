@@ -81,8 +81,25 @@ class Lightspeed(unittest.TestCase):
         conds = [{"type": "ApiReady", "status": "True"}, {"type": "ConsolePluginReady", "status": "True"},
                  {"type": "AlertsAdapterReady", "status": "False"}]
         r = g.judge_lightspeed(conds)
-        self.assertEqual(r.status, g.MANUAL)
+        self.assertEqual(r.status, g.PASS)
         self.assertIn("AlertsAdapterReady", r.detail)
+
+    def test_answer(self):
+        self.assertEqual(g.judge_lightspeed_answer(200, {"response": "A Pod is ...", "output_tokens": 40}).status, g.PASS)
+        self.assertEqual(g.judge_lightspeed_answer(200, {"response": ""}).status, g.FAIL)
+        self.assertEqual(g.judge_lightspeed_answer(401, {"detail": "unauthorized"}).status, g.FAIL)
+
+
+class OpenClaw(unittest.TestCase):
+    def test_answer_through_the_proxy(self):
+        ok = '{"model": "qwen", "choices": [{"message": {"content": "OK"}}]}\nhttp=200\n'
+        self.assertIsNone(g.judge_openclaw_call("zuno-claw-sale-01", ok))
+
+    def test_refusals(self):
+        self.assertIn("HTTP 401", g.judge_openclaw_call("ns", '{"detail":"no token"}\nhttp=401\n'))
+        self.assertIn("empty answer", g.judge_openclaw_call("ns", '{"choices": [{"message": {"content": ""}}]}\nhttp=200\n'))
+        self.assertIn("no JSON", g.judge_openclaw_call("ns", "<html>\nhttp=200\n"))
+        self.assertIn("HTTP ?", g.judge_openclaw_call("ns", ""))
 
     def test_api_not_ready_fails(self):
         r = g.judge_lightspeed([{"type": "ApiReady", "status": "False"}, {"type": "ConsolePluginReady", "status": "True"}])
@@ -113,7 +130,7 @@ class Aggregate(unittest.TestCase):
         self.assertEqual(g.last_json_line("no json here"), {})
 
     def test_optional_failures_do_not_fail_the_run(self):
-        results = [g.Result("dify", g.PASS, ""), g.Result("openclaw", g.FAIL, "", required=False),
+        results = [g.Result("dify", g.PASS, ""), g.Result("lightspeed", g.MANUAL, "", required=False),
                    g.Result("world-model", g.ROADMAP, "", required=False)]
         self.assertEqual(g.exit_code(results), 0)
 

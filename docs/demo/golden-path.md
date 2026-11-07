@@ -22,8 +22,8 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 | `open-webui` | One answer from the Zuno model through Open WebUI's API, signed in through Keycloak |
 | `zuno-code` | One answer from the `zuno-code` model through Open WebUI (Codestral first) |
 | `dify`, `kagent` | One answer through the experience's own token proxy, from inside its pod |
-| `openclaw` | `manual`: every `zuno-claw-*` pod is Ready; ask the question on screen (below) |
-| `lightspeed` | `manual`: the OLSConfig API and console plugin are Ready; ask the question on screen (below) |
+| `openclaw` | Every persona assistant answers from inside its pod through the operator's egress proxy (the `openclaw-<persona>` token is injected there) |
+| `lightspeed` | The OLSConfig API and console plugin are Ready, and Lightspeed answers one question (temporary port-forward, your OpenShift token; with a certificate login it falls back to `manual`) |
 | `world-model` | `roadmap` until ADR-0604 ships a probe (WP-235) |
 
 `RESULT: PASS` means every required moment passed. A `FAIL` on the morning of the demonstration switches that moment

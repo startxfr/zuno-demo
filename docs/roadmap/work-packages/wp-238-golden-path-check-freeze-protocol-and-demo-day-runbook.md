@@ -55,6 +55,13 @@ the mcp-gateway audit, which a rejected approval never produces (nothing runs). 
 access line for the call to Tekos (`judge_delegation`). Results are in the
 [demo-day runbook](../../demo/demo-day-2026-11-09.md#golden-path-results).
 
+## OpenClaw and Lightspeed made real (2026-11-07)
+
+The two moments that were readiness plus a manual step now get a real answer: OpenClaw from inside each persona's
+assistant pod through the operator's egress proxy (the exact path of its model calls, with the `openclaw-<persona>`
+token injected by the proxy), Lightspeed through its API over a temporary port-forward with the operator's OpenShift
+token. Both are required moments; the world model stays the only `roadmap` row.
+
 ## Acceptance
 
 - `make demo golden-path` reports one row per moment, each pass or fail with its evidence, in about 15 minutes.
