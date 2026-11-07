@@ -27,7 +27,7 @@ state are not restated here.
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
 | v0.15 | planned 2026-11-08 | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238), before the demonstration of 2026-11-09; named exceptions expected: ADR-0605 closes after the freeze baseline and the demonstration runs (WP-238), and D11 (carried from v0.14) |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
-| v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557) |
+| v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610) |
 
 ## MVP / v0
 
@@ -332,7 +332,12 @@ each rehearsed against a service simulated in a canary namespace (ADR-0609), and
 with the argocd work package. Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
 deprecated on 2026-11-07.
 
-**2 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`.** Open work packages: WP-211 to WP-215, WP-218.
+One new experience: Blender 3D objects generated as `bpy` scripts by `gpt-oss-20b` through the ai-gateway, under
+the user's own identity and a C3 floor (ADR-0610), the first of the band's two experience slots (ADR-0606 clause 2);
+its work package is opened when the band starts.
+
+**3 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Accepted`.** Open work packages: WP-211 to
+WP-215, WP-218.
 
 ## OKF stream
 
