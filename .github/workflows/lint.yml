@@ -92,6 +92,12 @@ jobs:
       # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
       - name: Golden-path probe judgement tests (ADR-0605)
         run: python3 evaluations/tests/test_golden_path_probe.py
+      # ADR-0610 (WP-245): the Blender add-on's static check, SSE parsing and device sign-in helpers, and how the
+      # prompt-set measurement judges a run (no Blender, no network).
+      - name: Blender add-on and measurement tests (ADR-0610)
+        run: |
+          python3 evaluations/tests/test_blender_addon.py
+          python3 evaluations/tests/test_blender_measure.py
       # ADR-0608 (WP-241): how each drift check judges what `oc get` returns.
       - name: Drift check judgement tests (ADR-0608)
         run: python3 platform/drift/tests/test_check_drift.py

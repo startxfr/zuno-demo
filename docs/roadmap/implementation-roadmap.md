@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
 | v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237 |
-| v0.17 | 3 | 3 | 10 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
+| v0.17 | 3 | 2 | 11 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1107,7 +1107,8 @@ the 2026-11-09 demonstration); the freeze window still applies.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07; the clause 8 prompt set and a client probe remain under ADR-0610) |
+| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07) |
+| WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
 
 ### OKF stream phases
 
@@ -1254,6 +1255,7 @@ moving.
 ## Change log
 
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-07 — WP-245 added (Phase 53): ADR-0610 Implemented (prompt set measured, golden-path moment `blender`); Blender joins the 2026-11-09 demonstration.
 - 2026-11-07 — ADR-0610 and WP-244 added (Phase 53, v0.17): Blender objects from text on a local model, executed ahead of its band by user decision.
 - 2026-11-07 — ADR-0605 to ADR-0609 and WP-238 to WP-243 added (Phase 52), from the project review of 2026-11-07. v0.15 becomes the demo-ready band: ADR-0565 (Implemented) and ADR-0605 (golden-path check and freeze window, WP-238), tagged before the demonstration of 2026-11-09. ADR-0584, ADR-0602 and ADR-0603 move to v0.16 with ADR-0606 (definition of done and WIP limit), ADR-0607 (pre-GA dependencies), ADR-0608 (drift) and ADR-0609 (canary rehearsals). ADR-0352 and ADR-0557 move to the new band v0.17. No decision clause of a moved record changes; each carries a dated amendment.
 - 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.

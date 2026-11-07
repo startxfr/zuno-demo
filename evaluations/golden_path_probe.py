@@ -24,6 +24,11 @@ One probe per demonstration moment, each a real call that must get a real answer
   world-model          ADR-0604: while the demo is installed, a real world is created as a presenter persona, video
                        arrives (first frame a keyframe), one world edit is screened and applied, and the session is
                        released; run inside the web pod. Roadmap while zuno_world_model_enabled is false
+  blender              ADR-0610: while the workstation entry exists, from this workstation like the Blender add-on:
+                       401 without a token and 404 off the two routed paths at ai-gateway.<domain>, then a device
+                       sign-in of the public client `blender` as eval-ai-dev-01 (no human), /v1/models, one streamed
+                       bpy generation that passes the add-on's static check, and the ai-gateway's log shows the C3
+                       floor for client blender and a gpt-oss-20b call; the device session is revoked afterwards
 
 Read-only with respect to the platform: the UnifAI sessions it creates are deleted, the approval request is rejected
 and its session cancelled, and Open WebUI's chat-completions API stores no chat. It spends a few hundred tokens per
@@ -41,7 +46,8 @@ Exit code 0 when every required moment passes, 1 otherwise. `manual` and `roadma
 Environment, all optional: OC_CONTEXT (an explicit `oc --context`), GOLDEN_PERSONA (UnifAI and Open WebUI persona,
 default eval-consultant-01), GOLDEN_GATEWAY_PERSONA (the persona of the ai-gateway token, default consultant-01),
 GOLDEN_VERIFY_TLS=1 (verify the routes' certificates), GOLDEN_SKIP (comma list of moments to skip),
-GOLDEN_WORLD_PERSONA (the presenter of the world-model moment, default ai-ops-01, group ocp-ai-ops).
+GOLDEN_WORLD_PERSONA (the presenter of the world-model moment, default ai-ops-01, group ocp-ai-ops),
+GOLDEN_BLENDER_PERSONA (the persona of the blender moment, default eval-ai-dev-01, group ocp-ai-dev).
 """
 from __future__ import annotations
 
@@ -683,6 +689,117 @@ def probe_world_model(ctx: Context) -> Result:
     return judge_world(last_json_line(run.stdout))
 
 
+BLENDER_PROMPT = "A coffee mug with a handle on a saucer"  # stage-ready 2/2 with both system prompts (ADR-0610 clause 8)
+_FLOOR_LINE_RE = re.compile(r"classification raised by floor: C\d -> C3 agent=blender task=bpy client=blender")
+_GPT_OSS_CALL_RE = re.compile(r"POST \S*/gpt-oss-20b/v1/chat/completions \"HTTP/1\.1 200")
+
+
+def _workstation_entry_installed() -> "tuple[Optional[bool], str]":
+    """Three states, as for the world model: (True, "") when the HTTPRoute is positively found, (False, why) when it is
+    positively absent, (None, why) when the lookup cannot be confirmed."""
+    try:
+        route = oc("get", "httproutes.gateway.networking.k8s.io", "ai-gateway-workstation", "-n", "zuno-ai-run",
+                   "-o", "name")
+    except Exception as exc:  # noqa: BLE001 - a timeout or a missing oc must not decide the verdict
+        return None, f"could not look the workstation entry up ({type(exc).__name__})"
+    if route.returncode == 0 and "ai-gateway-workstation" in (route.stdout or ""):
+        return True, ""
+    err = (route.stderr or "").strip()
+    if "NotFound" in err or "not found" in err:
+        return False, "the workstation entry is not installed (connectivity-link workstationEntry off)"
+    return None, f"could not look the workstation entry up ({err[:120] or 'no answer'})"
+
+
+def judge_blender(s: Dict) -> Result:
+    """The facts gathered by probe_blender -> one verdict. A persona that cannot sign in yet is a named, non-failing
+    state (the realm change creates it); everything else that goes wrong on an installed entry fails."""
+    if s.get("no_token") != 401:
+        return Result("blender", FAIL, f"the entry answered HTTP {s.get('no_token')} without a token, expected 401")
+    if s.get("unrouted") != 404:
+        return Result("blender", FAIL, f"an unrouted path answered HTTP {s.get('unrouted')}, expected 404")
+    login = s.get("login", "")
+    if login == "persona":
+        return Result("blender", SKIPPED, f"{s.get('persona')} cannot sign in yet (not in the realm, or the eval "
+                                          "personas Job has not run): edge checks passed", required=False)
+    if login != "ok":
+        return Result("blender", FAIL, f"device sign-in of {s.get('persona')} failed: {login}")
+    if s.get("models") != 200:
+        return Result("blender", FAIL, f"/v1/models answered HTTP {s.get('models')} for {s.get('persona')}")
+    if s.get("generation") != 200:
+        return Result("blender", FAIL, f"the generation answered {s.get('generation')}: {s.get('generation_error', '')}")
+    if s.get("problems"):
+        return Result("blender", FAIL, f"the script failed the add-on's static check: {'; '.join(s['problems'][:2])}")
+    if not s.get("floor_logged"):
+        return Result("blender", FAIL, "no 'raised by floor ... -> C3 ... client=blender' line in the ai-gateway log")
+    if not s.get("gpt_oss_called"):
+        return Result("blender", FAIL, "no gpt-oss-20b call in the ai-gateway log during the generation")
+    revoked = "" if s.get("revoked") else " (device session not revoked)"
+    return Result("blender", PASS,
+                  f"edge 401/404; {s.get('persona')} signed in by device flow; bpy script in "
+                  f"{s.get('generation_seconds', 0):.1f} s, {s.get('lines', 0)} lines, check PASS; C3 floor and "
+                  f"gpt-oss-20b in the ai-gateway log{revoked}")
+
+
+def probe_blender(ctx: Context) -> Result:
+    import ssl
+
+    import httpx
+
+    installed, why = _workstation_entry_installed()
+    if installed is None:
+        return Result("blender", SKIPPED, f"{why}: not judged", required=False)
+    if installed is False:
+        return Result("blender", ROADMAP, why, required=False)
+    sys.path.insert(0, str(HERE / "blender"))
+    from bpy_stub import load_addon
+    from device_login import DeviceLoginError, PersonaRefused, device_token, revoke
+
+    addon = load_addon()
+    gateway, issuer = addon.endpoints(ctx.domain)
+    persona = os.getenv("GOLDEN_BLENDER_PERSONA", "eval-ai-dev-01")
+    s: Dict = {"persona": persona}
+    s["no_token"] = httpx.post(f"{gateway}/v1/chat/completions", json={}, timeout=30, verify=VERIFY_TLS).status_code
+    s["unrouted"] = httpx.get(f"{gateway}/health", timeout=30, verify=VERIFY_TLS).status_code
+    try:
+        tokens = device_token(issuer, persona, ctx.password, verify=VERIFY_TLS, timeout=60)
+    except PersonaRefused:
+        s["login"] = "persona"
+        return judge_blender(s)
+    except DeviceLoginError as exc:
+        s["login"] = str(exc)[:160]
+        return judge_blender(s)
+    s["login"] = "ok"
+    try:
+        access = tokens["access_token"]
+        s["models"] = httpx.get(f"{gateway}/v1/models", headers={"Authorization": f"Bearer {access}"},
+                                timeout=30, verify=VERIFY_TLS).status_code
+        tls = ssl.create_default_context()
+        if not VERIFY_TLS:
+            tls.check_hostname, tls.verify_mode = False, ssl.CERT_NONE
+        payload = {"model": addon.MODEL, "temperature": 0.2,
+                   "messages": [{"role": "system", "content": addon.SYSTEM_PROMPT},
+                                {"role": "user", "content": f"Create this 3D object or scene: {BLENDER_PROMPT}"}]}
+        started = time.monotonic()
+        try:
+            status, answer = addon._stream_chat(f"{gateway}/v1/chat/completions", payload, tls, access, timeout=90)
+        except Exception as exc:  # noqa: BLE001 - a cut stream or a timeout is a failed generation
+            status, answer = 0, {"error": type(exc).__name__}
+        s["generation_seconds"] = time.monotonic() - started
+        s["generation"] = status
+        if status == 200:
+            code = addon.extract_code(answer)
+            s["lines"] = len(code.splitlines())
+            s["problems"] = addon.check_script(code)
+        else:
+            s["generation_error"] = str(answer.get("error", answer) if isinstance(answer, dict) else answer)[:160]
+        logs = oc("-n", "zuno-ai-run", "logs", "deploy/ai-gateway", "-c", "ai-gateway", "--since=3m", timeout=60)
+        s["floor_logged"] = bool(_FLOOR_LINE_RE.search(logs.stdout or ""))
+        s["gpt_oss_called"] = bool(_GPT_OSS_CALL_RE.search(logs.stdout or ""))
+    finally:
+        s["revoked"] = revoke(issuer, tokens.get("refresh_token", ""), verify=VERIFY_TLS)
+    return judge_blender(s)
+
+
 PROBES: Dict[str, Callable[[Context], Result]] = {
     "unifai-tekos": probe_unifai_tekos,
     "sovereignty": probe_sovereignty,
@@ -697,8 +814,11 @@ PROBES: Dict[str, Callable[[Context], Result]] = {
     "trace": probe_trace,
     "delegation-approval": probe_delegation_approval,
     "world-model": probe_world_model,
+    "blender": probe_blender,
 }
-OPTIONAL = {"world-model"}
+# Required once they have a verdict: a roadmap or skipped row (feature off, lookup not confirmable, persona not created
+# yet) never fails the run, a PASS or FAIL of an installed feature does. Blender is in the 2026-11-09 demonstration.
+OPTIONAL = {"world-model", "blender"}
 
 
 def run_one(name: str, ctx: Context) -> Result:

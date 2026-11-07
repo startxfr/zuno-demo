@@ -294,8 +294,99 @@ class Aggregate(unittest.TestCase):
     def test_every_moment_has_a_probe(self):
         self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "dify", "kagent",
                                          "openclaw", "lightspeed", "tools", "guardrails", "trace", "delegation-approval",
-                                         "world-model"})
+                                         "world-model", "blender"})
         self.assertLess(list(g.PROBES).index("unifai-tekos"), list(g.PROBES).index("trace"))
+
+
+class Blender(unittest.TestCase):
+    """ADR-0610 clause 9 (WP-245): the Blender workstation moment."""
+
+    OK = {"persona": "eval-ai-dev-01", "no_token": 401, "unrouted": 404, "login": "ok", "models": 200,
+          "generation": 200, "generation_seconds": 8.2, "lines": 50, "problems": [], "floor_logged": True,
+          "gpt_oss_called": True, "revoked": True}
+
+    def judge(self, **kw):
+        return g.judge_blender({**self.OK, **kw})
+
+    def test_a_full_run_passes_and_says_what_ran(self):
+        r = g.judge_blender(self.OK)
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("C3 floor", r.detail)
+        self.assertNotIn("not revoked", r.detail)
+
+    def test_every_broken_link_fails(self):
+        for kw, why in (({"no_token": 200}, "without a token"), ({"unrouted": 200}, "unrouted"),
+                        ({"login": "the token endpoint answered access_denied"}, "device sign-in"),
+                        ({"models": 403}, "/v1/models"), ({"generation": 0, "generation_error": "ReadTimeout"},
+                                                           "generation"),
+                        ({"problems": ["line 1: import os"]}, "static check"),
+                        ({"floor_logged": False}, "floor"), ({"gpt_oss_called": False}, "gpt-oss-20b")):
+            with self.subTest(why):
+                r = self.judge(**kw)
+                self.assertEqual(r.status, g.FAIL)
+                self.assertIn(why, r.detail)
+
+    def test_a_persona_not_created_yet_is_named_and_never_fails(self):
+        r = self.judge(login="persona")
+        self.assertEqual(r.status, g.SKIPPED)
+        self.assertIn("eval-ai-dev-01", r.detail)
+        saved = g.PROBES["blender"]
+        g.PROBES["blender"] = lambda ctx: r
+        try:
+            self.assertFalse(g.run_one("blender", None).required)
+        finally:
+            g.PROBES["blender"] = saved
+
+    def test_the_edge_is_checked_before_any_sign_in(self):
+        self.assertEqual(self.judge(no_token=502, login="persona").status, g.FAIL)
+
+    def probe_with(self, fake):
+        saved = g.oc
+        g.oc = fake
+        try:
+            return g.probe_blender(types.SimpleNamespace(domain="apps.example.com", password="x"))
+        finally:
+            g.oc = saved
+
+    def test_positively_absent_entry_is_roadmap_and_it_asks_for_the_httproute(self):
+        calls = []
+
+        def fake(*args, **kw):
+            calls.append(args)
+            return types.SimpleNamespace(returncode=1, stdout="",
+                                         stderr='Error from server (NotFound): httproutes "ai-gateway-workstation" not found')
+
+        r = self.probe_with(fake)
+        self.assertEqual((r.status, r.required), (g.ROADMAP, False))
+        self.assertIn("httproutes.gateway.networking.k8s.io", calls[0])
+
+    def test_an_unconfirmable_lookup_is_skipped_never_a_required_failure(self):
+        import subprocess
+
+        def timeout(*args, **kw):
+            raise subprocess.TimeoutExpired("oc", 120)
+
+        def unreachable(*args, **kw):
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Unable to connect to the server")
+
+        for name, fake in (("timeout", timeout), ("unreachable", unreachable)):
+            with self.subTest(name):
+                r = self.probe_with(fake)
+                self.assertEqual(r.status, g.SKIPPED)
+                saved = g.PROBES["blender"]
+                g.PROBES["blender"] = lambda ctx, r=r: r
+                try:
+                    self.assertFalse(g.run_one("blender", None).required)
+                finally:
+                    g.PROBES["blender"] = saved
+
+    def test_an_installed_entry_that_fails_is_required(self):
+        saved = g.PROBES["blender"]
+        g.PROBES["blender"] = lambda ctx: g.Result("blender", g.FAIL, "x")
+        try:
+            self.assertTrue(g.run_one("blender", None).required)
+        finally:
+            g.PROBES["blender"] = saved
 
 
 if __name__ == "__main__":

@@ -393,7 +393,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
-| [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Partially implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
+| [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
 
 ## OKF v0.1
 
