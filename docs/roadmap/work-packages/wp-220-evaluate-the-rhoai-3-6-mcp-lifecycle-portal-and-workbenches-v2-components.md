@@ -567,7 +567,7 @@ Decisions taken at closure: the Anthropic `/v1/messages` traffic stays uncounted
 `ocp-ai-dev` keeps no MCP tool (section 18).
 
 Not done, none blocking, to be taken up when the cause clears: the V2 workbench pilot (needs the Notebook v2 API); the MaaS 3.6 IPP-to-Praxis impact on the payload-processing
-workarounds and the Keycloak `apiKeyHelper` path (unverified); an upstream report for the OGX CA-bundle defect (text drafted, not sent).
+workarounds and the Keycloak `apiKeyHelper` path (unverified); an upstream report for the OGX CA-bundle defect (text drafted, not sent: [evidence/wp-220-ogx-ca-bundle-vendor-report.md](../evidence/wp-220-ogx-ca-bundle-vendor-report.md)).
 
 ## Steps
 

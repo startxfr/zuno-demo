@@ -180,3 +180,7 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   target absent from `delegation.write_allowed`, is accepted as covered by the mcp-gateway and a2a-gateway unit tests, because no second
   write-capable target exists to replay it against. [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
   stays `Accepted` until its remaining proofs are made.
+- **UnifAI 0.1.62 pinned on demo333 (2026-11-06):** catalog `sha256:b8586c96…`, five images, operator CSV 0.1.62, all seven deployments rolled
+  without intervention. R-539 replayed: with a session `approve_all` rule the worker logs `approve_all: True` and the delegated write still waited
+  for the user (reject answered, nothing ran), so an auto-approval does not cross the hop. R-538 (cap of 3 requests per session) was not reachable
+  live because Arkos stops after the first refusal; accepted as covered upstream. The remaining ADR-0409 proofs are all closed or accepted.

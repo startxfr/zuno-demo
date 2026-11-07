@@ -244,11 +244,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:972c6853c36b45850f63bb45bfa3eac8e45683c4e55319b26c7ded69c65ce353  # v0.1.61
-      identity: quay.io/zuno/unifai-identity@sha256:1edc47f37e505b3658dbaee2f69bd5e200aae6a7daed192b4f7cbe68af9ca80f  # v0.1.61
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:bf839719c39c6b89cb13e26eabdfc290ed8f206036399136552063eba7bd0847  # v0.1.61
-      rag: quay.io/zuno/unifai-rag@sha256:9f4972dee45977d996b490af57fe3497b304cc7a8e24292b2a318ae5f9d31079  # v0.1.61
-      ui: quay.io/zuno/unifai-ui@sha256:f81499db2448ec039655b88f49f94796bb07810026982d3f3dcdac36c7ad9c0d  # v0.1.61
+      backend: quay.io/zuno/unifai-backend@sha256:2d0c6bb0a8d1a6c807d681a86d0eea8591382a7372c5f8064725980286f8a0f8  # v0.1.62
+      identity: quay.io/zuno/unifai-identity@sha256:7326cb345f60922f574aa916c19108d56bd63a9c6885a7d190654eb2b407b78b  # v0.1.62
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:28c20a0e64d4beb18ea80af015aa07d1d5d2cdb4af7aa0460ece5ff8e74c1408  # v0.1.62
+      rag: quay.io/zuno/unifai-rag@sha256:0d68f18ccb733a5030bf43e2d0d04b9b0e47b54ed75c6f1861883458b0ad7117  # v0.1.62
+      ui: quay.io/zuno/unifai-ui@sha256:862c50588a9f1d27443825cb6fe8158bbc484088685d1e32176a18118383ec79  # v0.1.62
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:

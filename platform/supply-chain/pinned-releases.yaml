@@ -498,3 +498,54 @@ releases:
     digest: sha256:a8c8795bf6f60bdd9ecfb76aa23186dd2862ec49f88e8c71524bce0850609b68
     signed: true
     signed_at: '2026-11-06T14:10:38Z'
+- release_tag: v0.14.1
+  pinned_at: '2026-11-06T23:20:36Z'
+  pins:
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:dfa5fe3f3badbdf6aac73ce5878fd2bd7a5fcc30724276e99beaa9e818103331
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/diagram-render/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:8e402adba46d8e518fb013e0e247e210a423f080ddc3df6c454360ab03dd139a
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mcp-aap/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:b48788016076ea67e54bb5e6cd8a15b9abcc1c09594d5f472319a5844f8a9df3
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:3b203e029e482315ac8d0c0cf0466bd09e652aa8f2089f701e9bbf0e58f76ce5
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:5aa82eb8742be798674dca398bcee4cdaf17e8e975216a7e5c0a7744469b485d
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:5fd462fbac6b11341f53adbe900ee49416980aa86364c79c136293a393835799
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.14.1
+    digest: sha256:209249ce38cd42583bb566ae2d597199843ce03c3b2dd0078b328251df2d9949
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.14.1
+    digest: sha256:f699c1a054b6143c9d71c35a14835fbf18ed3597e68cdc5a56b7dcf0eb3ceaa7
+    signed: true
+    signed_at: '2026-11-06T23:20:36Z'

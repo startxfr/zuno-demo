@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 2 | 28 | — |
+| v0.11 | 23 | 1 | 28 | — |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
@@ -1413,3 +1413,4 @@ moving.
   fixed: renamed roadmap-container entries in `ADR_INDEX_EXCLUDED_FILES`,
   status normalization for ` - see …` / linked-Superseded forms); 35 briefs
   authored (13 + 9 + 13).
+- 2026-11-07 — ADR-0409 Implemented. UnifAI 0.1.62 is pinned on demo333; with a session `approve_all` rule the worker applies it (R-539) and the delegated write still waits for the user. The per-session cap of 3 requests (R-538) could not be reached live (Arkos stops after the first refusal) and is covered upstream.
