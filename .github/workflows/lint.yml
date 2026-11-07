@@ -419,8 +419,15 @@ jobs:
             if [ -f "evaluations/$agent/requirements.txt" ]; then
               pip install -r "evaluations/$agent/requirements.txt"
             fi
-            python3 evaluations/quality_gate.py --agent "$agent" --candidate ci-smoke-test
+            python3 evaluations/quality_gate.py --agent "$agent" --candidate ci-smoke-test 2>gate.err
             code=$?
+            cat gate.err >&2
+            # A check that reads the cluster (peft_regression runs `oc`) cannot run on a runner without one: the gate
+            # fails it closed with exit 2, which is an environment limit here, not a wiring defect.
+            if [ "$code" -eq 2 ] && grep -q "No such file or directory: 'oc'" gate.err; then
+              echo "quality gate needs a live cluster for agent=$agent (oc not found) - not a wiring defect"
+              code=1
+            fi
             if [ "$code" -eq 2 ]; then
               echo "::error::quality gate wiring broken for agent=$agent (exit 2 = config/wiring defect, not a scenario-rate result)"
               exit_status=1
