@@ -55,6 +55,27 @@ def admin_groups() -> List[str]:
     return [g.strip() for g in raw.split(",") if g.strip()]
 JWT_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "30"))
 
+
+def allowed_clients() -> List[str]:
+    """ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (`azp`) whose tokens
+    this gateway accepts, from JWT_ALLOWED_CLIENTS (comma-separated, read per call;
+    an entry ending in `*` is a prefix). Empty, the default, accepts every client
+    the audience admits, as before. Set, a token from another client, or without
+    `azp`, is refused with a 401: on top of the `zuno-admin-api` audience
+    (WP-222), each experience is then admitted by name."""
+    raw = os.getenv("JWT_ALLOWED_CLIENTS", "")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def client_allowed(azp: str, patterns: List[str]) -> bool:
+    for pattern in patterns:
+        if pattern.endswith("*"):
+            if azp.startswith(pattern[:-1]) and len(azp) > len(pattern) - 1:
+                return True
+        elif azp == pattern:
+            return True
+    return False
+
 _jwks_client: Optional[PyJWKClient] = None
 
 
@@ -122,6 +143,11 @@ def validate_token(
     sub = claims.get("sub")
     if not sub:
         raise HTTPException(status_code=401, detail="Token missing 'sub' claim.")
+
+    patterns = allowed_clients()
+    if patterns and not client_allowed(str(claims.get("azp") or ""), patterns):
+        logger.warning("token of client %r refused (JWT_ALLOWED_CLIENTS)", claims.get("azp"))
+        raise HTTPException(status_code=401, detail="Token issued to a client this gateway does not accept.")
 
     groups = claims.get("groups", []) or []
     normalized_groups = [g.lstrip("/") for g in groups]

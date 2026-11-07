@@ -67,6 +67,19 @@ keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/ope
 # or the pod refuses to start).
 jwtAudience: zuno-admin-api
 jwtAudienceRequired: true
+# ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens the
+# gateway accepts, on top of jwtAudience ("*" suffix = prefix). Empty (default)
+# accepts every client the audience admits. Include the admin client when
+# /admin/* is used.
+jwtAllowedClients: []
+# ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
+# With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
+# the WP-209 classification floor, the routing preferences and the guardrails mode
+# key on the verified agent; a disagreeing X-Zuno-Agent is ignored and logged. A
+# missing or invalid chain keeps today's headers and the per-client floor.
+agentChain:
+  verify: false
+  publicKey: ""
 localModelEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
 localModelName: qwen3.6-27b-instruct
 

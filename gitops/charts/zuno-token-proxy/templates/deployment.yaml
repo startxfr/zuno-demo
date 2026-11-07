@@ -64,6 +64,10 @@ spec:
               value: {{ .Values.refreshRatio | quote }}
             - name: UPSTREAM_TIMEOUT_S
               value: {{ .Values.upstreamTimeoutSeconds | quote }}
+            {{- if .Values.inboundAuth.enabled }}
+            - name: INBOUND_KEYS_FILE
+              value: /var/run/zuno-token-proxy/inbound_keys
+            {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

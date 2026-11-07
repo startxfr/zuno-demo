@@ -17,6 +17,7 @@ GET  /healthz  /readyz
 - `X-Zuno-Delegated-By` / `X-Zuno-Delegation-Depth` are verified like the mcp-gateway does (`app/agent_chain.py` is a copy of its
   module): declared targets, depth within `min(agent max_depth, corp ceiling)`, no cycle. They are passed on unchanged.
   `X-Zuno-Data-Classification` is raised to at least the agent's floor, never lowered.
+- WP-225 lot C (ADR-0603 M14): with `AGENT_CHAIN_SIGNING_KEY_FILE` (chart `agentChain.sign`), every call to the ai-gateway and the mcp-gateway carries `X-Zuno-Agent-Chain`, an EdDSA JWS of the agent, its task and the checked delegators, bound to the caller's bearer (`ath`), addressed to the receiving gateway and valid 60 s (`app/signed_chain.py`, byte-identical in the three services). An inbound chain header is never passed on.
 - The task to run is `message.metadata.task`, else the agent's primary task.
 - No onward delegation, no approval across hops (`input-required` is never raised), no credential of its own.
 

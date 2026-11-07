@@ -63,3 +63,16 @@ credentials:
 repositoryAllowlist:
   groups: {}
   scope: all
+
+# ADR-0602 clause 10 / ADR-0603 M14 (WP-225 lot C): verify the mcp-gateway's
+# per-call assertion (Authorization: Bearer <EdDSA JWT, typ zuno-call+jwt>: aud this
+# server, sub the caller, act the gateway, the tool, exp <= 60 s, jti consumed once).
+# publicKey: the PEM of Vault mcp/gateway-call-assertion public_key. Set, an
+# assertion is verified when one is sent (a forged, expired, misaddressed,
+# other-tool or replayed one is refused) and a request without one is still
+# served. required: true refuses every request without a valid assertion; set it
+# only after the mcp-gateway runs with outboundIdentity.mode assertion. Both off by
+# default (today's behaviour).
+callAssertion:
+  publicKey: ""
+  required: false

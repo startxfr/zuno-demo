@@ -24,7 +24,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
-from app import caller_context
+from app import call_assertion, caller_context
 from app.bindings import Binding
 from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, rag_query, web_search
 
@@ -159,14 +159,29 @@ async def _invoke_streamable_http(
     # the backend's own name, which callers using canonical capability IDs
     # never see.
     #
-    # Authorization is still forwarded for audit/observability even though
+    # Authorization was forwarded for audit/observability even though
     # downstream servers don't themselves re-validate it (the gateway's
     # ADR-0011 policy intersection already happened);
     # X-Zuno-Gateway-Token is the one that's actually enforced (ADR-0037).
+    # WP-225 lot C makes what is sent per binding (see below).
     endpoint = binding.endpoint_url()
     # The headers are built here from binding data and the validated identity only;
     # nothing of the inbound request (an X-Zuno-Caller-* header included) is copied.
-    headers = {"Authorization": f"Bearer {bearer_token}"}
+    #
+    # ADR-0602 clause 10 (WP-225 lot C): with MCP_OUTBOUND_IDENTITY=assertion the
+    # caller's bearer is replaced by a per-call assertion the gateway signs (aud the
+    # backend, sub the caller, act the gateway, the tool, exp <= 60 s, jti); a
+    # third-party backend gets no Authorization at all, and a `user_token` binding
+    # keeps the bearer (app/call_assertion.py). The default (bearer) forwards it, as
+    # before. An unusable key fails the call: never a fallback to the bearer.
+    try:
+        authorization = call_assertion.authorization_for(
+            binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or ""
+        )
+    except call_assertion.AssertionUnavailable as exc:
+        logger.error("no call assertion for %s: %s", binding.backend, exc)
+        raise DownstreamError(502, f"{binding.backend}: the gateway cannot sign the call assertion") from exc
+    headers = {"Authorization": authorization} if authorization else {}
     if binding.gateway_token:
         headers["X-Zuno-Gateway-Token"] = MCP_GATEWAY_WORKLOAD_TOKEN
     if binding.caller_context:
@@ -263,8 +278,13 @@ def _tool_input_schema(tool: Any) -> Optional[Dict[str, Any]]:
     return schema if isinstance(schema, dict) else None
 
 
-async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True) -> Dict[str, Dict[str, Any]]:
+async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True, backend: str = "") -> Dict[str, Dict[str, Any]]:
     headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN} if gateway_token else {}
+    # WP-225 lot C: in assertion mode a Zuno server may require an assertion on every
+    # request; a schema read carries one for the gateway itself, with no tool.
+    authorization = call_assertion.schema_authorization_for(backend, gateway_token)
+    if authorization:
+        headers["Authorization"] = authorization
     http_client = httpx2.AsyncClient(timeout=SCHEMA_TIMEOUT_SECONDS, headers=headers)
     async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
         async with ClientSession(read, write) as session:
@@ -276,12 +296,14 @@ async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True) -> 
     }
 
 
-async def _endpoint_schemas(endpoint: str, gateway_token: bool = True) -> Dict[str, Dict[str, Any]]:
+async def _endpoint_schemas(endpoint: str, gateway_token: bool = True, backend: str = "") -> Dict[str, Dict[str, Any]]:
     cached = _SCHEMA_CACHE.get(endpoint)
     if cached and cached[0] > time.monotonic():
         return cached[1]
     try:
-        schemas = await asyncio.wait_for(_fetch_endpoint_schemas(endpoint, gateway_token), SCHEMA_TIMEOUT_SECONDS + 1)
+        schemas = await asyncio.wait_for(
+            _fetch_endpoint_schemas(endpoint, gateway_token, backend), SCHEMA_TIMEOUT_SECONDS + 1
+        )
         _SCHEMA_CACHE[endpoint] = (time.monotonic() + SCHEMA_TTL_SECONDS, schemas)
     except BaseException as exc:  # noqa: BLE001 - includes the SDK's ExceptionGroup; never break a listing
         if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
@@ -304,7 +326,10 @@ async def schemas_for(bindings: List[Binding]) -> Dict[str, Dict[str, Any]]:
         except ValueError:
             continue
     fetched = await asyncio.gather(
-        *(_endpoint_schemas(endpoint, any(b.gateway_token for b in group)) for endpoint, group in wanted.items())
+        *(
+            _endpoint_schemas(endpoint, any(b.gateway_token for b in group), group[0].backend)
+            for endpoint, group in wanted.items()
+        )
     )
     out: Dict[str, Dict[str, Any]] = {}
     for (endpoint, group), schemas in zip(wanted.items(), fetched):

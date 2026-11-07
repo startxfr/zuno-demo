@@ -93,6 +93,9 @@ APP_OVERLAYS: Dict[str, Dict[str, Any]] = {
     "zuno-unifai-d1": {"stack": {"backup": {"enabled": True}}},
     # ansible/roles/rhtas_config resolves the TUF root live.
     "zuno-rhtas-config-d1": {"policyOperand": {"trustRoot": {"rootJsonBase64": "cGxhY2Vob2xkZXI="}}},
+    # ansible/roles/dify dify_token_proxy_inbound_auth (WP-225 lot C, default false).
+    "zuno-token-proxy-dify-d1": {"inboundAuth": {"enabled": True}},
+    "zuno-dify-knowledge-d1": {"proxyAuth": {"enabled": True}},
     # lightspeed_identity_mode=serviceIdentity (inventory).
     "zuno-lightspeed-config-d1": {"mcp": {"enabled": True, "identityMode": "serviceIdentity"}},
 }

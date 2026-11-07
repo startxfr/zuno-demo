@@ -23,7 +23,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import classification_floor, model_tasks, tool_markers
+from app import classification_floor, model_tasks, signed_chain, tool_markers
 from app import key_ceilings, metered_paths, stream_guard
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, require_admin, validate_token
@@ -389,6 +389,22 @@ async def _guardrails_refusal(
     return JSONResponse(guardrails.refusal_body(stage, detections), status_code=400)
 
 
+def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerIdentity) -> "tuple[str, str]":
+    """ADR-0603 M14 (WP-225 lot C): the (agent, task) a call is made for.
+
+    With AGENT_CHAIN_VERIFY on and a valid X-Zuno-Agent-Chain (signed by the
+    a2a-gateway, bound to this bearer, addressed to the ai-gateway;
+    app/signed_chain.py), the verified pair replaces X-Zuno-Agent / X-Zuno-Task, so
+    the WP-209 floor, the routing preferences and the guardrails mode key on an
+    agent the caller cannot choose. A disagreeing header is ignored and logged.
+    Without a verified chain the headers apply, as before, and so does the
+    per-client floor."""
+    resolved = signed_chain.resolve(
+        chain_header, agent, task, token=identity.token, audience="ai-gateway", log=logger
+    )
+    return resolved.agent, resolved.task
+
+
 @app.post("/v1/chat/completions", dependencies=[Depends(adopt_incoming_trace_context)])
 async def chat_completions(
     payload: ChatCompletionRequest,
@@ -432,7 +448,11 @@ async def chat_completions(
     # since it is a per-CALL value, not a routing decision or a provider
     # default. Optional; absent means no cap, today's exact behavior.
     x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
+    # ADR-0603 M14 (WP-225 lot C): the a2a-gateway's signed agent chain, verified
+    # by _agent_identity() only when AGENT_CHAIN_VERIFY is on.
+    x_zuno_agent_chain: str = Header(default="", alias=signed_chain.HEADER),
 ):
+    x_zuno_agent, x_zuno_task = _agent_identity(x_zuno_agent_chain, x_zuno_agent, x_zuno_task, identity)
     set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
     set_caller_persona(identity.persona)  # ADR-0593: the zuno.persona span attribute and the per-user budget
     # ADR-0596: an experience client's declared model (e.g. zuno-code) selects
@@ -1976,11 +1996,14 @@ async def _metered_endpoint(api: str, request: Request, identity: CallerIdentity
     except ValueError:
         return metered_paths.error(api, 400, "invalid_request", "the request body is not valid JSON")
     h = request.headers
+    agent, task = _agent_identity(
+        h.get(signed_chain.HEADER, ""), h.get("X-Zuno-Agent", ""), h.get("X-Zuno-Task", ""), identity
+    )
     return await _metered_call(
         api, body, identity,
         classification_header=h.get("X-Zuno-Data-Classification", ""),
         local_only_header=h.get("X-Zuno-Local-Only", "false"),
-        agent=h.get("X-Zuno-Agent", ""), task=h.get("X-Zuno-Task", ""),
+        agent=agent, task=task,
         request_id_header=h.get("X-Zuno-Request-Id", ""), run_id_header=h.get("X-Zuno-Run-Id", ""),
         quota_class_header=h.get("X-Zuno-Quota-Class", ""), project_id_header=h.get("X-Zuno-Project-Id", ""),
         forwarded=_forwarded(request), count_tokens=count_tokens,

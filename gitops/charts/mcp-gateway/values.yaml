@@ -103,6 +103,37 @@ metricsQuery:
 jsonRpc:
   maxBatchSize: 20
 
+# ADR-0602 clause 10 / ADR-0603 M14 (WP-225 lot C): what the gateway sends as
+# Authorization to a streamable-HTTP backend.
+#   bearer     the caller's own Keycloak token, forwarded (today's behaviour).
+#   assertion  a per-call JWT the gateway signs (EdDSA; aud the backend, sub the
+#              caller, act the gateway, the tool, exp <= 60 s, jti), verified by
+#              each Zuno server (callAssertion.publicKey in its chart). A
+#              third-party backend (kubernetes-mcp-server) gets no Authorization;
+#              a binding with `user_token: true` keeps the bearer. Needs the key
+#              pair in Vault (vaultKey, fields private_key and public_key) and the
+#              key granted to zuno-ai-run in platform/vault/secret-access.yaml.
+outboundIdentity:
+  mode: bearer
+  assertionTtlSeconds: 60
+  vaultKey: mcp/gateway-call-assertion
+  vaultProperty: private_key
+
+# ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
+# With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
+# a valid chain names the agent, task and delegators of the call, and a disagreeing
+# X-Zuno-Agent is ignored and logged. A missing or invalid chain keeps today's
+# headers. Off by default.
+agentChain:
+  verify: false
+  publicKey: ""
+
+# ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens the
+# gateway accepts, on top of jwtAudience. An entry ending in "*" is a prefix.
+# Empty (the default) accepts every client the audience admits. Include the admin
+# client when /admin/* is used.
+jwtAllowedClients: []
+
 # ADR-0524 clause 3 (WP-085 step 3): lets OpenShift Lightspeed reach this
 # gateway's MCP front-door (/mcp). Default false - the allow is scoped by
 # NAMESPACE rather than by pod label, because Lightspeed's pods are

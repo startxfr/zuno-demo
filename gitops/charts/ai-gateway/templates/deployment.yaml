@@ -104,6 +104,20 @@ spec:
               value: {{ .Values.jwtAudience | quote }}
             - name: JWT_AUDIENCE_REQUIRED
               value: {{ .Values.jwtAudienceRequired | quote }}
+            {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
+            {{- with .Values.jwtAllowedClients }}
+            - name: JWT_ALLOWED_CLIENTS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- if .Values.agentChain.verify }}
+            {{- if not .Values.agentChain.publicKey }}
+            {{- fail "agentChain.verify needs agentChain.publicKey (the PEM of Vault a2a/agent-chain public_key)" }}
+            {{- end }}
+            - name: AGENT_CHAIN_VERIFY
+              value: "true"
+            - name: AGENT_CHAIN_PUBLIC_KEY
+              value: {{ .Values.agentChain.publicKey | quote }}
+            {{- end }}
             - name: LOCAL_MODEL_ENDPOINT
               value: {{ .Values.localModelEndpoint | quote }}
             - name: LOCAL_MODEL_NAME

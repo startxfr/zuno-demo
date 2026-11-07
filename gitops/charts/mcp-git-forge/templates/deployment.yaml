@@ -67,6 +67,18 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
+            {{- if .Values.callAssertion.publicKey }}
+            - name: MCP_CALL_ASSERTION_PUBLIC_KEY
+              value: {{ .Values.callAssertion.publicKey | quote }}
+            {{- end }}
+            {{- if .Values.callAssertion.required }}
+            {{- if not .Values.callAssertion.publicKey }}
+            {{- fail "callAssertion.required needs callAssertion.publicKey" }}
+            {{- end }}
+            - name: MCP_CALL_ASSERTION_REQUIRED
+              value: "true"
+            {{- end }}
             # ADR-0603 M12 (WP-225 lot B): the repositories each Keycloak group may
             # reach, checked against the signed caller context. "{}" = no allowlist.
             - name: GIT_FORGE_REPOSITORY_ALLOWLIST

@@ -24,6 +24,7 @@ stay the mcp-gateway's. Deployed by `gitops/charts/zuno-dify-knowledge`.
 | `TOOL_NAME` | default `knowledge.tech.search` |
 | `KNOWLEDGE_BASES` | `id=tag,...`, default `tech=knowledge.tech` |
 | `MAX_TOP_K`, `UPSTREAM_TIMEOUT_S` | optional |
+| `PROXY_KEY_FILE` | optional (WP-225 lot C): the token proxy's inbound key, sent as a bearer to `MCP_URL` |
 
 Tests (token proxy / gateway faked):
 

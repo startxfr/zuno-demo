@@ -171,6 +171,19 @@ namespace matcher in every selector (`app/promql_scope.py`,
 `METRICS_NAMESPACES_BY_GROUP`), and a JSON-RPC batch on `/mcp` is bounded by
 `MCP_MAX_BATCH_SIZE` (one `-32600` Invalid Request past it).
 
+Since WP-225 lot C (ADR-0602 clause 10, ADR-0603 M14), all off by default:
+- `MCP_OUTBOUND_IDENTITY=assertion` replaces the forwarded bearer with a per-call
+  EdDSA assertion (`app/call_assertion.py`: aud the backend, sub the caller, act the
+  gateway, the tool, exp at most 60 s, jti), verified by the four Zuno servers; a
+  third-party backend gets no `Authorization`, and a `user_token: true` binding
+  keeps the bearer;
+- the caller's entitlement to the agent (ADR-0040) is checked in `evaluate()`, so
+  the REST path refuses what `/mcp` refuses;
+- `AGENT_CHAIN_VERIFY` with `AGENT_CHAIN_PUBLIC_KEY`: a valid `X-Zuno-Agent-Chain`
+  signed by the a2a-gateway (`app/signed_chain.py`) names the agent, task and
+  delegators, and disagreeing headers are ignored and logged;
+- `JWT_ALLOWED_CLIENTS`: a token whose `azp` is not listed is refused.
+
 ## Policy intersection: all five factors
 
 This gateway authoritatively enforces the full intersection - any single

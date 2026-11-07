@@ -217,6 +217,10 @@ jobs:
           # rewritten query.
           pip install --require-hashes -r tests/requirements.txt
           python3 tests/test_wp225_lot_b.py
+          # WP-225 lot C (ADR-0602 clause 10, ADR-0603 M14): the per-call assertion
+          # instead of the forwarded bearer, one entitlement check for REST and /mcp,
+          # the signed agent chain, the azp allowlist.
+          python3 tests/test_wp225_lot_c.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -233,6 +237,8 @@ jobs:
           pip install -r requirements.txt
           python3 tests/test_token_proxy.py
           python3 tests/test_tls_verify.py
+          # WP-225 lot C: the proxy authenticates its callers (INBOUND_KEYS_FILE).
+          python3 tests/test_wp225_inbound_auth.py
       - name: zuno-dify-knowledge tests (ADR-0599)
         working-directory: components/zuno-dify-knowledge
         run: |
@@ -266,6 +272,14 @@ jobs:
           # results scanned, streams cut on a detection, the classifier hook, and
           # the metered /v1/messages and /v1/responses with the per-key ceiling.
           python3 tests/test_wp225_guardrails_metering.py
+          # WP-225 lot C (ADR-0603 M14): the floor keys on the verified agent chain.
+          python3 tests/test_wp225_lot_c.py
+      - name: a2a-gateway tests (ADR-0401/0403, WP-225 lot C)
+        working-directory: components/a2a-gateway
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+          python3 -m pytest -q tests
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |
@@ -299,6 +313,8 @@ jobs:
           python3 tests/test_mcp_protocol.py
           # WP-225 lot B (ADR-0603 M12): the space allowlist from the signed caller context.
           python3 tests/test_wp225_space_allowlist.py
+          # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
+          python3 tests/test_wp225_call_assertion.py
       # ADR-0119: was missing (a real gap the new
       # check_mcp_server_conformance.py checker caught) - these tests
       # existed but never ran in CI.
@@ -309,6 +325,8 @@ jobs:
           python3 tests/test_mcp_protocol.py
           # WP-225 lot B (ADR-0603 M12): owner scoping from the signed caller context.
           python3 tests/test_wp225_owner_scoping.py
+          # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
+          python3 tests/test_wp225_call_assertion.py
       - name: git-forge MCP server tests (ADR-0120)
         working-directory: components/mcp-servers/git-forge
         run: |
@@ -316,6 +334,8 @@ jobs:
           python3 tests/test_mcp_protocol.py
           # WP-225 lot B (ADR-0603 M12): the repository allowlist from the signed caller context.
           python3 tests/test_wp225_repository_allowlist.py
+          # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
+          python3 tests/test_wp225_call_assertion.py
       - name: aap MCP server tests (ADR-0355)
         working-directory: components/mcp-servers/aap
         run: |
@@ -323,6 +343,8 @@ jobs:
           python3 tests/test_mcp_protocol.py
           # WP-225 lot B (ADR-0603 M15): the per-caller cluster_audit launch limit.
           python3 tests/test_wp225_launch_rate_limit.py
+          # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
+          python3 tests/test_wp225_call_assertion.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

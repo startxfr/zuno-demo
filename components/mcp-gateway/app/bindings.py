@@ -88,6 +88,12 @@ class Binding:
     # from a backend that does not check it (the upstream kubernetes-mcp-server).
     caller_context: bool = False
     gateway_token: bool = True
+    # ADR-0602 clause 10 (WP-225 lot C): streamable-http only. `user_token: true`
+    # means the backend needs the caller's own Keycloak token (a provider-delegated
+    # backend): it keeps the forwarded bearer when MCP_OUTBOUND_IDENTITY=assertion
+    # replaces it with the gateway's per-call assertion everywhere else
+    # (app/call_assertion.py). No shipped binding sets it.
+    user_token: bool = False
 
     def all_names(self) -> List[str]:
         """The capability plus its aliases - the equivalence set used for
@@ -147,6 +153,7 @@ class BindingRegistry:
                         backend_default_endpoint=backends_defaults.get(item["backend"]),
                         caller_context=item.get("caller_context", False),
                         gateway_token=item.get("gateway_token", True),
+                        user_token=item.get("user_token", False),
                     )
                     problem = _validate(binding)
                     if problem:
@@ -213,7 +220,7 @@ class BindingRegistry:
 
 
 def _validate(binding: Binding) -> Optional[str]:
-    for flag in ("caller_context", "gateway_token"):
+    for flag in ("caller_context", "gateway_token", "user_token"):
         if not isinstance(getattr(binding, flag), bool):
             return f"binding '{binding.capability}' has a non-boolean {flag} {getattr(binding, flag)!r}"
     if binding.auth_mode not in VALID_AUTH_MODES:

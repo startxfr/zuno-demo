@@ -575,6 +575,194 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# --------------------------------------------------------------------------
+# BEGIN call-assertion verifier (WP-225 lot C)
+#
+# ADR-0602 clause 10 / ADR-0603 M14: the per-call assertion. With
+# MCP_OUTBOUND_IDENTITY=assertion the gateway sends, instead of the caller's
+# bearer, a JWT it signs with a key only it holds (EdDSA, typ zuno-call+jwt; see
+# components/mcp-gateway/app/call_assertion.py): iss mcp-gateway, aud this
+# server's backend name, sub the caller, act the gateway, tool the backend tool
+# name, exp at most 60 s after iat, jti. This server holds the public key
+# (MCP_CALL_ASSERTION_PUBLIC_KEY, PEM) and verifies it here, before any MCP
+# handling. A forged, expired, too long-lived or misaddressed assertion is
+# refused (401). A tools/call whose name is not the assertion's tool, or whose
+# jti was already consumed, is refused (403). With
+# MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
+# refused; without it a request carrying no assertion is served as before.
+# This block is byte-identical in confluence, git-forge, salesforce and aap
+# (each image is built from its own directory, ADR-0119); the lot C tests
+# compare the copies.
+# --------------------------------------------------------------------------
+
+import logging as _assertion_logging  # noqa: E402 - part of the self-contained block
+
+import jwt as _assertion_jwt  # noqa: E402
+from cryptography.hazmat.primitives import serialization as _assertion_serialization  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as _AssertionPublicKey  # noqa: E402
+
+_ASSERTION_LOG = _assertion_logging.getLogger("zuno.call_assertion")
+CALL_ASSERTION_TYPE = "zuno-call+jwt"
+CALL_ASSERTION_ISSUER = "mcp-gateway"
+CALL_ASSERTION_MAX_TTL_SECONDS = 60
+CALL_ASSERTION_LEEWAY_SECONDS = 5
+CALL_ASSERTION_MAX_BODY_BYTES = 1024 * 1024
+_CALL_ASSERTION_KEYS: Dict[str, Any] = {}
+_CALL_ASSERTION_SEEN: Dict[str, float] = {}
+
+
+class CallAssertionError(ValueError):
+    """The assertion is not acceptable; the message is safe to return."""
+
+
+def _call_assertion_required() -> bool:
+    return os.getenv("MCP_CALL_ASSERTION_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _call_assertion_public_key() -> Any:
+    pem = os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip()
+    if not pem:
+        return None
+    if pem not in _CALL_ASSERTION_KEYS:
+        try:
+            key = _assertion_serialization.load_pem_public_key(pem.encode("utf-8"))
+        except ValueError:
+            key = None
+        if not isinstance(key, _AssertionPublicKey):
+            _ASSERTION_LOG.error("MCP_CALL_ASSERTION_PUBLIC_KEY is not an Ed25519 public key; every assertion is refused")
+            key = None
+        _CALL_ASSERTION_KEYS[pem] = key
+    return _CALL_ASSERTION_KEYS[pem]
+
+
+def _call_assertion_type(token: str) -> str:
+    try:
+        return str(_assertion_jwt.get_unverified_header(token).get("typ") or "")
+    except _assertion_jwt.PyJWTError:
+        return ""
+
+
+def _verify_call_assertion(token: str, key: Any, now: Optional[float] = None) -> Dict[str, Any]:
+    if key is None:
+        raise CallAssertionError("no call-assertion public key is configured")
+    try:
+        claims = _assertion_jwt.decode(
+            token,
+            key,
+            algorithms=["EdDSA"],
+            audience=CALLER_CONTEXT_AUDIENCE,
+            issuer=CALL_ASSERTION_ISSUER,
+            options={"require": ["exp", "iat", "aud", "iss", "sub", "jti"], "verify_exp": False, "verify_iat": False},
+        )
+    except _assertion_jwt.PyJWTError as exc:
+        raise CallAssertionError(f"invalid call assertion: {exc}") from exc
+    current = time.time() if now is None else now
+    iat, exp = claims.get("iat"), claims.get("exp")
+    if not isinstance(iat, int) or not isinstance(exp, int) or exp < iat or exp - iat > CALL_ASSERTION_MAX_TTL_SECONDS:
+        raise CallAssertionError("call assertion lifetime is not within 60 seconds")
+    if iat > current + CALL_ASSERTION_LEEWAY_SECONDS or current > exp + CALL_ASSERTION_LEEWAY_SECONDS:
+        raise CallAssertionError("call assertion expired or not yet valid")
+    if (claims.get("act") or {}).get("sub") != CALL_ASSERTION_ISSUER:
+        raise CallAssertionError("call assertion has no gateway actor")
+    if not isinstance(claims.get("tool"), str) or not isinstance(claims.get("jti"), str):
+        raise CallAssertionError("call assertion has no tool or jti")
+    return claims
+
+
+def _consume_call_assertion(jti: str, exp: int, now: Optional[float] = None) -> bool:
+    """True the first time a jti is used for a tools/call; False on a replay."""
+    current = time.time() if now is None else now
+    for seen, until in list(_CALL_ASSERTION_SEEN.items()):
+        if until < current:
+            del _CALL_ASSERTION_SEEN[seen]
+    if jti in _CALL_ASSERTION_SEEN:
+        return False
+    _CALL_ASSERTION_SEEN[jti] = exp + CALL_ASSERTION_LEEWAY_SECONDS
+    return True
+
+
+def _called_tools(body: bytes) -> List[str]:
+    try:
+        message = json.loads(body) if body else None
+    except (ValueError, UnicodeDecodeError):
+        return []
+    messages = message if isinstance(message, list) else [message]
+    names = []
+    for item in messages:
+        if isinstance(item, dict) and item.get("method") == "tools/call":
+            params = item.get("params") if isinstance(item.get("params"), dict) else {}
+            names.append(str(params.get("name") or ""))
+    return names
+
+
+class CallAssertionMiddleware:
+    """Pure ASGI, so the body read for a tools/call is replayed to the MCP app intact."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        key, required = _call_assertion_public_key(), _call_assertion_required()
+        if not required and not os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip():
+            await self.app(scope, receive, send)
+            return
+        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []}
+        auth = headers.get("authorization", "")
+        token = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
+        if not token or _call_assertion_type(token) != CALL_ASSERTION_TYPE:
+            if required:
+                await JSONResponse({"detail": "a gateway call assertion is required"}, status_code=401)(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+        try:
+            claims = _verify_call_assertion(token, key)
+        except CallAssertionError as exc:
+            _ASSERTION_LOG.warning("call assertion refused: %s", exc)
+            await JSONResponse({"detail": str(exc)}, status_code=401)(scope, receive, send)
+            return
+        chunks, size, more = [], 0, True
+        while more:
+            message = await receive()
+            if message.get("type") != "http.request":
+                break
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > CALL_ASSERTION_MAX_BODY_BYTES:
+                await JSONResponse({"detail": "request body too large"}, status_code=413)(scope, receive, send)
+                return
+            chunks.append(chunk)
+            more = message.get("more_body", False)
+        body = b"".join(chunks)
+        called = _called_tools(body)
+        if called:
+            if len(called) != 1 or called[0] != claims["tool"]:
+                _ASSERTION_LOG.warning("call assertion for tool %r refused for tools/call %s", claims["tool"], called)
+                await JSONResponse({"detail": "the call assertion was minted for another tool"}, status_code=403)(scope, receive, send)
+                return
+            if not _consume_call_assertion(claims["jti"], claims["exp"]):
+                _ASSERTION_LOG.warning("call assertion replay refused (jti %s)", claims["jti"])
+                await JSONResponse({"detail": "the call assertion was already used"}, status_code=403)(scope, receive, send)
+                return
+        sent = False
+
+        async def replay():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
+# END call-assertion verifier (WP-225 lot C)
+# --------------------------------------------------------------------------
+
+
 mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
     streamable_http_path="/mcp",
     transport_security=TransportSecuritySettings(
@@ -587,4 +775,6 @@ mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
     ),
 )
 mcp_asgi_app.add_middleware(GatewayTokenMiddleware)
+# WP-225 lot C: added last, so it runs first (outermost), ahead of the workload-token check.
+mcp_asgi_app.add_middleware(CallAssertionMiddleware)
 app.mount("/", mcp_asgi_app)
