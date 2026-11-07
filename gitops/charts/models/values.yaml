@@ -112,6 +112,15 @@ hardwareProfiles:
 metrics:
   enabled: true
 
+# WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
+# runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
+# 8000. templates/networkpolicy-evalhub-clients.yaml admits them, per listed model.
+evalHubClients:
+  enabled: true
+  instance: zuno-evalhub
+  models:
+    - qwen35-9b
+
 # ADR-0523 (WP-082): OTel auto-instrumentation of the model workloads.
 # Gates templates/instrumentation.yaml and the vLLM --otlp-traces-endpoint
 # args below; the inject-sdk pod annotations reference the Instrumentation

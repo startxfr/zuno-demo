@@ -29,7 +29,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.4 | 30 | 4 | 31 | WP-101 |
 | v0.5 | 13 | — | 18 | WP-101 |
 | v0.6 | 4 | — | 6 | WP-101 |
-| v0.7 | 9 | 1 | 19 | WP-115 |
+| v0.7 | 9 | 1 | 19 | — |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
@@ -662,7 +662,7 @@ move off KFP to a later ADR.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-115 | [wp-115](work-packages/wp-115-trustyai-dashboard-ui-flags-and-evalhub.md) | 0534 | WP-113 | Operator pending (2026-09-02) | flags patched live and the `EvalHub` instance is `Ready` (commits `932abb63`, `365c8252` — the ea build crashes on any `otel` block); remaining: one real UI-launched evaluation run end to end |
+| WP-115 | [wp-115](work-packages/wp-115-trustyai-dashboard-ui-flags-and-evalhub.md) | 0534 | WP-113 | Done (2026-11-07, vendor limitation) | UI flow proven up to the model call; the score is blocked by EvalHub job pods having no SA token in istio-proxy (KServe DR caCertificates path), recorded in the brief |
 | WP-116 | [wp-116](work-packages/wp-116-mlflow-experiment-tracking.md) | 0538, 0302, 0526 | ADR-0529 pguser mechanics | Done (2026-09-03) | none — MLflow runs PostgreSQL-backed (`Available=True`, 50 tables migrated), the pipeline logs params/metrics/gate non-fatally, and the `wesh-20260829-145123` run is visible in the Experiments page via an idempotent backfill; seven live defects fixed on the way in, including a wedged `zuno` database that had been blocking `make d0 install postgresql` for everyone |
 | WP-117 | [wp-117](work-packages/wp-117-kueue-gpu-quota-and-queued-workloads.md) | 0538, 0321, 0351 | WP-109, WP-113 | Done (2026-09-03) | GPU-MIG ResourceFlavor + ClusterQueue quota, LocalQueue and namespace enrolment for `zuno-ai-run`, queue-name labels on the garak/ragas Jobs, plus the `trainingJobs` dashboard flag. Second attempt: enrolment is namespace-wide with no per-workload opt-out, so the recreation loop had to be closed first; quota deliberately undersized to serialise multi-GiB image pulls |
 | WP-118 | [wp-118](work-packages/wp-118-demo333-portability-blockers.md) | 0517 | none | Done (9 of 9 blockers closed, 2026-09-03) | no chart default names `demo222` any more: five charts on the `apps.mycluster.example.com` token, the `machines` chart's AWS identity, four `gp3-csi` defaults and cert-manager's Route53 zone all discovered at apply time and flipped to placeholders, the Salesforce duplicate-seed and MariaDB S3 gaps closed, and the RHOAI InstallPlan drift closed as a decision (keep the gate, detect it in precheck from the PackageManifest). Every flip was applied live first and verified inert — MachineSets byte-unchanged, all 15 PVCs unchanged, ACME track intact, cert-manager's re-apply `changed=0`. Closes the known literals, not the claim that the automation bootstraps: that is ADR-0517's own run, still blocked on `demo333` being provisioned |
