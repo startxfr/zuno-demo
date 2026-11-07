@@ -1,0 +1,79 @@
+{{/*
+ADR-0602 / WP-224: targeted mutual TLS on the three meshed namespaces that
+hold the platform's data, identity and AI runtime (zuno-data, zuno-auth,
+zuno-ai-run). Not mesh-wide and not redhat-ods-*: those namespaces host
+operator-owned workloads whose callers this repository does not control.
+
+Rendered for a platformNamespaces entry that sets .peerAuthentication:
+
+  - one namespace-wide PeerAuthentication `default` whose mode is
+    .peerAuthentication.mode (PERMISSIVE while the plaintext inbound is
+    observed live, STRICT afterwards: flipping a namespace is that one line);
+  - one workload-scoped PeerAuthentication per .exceptions entry. Each keeps
+    the namespace mode (no `mtls` block: Istio inherits the parent) and opens
+    only the listed CONTAINER ports to plaintext, for callers outside the mesh
+    (router, OpenShift monitoring, unmeshed client namespaces). The selector
+    must match one workload only (Istio applies the oldest of two overlapping
+    workload policies), and every exception names its non-mesh caller in
+    .reason, rendered as the zuno.io/permissive-reason annotation that
+    platform/security/check_mesh_mtls.py requires.
+
+The PeerAuthentication CRD ships with the Service Mesh operator (Day 0), so it
+exists before this Day 1 overlay syncs; SkipDryRunOnMissingResource only
+covers a from-scratch install racing the operator.
+*/}}
+{{- if .Values.policy.enabled }}
+{{- range $entry := .Values.platformNamespaces }}
+{{- with $entry.peerAuthentication }}
+{{- $mode := required (printf "platformNamespaces[%s].peerAuthentication.mode is required (PERMISSIVE or STRICT)" $entry.name) .mode }}
+{{- if not (has $mode (list "PERMISSIVE" "STRICT")) }}
+{{- fail (printf "platformNamespaces[%s].peerAuthentication.mode must be PERMISSIVE or STRICT, got %s" $entry.name $mode) }}
+{{- end }}
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: {{ $entry.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  mtls:
+    mode: {{ $mode }}
+---
+{{- range .exceptions }}
+{{- $name := required (printf "platformNamespaces[%s].peerAuthentication.exceptions[].name is required" $entry.name) .name }}
+{{- $reason := required (printf "platformNamespaces[%s].peerAuthentication.exceptions[%s].reason is required: name the non-mesh caller" $entry.name $name) .reason }}
+{{- if not .selector }}
+{{- fail (printf "platformNamespaces[%s].peerAuthentication.exceptions[%s].selector is required (portLevelMtls only applies to a workload)" $entry.name $name) }}
+{{- end }}
+{{- if not .ports }}
+{{- fail (printf "platformNamespaces[%s].peerAuthentication.exceptions[%s].ports is empty" $entry.name $name) }}
+{{- end }}
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ $name }}
+  namespace: {{ $entry.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    zuno.io/permissive-reason: {{ $reason | quote }}
+spec:
+  selector:
+    matchLabels:
+      {{- toYaml .selector | nindent 6 }}
+  portLevelMtls:
+    {{- range .ports }}
+    {{ . }}:
+      mode: PERMISSIVE
+    {{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

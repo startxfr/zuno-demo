@@ -481,6 +481,24 @@ def _adr_index_rows() -> dict:
     return rows
 
 
+def adr_number_collisions(paths: List[pathlib.Path]) -> List[Finding]:
+    """Two records under one number (ADR-0606 clause 5).
+
+    The other checks key ADR files by their four-digit prefix, so a second
+    file with a taken number silently replaces the first: on 2026-11-07 a
+    second `0602-*` record showed up only as link and status drift, and
+    would have shown nothing had its slug sorted first. This is the explicit
+    check.
+    """
+    by_number: dict = {}
+    for path in paths:
+        by_number.setdefault(path.name[:4], []).append(path.name)
+    return [Finding("adr_index",
+                    f"ADR-{number} is used by {len(names)} files ({', '.join(names)}); "
+                    "an ADR number names exactly one record - give the newer one the next free number")
+            for number, names in sorted(by_number.items()) if len(names) > 1]
+
+
 def check_adr_index() -> List[Finding]:
     """The index agrees with the records it indexes.
 
@@ -493,6 +511,7 @@ def check_adr_index() -> List[Finding]:
     """
     findings: List[Finding] = []
     rows = _adr_index_rows()
+    findings += adr_number_collisions(sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md")))
     files = {p.name[:4]: p for p in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md"))}
 
     for number, entries in sorted(rows.items()):
@@ -764,7 +783,7 @@ def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
 
 ADR_VERSIONS = ["v0", "v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6",
                 "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "v0.12", "v0.13", "v0.14",
-                "OKF v0.1"]
+                "v0.15", "v0.16", "v0.17", "OKF v0.1"]
 WP_OPEN_EXCLUDED = {"done", "abandoned", "cancelled", "closed — deferred"}
 
 

@@ -113,7 +113,9 @@ def chat_model_for(
         if ca_bundle:
             import httpx
 
-            http_async_client = httpx.AsyncClient(verify=ca_bundle)
+            from app.tls import verify_for
+
+            http_async_client = httpx.AsyncClient(verify=verify_for(ca_bundle))
 
         from app.reasoning import with_reasoning
 
@@ -188,7 +190,7 @@ def chat_model_for(
         from langchain_mistralai import ChatMistralAI
 
         return ChatMistralAI(
-            model=cfg.get("model", "mistral-large-latest"),
+            model=cfg.get("model", "mistral-large-4"),
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
             max_tokens=max_tokens,

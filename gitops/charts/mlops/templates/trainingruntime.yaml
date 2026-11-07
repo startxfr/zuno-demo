@@ -84,7 +84,7 @@ spec:
                   containers:
                     - name: node
                       image: {{ include "mlops.image" . }}
-                      imagePullPolicy: Always
+                      imagePullPolicy: {{ include "mlops.imagePullPolicy" . }}
                       resources:
                         requests:
                           cpu: {{ .Values.training.resources.cpuRequest | quote }}

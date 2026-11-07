@@ -15,7 +15,7 @@
       client_id: admin-cli
       username: "{{ _kc_automation_user }}"
       password: "{{ _kc_automation_password }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   register: _kagent_kc_token
   no_log: true
 
@@ -30,7 +30,7 @@
   ansible.builtin.uri:
     url: "{{ _kc_api }}/clients?clientId=kagent"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   register: _kc_client
   no_log: true
 
@@ -43,7 +43,7 @@
   ansible.builtin.uri:
     url: "{{ item }}"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop:
     - "{{ _kc_api }}/clients/{{ _kc_client.json[0].id }}/service-account-user"
     - "{{ _kc_api }}/users?username={{ kagent_persona }}&exact=true"
@@ -54,7 +54,7 @@
   ansible.builtin.uri:
     url: "{{ _kc_api }}/users/{{ item }}/groups?max=500"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop:
     - "{{ _kc_users.results[0].json.id }}"
     - "{{ _kc_users.results[1].json[0].id }}"
@@ -67,7 +67,7 @@
     method: PUT
     headers: "{{ _kc_headers }}"
     status_code: [204]
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop: "{{ _kc_groups.results[1].json | rejectattr('id', 'in', _kc_groups.results[0].json | map(attribute='id') | list) | list }}"
   loop_control:
     label: "{{ item.path }}"

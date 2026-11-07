@@ -1,7 +1,9 @@
 ---
 # Cluster-admin objects other Day 0 components depend on; runs right after
-# argocd (day0_install.yml), whose zuno AppProject this role's Applications
-# reference via `project: zuno` (ADR-0314). StorageClass is discover-only:
+# argocd (day0_install.yml), whose zuno-platform AppProject this role's
+# Applications reference via `project: zuno-platform` (ADR-0314; the split
+# of the single `zuno` project is ADR-0602 clause 5 / WP-224). They render
+# only cluster-scoped kinds. StorageClass is discover-only:
 # provisioner details vary per cluster, so we only verify one exists rather
 # than guessing parameters.
 - name: "admin_context | discover existing StorageClasses"

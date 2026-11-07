@@ -3,7 +3,9 @@
 # the Keycloak client (WP-179's four-place pattern); this role seeds only its own
 # openclaw/<persona> path, and only when it is missing.
 # ADR-0595: the Control UI password reads zuno_personas_openclaw_ui_password, which
-# inherits zuno_personas_mainpwd from ansible/confidential.yml.
+# inherits zuno_personas_mainpwd from ansible/confidential.yml. ADR-0602 / WP-223: in
+# the hardened profile that variable is undefined on purpose, so each persona's path
+# gets its own random password below (read it back from Vault openclaw/<persona>).
 - name: "openclaw | load the committed per-cluster variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
@@ -26,25 +28,11 @@
       - "component=server"
   register: _vault_pod
 
-- name: "openclaw | read the Vault bootstrap credentials"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-vault
-    name: vault-bootstrap-credentials
-  register: _openclaw_vault_creds
-  no_log: true
-
-- name: "openclaw | fail if Vault isn't bootstrapped"
-  ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found in zuno-vault - run `make d0 install vault` first."
-  when: >-
-    (_vault_pod.resources | default([]) | length) == 0 or
-    (_openclaw_vault_creds.resources | default([]) | length) == 0
-
-- name: "openclaw | set the Vault connection fact"
-  ansible.builtin.set_fact:
-    _vault_root_token: "{{ _openclaw_vault_creds.resources[0].data.root_token | b64decode }}"
-  no_log: true
+# ADR-0602 clause 1 / WP-223: a short-lived ansible-seeder token
+# (zuno_vault_token, read by vault_seed_if_missing.yml), not the root token
+# from vault-bootstrap-credentials; the helper fails if Vault is not running.
+- name: "openclaw | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
 - name: "openclaw | check the Keycloak client secrets exist"
   kubernetes.core.k8s_exec:
@@ -52,7 +40,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -field=client_secret zuno/keycloak/openclaw-{{ item.name }} >/dev/null"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -field=client_secret zuno/keycloak/openclaw-{{ item.name }} >/dev/null"
   loop: "{{ _openclaw.personas }}"
   loop_control:
     label: "keycloak/openclaw-{{ item.name }}"
@@ -77,6 +65,7 @@
   vars:
     vault_seed_path: "openclaw/{{ item.name }}"
     vault_seed_fields:
-      ui_password: "{{ zuno_personas_openclaw_ui_password }}"
+      ui_password: "{{ zuno_personas_openclaw_ui_password |
+        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       # oauth2-proxy accepts a 16, 24 or 32 byte cookie secret.
       cookie_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"

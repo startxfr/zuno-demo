@@ -9,23 +9,44 @@
     name: namespaces
     tasks_from: install
 
+# ADR-0352 (WP-216): Tier A-operator. `zuno_external_secrets_mode: external`
+# means the operator is installed and lifecycle-managed outside this installer:
+# the -d0 Application (Subscription) is not applied, its presence is asserted
+# instead. The -d1 operand config (OperatorConfig, per-namespace SecretStores)
+# stays ours in both modes (clause 7). Absent means internal.
+- name: "external_secrets | resolve the component mode (ADR-0352)"
+  ansible.builtin.include_tasks: mode.yml
+
     # Catalog source varies per cluster (e.g. community-operators, not always
     # redhat-operators); discover it from the PackageManifest rather than
     # hardcoding, or the Subscription fails to resolve.
 - name: "external_secrets | resolve the operator package"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  when: _eso_mode == 'internal'
   vars:
     operator_package_name: "external-secrets-operator"
     operator_package_catalog_hint: "external-secrets"
 
+- name: "external_secrets | assert the unmanaged operator (external mode)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_unmanaged_operator.yml"
+  when: _eso_mode == 'external'
+  vars:
+    unmanaged_operator_component: external_secrets
+    unmanaged_operator_crds: "{{ _eso_unmanaged.crds }}"
+    unmanaged_operator_csv_prefix: "{{ _eso_unmanaged.csv_prefix }}"
+    unmanaged_operator_deployment: "{{ _eso_unmanaged.deployment }}"
+    unmanaged_operator_fail: true
+
 # Operator install (d0) is separate from OperatorConfig and the
-# Vault-backed ClusterSecretStore (both d1, applied below once the Vault
+# per-namespace Vault-backed SecretStores (both d1, ADR-0602/WP-223; applied below once the Vault
 # client Service is discovered) - deferring OperatorConfig to d1 avoids
 # racing its CRD registration, since by d1 time this d0 Application has
 # already gone Synced+Healthy (CSV installed).
 - name: "external_secrets | apply the external-secrets GitOps Application (d0: operator install only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  when: not (operator_package_skip_d0 | bool)
+  when:
+    - _eso_mode == 'internal'
+    - not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "external-secrets"
     gitops_app_phase: "d0"
@@ -60,7 +81,7 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-- name: "external_secrets | apply the external-secrets GitOps Application (d1: OperatorConfig + Vault-backed ClusterSecretStore)"
+- name: "external_secrets | apply the external-secrets GitOps Application (d1: OperatorConfig + per-namespace SecretStores)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "external-secrets"
@@ -69,15 +90,15 @@
     gitops_app_extra_helm_values:
       operatorconfig:
         enabled: true
-      clusterSecretStore:
+      secretStores:
         enabled: true
       vaultServiceName: "{{ _eso_vault_service_name }}"
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
 # ArgoCD reports the OperatorConfig CR Healthy as soon as synced, not once
-# the operand Deployment it triggers is ready - the ClusterSecretStore
-# below needs the ServiceAccount that Deployment's rollout creates. Runs
+# the operand Deployment it triggers is ready - the SecretStores
+# below need the ServiceAccount that Deployment's rollout creates. Runs
 # after d1, since OperatorConfig (created by d1 above) is what makes the
 # operator deploy this Deployment in the first place.
 - name: "external_secrets | wait for the ESO operand Deployment to be ready"
@@ -93,14 +114,21 @@
   retries: 60
   delay: 10
 
-- name: "external_secrets | wait for the ClusterSecretStore to report Valid"
+# ADR-0602/WP-223: one SecretStore per namespace, each logging in to Vault with
+# its own role ns-<namespace>. Wait for every store this chart renders (the
+# list in its values.yaml); a store stuck not Ready usually means the Vault
+# configure step has not written that namespace's role from
+# platform/vault/secret-access.yaml yet.
+- name: "external_secrets | wait for every per-namespace SecretStore to report Ready"
   kubernetes.core.k8s_info:
     api_version: external-secrets.io/v1beta1
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: SecretStore
+    namespace: "{{ item }}"
+    name: vault
   register: _eso_store
   until: >-
     (_eso_store.resources | default([]) | length) > 0 and
     (_eso_store.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
   retries: 30
   delay: 10
+  loop: "{{ (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/external-secrets/values.yaml') | from_yaml).secretStores.namespaces }}"

@@ -1,6 +1,6 @@
 # WP-210: Page-level Confluence ACL in the fork connector
 
-- **State:** Not started
+- **State:** Abandoned (2026-11-07, user decision) - page-level ACL is not needed: per-source `aclGroups`, enforced fail-closed at query time by UnifAI RAG, is the demo contract
 - **ADRs:** [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md)
 - **Depends on:** none (a change to the UnifAI fork, handed to the fork session as a patch)
 - **Related:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (closed; it records this as a cut), [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-186](wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md)

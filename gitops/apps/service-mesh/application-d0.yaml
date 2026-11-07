@@ -13,7 +13,7 @@ metadata:
     # after `postgresql` instead (day0_install.yml).
     argocd.argoproj.io/sync-wave: "-172"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

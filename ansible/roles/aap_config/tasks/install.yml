@@ -74,7 +74,7 @@
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/"
     method: GET
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_api_ping
   until: _aap_config_api_ping.status | default(0) == 200
@@ -99,7 +99,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_org_lookup
   no_log: true
@@ -111,7 +111,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: "{{ aap_config_organization | default('zuno') }}"
@@ -127,7 +127,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_org_synced
   until: (_aap_config_org_synced.json.count | default(0) | int) > 0
@@ -173,27 +173,11 @@
       - "component=server"
   register: _vault_pod
 
-- name: "aap-config | read the Vault bootstrap credentials"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-vault
-    name: vault-bootstrap-credentials
-  register: _aap_config_vault_creds
-  no_log: true
-
-- name: "aap-config | fail if Vault isn't bootstrapped"
-  ansible.builtin.fail:
-    msg: >-
-      vault-bootstrap-credentials not found in zuno-vault - run
-      `make d0 install vault` first.
-  when: >-
-    (_vault_pod.resources | default([]) | length) == 0 or
-    (_aap_config_vault_creds.resources | default([]) | length) == 0
-
-- name: "aap-config | set the Vault connection fact"
-  ansible.builtin.set_fact:
-    _vault_root_token: "{{ _aap_config_vault_creds.resources[0].data.root_token | b64decode }}"
-  no_log: true
+# ADR-0602 clause 1 / WP-223: a short-lived ansible-seeder token
+# (zuno_vault_token) instead of the root token from
+# vault-bootstrap-credentials; the helper fails if Vault is not running.
+- name: "aap-config | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
 - name: "aap-config | check whether zuno/aap/controller-token already exists in Vault"
   kubernetes.core.k8s_exec:
@@ -201,7 +185,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/controller-token"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/aap/controller-token"
   register: _aap_config_token_existing
   changed_when: false
   failed_when: false
@@ -219,7 +203,7 @@
     method: GET
     headers:
       Authorization: "Bearer {{ (_aap_config_token_existing.stdout | from_json).data.data.token }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: [200, 401, 403]
   register: _aap_config_token_probe
   when: _aap_config_token_existing.rc == 0
@@ -251,7 +235,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       description: "zuno-aap-config resource-operator connection (WP-073)"
@@ -266,7 +250,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/controller-token
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/controller-token
       token={{ _aap_config_token_minted.json.token | quote }}"
   when: _aap_config_token_needs_mint | bool
   no_log: true
@@ -324,7 +308,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: [200, 401, 403]
   register: _aap_config_census
   loop: >-
@@ -362,7 +346,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: [200, 401, 403]
   register: _aap_config_wf_node_census
   loop: "{{ aap_config_workflow_templates | map(attribute='name') | list }}"
@@ -452,7 +436,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_project_lookup
   until: (_aap_config_project_lookup.json.count | default(0) | int) > 0
@@ -483,7 +467,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       scm_branch: "{{ zuno_gitops_target_revision | default('main') }}"
@@ -500,7 +484,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     # The Controller API returns 202 (Accepted, async job queued) here -
     # confirmed live 2026-08-30, contradicting an initial guess of 201
     # made from a manual curl test that never actually checked the HTTP
@@ -516,7 +500,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_project_update_status
   until: (_aap_config_project_update_status.json.status | default('')) in ['successful', 'failed', 'error', 'canceled']
@@ -543,7 +527,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_jt_lookup
   until: (_aap_config_jt_lookup.json.count | default(0) | int) > 0
@@ -560,7 +544,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_inventory_lookup
   until: (_aap_config_inventory_lookup.json.count | default(0) | int) > 0
@@ -575,7 +559,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_host_lookup
   no_log: true
@@ -587,7 +571,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: localhost
@@ -605,7 +589,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_credential_lookup
   until: (_aap_config_credential_lookup.json.count | default(0) | int) > 0
@@ -620,7 +604,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_jt_credentials
   no_log: true
@@ -632,7 +616,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       id: "{{ _aap_config_credential_lookup.json.results[0].id }}"
@@ -674,7 +658,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_wft_lookup
   until: (_aap_config_wft_lookup.json.count | default(0) | int) > 0
@@ -716,6 +700,12 @@
 # down into Controller with a *different* id, so the role assignment below
 # resolves the Controller-side id rather than reusing the gateway one.
 
+# ADR-0602 clause 1 / WP-223: the ansible-seeder token has a 1h TTL and the
+# waits above (Application sync, Gateway readiness) can approach that on a
+# cold cluster, so log in again before the second group of Vault calls.
+- name: "aap-config | log in to Vault again (fresh ansible-seeder token)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
 - name: "aap-config | seed the mcp-aap user's password in Vault (idempotent - first run only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
@@ -731,7 +721,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/mcp-user"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/aap/mcp-user"
   register: _aap_config_mcp_user_vault
   changed_when: false
   no_log: true
@@ -749,7 +739,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_mcp_user_lookup
   no_log: true
@@ -764,7 +754,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       username: "{{ _aap_config_mcp_username }}"
@@ -801,7 +791,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_auditor_role
   changed_when: false
@@ -819,7 +809,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_mcp_gw_user
   until: (_aap_config_mcp_gw_user.json.count | default(0) | int) > 0
@@ -835,7 +825,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       user: "{{ _aap_config_mcp_gw_user.json.results[0].id | int }}"
@@ -863,7 +853,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_mcp_ctrl_user
   until: (_aap_config_mcp_ctrl_user.json.count | default(0) | int) > 0
@@ -878,7 +868,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_mcp_role_lookup
   vars:
@@ -896,7 +886,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       name: "{{ aap_config_mcp_role_name | default('zuno-day0-check-executor') }}"
@@ -928,7 +918,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_mcp_assignment_lookup
   no_log: true
@@ -942,7 +932,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       role_definition: "{{ _aap_config_mcp_role_id | int }}"
@@ -973,7 +963,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/mcp-token"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/aap/mcp-token"
   register: _aap_config_mcp_token_existing
   changed_when: false
   failed_when: false
@@ -989,7 +979,7 @@
     method: GET
     headers:
       Authorization: "Bearer {{ (_aap_config_mcp_token_existing.stdout | from_json).data.data.token }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: [200, 401, 403]
   register: _aap_config_mcp_token_probe
   when: _aap_config_mcp_token_existing.rc == 0
@@ -1014,7 +1004,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       password: "{{ _aap_config_mcp_password }}"
@@ -1031,7 +1021,7 @@
     url_username: "{{ _aap_config_mcp_username }}"
     url_password: "{{ _aap_config_mcp_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       description: "mcp-aap server, least-privilege (ADR-0355/WP-074)"
@@ -1050,7 +1040,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/mcp-token
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/mcp-token
       token={{ _aap_config_mcp_token_minted.json.token | quote }}
       url={{ aap_config_mcp_gateway_service_url | default('http://aap.zuno-aap.svc') | quote }}"
   when: _aap_config_mcp_token_needs_mint | bool
@@ -1105,7 +1095,7 @@
       ansible.builtin.uri:
         url: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
         method: GET
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_config_realm_info
 
@@ -1116,7 +1106,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_config_authenticator_lookup
       no_log: true
@@ -1143,7 +1133,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           name: "Keycloak zuno"
@@ -1177,7 +1167,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_config_maps
       no_log: true
@@ -1199,7 +1189,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_config_stale_superuser_map
       no_log: true
@@ -1211,7 +1201,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: [204, 404]
       when: (_aap_config_stale_superuser_map.json.count | default(0) | int) > 0
       no_log: true
@@ -1225,7 +1215,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           name: superuser-aap-admin
@@ -1264,7 +1254,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           name: team-aap-ops
@@ -1293,7 +1283,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           name: team-aap-reader
@@ -1334,7 +1324,7 @@
         url_username: admin
         url_password: "{{ _aap_config_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         body_format: json
         body:
           name: allow-authenticated

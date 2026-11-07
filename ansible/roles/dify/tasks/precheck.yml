@@ -98,7 +98,7 @@
     - name: "dify | probe the Route without a session"
       ansible.builtin.uri:
         url: "https://dify.{{ cluster_base_domain }}/console/api/setup"
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         follow_redirects: none
         status_code: [200, 302, 401, 403]
       register: _dify_route

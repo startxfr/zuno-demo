@@ -1,8 +1,17 @@
 ---
+# ADR-0603 M20 (WP-226): exact versions, not ranges. A range let every install
+# resolve whatever Galaxy served that day (kubernetes.core ">=3.0.0" spans
+# five majors), so two operators could run the same playbook against
+# different module code. These are the versions the playbooks run with on the
+# maintainer's workstation on 2026-11-07 (`ansible-galaxy collection list`,
+# ~/.ansible/collections, first on COLLECTIONS_PATHS) and in the lint.yml
+# ansible job. Bump one deliberately, re-run the syntax check and a
+# `make d0 check`, and record the bump in the commit message. Dependabot does
+# not cover Galaxy collections.
 collections:
   - name: kubernetes.core
-    version: ">=3.0.0"
+    version: "3.3.1"
   - name: community.hashi_vault
-    version: ">=6.0.0"
+    version: "7.1.0"
   - name: community.general
-    version: ">=8.0.0"
+    version: "13.2.0"

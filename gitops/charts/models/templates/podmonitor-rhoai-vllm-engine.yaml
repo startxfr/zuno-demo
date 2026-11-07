@@ -95,6 +95,7 @@ spec:
       scheme: https
       portNumber: 8000
       tlsConfig:
+        # ADR-0603 M3: kept - read-only metrics scrape of a pod IP, whose service-CA cert names the Service, not the IP.
         insecureSkipVerify: true
   selector:
     matchExpressions:

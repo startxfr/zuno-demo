@@ -116,7 +116,7 @@ Real residual risks of a `make d0 install vault` re-run, which are not about
 secret rotation (the role's `git add` + `git commit` of the Transit public
 key into the operator's working tree left with the OKF Transit chain in
 WP-165): it deletes and
-recreates the `vault-unseal-configure` Job on every run (idempotent, but it
+recreates the `vault-configure` Job on every run (idempotent, but it
 re-runs the whole PKI/policy configuration), and hard-fails if
 `ansible/confidential.yml` is absent.
 

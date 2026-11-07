@@ -1,0 +1,104 @@
+{{- if and .Values.stack.enabled .Values.egress.enabled }}
+{{- if not .Values.egress.hosts }}
+{{- fail "egress.hosts is empty: list the stack's external hosts, or set egress.enabled=false" }}
+{{- end }}
+{{- $s := .Values.stack }}
+# ADR-0602 / WP-224, following ADR-0590: the stack reaches Keycloak's public
+# name, its own identity Route, the Confluence site, the backup bucket and the
+# web RAG sources, and nothing else outside the cluster. In-cluster traffic
+# (DNS, the gateways in zuno-ai-run, the stack's own services) is not affected.
+# The Kubernetes API is reached through the control-plane node IPs (its Service
+# DNATs to them): rag-server calls TokenReview (RAG_TOKENREVIEW_ENABLED=true
+# live). One per namespace, named default.
+#
+# Residual risks, accepted (ADR-0590): Keycloak and the identity Route resolve
+# to the shared router load balancer, so every *.apps Route is reachable at the
+# IP level; a dnsName rule admits whatever else the same CDN or S3 front IPs
+# serve; DNS stays open, so a compromised pod can still tunnel through it.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  egress:
+    {{- if .Values.egress.apiServer }}
+    - type: Allow
+      to:
+        nodeSelector:
+          matchLabels:
+            node-role.kubernetes.io/control-plane: ""
+      ports:
+        - protocol: TCP
+          port: 6443
+    {{- end }}
+    # Keycloak: identity (DIRECTORY_OIDC_JWKS_URL), rag (OIDC_ISSUER_URL),
+    # multiagent (KEYCLOAK_BASE_URL).
+    - type: Allow
+      to:
+        dnsName: keycloak.{{ .Values.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- range .Values.egress.routeNames }}
+    - type: Allow
+      to:
+        dnsName: {{ . }}-{{ $.Values.namespace }}.{{ $.Values.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- with $s.rag.confluenceUrl }}
+    # Confluence RAG sources (CONFLUENCE_ALLOWED_HOSTS of rag and rag-celery).
+    - type: Allow
+      to:
+        dnsName: {{ (urlParse .).host }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- if $s.backup.enabled }}
+    {{- $s3 := "" }}
+    {{- if $s.backup.endpoint }}
+    {{- $s3 = (urlParse $s.backup.endpoint).host }}
+    {{- else if $s.backup.region }}
+    {{- $s3 = printf "s3.%s.amazonaws.com" $s.backup.region }}
+    {{- end }}
+    {{- if $s3 }}
+    # Backup CronJobs and restore Jobs (stack.backup): the S3 endpoint and the
+    # bucket's virtual-hosted name.
+    - type: Allow
+      to:
+        dnsName: {{ $s3 }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- with $s.backup.bucket }}
+    - type: Allow
+      to:
+        dnsName: {{ . }}.{{ $s3 }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- range .Values.egress.hosts }}
+    # {{ required (printf "egress.hosts[%s].reason is required" .dnsName) .reason }}
+    - type: Allow
+      to:
+        dnsName: {{ required "egress.hosts[].dnsName is required" .dnsName }}
+      ports:
+        {{- range (.ports | default (list 443)) }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+    {{- end }}
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0
+{{- end }}

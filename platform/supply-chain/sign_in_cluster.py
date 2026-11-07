@@ -91,7 +91,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DEFAULT_VAULT_ADDR = "http://zuno-vault.zuno-vault.svc:8200"
+# ADR-0602 clause 1 / WP-223: Vault's listener serves TLS with an OpenShift
+# service-ca certificate for this Service name; the service CA is mounted in
+# every pod next to the ServiceAccount token. VAULT_CACERT (the variable the
+# vault CLI and cosign's hashivault KMS client both read) overrides it.
+DEFAULT_VAULT_ADDR = "https://zuno-vault.zuno-vault.svc:8200"
+DEFAULT_VAULT_CACERT = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 DEFAULT_ROLE = "platform-signer"
 DEFAULT_KEY_NAME = "zuno-platform-signer"
 DEFAULT_JWT_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -137,6 +142,13 @@ def _cosign_path() -> str:
     return cosign_bin
 
 
+def _vault_cacert() -> str | None:
+    """The CA file Vault's TLS certificate is verified against, or None to use
+    the system trust store (an explicit https VAULT_ADDR with a public cert)."""
+    cacert = os.environ.get("VAULT_CACERT", DEFAULT_VAULT_CACERT)
+    return cacert if cacert and pathlib.Path(cacert).is_file() else None
+
+
 def vault_login(vault_addr: str, role: str, jwt_path: str) -> str:
     """Kubernetes-auth login against Vault; returns a client token.
 
@@ -153,7 +165,9 @@ def vault_login(vault_addr: str, role: str, jwt_path: str) -> str:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        cacert = _vault_cacert()
+        context = ssl.create_default_context(cafile=cacert) if vault_addr.startswith("https") else None
+        with urllib.request.urlopen(req, timeout=10, context=context) as resp:
             body = json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         raise SignerError(f"Vault Kubernetes-auth login failed ({exc.code}): {exc.read().decode()}") from exc
@@ -170,6 +184,9 @@ def _cosign_env(vault_addr: str, vault_token: str) -> dict:
     env = os.environ.copy()
     env["VAULT_ADDR"] = vault_addr
     env["VAULT_TOKEN"] = vault_token
+    cacert = _vault_cacert()
+    if cacert:
+        env["VAULT_CACERT"] = cacert
     return env
 
 

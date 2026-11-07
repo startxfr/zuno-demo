@@ -1,7 +1,8 @@
 # WP-115: TrustyAI in the RHOAI dashboard - feature flags and the EvalHub instance
 
-- **State:** Operator pending (2026-09-02) — flags patched live and the EvalHub instance is
-  Ready; the one remaining step is a real UI-launched evaluation run (operator action)
+- **State:** Done (2026-11-07, with a recorded vendor limitation) - the Evaluations page works end to end on RHOAI
+  3.6.0-ea.2 up to the call to the model (RBAC, collections, providers, tokenizer, dataset, job); the score itself is
+  blocked by an EvalHub x KServe defect for meshed models; documented workaround: do not evaluate models in the mesh, see "Closure (2026-11-07)" below
 - **ADRs:** [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
 - **Depends on:** WP-113 (Done - the Grafana surface this complements)
 - **Related:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
@@ -87,3 +88,58 @@ the acceptance proof that the surface is not merely rendered but functional.
 ## Status updates (once live-verified)
 
 - `State` moves to `Done` once checklist items 1-4 pass, including a real UI-launched run.
+
+## Update (2026-11-07) - RHOAI 3.6: the personas had no right to use the page
+
+Three things stood between the personas and a UI-launched run on RHOAI 3.6.0-ea.2:
+
+1. The RHOAI dashboard itself answered 404 on `rh-ai.<domain>` (portal hostname route, fixed under WP-220's update
+   of the same date).
+2. A browser that had loaded the page before the upgrade kept a stale `/_mf/evalHub/remoteEntry.js` (the module server
+   answers 304 to a later `If-Modified-Since`) and asked for a chunk the new module does not have: `ChunkLoadError`.
+   A hard refresh fixes it; nothing on the cluster.
+3. RBAC: the eval-hub-ui BFF lists EvalHub CRs as the user, and the EvalHub server authorizes each call with a
+   SubjectAccessReview on `trustyai.opendatahub.io` collections/providers/evaluations (and `mlflow.kubeflow.org`
+   experiments on job creation). The vendor grants evalhubs read only in redhat-ods-applications, and admin/edit
+   aggregate none of it, so ai-ops-01 (admin of zuno-ai-run) saw nothing. New
+   `templates/evalhub-user-rbac.yaml` (`evalHub.userGroups`: ocp-ai-ops, ocp-ai-dev): live 2026-11-07, SARs allow
+   collections/providers list, evaluations list/create and experiments create; providers create stays refused.
+
+
+## Closure (2026-11-07) - six UI-launched runs, closed with a vendor limitation
+
+Six runs launched by ai-dev-01 from the Evaluations page (project zuno-ai-run, external endpoint
+`http://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1`), each failure removing one cause:
+
+| Run | Failure | Cause and action |
+|---|---|---|
+| 1 | cannot reach huggingface.co | zuno-ai-run EgressFirewall (WP-224 rehearsal) is deny-all; HF hosts opened for the test only |
+| 2 | `qwen3.5-9b` is not a valid HF id | the tokenizer defaults to the model name; vLLM serves `qwen3.5-9b` (not `qwen35-9b`) |
+| 3 | tokenizer.json download timeout | HF serves it from the Xet CDN `us.aws.cdn.hf.co`; added for the test |
+| 4 | connection reset on :8000 | per-model NetworkPolicy admits only ai-gateway, MaaS gateway, monitoring; `templates/networkpolicy-evalhub-clients.yaml` (models chart) admits the instance's evaluation-job pods |
+| 5 | pod stuck in Init | mesh CA down during the WP-223 Vault migration (vault-issuer-istio CA bundle), fixed by that window |
+| 6 | 502 / connection reset on :8000 | **vendor defect, not fixable from the EvalHub CR** |
+
+Run 6's cause: EvalHub job pods set `automountServiceAccountToken: false` and mount the SA token only into the
+`sidecar` and `adapter` containers. The DestinationRule that KServe generates for every LLMInferenceService
+workload Service (`<model>-kserve-workload-svc`, `tls.mode: SIMPLE`) points Envoy at
+`caCertificates: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, which does not exist in the job pod's
+`istio-proxy`, so the TLS origination fails and the connection is reset. A throwaway meshed pod with the same labels
+and the default token mount got HTTP 200 on `/v1/models` and `/v1/completions` three times out of three. The EvalHub
+CR offers no pod annotation, label or automount knob.
+
+**Documented workaround (user decision, 2026-11-07): do not evaluate models that sit in the service mesh.** The
+Evaluations page is used only against endpoints its job pods can reach without the KServe `DestinationRule` (a model
+outside the mesh, or an external OpenAI-compatible endpoint). No vendor report is filed.
+
+**Egress (user decision, 2026-11-07): no egress is opened for EvalHub.** A UI-launched run downloads its tokenizer and
+dataset at run time (`huggingface.co`, the Xet CDN `us.aws.cdn.hf.co`, and for ifeval `raw.githubusercontent.com`),
+and the zuno-ai-run EgressFirewall (WP-224, owned by ArgoCD through `gitops/charts/namespaces/values.yaml`) allows none
+of them. UI-launched evaluations are therefore not usable on demo333, by decision; the page, the RBAC and the
+NetworkPolicy stay in place for a cluster that allows that egress or pre-fills a cache PVC (like `lmeval-hf-cache`).
+
+Benchmark parameters that work in the form: `{"tokenizer": "Qwen/Qwen3.5-9B", "num_examples": 10}`, model name
+`qwen3.5-9b`. A run behind the zuno-ai-run firewall also needs `huggingface.co`, `us.aws.cdn.hf.co` (Xet) and, for
+ifeval, `raw.githubusercontent.com` (NLTK punkt_tab); those hosts were removed after the test and are not in git.
+`make d3 check trustyai-config`: green (2026-11-07). Checklist items 1, 2 and 4 pass; item 3 (run completes with a
+result) is the vendor limitation above.

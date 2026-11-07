@@ -775,7 +775,7 @@ def u_bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
         f"{_unifai().ui_url}/api2/sessions/user.session.create",
         json={"blueprintId": "x"},
         timeout=15,
-        verify=False,
+        verify=False,  # ADR-0603 M3: no credential sent (the check asserts the refusal); lab Routes may serve the router default cert
     )
     return ScenarioResult(s["id"], s["title"], resp.status_code == 401, f"status={resp.status_code}")
 
@@ -803,6 +803,7 @@ def u_health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
     statuses: Dict[str, Any] = {}
     for name in wanted:
         try:
+            # verify=False kept (ADR-0603 M3): unauthenticated health probe, only the status code is read.
             statuses[name] = httpx.get(urls[name], timeout=10, verify=False).status_code
         except Exception as exc:  # noqa: BLE001
             statuses[name] = str(exc)

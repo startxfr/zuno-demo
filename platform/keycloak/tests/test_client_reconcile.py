@@ -279,7 +279,122 @@ def test_the_jobs_sign_in_as_the_automation_account_and_create_the_admins() -> N
         assert path in (templates / es).read_text(), f"{es} does not read Vault {path}"
 
 
+# --- ADR-0602 clause 3 / ADR-0603 M5, M6 / WP-223: realm settings ------------
+
+BRUTE_FORCE_KEYS = {
+    "bruteForceProtected": True,
+    "permanentLockout": False,
+    "failureFactor": 30,
+    "waitIncrementSeconds": 60,
+    "maxFailureWaitSeconds": 900,
+    "quickLoginCheckMilliSeconds": 1000,
+    "minimumQuickLoginWaitSeconds": 60,
+    "maxDeltaTimeSeconds": 43200,
+}
+_profile_renders: dict[str, list[dict]] = {}
+
+
+def _render_profile(profile: str) -> list[dict]:
+    """Render with securityProfile=<profile>; [] when helm is absent."""
+    if profile not in _profile_renders:
+        if shutil.which("helm") is None:
+            print("SKIP: helm not on PATH - profile rendering tests cannot run")
+            _profile_renders[profile] = []
+        else:
+            import yaml
+
+            out = subprocess.run(
+                ["helm", "template", str(CHART), "--set", "keycloak.enabled=true",
+                 "--set", f"clusterBaseDomain={TEST_DOMAIN}", "--set", f"securityProfile={profile}"],
+                capture_output=True, text=True, check=True,
+            )
+            _profile_renders[profile] = [d for d in yaml.safe_load_all(out.stdout) if d]
+    return _profile_renders[profile]
+
+
+def _realm_settings(profile: str) -> dict | None:
+    for d in _render_profile(profile):
+        if d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "zuno-keycloak-clients":
+            return json.loads(d["data"]["realm-settings.json"])
+    return None
+
+
+def test_the_realm_file_starts_with_brute_force_protection() -> None:
+    """A fresh import must already be protected: the Job only runs after it."""
+    realm = _load_realm()
+    for key, value in BRUTE_FORCE_KEYS.items():
+        assert realm.get(key) == value, f"realm-zuno.json {key}={realm.get(key)!r}, expected {value!r}"
+    # hardened-only keys go through the Job, never into the import file
+    assert "passwordPolicy" not in realm, "passwordPolicy belongs to the hardened Job settings only"
+
+
+def test_realm_settings_profile_split() -> None:
+    demo, hardened = _realm_settings("demo"), _realm_settings("hardened")
+    if demo is None and hardened is None and shutil.which("helm") is None:
+        return
+    assert demo is not None and hardened is not None, "realm-settings.json missing from the ConfigMap"
+    for name, settings in (("demo", demo), ("hardened", hardened)):
+        for key, value in BRUTE_FORCE_KEYS.items():
+            assert settings.get(key) == value, f"{name}: {key}={settings.get(key)!r}, expected {value!r}"
+    assert "passwordPolicy" not in demo, "demo must not set a password policy"
+    assert "ssoSessionIdleTimeout" not in demo, "demo must leave the realm file's idle timeout alone"
+    assert hardened.get("passwordPolicy") == "length(12) and digits(1) and notUsername"
+    assert hardened.get("ssoSessionIdleTimeout") == 3600
+
+
+def test_an_unknown_profile_fails_the_render() -> None:
+    if shutil.which("helm") is None:
+        return
+    out = subprocess.run(
+        ["helm", "template", str(CHART), "--set", "keycloak.enabled=true", "--set", "securityProfile=hardend"],
+        capture_output=True, text=True,
+    )
+    assert out.returncode != 0 and "securityProfile must be demo or hardened" in out.stderr
+
+
+def test_the_job_applies_realm_settings_and_totp_only_when_hardened() -> None:
+    for profile in ("demo", "hardened"):
+        job = next((d for d in _render_profile(profile) if d.get("kind") == "Job"
+                    and d["metadata"]["name"] == "zuno-keycloak-client-reconcile"), None)
+        if job is None:
+            return
+        container = job["spec"]["template"]["spec"]["containers"][0]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        assert env.get("KC_SECURITY_PROFILE") == profile
+        script = container["command"][2]
+        line = next((ln for ln in script.splitlines()
+                     if "update" in ln and 'realms/$KC_REALM' in ln and "realm-settings.json" in ln), None)
+        assert line is not None, "the Job never applies realm-settings.json"
+        assert " -m" in line, "the realm update must merge (only the listed keys change): " + line.strip()
+        # applied after the realm wait, before any client work
+        assert script.index('never became reachable') < script.index(line) < script.index("/realm/client-*.json")
+        # TOTP: guarded by the profile, console account only, never the automation account
+        assert 'requiredActions=["CONFIGURE_TOTP"]' in script
+        assert '[ "$KC_SECURITY_PROFILE" = "hardened" ]' in script
+        totp_block = script[script.index('[ "$KC_SECURITY_PROFILE" = "hardened" ]'):]
+        totp_block = totp_block[:totp_block.index("created=0")]
+        assert "KC_CONSOLE_USER" in totp_block and "KC_AUTOMATION_USER" not in totp_block, (
+            "CONFIGURE_TOTP on the automation account would make Keycloak refuse every Job's password grant"
+        )
+        proc = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+
+
+def test_no_client_password_grant_changed_by_the_profile() -> None:
+    """User decision (WP-223): openshift and aap keep directAccessGrantsEnabled."""
+    realm = _load_realm()
+    grants = {c["clientId"]: c.get("directAccessGrantsEnabled") for c in realm["clients"]}
+    for cid in ("openshift", "aap"):
+        if cid in grants:
+            assert grants[cid] is True, f"{cid} must keep the password grant (user decision)"
+
+
 TESTS = [
+    test_the_realm_file_starts_with_brute_force_protection,
+    test_realm_settings_profile_split,
+    test_an_unknown_profile_fails_the_render,
+    test_the_job_applies_realm_settings_and_totp_only_when_hardened,
+    test_no_client_password_grant_changed_by_the_profile,
     test_the_realm_file_is_valid_json_and_declares_the_admin_client,
     test_client_text_fields_fit_keycloak_s_columns,
     test_no_service_account_may_write_to_the_realm,

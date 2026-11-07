@@ -1,0 +1,24 @@
+{{- if .Values.classification.floorsGenerated }}
+{{- if not (.Files.Get "files/classification-floors.generated.yaml") }}
+{{- fail "classification.floorsGenerated is true but files/classification-floors.generated.yaml is missing or empty (run platform/okf/generate_stack_config.py)" }}
+{{- end }}
+# ADR-0565 clause 5 (WP-209): the classification floor of every (agent, task),
+# generated from the admitted agents release by
+# platform/okf/generate_stack_config.py. The gateway routes a call at
+# max(X-Zuno-Data-Classification, floor) and reloads the mounted copy when it
+# changes (app/routing_watch.py).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-gateway-classification-floors
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    # Before the Deployment (wave 60), which mounts it.
+    argocd.argoproj.io/sync-wave: "55"
+data:
+  classification-floors.yaml: |
+{{ .Files.Get "files/classification-floors.generated.yaml" | indent 4 }}
+{{- end }}

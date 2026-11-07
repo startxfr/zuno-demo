@@ -12,6 +12,9 @@ image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/zuno-token-proxy
   # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
   tag: latest
+  # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
+  # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
+  digest: ""
   pullPolicy: Always
 
 replicas: 1
@@ -53,8 +56,8 @@ upstreamTimeoutSeconds: "300"
 
 externalSecrets:
   refreshInterval: 1h
-  secretStore: vault-backend
-
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStore: vault
 resources:
   requests:
     cpu: 50m

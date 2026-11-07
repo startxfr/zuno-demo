@@ -1,0 +1,25 @@
+---
+# ADR-0602 clause 5 / WP-224 (finding C4): the root app-of-apps only
+# (gitops/root-app-of-apps.yaml, the manual pure-GitOps bootstrap - no
+# Ansible task applies it). It may create Application objects in
+# openshift-gitops and nothing else: each child Application then names its
+# own project (zuno-platform or zuno-apps), which bounds what it renders.
+# This is the only project whose destinations include openshift-gitops.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: zuno-bootstrap
+  namespace: openshift-gitops
+  labels:
+    zuno.io/managed-by: zuno-ansible
+spec:
+  description: >-
+    Root app-of-apps only (ADR-0602 clause 5): Application objects in
+    openshift-gitops
+  sourceRepos:
+    - https://github.com/startxfr/zuno-demo.git
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: openshift-gitops}
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - {group: argoproj.io, kind: Application}

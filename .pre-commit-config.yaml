@@ -1,0 +1,7 @@
+# ADR-0603 / WP-222: stop a credential before it reaches a public repository.
+# Install once with `pre-commit install`; CI runs the same scan (.github/workflows/secret-scan.yml).
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

@@ -11,6 +11,14 @@
     "accessTokenLifespan": 900,
     "ssoSessionIdleTimeout": 28800,
     "ssoSessionMaxLifespan": 36000,
+    "bruteForceProtected": true,
+    "permanentLockout": false,
+    "failureFactor": 30,
+    "waitIncrementSeconds": 60,
+    "maxFailureWaitSeconds": 900,
+    "quickLoginCheckMilliSeconds": 1000,
+    "minimumQuickLoginWaitSeconds": 60,
+    "maxDeltaTimeSeconds": 43200,
     "roles": {
         "client": {}
     },
@@ -300,6 +308,15 @@
             "attributes": {
                 "description": [
                     "ADR-0349 cluster-access dimension (replaces ADR-0320's aiops and zuno-admin's per-namespace admin) \u2014 bound to admin as RoleBindings over the live-discovered zuno.io/managed=true namespace set; no ClusterRole"
+                ]
+            }
+        },
+        {
+            "name": "zuno-world-model-users",
+            "path": "/zuno-world-model-users",
+            "attributes": {
+                "description": [
+                    "ADR-0604/WP-233 world-model experience: members (the presenter) may open the world-model demo, with ocp-ai-ops and ocp-paas-ops. Create-only like every realm group; the world_model role creates it live when missing"
                 ]
             }
         },
@@ -1311,6 +1328,56 @@
                         "access.token.claim": "true",
                         "id.token.claim": "false",
                         "userinfo.token.claim": "false"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
+        }, {
+            "clientId": "world-model",
+            "name": "World model experience",
+            "description": "Confidential client of the world-model experience (ADR-0604, WP-233): browser flow for its oauth2-proxy front door; the API passes the user's own token to the ai-gateway for prompt enhancement (C1, local only), so no service account and no persona claim",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.world_model_client_secret}",
+            "redirectUris": [
+                "https://world-model.apps.mycluster.example.com/oauth2/callback"
+            ],
+            "webOrigins": [
+                "https://world-model.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
                     }
                 },
                 {

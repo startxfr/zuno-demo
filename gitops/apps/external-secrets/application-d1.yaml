@@ -1,7 +1,7 @@
 ---
-# ClusterSecretStore/ExternalSecret operand, applied after the operator install
-# (application-d0.yaml) is healthy, with the Vault client Service name injected
-# at apply time.
+# Per-namespace SecretStores (ADR-0602/WP-223) and the cluster-domain
+# ExternalSecret, applied after the operator install (application-d0.yaml) is
+# healthy, with the Vault client Service name injected at apply time.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,7 +10,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-200"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -20,7 +20,7 @@ spec:
       values: |
         operatorconfig:
           enabled: true
-        clusterSecretStore:
+        secretStores:
           enabled: true
   destination:
     server: https://kubernetes.default.svc

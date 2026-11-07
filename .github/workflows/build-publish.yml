@@ -1,6 +1,16 @@
 # ADR-0115: build every component in CI, publish to Quay with immutable
 # tags, generate an SBOM, and scan for vulnerabilities.
 #
+# ADR-0603 M17/M18 (WP-226, 2026-11-07): keyless signing is back, through
+# the public Sigstore instance (GitHub OIDC), plus the SBOM as a signed
+# attestation, and verified in the same job. It does not depend on the
+# in-cluster Vault Transit key the note below is about. The identity to
+# verify against is this workflow on this repository:
+#   issuer   https://token.actions.githubusercontent.com
+#   subject  ^https://github.com/startxfr/zuno-demo/.github/workflows/build-publish.yml@refs/(heads/main|tags/v[0-9].*)$
+#   repository (certificate extension) startxfr/zuno-demo
+# A run from any other branch signs, but its signature does not verify.
+#
 # ADR-0420/WP-070 (2026-08-22): the signing steps this workflow used to run
 # here (keyless cosign via GitHub's OIDC identity, Sigstore Fulcio/Rekor)
 # are removed - a GitHub-hosted runner has no route to the in-cluster Vault
@@ -11,8 +21,8 @@
 # see docs/adr/0420-*.md. OKF bundles are no longer signed by this
 # platform at all: the zuno-demo-agents release workflow signs them
 # keyless (ADR-0578) and this platform verifies them at admission. This workflow still builds/publishes/SBOMs/scans
-# for the optional Quay release path (RELEASING.md); it just doesn't sign
-# anymore.
+# for the optional Quay release path (RELEASING.md); see the WP-226 note
+# above for its keyless signing.
 #
 # DISABLED (2026-08-22, WP-04/ADR-0115 closed - see the ADR's "closed,
 # pipeline disabled" note): the automatic push/tag triggers below are
@@ -59,7 +69,7 @@ jobs:
     outputs:
       servers: ${{ steps.discover.outputs.servers }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Discover components/mcp-servers/*/Dockerfile
         id: discover
         run: |
@@ -69,6 +79,10 @@ jobs:
 
   build-publish-sign:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Keyless signing: the job's OIDC token is exchanged for a Fulcio certificate.
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +91,10 @@ jobs:
           # own component directory (e.g. platform/okf/) and needs the
           # repository root as build context - see each Dockerfile's own
           # header comment for exactly why.
+          #
+          # ADR-0603 M16 (WP-226): every BASE_IMAGE below is tag@digest, the
+          # same digest the zuno-ai-build mirror imports
+          # (ansible/roles/image_mirrors/tasks/install.yml) - bump both together.
           #
           # build_args: every Dockerfile's FROM defaults to the
           # cluster-internal zuno-ai-build ImageStream mirror
@@ -94,12 +112,12 @@ jobs:
             dockerfile: components/ai-gateway/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           - name: mcp-gateway
             dockerfile: components/mcp-gateway/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0585/WP-175: the A2A front door; built in-cluster by its own role, listed here so
           # the ADR-0324 inventory is whole. It bakes nothing from the agents release (okf-fetch
           # extracts it at pod start), but follows the other gateways' repository-root context.
@@ -107,21 +125,21 @@ jobs:
             dockerfile: components/a2a-gateway/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0601/WP-202: the experience clients' token proxy; built in-cluster by
           # ansible/roles/token_proxy_build, listed here so the ADR-0324 inventory is whole.
           - name: zuno-token-proxy
             dockerfile: components/zuno-token-proxy/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0599/WP-205: Dify's External Knowledge adapter; built in-cluster by
           # ansible/roles/dify_knowledge_build, listed here so the ADR-0324 inventory is whole.
           - name: zuno-dify-knowledge
             dockerfile: components/zuno-dify-knowledge/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0516: backs mcp-gateway's generate_diagram handler, same
           # relationship ai-gateway has to image_gen.py above - a
           # standalone entry (not context: ".") since, unlike every
@@ -131,7 +149,7 @@ jobs:
             dockerfile: components/diagram-render/Dockerfile
             context: components/diagram-render
             build_args: |
-              BASE_IMAGE=docker.io/library/node:20-alpine
+              BASE_IMAGE=docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
           # ADR-0119 (WP-057): confluence/salesforce used to be
           # listed here by hand, one entry each. They - and every future
           # components/mcp-servers/<name>/Dockerfile - are now built by
@@ -145,7 +163,7 @@ jobs:
             dockerfile: components/mlops/Containerfile
             context: .
             build_args: |
-              BASE_IMAGE=registry.access.redhat.com/ubi9/python-311:latest
+              BASE_IMAGE=registry.access.redhat.com/ubi9/python-311:latest@sha256:a0bdb55576fc5b8d6704279307817828ef027e1065533ceba133fe9516003a6c
           # ADR-0420/WP-068: the in-cluster signing identity's own image -
           # published here too so it has real SBOM/scan coverage like every
           # other first-party component, even though its actual deployment
@@ -156,7 +174,7 @@ jobs:
             dockerfile: components/supply-chain-signer/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0324 inventory: both are built in-cluster by their own roles
           # (ansible/roles/trustyai_eval_build, aap_execution_environment_build)
           # from the repository root; listed here so the inventory is whole.
@@ -164,7 +182,7 @@ jobs:
             dockerfile: components/trustyai-eval/Dockerfile
             context: .
             build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # Its base is registry.redhat.io's supported EE: a CI build needs a
           # Red Hat registry login, which this workflow (workflow_dispatch
           # only, ADR-0115) does not hold today.
@@ -172,7 +190,7 @@ jobs:
             dockerfile: components/aap-execution-environment/Dockerfile
             context: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Compute immutable tags (ADR-0115 - never :latest)
         id: tags
@@ -183,17 +201,17 @@ jobs:
           fi
 
       - name: Log in to Quay
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -203,18 +221,54 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ steps.tags.outputs.sha_tag }}
             ${{ steps.tags.outputs.release_tag != '' && format('{0}/{1}/{2}:{3}', env.REGISTRY, env.REGISTRY_NAMESPACE, matrix.name, steps.tags.outputs.release_tag) || '' }}
 
+      # ADR-0603 M17/M18 (WP-226): keyless signature through the public Sigstore
+      # instance (GitHub OIDC -> Fulcio certificate, Rekor entry) and the SBOM
+      # attached as a signed in-toto attestation, both on the pushed digest.
+      # No in-cluster key is involved, which is why this works from a
+      # GitHub-hosted runner where ADR-0420's Vault Transit signing could not.
+      # cosign-installer verifies the cosign binary it downloads.
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        with:
+          cosign-release: v2.4.1
+
+      - name: Sign the image keylessly (ADR-0603 M17)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
       - name: Generate SBOM (SPDX)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom-${{ matrix.name }}.spdx.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-${{ matrix.name }}
           path: sbom-${{ matrix.name }}.spdx.json
 
+      - name: Attach the SBOM as a signed attestation (ADR-0603 M18)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate sbom-${{ matrix.name }}.spdx.json "$IMAGE"
+
+      - name: Verify the signature and the SBOM attestation
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          ISSUER: https://token.actions.githubusercontent.com
+          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/(heads/main|tags/v[0-9].*)$'
+        run: |
+          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
+          cosign verify-attestation --type spdxjson --certificate-oidc-issuer "$ISSUER" \
+            --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
+          echo "signed and attested: $IMAGE"
+
+      # ADR-0603 M18 (WP-226): `ignore-unfixed` is dropped, so the report also
+      # lists the HIGH/CRITICAL findings no upstream fix exists for yet - they
+      # are still in the image and a reader of the report must see them.
       # Reports HIGH/CRITICAL findings but does not block publish
       # (continue-on-error) - real upstream base-image/dependency CVEs exist
       # across most components today (tracked in ADR-0115's Implementation
@@ -222,13 +276,12 @@ jobs:
       # was judged out of scope for this pass; see ADR-0115 for the accepted
       # findings and the follow-up remediation this defers to.
       - name: Scan for vulnerabilities (Trivy) - reports HIGH/CRITICAL, non-blocking
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         continue-on-error: true
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
           exit-code: "1"
-          ignore-unfixed: true
 
   # ADR-0119 (WP-057): builds every MCP server discover-mcp-servers found,
   # mirroring build-publish-sign's own build/SBOM/scan steps - kept as a
@@ -240,12 +293,16 @@ jobs:
     needs: discover-mcp-servers
     if: needs.discover-mcp-servers.outputs.servers != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Keyless signing: the job's OIDC token is exchanged for a Fulcio certificate.
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
         name: ${{ fromJson(needs.discover-mcp-servers.outputs.servers) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Compute immutable tags (ADR-0115 - never :latest)
         id: tags
@@ -256,44 +313,76 @@ jobs:
           fi
 
       - name: Log in to Quay
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: components/mcp-servers/${{ matrix.name }}
           file: components/mcp-servers/${{ matrix.name }}/Dockerfile
           build-args: |
-            BASE_IMAGE=docker.io/library/python:3.12-slim
+            BASE_IMAGE=docker.io/library/python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}:${{ steps.tags.outputs.sha_tag }}
             ${{ steps.tags.outputs.release_tag != '' && format('{0}/{1}/mcp-{2}:{3}', env.REGISTRY, env.REGISTRY_NAMESPACE, matrix.name, steps.tags.outputs.release_tag) || '' }}
 
+      # ADR-0603 M17/M18 (WP-226): keyless signature through the public Sigstore
+      # instance (GitHub OIDC -> Fulcio certificate, Rekor entry) and the SBOM
+      # attached as a signed in-toto attestation, both on the pushed digest.
+      # No in-cluster key is involved, which is why this works from a
+      # GitHub-hosted runner where ADR-0420's Vault Transit signing could not.
+      # cosign-installer verifies the cosign binary it downloads.
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        with:
+          cosign-release: v2.4.1
+
+      - name: Sign the image keylessly (ADR-0603 M17)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
       - name: Generate SBOM (SPDX)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom-mcp-${{ matrix.name }}.spdx.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-mcp-${{ matrix.name }}
           path: sbom-mcp-${{ matrix.name }}.spdx.json
 
+      - name: Attach the SBOM as a signed attestation (ADR-0603 M18)
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate sbom-mcp-${{ matrix.name }}.spdx.json "$IMAGE"
+
+      - name: Verify the signature and the SBOM attestation
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          ISSUER: https://token.actions.githubusercontent.com
+          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/(heads/main|tags/v[0-9].*)$'
+        run: |
+          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
+          cosign verify-attestation --type spdxjson --certificate-oidc-issuer "$ISSUER" \
+            --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
+          echo "signed and attested: $IMAGE"
+
       - name: Scan for vulnerabilities (Trivy) - reports HIGH/CRITICAL, non-blocking
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         continue-on-error: true
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
           exit-code: "1"
-          ignore-unfixed: true

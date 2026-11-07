@@ -1,0 +1,41 @@
+{{- /*
+WP-115 (RHOAI 3.6.0-ea.2, demo333, 2026-11-07): a benchmark launched from the RHOAI
+Evaluations page runs as a Job of the EvalHub instance (labels app=evalhub,
+component=evaluation-job, evalhub_instance_name=<instance>). Its pod calls
+http://<model>-kserve-workload-svc:8000/v1 (the pod's sidecar originates the TLS, see
+[[lmevaljob-mesh-double-tls]]), and the per-model NetworkPolicies admit only ai-gateway,
+the MaaS gateway and monitoring: the run failed with "connection reset by peer".
+NetworkPolicies are additive, so this is a separate object per listed model, admitting
+only that instance's evaluation-job pods on 8000; the model's own policy is untouched.
+*/ -}}
+{{- if .Values.evalHubClients.enabled }}
+{{- range .Values.evalHubClients.models }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ . }}-from-evalhub
+  namespace: {{ $.Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ . }}
+      kserve.io/component: workload
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: evalhub
+              component: evaluation-job
+              evalhub_instance_name: {{ $.Values.evalHubClients.instance }}
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}
+{{- end }}

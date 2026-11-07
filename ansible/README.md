@@ -17,10 +17,10 @@ ingestion), and Day 3 (agent test/stresstest/operational actions):
    exists; `argocd` installs the OpenShift GitOps operator and the zuno
    `AppProject`; `namespaces` applies the bare Namespace objects (its
    ResourceQuota/NetworkPolicy overlay is Day 2, see below); `vault`
-   installs itself as a GitOps Application, then imperatively
-   initializes/unseals it; `cert_manager` installs cert-manager and a
+   installs itself as a GitOps Application (raft, AWS KMS auto-unseal,
+   TLS - ADR-0602), then imperatively initializes and configures it; `cert_manager` installs cert-manager and a
    Vault-backed `ClusterIssuer`; `external-secrets` installs the operator
-   and the Vault-backed `ClusterSecretStore`. `postgresql`/`keycloak`/
+   and one Vault-backed `SecretStore` per namespace (ADR-0602). `postgresql`/`keycloak`/
    `aap`/`aap-config` (ADR-0421, moved here from Day 1) sit right after
    `machines` - their only real prerequisites (`vault`/`external-secrets`/
    `machines`) already precede them. `aap` (ADR-0354) installs Ansible

@@ -24,12 +24,15 @@
     name: zuno-argocd-application-controller-admin
   register: _argocd_crb_lookup
 
-- name: "argocd | look up the zuno AppProject"
+# ADR-0602 clause 5 / WP-224: installed means the split projects exist (a
+# cluster with only the legacy `zuno` project is not installed at this level).
+- name: "argocd | look up the zuno-platform and zuno-apps AppProjects"
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
     kind: AppProject
     namespace: openshift-gitops
-    name: zuno
+    label_selectors:
+      - zuno.io/managed-by=zuno-ansible
   register: _argocd_appproject_lookup
 
 - name: "argocd | look up the ArgoCD CR's resourceHealthChecks (ADR-0312)"
@@ -48,7 +51,8 @@
         and (_argocd_server_lookup.resources | default([]) | length) > 0
         and (_argocd_server_lookup.resources[0].status.readyReplicas | default(0)) > 0
         and (_argocd_crb_lookup.resources | default([]) | length) > 0
-        and (_argocd_appproject_lookup.resources | default([]) | length) > 0
+        and (_argocd_appproject_lookup.resources | default([]) | map(attribute='metadata.name')
+             | select('in', ['zuno-platform', 'zuno-apps']) | list | length) == 2
         and (_argocd_cr_lookup.resources | default([]) | length) > 0
         and (_argocd_cr_lookup.resources[0].spec.resourceHealthChecks | default([])
              | selectattr('kind', 'equalto', 'Subscription') | list | length) > 0

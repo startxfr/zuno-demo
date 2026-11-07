@@ -1,5 +1,5 @@
 ---
-# External Secrets Operator install; the ClusterSecretStore/ExternalSecret
+# External Secrets Operator install; the SecretStores/ExternalSecret
 # operand is a separate Application (application-d1.yaml) applied after this one
 # is healthy.
 apiVersion: argoproj.io/v1alpha1
@@ -12,7 +12,7 @@ metadata:
     # after `vault` is initialized/unsealed instead.
     argocd.argoproj.io/sync-wave: "-201"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

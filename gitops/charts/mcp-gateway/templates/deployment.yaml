@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "15"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "mcp-gateway.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "mcp-gateway") }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -22,10 +25,16 @@ spec:
         # WP-156: the pod label UnifAI's RAG server admits
         # (UnifaiStack spec.exposure.ragClients), for search_technical_docs.
         zuno.io/rag-client: "true"
-      {{- if .Values.okf.fetch.enabled }}
+      {{- $digestAnnotations := include "mcp-gateway.digestAnnotations" .Values }}
+      {{- if or .Values.okf.fetch.enabled $digestAnnotations }}
       annotations:
+        {{- if .Values.okf.fetch.enabled }}
         # ADR-0580: a promoted release changes this, which rolls the pods.
         zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+        {{- end }}
+        {{- with $digestAnnotations }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- end }}
     spec:
       serviceAccountName: mcp-gateway
@@ -62,8 +71,8 @@ spec:
         # ADR-0580/WP-161: pull, verify offline, extract. Non-zero exit on any
         # verification failure keeps the pod in Init.
         - name: okf-fetch
-          image: "{{ .Values.okf.fetch.image.repository }}:{{ .Values.okf.fetch.image.tag }}"
-          imagePullPolicy: {{ .Values.okf.fetch.image.pullPolicy }}
+          image: {{ include "mcp-gateway.imageRef" .Values.okf.fetch.image | quote }}
+          imagePullPolicy: {{ include "mcp-gateway.imagePullPolicy" .Values.okf.fetch.image }}
           command:
             - python3
             - /app/platform/supply-chain/admit_okf_bundle.py
@@ -89,8 +98,8 @@ spec:
       {{- end }}
       containers:
         - name: mcp-gateway
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "mcp-gateway.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "mcp-gateway.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -119,10 +128,18 @@ spec:
             - name: MCP_FRONTDOOR_CAPABILITIES
               value: {{ join "," .Values.lightspeed.frontdoorCapabilities | quote }}
 {{- end }}
+            {{- /* ADR-0602 clause 6 / WP-224: the JWKS defaults to the issuer's own HTTPS
+                 endpoint (public Route, Let's Encrypt), never an empty string - app/auth.py
+                 would take "" literally instead of its own default. */}}
+            {{- $issuer := .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) }}
             - name: KEYCLOAK_ISSUER
-              value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
+              value: {{ $issuer | quote }}
             - name: KEYCLOAK_JWKS_URL
-              value: {{ .Values.keycloakJwksUrl | quote }}
+              value: {{ .Values.keycloakJwksUrl | default (printf "%s/protocol/openid-connect/certs" $issuer) | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ .Values.jwtAudience | quote }}
+            - name: JWT_AUDIENCE_REQUIRED
+              value: {{ .Values.jwtAudienceRequired | quote }}
             - name: AI_GATEWAY_URL
               value: {{ .Values.aiGatewayUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS

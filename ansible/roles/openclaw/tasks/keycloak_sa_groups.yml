@@ -16,7 +16,7 @@
       client_id: admin-cli
       username: "{{ _kc_automation_user }}"
       password: "{{ _kc_automation_password }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   register: _openclaw_kc_token
   no_log: true
 

@@ -4,7 +4,11 @@ image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ai-gateway
   # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
   tag: latest
+  # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
+  # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
+  digest: ""
   # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
+  # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always
 
 replicas: 1
@@ -49,16 +53,20 @@ resources:
 clusterBaseDomain: apps.mycluster.example.com
 # Empty means "https://keycloak.<clusterBaseDomain>/realms/zuno".
 keycloakIssuer: ""
-# JWKS is fetched over the in-cluster Service, not the external Route -
-# the issuer string above is only compared against the token's iss
-# claim, while this URL is what actually gets dialed (the two are
-# separate env vars in app/auth.py for exactly this). Fetching via the
-# Route fails TLS verification (the chain ends at Vault's internal root
-# CA, not in the container's system store); the in-cluster hop stays
-# plain-HTTP by Keycloak's own design (spec.http.httpEnabled, edge
-# termination) inside the mesh/NetworkPolicy boundary (zuno-auth allows
-# zuno-ai-run).
+# User decision 2026-11-07 (WP-224 review): the JWKS stays on the in-cluster
+# Service. The gateways are meshed and zuno-auth is STRICT, so this hop is mTLS
+# (the client sidecar originates it), with no dependency on the public load
+# balancer and the router hairpin. The issuer above stays HTTPS: it is only
+# compared with the token's `iss`. Empty means "<issuer>/protocol/openid-connect/certs"
+# (an external Keycloak, ADR-0352 external mode).
 keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
+# ADR-0602 / WP-222: the audience every experience client's token carries (the maas-gateway-audience
+# mapper of realm-zuno.json: unifai, open-webui, dify, kagent, openclaw-*, zuno-evaluations,
+# zuno-stresstest), the same one a2a-gateway requires. Tokens of `openshift`, `aap` and `zuno-signer`
+# lack it and are refused. Empty = the audience is not checked (and jwtAudienceRequired must be false,
+# or the pod refuses to start).
+jwtAudience: zuno-admin-api
+jwtAudienceRequired: true
 localModelEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
 localModelName: qwen3.6-27b-instruct
 
@@ -184,6 +192,28 @@ maxTokensDefault: 8192
 modelRouting:
   generated: false
 
+# ADR-0565 clause 5 (WP-209): the ai-gateway routes and counts a chat call at
+# max(X-Zuno-Data-Classification, floor(agent, task)).
+classification:
+  # Mount the per-(agent, task) floors generated from the admitted agents
+  # release (files/classification-floors.generated.yaml). Needs an image with
+  # app/classification_floor.py (ai-gateway after WP-209); an older image
+  # ignores the file.
+  floorsGenerated: false
+  # The level of a call that sends no X-Zuno-Data-Classification header:
+  # C1, C2 or C3 (the template refuses anything else). C3 fails closed (local
+  # models only) and is ADR-0565's target, but stays off until the callers the
+  # WP-209 brief lists (the UnifAI shared `zuno-gateway` LLM above all) send a
+  # header. An older image ignores it and keeps C1.
+  defaultWhenAbsent: C1
+  # WP-209 review: the floor of a call that names no known agent (absent or
+  # unknown X-Zuno-Agent), per Keycloak client (`azp`), e.g. {unifai: C2}.
+  # The agent and task headers are caller-set, so without it a UnifAI token
+  # escapes every floor by omitting X-Zuno-Agent while the default is C1.
+  # Empty = none (today's behaviour). A caller claiming a low-floor agent is
+  # closed only by a verifiable agent identity (WP-225 lot C).
+  clientFloors: {}
+
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
 # a non-standard quota class (X-Zuno-Quota-Class) and a project id
 # (X-Zuno-Project-Id). Any other caller runs under `standard` with no
@@ -208,6 +238,8 @@ experienceClients:
   # ADR-0599/ADR-0600 (WP-202): through their zuno-token-proxy (ADR-0601).
   - dify
   - kagent
+  # ADR-0604 (WP-233): world-model prompt enhancement, C1 and local only.
+  - world-model
   - zuno-evaluations
   - zuno-stresstest
 

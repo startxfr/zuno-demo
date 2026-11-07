@@ -244,11 +244,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:2d0c6bb0a8d1a6c807d681a86d0eea8591382a7372c5f8064725980286f8a0f8  # v0.1.62
-      identity: quay.io/zuno/unifai-identity@sha256:7326cb345f60922f574aa916c19108d56bd63a9c6885a7d190654eb2b407b78b  # v0.1.62
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:28c20a0e64d4beb18ea80af015aa07d1d5d2cdb4af7aa0460ece5ff8e74c1408  # v0.1.62
-      rag: quay.io/zuno/unifai-rag@sha256:0d68f18ccb733a5030bf43e2d0d04b9b0e47b54ed75c6f1861883458b0ad7117  # v0.1.62
-      ui: quay.io/zuno/unifai-ui@sha256:862c50588a9f1d27443825cb6fe8158bbc484088685d1e32176a18118383ec79  # v0.1.62
+      backend: quay.io/zuno/unifai-backend@sha256:25cf3c6d65c8e4e774b60897020bc51da241df93f41a9f4b981b959be1a12650  # v0.1.64
+      identity: quay.io/zuno/unifai-identity@sha256:6b6bf1070d35a7b05378d3f2d301b14d218925fc540a7f9dd2decb6797c80397  # v0.1.64
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:adb05e40c6d7bdba910735655726a51678cf9c37f9f3defbc31b368d3c75439d  # v0.1.64
+      rag: quay.io/zuno/unifai-rag@sha256:81a2539506f02b53924e473bcc4b56efe9d2458568494ac4fcee6568e904b85d  # v0.1.64
+      ui: quay.io/zuno/unifai-ui@sha256:b06a5da46c1c817f47e99c43a2ad9c3031069937b24534212c813f26cfb4e768  # v0.1.64
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -308,6 +308,12 @@ zuno_ai_gateway_quota_ledger_store: redis
 # image built from b1facfc2 or later (ai-gateway-28).
 zuno_ai_gateway_model_routing_generated: true
 zuno_ai_gateway_guardrails_modes_generated: true
+# ADR-0565 clause 5 (WP-209, user go 2026-11-07): mount the per-agent/task
+# classification floors generated from the agents release. A header-less call
+# stays C1 (zuno_ai_gateway_classification_default_when_absent unset, user
+# decision) and the per-client floor stays empty. Needs an image from 4a214782
+# or later.
+zuno_ai_gateway_classification_floors_generated: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

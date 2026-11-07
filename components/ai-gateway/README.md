@@ -33,8 +33,14 @@ response field:
 - **Auth:** `Authorization: Bearer <keycloak-jwt>` (required - validated
   against the realm's JWKS; this gateway does not do group-based
   authorization, only authenticated-caller verification).
-- **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional, default
-  `C1`) - the primary input that selects the provider/fallback chain.
+- **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional; when absent,
+  `CLASSIFICATION_DEFAULT_WHEN_ABSENT`, chart `classification.defaultWhenAbsent`,
+  `C1` shipped) - the primary input that selects the provider/fallback chain.
+  Since WP-209 (ADR-0565 clause 5) the call is routed and counted at
+  `max(header, floor(X-Zuno-Agent, X-Zuno-Task))`, the floors generated from the
+  admitted agents release (`app/classification_floor.py`,
+  `CLASSIFICATION_FLOORS_PATH`); a raised level is logged
+  (`classification raised by floor: C1 -> C3 agent=... task=...`).
   **`model` in the request body is accepted for wire-format
   compatibility but ignored for v0** - routing never looks at it.
 - **Header:** `X-Zuno-Local-Only: true|false` (optional, default `false`) -
@@ -107,7 +113,7 @@ OpenAI list-models format (`{"object": "list", "data": [{"id", "object":
 "model", "created", "owned_by"}]}`), JWT-authenticated like the other
 routes. Lists the `auto` alias plus the distinct `model` of every
 `provider-routing.yaml` entry eligible for the caller's
-`X-Zuno-Data-Classification` (default `C1`; `X-Zuno-Local-Only: true`
+`X-Zuno-Data-Classification` (absent: the same default as chat; `X-Zuno-Local-Only: true`
 keeps local ones only) - the same eligibility filter as chat completions.
 `Cache-Control: private, max-age=30`. `422` on an unknown classification,
 `401` without a valid JWT.
@@ -135,6 +141,12 @@ Liveness always `200`. Readiness returns `503` until
 
 Re-reads `provider-routing.yaml` from disk without a pod restart (mirrors
 `mcp-gateway`'s `/admin/reload-policy`).
+
+**Authentication (ADR-0602 / WP-222).** Every `/admin/*` route (this one and `/admin/optimizer/*`) needs a Keycloak JWT
+(audience `zuno-admin-api`) whose `groups` include one of `ADMIN_GROUPS`
+(default `ocp-paas-ops,ocp-ai-ops`): no token gives `401`, another group `403`.
+`ADMIN_AUTH_MODE=off` restores the old network-only trust and is meant for
+break-glass only.
 
 ## Streaming and fallback
 

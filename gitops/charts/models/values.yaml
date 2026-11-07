@@ -112,6 +112,15 @@ hardwareProfiles:
 metrics:
   enabled: true
 
+# WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
+# runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
+# 8000. templates/networkpolicy-evalhub-clients.yaml admits them, per listed model.
+evalHubClients:
+  enabled: true
+  instance: zuno-evalhub
+  models:
+    - qwen35-9b
+
 # ADR-0523 (WP-082): OTel auto-instrumentation of the model workloads.
 # Gates templates/instrumentation.yaml and the vLLM --otlp-traces-endpoint
 # args below; the inject-sdk pod annotations reference the Instrumentation
@@ -429,8 +438,8 @@ modelsS3:
   prefix: models
   endpoint: s3.eu-west-2.amazonaws.com
   region: eu-west-2
-  # Where the read credential lives in Vault (via the vault-backend
-  # ClusterSecretStore) - consumed by both s3-serving-credentials.yaml
+  # Where the read credential lives in Vault (via the namespace's own `vault`
+  # SecretStore, ADR-0602/WP-223) - consumed by both s3-serving-credentials.yaml
   # (classic predictor) and maas.yaml's ExternalSecret.
   externalSecret:
     remoteKey: rag/s3
@@ -1457,7 +1466,7 @@ externalModels:
   - name: mistral-large
     endpoint: api.mistral.ai
     provider: mistral
-    targetModel: mistral-large-latest
+    targetModel: mistral-large-4
     secretName: llm-provider-mistral-maas
     vault:
       path: providers/mistral

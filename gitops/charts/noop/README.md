@@ -14,6 +14,10 @@ one side (e.g. `vault` has no OLM operator at all, so all of its content is
 the `-d0`/`-d1` naming convention uniform and visible in `gitops/apps/`
 without any component being a silent exception.
 
-`spec.destination.namespace` for a `noop`-sourced Application is set to
-`openshift-gitops` (a namespace that always exists) - it has no effect since
-nothing is ever deployed.
+`spec.destination.namespace` for a `noop`-sourced Application is the
+namespace its component lives in (e.g. `zuno-ai-run`, `zuno-vault`,
+`openshift-lws-operator`) - it has no effect since nothing is ever deployed,
+but it must be a destination of the Application's AppProject. It used to be
+`openshift-gitops`; ADR-0602 clause 5 / WP-224 reserves that namespace for
+the `zuno-bootstrap` project (the root App-of-Apps), so no `zuno-platform`
+or `zuno-apps` Application may target it.

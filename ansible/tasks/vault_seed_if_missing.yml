@@ -8,17 +8,31 @@
 # regenerate and overwrite every credential seeded this way, desyncing it
 # from whatever any already-running consumer cached (has broken maas-api
 # and MariaDB's root password this way before).
+#
+# Requires zuno_vault_token (ADR-0602 clause 1 / WP-223): the caller includes
+# ansible/tasks/vault_login.yml once before its seed loop - not here, so a
+# loop of N seeds logs in once, not N times.
 - name: "vault | check whether zuno/{{ vault_seed_path }} already exists"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/{{ vault_seed_path }}"
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/{{ vault_seed_path }}"
   register: _vault_seed_existing
   changed_when: false
   failed_when: false
   no_log: true
+
+# Review finding (WP-223): only "no value found" (vault exits 2) means the path
+# is missing. Any other failure (exec or TLS error, standby node) must stop the
+# run, not seed a fresh random value over a live credential.
+- name: "vault | fail when the existence check itself failed"
+  ansible.builtin.fail:
+    msg: >-
+      Could not tell whether zuno/{{ vault_seed_path }} exists (rc={{ _vault_seed_existing.rc | default('n/a') }}).
+      Not seeding: a read error is not proof the path is empty.
+  when: (_vault_seed_existing.rc | default(1)) not in [0, 2]
 
 - name: "vault | seed zuno/{{ vault_seed_path }} (first run only)"
   kubernetes.core.k8s_exec:
@@ -26,7 +40,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ vault_seed_path }}
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/{{ vault_seed_path }}
       {% for field_name, field_value in vault_seed_fields.items() %}{{ field_name }}={{ field_value | quote }} {% endfor %}"
-  when: _vault_seed_existing.rc != 0
+  when: _vault_seed_existing.rc == 2
   no_log: true

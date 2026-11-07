@@ -1,8 +1,10 @@
 {{- /*
-ADR-0112 (roadmap WP-13). See values.yaml's backup comment for why this
-is a CSI VolumeSnapshot (not `vault operator raft snapshot` - the file
-storage backend has no such API) and for the live-cluster verification
-of every field used below. Disabled by default.
+ADR-0112 (roadmap WP-13). A CSI VolumeSnapshot of the whole data PVC; see
+values.yaml's backup comment for the live-cluster verification of every
+field used below. Written when storage was "file" (no snapshot API);
+ADR-0602 clause 1 / WP-223 moved storage to raft and added the
+application-consistent cronjob-raft-snapshot.yaml next to this one, which
+stays as the fast whole-volume restore path.
 */ -}}
 {{- if .Values.backup.enabled }}
 apiVersion: v1

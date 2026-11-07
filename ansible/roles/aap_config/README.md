@@ -131,17 +131,18 @@ Both are consumed through `AnsibleCredential`'s native
 bootstrap cluster-admin kubeconfig (ADR-0354 Security considerations,
 narrowed per WP-073, extended per WP-094). If a precheck or install ever
 fails on permissions, widen with a targeted extra Role/ClusterRole entry,
-never swap in a broader built-in or cluster-admin - three such widenings
-exist so far. Two are routine, both because `cluster-reader` deliberately
-excludes Secrets entirely: `templates/rolebinding-vault-secrets.yaml`
-(`zuno-vault`, vault's own precheck) and gitops/charts/connectivity-link/
+never swap in a broader built-in or cluster-admin - two such widenings
+exist so far (a third, `templates/rolebinding-vault-secrets.yaml` for
+vault's own precheck in `zuno-vault`, was removed by ADR-0602/WP-223). One
+is routine, because `cluster-reader` deliberately excludes Secrets
+entirely: gitops/charts/connectivity-link/
 `templates/rolebinding-aap-day0-check-secrets.yaml` (`kuadrant-system`,
 confirmed live 2026-08-30 running `zuno-day1-check-workflow` for real -
 connectivity_link's precheck reads `authorino-server-cert`'s
 `tls.crt`/`tls.key` keys, WP-071's regression check; moved out of this
 chart 2026-09-06, ADR-0517 - a Day 0 sync cannot apply into a namespace
 the Day 1 connectivity-link chart creates, so the pair now lives with
-that namespace's owner). The third,
+that namespace's owner). The other,
 `templates/rolebinding-connectivity-link-exec.yaml` (`openshift-ingress`,
 also confirmed live 2026-08-30 in the same run), is **not** routine -
 `pods/exec` grants arbitrary command execution inside any pod the Role's
@@ -192,23 +193,23 @@ An existing authenticator is never PATCHed - config drift (e.g. a rotated
 client secret) is fixed by deleting the authenticator in the Gateway UI
 and re-running `make d0 install aap-config`.
 
-## Known limitation: `aap-day0-check` cannot confirm vault's seal state
+## `aap-day0-check` and vault's seal state (no Secret or exec access)
 
 Confirmed live 2026-08-25, first real `zuno-day0-check` run: `vault`'s
-`precheck.yml` calls `vault status` via `pods/exec` to determine whether
-the server is unsealed - `cluster-reader` does not grant `pods/exec`
-(unlike `secrets`, it's not merely excluded, it's entirely absent from
-the built-in role), so that step never runs and `vault` always reports
-"NOT installed" through this credential, even when it's healthy. **This
-was left unfixed on purpose**: unlike the Secrets read
-(`rolebinding-vault-secrets.yaml`, existence/metadata only), `pods/exec`
-is execute-any-command-in-that-pod, not a bounded read - RBAC has no
-finer-grained way to scope it to just the `vault status` invocation. The
-operator decided this one false negative is an acceptable trade against
-widening the credential's capability class. `make d0 check vault` from
-an operator shell (cluster-admin) remains the source of truth for vault's
-real state; `zuno-day0-check`'s report should be read with that one
-known gap in mind.
+`precheck.yml` calls `vault status` via `pods/exec`, which
+`cluster-reader` does not grant, so `vault` always reported "NOT
+installed" through this credential. That was left unfixed on purpose
+(`pods/exec` is execute-any-command, not a bounded read).
+
+ADR-0602 clause 1 / WP-223 changed both halves: `precheck.yml` no longer
+looks up `vault-bootstrap-credentials` (fresh installs never create it,
+the root token is revoked after bootstrap), so the
+`rolebinding-vault-secrets.yaml` Role that let this credential read every
+Secret in `zuno-vault` - root token included - is gone; and when
+`vault status` cannot be executed, the precheck falls back to the Vault
+pod's Ready condition (the chart's readiness probe runs the same
+`vault status`, Ready = initialized and unsealed). No exec grant was
+added.
 
 ## What's unverified against a live cluster
 

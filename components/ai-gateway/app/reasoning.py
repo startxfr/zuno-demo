@@ -60,10 +60,11 @@ def _subclass(base: type) -> type:
                     gen.message.additional_kwargs[REASONING_KEY] = text
             return result
 
-        # Mirrors langchain-openai 0.2.4's ChatOpenAI/BaseChatOpenAI._astream (pinned in
-        # requirements.txt) minus the response_format / response-headers
-        # branches this gateway never uses; the only addition is the
-        # reasoning delta capture.
+        # Mirrors langchain-openai 0.2.14's ChatOpenAI/BaseChatOpenAI._astream (pinned in
+        # requirements.in; re-read against 0.2.14 for WP-226, same helpers and
+        # signatures as 0.2.4) minus the response-headers branch this gateway
+        # never uses and the logprobs passed to on_llm_new_token, which no
+        # callback here reads; the only addition is the reasoning delta capture.
         async def _astream(  # type: ignore[override]
             self,
             messages: List[Any],

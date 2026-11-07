@@ -1,7 +1,7 @@
 # ADR-0584: Define agent lifecycle states, roles and incident revocation
 
 - **Status:** Accepted
-- **Target:** v0.15 (retargeted from v0.12 on 2026-11-05: WP-167 delivered ADR-0582, not this decision, so none of its work has started, see the status note)
+- **Target:** v0.16 (retargeted from v0.15 on 2026-11-07: v0.15 became the demo-ready band of ADR-0605, and WP-221 needs an operator release that waits for the window after the 2026-11-09 demonstration)
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
 - **Extends:** [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) (review and CODEOWNERS), [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
@@ -108,3 +108,13 @@ Checked against the repository and demo333, the decision is mostly not built, an
 - **Clause 4 verified on 2026-11-05** ([pilot](../roadmap/evidence/wp-221-session-pilot-2026-11-05.md)): UnifAI already keeps the session of a deleted workflow readable by its owner and refuses to resume it, so this clause needs no fork change.
 - **Not built:** the `deprecated` and `retired` states and their effects (clause 3); the revocation list as a GitOps-managed ConfigMap read by the operator, and the runbook (clause 5); the operator events for admission, state change, revocation and rejection (clause 6).
 - **Next step:** [WP-221](../roadmap/work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) carries clauses 3 to 6. It needs a change in the UnifAI operator (a fork patch).
+
+## Amendment (2026-11-07): retargeted to v0.16
+
+v0.15 became the demo-ready band of [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md),
+tagged before the 2026-11-09 demonstration. This record moves to v0.16 because its remaining clauses (3, 5 and 6) need a
+change in the UnifAI operator, carried by WP-221. That operator release is pinned under
+[ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) (one go per release, backup and recorded rollback, a
+golden-path run after it, never inside a freeze), and the revocation list is rehearsed in a canary namespace under
+[ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) before it is used on a live agent. No decision clause
+changes.

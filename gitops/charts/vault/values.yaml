@@ -2,11 +2,20 @@
 global:
   clusterBaseDomain: apps.mycluster.example.com
 
+# ADR-0602 clause 1 / WP-223: the Route is OFF by default. Nothing in the
+# platform reaches Vault through it (every client is in-cluster, on the
+# Service), so an always-on public UI was attack surface with no consumer.
+# When an operator enables it for a session, it is reencrypt (the router
+# re-establishes TLS to the service-ca serving cert of the listener below,
+# trusting the service CA automatically) and can be pinned to an allow-list
+# of source CIDRs through ipWhitelist (space-separated, the router's own
+# haproxy.router.openshift.io/ip_whitelist syntax).
 # route.host empty means "vault.<global.clusterBaseDomain>" (see
 # templates/_helpers.tpl).
 route:
-  enabled: true
+  enabled: false
   host: ""
+  ipWhitelist: ""
 
 # Values for the upstream hashicorp/vault chart dependency, nested under
 # "vault:" per Helm subchart convention.
@@ -15,6 +24,40 @@ vault:
   # (arbitrary/non-root UID, no privileged context).
   global:
     openshift: true
+    # ADR-0602 clause 1 / WP-223: the listener serves TLS. This flag is what
+    # switches the upstream chart's probes, port names and in-pod
+    # VAULT_ADDR/VAULT_API_ADDR to https - the listener itself is configured
+    # in ha.raft.config below.
+    tlsDisable: false
+
+  # ADR-0602 clause 1 / WP-223: auto-unseal through AWS KMS. Before this, the
+  # single unseal key sat in a cluster Secret next to the root token and
+  # nothing re-unsealed Vault after a restart (every pod restart was an
+  # outage until a human ran the unseal Job). Both blocks are read by the
+  # tpl'd ha.raft.config below - which is why they live under "vault:" (the
+  # subchart's own values) rather than at the top level of this file.
+  #
+  # seal.type: awskms is the design. "shamir" exists ONLY so
+  # ansible/playbooks/vault_migrate_kms_raft.yml can render its intermediate
+  # state (storage already moved to raft, seal not yet migrated); a fresh
+  # install never uses it.
+  seal:
+    type: awskms
+  # kms.keyId is deliberately empty: the tpl below `required`s it whenever
+  # seal.type=awskms, so this chart does not render until Ansible supplies
+  # the key (ansible/roles/vault, from confidential.yml
+  # zuno_vault_kms_key_id). That is also the guard for a cluster still on
+  # the old file/shamir layout: the new chart reaching its targetRevision
+  # makes the Application fail to render (ComparisonError, nothing applied)
+  # instead of starting an empty raft Vault next to the old data - see
+  # docs/platform/vault-kms-raft-migration.md.
+  # AWS credentials come from the vault-aws-kms Secret (server.
+  # extraSecretEnvironmentVars below), created by ansible/roles/vault - never
+  # from these values.
+  kms:
+    region: eu-west-1
+    keyId: ""
+
   server:
     priorityClassName: zuno-platform-critical
     image:
@@ -25,17 +68,139 @@ vault:
       # have, so the mirror's own `from` explicitly uses docker.io.
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/vault
       tag: "1.17.2"
+
+    # ADR-0602 clause 1 / WP-223: the listener certificate is issued by the
+    # OpenShift service CA (service.beta.openshift.io/serving-cert-secret-name
+    # on the client Service): no extra PKI to run, rotated by the platform,
+    # and trusted by every pod through the service-ca.crt OpenShift injects
+    # next to each ServiceAccount token. SANs: zuno-vault.zuno-vault.svc and
+    # zuno-vault.zuno-vault.svc.cluster.local - which is why every client
+    # dials the Service name, never 127.0.0.1 or a pod address.
+    #
+    # A templated string, not a map: the upstream chart stamps
+    # server.service.annotations on all four of its Services (client,
+    # -internal, -active, -standby), and four Services claiming the same
+    # serving-cert Secret race in the service-ca controller - whichever wins
+    # decides the SANs. .Template.Name is the upstream template file being
+    # rendered, so only the client Service gets the annotation.
+    service:
+      annotations: |
+        {{- if hasSuffix "/server-service.yaml" .Template.Name }}
+        service.beta.openshift.io/serving-cert-secret-name: vault-tls
+        {{- end }}
+    volumes:
+      - name: vault-tls
+        secret:
+          secretName: vault-tls
+          defaultMode: 0440
+    volumeMounts:
+      - name: vault-tls
+        mountPath: /vault/tls
+        readOnly: true
+
+    # The upstream chart pins the in-pod VAULT_ADDR to https://127.0.0.1:8200
+    # (not overridable without duplicating the env name), and the
+    # service-ca cert has no IP SAN. VAULT_TLS_SERVER_NAME makes the CLI
+    # verify the certificate against the Service name instead, and
+    # VAULT_CACERT points it at the service CA - so every `k8s_exec ... vault
+    # ...` in ansible/ verifies TLS without per-task changes.
+    extraEnvironmentVars:
+      VAULT_CACERT: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+      VAULT_TLS_SERVER_NAME: zuno-vault.zuno-vault.svc
+    # Static IAM credentials of a dedicated KMS-only user (exact policy in
+    # docs/platform/vault-kms-raft-migration.md): kms:Encrypt/Decrypt/
+    # DescribeKey on one key ARN. The Secret is created by
+    # ansible/roles/vault before this Application is applied.
+    extraSecretEnvironmentVars:
+      - envName: AWS_ACCESS_KEY_ID
+        secretName: vault-aws-kms
+        secretKey: AWS_ACCESS_KEY_ID
+      - envName: AWS_SECRET_ACCESS_KEY
+        secretName: vault-aws-kms
+        secretKey: AWS_SECRET_ACCESS_KEY
+
+    # The data PVC is shared with the legacy file layout during the
+    # migration (raft lives in a subdirectory, see ha.raft.config), and
+    # whether raft creates a missing directory itself is not something to
+    # bet a fresh install on. Creating it here makes a fresh install and a
+    # migrated one start the same way.
+    extraInitContainers:
+      - name: raft-dir
+        image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/vault:1.17.2
+        command: ["/bin/sh", "-ec", "mkdir -p /vault/data/raft"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+          - name: data
+            mountPath: /vault/data
+
+    # ADR-0602 clause 1 / WP-223: integrated (raft) storage replaces "file".
+    # It is what gives this Vault a consistent online snapshot
+    # (templates/cronjob-raft-snapshot.yaml) and a path to 3 replicas.
+    # Rendered through the upstream chart's HA mode, the only mode whose
+    # StatefulSet can grow past one pod; replicas stays 1 until a deliberate
+    # scale-out. The StatefulSet name, its "data" volumeClaimTemplate and
+    # therefore the data-zuno-vault-0 PVC are the same in both modes.
     standalone:
+      enabled: false
+    ha:
       enabled: true
-      config: |
-        ui = true
-        listener "tcp" {
-          address = "[::]:8200"
-          tls_disable = true
-        }
-        storage "file" {
-          path = "/vault/data"
-        }
+      replicas: 1
+      # The upstream default computes maxUnavailable from replicas and
+      # renders an unusable budget at replicas=1. With auto-unseal a
+      # reschedule no longer needs a human, so no PDB at one replica (the
+      # same posture the standalone StatefulSet had); enable it together
+      # with replicas: 3.
+      disruptionBudget:
+        enabled: false
+      raft:
+        enabled: true
+        # VAULT_RAFT_NODE_ID = the pod name (zuno-vault-0, -1, -2).
+        setNodeId: true
+        # tpl'd by the upstream chart with the subchart context, so
+        # .Values here is the "vault:" block of this file.
+        #
+        # retry_join: one block per replica, dialling each peer's API port
+        # through the headless Service. The service-ca cert does not carry
+        # the per-pod names, so leader_tls_servername verifies the peer
+        # against the client Service name the cert does carry. At
+        # replicas=1 the single block points at the pod itself and is
+        # inert.
+        config: |
+          ui = true
+
+          listener "tcp" {
+            address         = "[::]:8200"
+            cluster_address = "[::]:8201"
+            tls_cert_file   = "/vault/tls/tls.crt"
+            tls_key_file    = "/vault/tls/tls.key"
+          }
+
+          storage "raft" {
+            path = "/vault/data/raft"
+          {{- $fullname := include "vault.fullname" . }}
+          {{- range $i := until (int .Values.server.ha.replicas) }}
+            retry_join {
+              leader_api_addr       = "https://{{ $fullname }}-{{ $i }}.{{ $fullname }}-internal:8200"
+              leader_ca_cert_file   = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+              leader_tls_servername = "{{ $fullname }}.{{ $.Release.Namespace }}.svc"
+            }
+          {{- end }}
+          }
+          {{- if eq .Values.seal.type "awskms" }}
+
+          seal "awskms" {
+            region     = "{{ .Values.kms.region }}"
+            kms_key_id = "{{ required "vault.kms.keyId is required when vault.seal.type=awskms (ansible/roles/vault sets it from zuno_vault_kms_key_id)" .Values.kms.keyId }}"
+          }
+          {{- else if ne .Values.seal.type "shamir" }}
+          {{- fail (printf "vault.seal.type must be awskms or shamir, got %q" .Values.seal.type) }}
+          {{- end }}
+
+          service_registration "kubernetes" {}
+
     dataStorage:
       enabled: true
       size: 2Gi
@@ -46,22 +211,24 @@ vault:
       limits:
         cpu: 500m
         memory: 512Mi
+  # The UI is served by the listener above on the client Service (which the
+  # Route targets when enabled); a separate -ui Service is one more entry
+  # point with no consumer.
   ui:
-    enabled: true
+    enabled: false
   injector:
     enabled: false
 
 # ADR-0112 (roadmap WP-13): scheduled snapshot of Vault's data PVC
 # (templates/cronjob-backup.yaml), rendered by this chart's own -d1
-# Application, false by default alongside every other switch in this
-# repo's optional-resource pattern. Vault's storage backend here is
-# "file" (standalone.config above), not Raft/integrated storage, so
-# there is no `vault operator raft snapshot` API to call - the storage
-# backend's own snapshot mechanism for a plain filesystem PVC is a CSI
-# VolumeSnapshot of the volume itself. `oc get volumesnapshotclass` shows
-# `csi-aws-vsc` (driver ebs.csi.aws.com, matching gp3-csi's own
-# provisioner) and `oc explain volumesnapshot.spec` confirms the schema
-# used below.
+# Application. Kept alongside the raft snapshot below (ADR-0602 clause 1 /
+# WP-223): the CSI VolumeSnapshot is a crash-consistent image of the whole
+# volume (fast whole-PVC restore, same region only); the raft snapshot is an
+# application-consistent, portable file that `vault operator raft snapshot
+# restore` accepts on any Vault sealed by the same KMS key. `oc get
+# volumesnapshotclass` shows `csi-aws-vsc` (driver ebs.csi.aws.com,
+# matching gp3-csi's own provisioner) and `oc explain volumesnapshot.spec`
+# confirms the schema used below.
 backup:
   enabled: true
   schedule: "0 4 * * *"  # daily 04:00 - RPO <= 24h (ADR-0112)
@@ -82,3 +249,20 @@ backup:
     # docker.io/bitnami/kubectl.
     repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/bitnami-kubectl
     tag: "1.31"
+
+# ADR-0602 clause 1 / WP-223: `vault operator raft snapshot save` on a
+# schedule (templates/cronjob-raft-snapshot.yaml), written to a dedicated
+# PVC and pruned to the newest retentionCount files. The CronJob logs in
+# through the Kubernetes auth role raft-snapshot (policy: read on
+# sys/storage/raft/snapshot only), created by ansible/roles/vault's
+# configure Job and bound to the vault-raft-snapshot ServiceAccount - no
+# token is stored anywhere. Restoring one needs the KMS key (the snapshot
+# is encrypted by the seal) and, on a new cluster, the recovery keys:
+# docs/platform/backup-recovery.md.
+raftSnapshot:
+  enabled: true
+  schedule: "30 4 * * *"  # after the 04:00 CSI snapshot
+  retentionCount: 7
+  pvcSize: 1Gi
+  # Empty = the cluster's default StorageClass.
+  storageClassName: ""

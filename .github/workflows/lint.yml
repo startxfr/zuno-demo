@@ -10,23 +10,26 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   policy-as-code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
-      - run: pip install pyyaml
+      - run: pip install pyyaml packaging
       # ADR-0580/WP-165: agents and the corp policies are not in this
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@v1
+      - uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -52,6 +55,16 @@ jobs:
       # (`make d2 check supply-chain`).
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
+      # ADR-0603 M20 (WP-226): every Python lock is hashed, fresh against its
+      # requirements.in, and one version per shared library.
+      - name: Hashed Python lockfiles, one version per library (ADR-0603)
+        run: |
+          python3 platform/python/check_python_locks.py
+          python3 platform/python/tests/test_check_python_locks.py
+      # ADR-0603 M16 (WP-226): a digest in a chart's values is a signed pin of
+      # a ledgered release, never a hand edit.
+      - name: Rendered image digests match the release ledger (ADR-0603)
+        run: python3 platform/supply-chain/render_release_digests.py --check
       - name: MCP server conformance (ADR-0119)
         run: python3 platform/supply-chain/check_mcp_server_conformance.py
       # ADR-0106/WP-165: OKF schema and policy validation, the quota-policy
@@ -61,6 +74,9 @@ jobs:
       # okf-release job below verifies.
       - name: Validate canonical platform documentation (ADR-0323)
         run: python3 platform/docs/check_docs.py
+      # ADR-0606 clause 5 (WP-239): two ADR files under one number.
+      - name: ADR number collision tests (ADR-0606)
+        run: python3 platform/docs/tests/test_adr_number_collisions.py
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).
@@ -73,6 +89,9 @@ jobs:
           python3 platform/okf/tests/test_okf_conformance.py
           python3 components/mcp-gateway/tests/test_okf_conformance.py
           python3 evaluations/tests/test_okf_hook.py
+      # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
+      - name: Golden-path probe judgement tests (ADR-0605)
+        run: python3 evaluations/tests/test_golden_path_probe.py
       - name: Validate knowledge-domain descriptors and references (ADR-0202/ADR-0203)
         run: python3 platform/docs/check_knowledge_refs.py
       - name: Verify generated quota enforcement matches the released quota-policy.yaml (ADR-0511)
@@ -89,8 +108,8 @@ jobs:
   helm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
       - name: helm lint every chart
         run: |
           set -e
@@ -114,6 +133,11 @@ jobs:
       # argument crash-looped qwen35-9b on 2026-10-25 (60d6e81e).
       - name: vLLM args survive the KServe start script
         run: python3 -m pytest -q platform/models/tests
+      # ADR-0603 M16 (WP-226): rendering a ledgered digest pins the Deployment
+      # (repository@digest, IfNotPresent, no :latest trigger); needs helm.
+      - name: render_release_digests.py tests (ADR-0603)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_render_release_digests.py
       # The check renders the keycloak and postgresql charts, which both depend
       # on the startx "operator" chart (alias:startx); keycloak's was built
       # above, postgresql's was not and `helm template` refused to render it.
@@ -122,12 +146,41 @@ jobs:
           helm dependency build gitops/charts/postgresql
           python3 platform/security/check_workload_hardening.py
           python3 platform/security/tests/test_secret_env_names.py
+      # ADR-0602 clause 2 / WP-223: every ExternalSecret reads Vault through its
+      # namespace's own SecretStore and only the keys platform/vault/
+      # secret-access.yaml grants that namespace (no ClusterSecretStore). Renders
+      # every gitops/apps Application from a dependency-free chart copy, so it
+      # needs helm but no chart repository.
+      - name: Per-namespace Vault secret access (ADR-0602)
+        run: |
+          python3 platform/vault/check_secret_access.py
+          python3 platform/vault/tests/test_check_secret_access.py
+      # ADR-0602 / WP-224: PeerAuthentications only in zuno-data, zuno-auth and
+      # zuno-ai-run, every plaintext port exception justified, and a deny-all
+      # EgressFirewall ending in Deny 0.0.0.0/0 in zuno-ai-run and zuno-unifai.
+      # Same hermetic rendering as the step above (helm, no chart repository).
+      - name: Targeted mesh mTLS and egress firewalls (ADR-0602)
+        run: |
+          python3 platform/security/check_mesh_mtls.py
+          python3 platform/security/tests/test_check_mesh_mtls.py
+      # ADR-0602 clause 5 / WP-224: every gitops/apps Application sits in
+      # zuno-platform or zuno-apps and renders only the cluster-scoped kinds
+      # and namespaces its AppProject allows. Renders WITH subcharts (the
+      # startx subcharts carry the Namespaces and OLM objects), so every
+      # dependency is built first; --strict-dependencies fails on a gap.
+      - name: ArgoCD AppProject split (ADR-0602)
+        run: |
+          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          for repo in https://borispolonsky.github.io/dify-helm https://charts.bitnami.com/bitnami https://charts.jetstack.io https://helm.openwebui.com https://helm.releases.hashicorp.com; do helm repo add "$(echo "$repo" | tr -c 'a-z0-9\n' '-')" "$repo"; done
+          for chart in gitops/charts/*/; do if grep -q '^dependencies:' "$chart/Chart.yaml"; then helm dependency build "$chart"; fi; done
+          python3 platform/gitops/check_app_projects.py --strict-dependencies
+          python3 platform/gitops/tests/test_check_app_projects.py
 
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - run: pip install pyyaml
@@ -135,10 +188,10 @@ jobs:
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@v1
+      - uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -164,6 +217,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_token_proxy.py
+          python3 tests/test_tls_verify.py
       - name: zuno-dify-knowledge tests (ADR-0599)
         working-directory: components/zuno-dify-knowledge
         run: |
@@ -185,9 +239,14 @@ jobs:
           # including the via_maas branch structure-demo's own preferred
           # candidate actually uses.
           python3 tests/test_max_tokens_passthrough.py
+          # WP-226: the CA bundle path reaches httpx 0.28 as an SSLContext.
+          python3 tests/test_tls_verify.py
           # WP-157: the default-off MaaS switches (429 pass-through, gateway
           # identity and its attested headers, per-class fail modes).
           python3 tests/test_wp157_maas_switches.py
+          # WP-209 (ADR-0565 clause 5): effective = max(header, floor(agent, task)),
+          # and the level of a header-less call (C1 shipped, C3 tested).
+          python3 tests/test_wp209_classification_floor.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |
@@ -240,7 +299,7 @@ jobs:
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |
-          pip install pyyaml httpx
+          pip install -r tekos/requirements.txt
           python3 tests/test_quality_gate.py
       - name: evaluations benchmark harness tests (ADR-0305)
         working-directory: evaluations
@@ -283,10 +342,10 @@ jobs:
     # real live verdict is exercised instead.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - run: pip install pyyaml
@@ -294,10 +353,10 @@ jobs:
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@v1
+      - uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -358,8 +417,11 @@ jobs:
   ansible:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: pip install ansible && ansible-galaxy collection install kubernetes.core
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # ADR-0603 M20 (WP-226): ansible pinned, collections from the pinned
+      # ansible/requirements.yml (installed to ~/.ansible/collections, which
+      # takes precedence over the copies bundled in the ansible package).
+      - run: pip install ansible==12.3.0 && ansible-galaxy collection install -r ansible/requirements.yml
       - name: Syntax-check every playbook
         run: |
           set -e
@@ -374,15 +436,15 @@ jobs:
   okf-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - run: pip install pyyaml
-      - uses: oras-project/setup-oras@v1
+      - uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         with:
           cosign-release: v2.4.1
       - name: Verify and validate the locked agents release

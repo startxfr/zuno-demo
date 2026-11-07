@@ -9,12 +9,21 @@
     kind: ClusterRoleBinding
     name: zuno-argocd-application-controller-admin
 
-- name: "argocd | delete the zuno AppProject"
+# ADR-0602 clause 5 / WP-224: the three projects, plus the legacy `zuno`
+# one a cluster may still carry from before the split.
+- name: "argocd | delete the zuno AppProjects"
   kubernetes.core.k8s:
     state: absent
     api_version: argoproj.io/v1alpha1
     kind: AppProject
-    name: zuno
+    name: "{{ _argocd_appproject }}"
     namespace: openshift-gitops
+  loop:
+    - zuno-platform
+    - zuno-apps
+    - zuno-bootstrap
+    - zuno
+  loop_control:
+    loop_var: _argocd_appproject
 
 # Operator removal is intentionally skipped here.

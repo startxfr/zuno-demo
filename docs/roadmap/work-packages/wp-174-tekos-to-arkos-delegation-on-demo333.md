@@ -184,3 +184,30 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   without intervention. R-539 replayed: with a session `approve_all` rule the worker logs `approve_all: True` and the delegated write still waited
   for the user (reject answered, nothing ran), so an auto-approval does not cross the hop. R-538 (cap of 3 requests per session) was not reachable
   live because Arkos stops after the first refusal; accepted as covered upstream. The remaining ADR-0409 proofs are all closed or accepted.
+
+## Progress (2026-11-07): UnifAI 0.1.63 breaks the approval relay on Redis
+
+UnifAI 0.1.63 was pinned on demo333 on 2026-11-07 (acceptance gate 18/18). The same day the UnifAI team found that on Redis,
+`POST /session.approval` answers HTTP 500 to every decision: the endpoint calls `channel.is_pending()` first and the Redis
+channel proxy only has `submit()`. The human approval of a delegated write (ADR-0409, step 5 of the relay) therefore does
+not work on 0.1.63; it worked on 0.1.61 and 0.1.62. The gate does not cover this case. Decision (user, 2026-11-07): keep
+0.1.63 in place and wait for 0.1.64; no approval proof, no release from `devel` until then. The live proof of R-540 (409
+`approval_not_pending` on a stale request) waits for 0.1.64 as well.
+
+## Progress (2026-11-07, evening): UnifAI 0.1.64 pinned, the approval relay works again
+
+UnifAI 0.1.64 (fork R-542, `channel.is_pending()` on the Redis channel proxy) was pinned on demo333 with the user's go (catalog
+`sha256:f0c3cf5d…`, five images; `devel` commits d236620f and 0435ddc9); the operator CSV is Succeeded and the seven pods run the
+release digests. Live proofs, persona `eval-consultant-01`, Arkos to Tekos `aap.cluster.audit` (`write`), script
+`evaluations/arkos/approval_proof.py`:
+
+| Proof | Raw answer |
+|---|---|
+| Approve | request shown after 10 s, `POST /session.approval` approve answers 200 `{"status":"submitted"}`, session COMPLETED |
+| Answered request id again | 409 `{"code":"approval_not_pending", ...}` (R-540) |
+| Made-up request id | 409 `{"code":"approval_not_pending", ...}`, never a 500 (R-542 fixed) |
+| No answer for 330 s | `{"type":"approval_expired","request_id":"9a75ff43…","node":"a2a-tekos"}` reaches the stream; the run was then cancelled (cancel 200) |
+
+Not checked: that the AAP job of the approved run started on the AAP side. The script now runs the two stale probes after an
+approve and prints the expiry event and the event types seen after a silence. A first silent run (2026-11-07) had not logged
+the stream; the replay did.

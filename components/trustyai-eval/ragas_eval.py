@@ -22,13 +22,13 @@ Output: a JSON report on stdout and at REPORT_PATH. Observe-only by
 design - the report carries scores, not verdicts; thresholds and pass/
 fail policy are explicitly deferred by ADR-0534's Non-goals.
 
-Env (all have working in-cluster defaults):
+Env (in-cluster defaults unless marked required):
   UNIFAI_RAG_URL    default http://unifai-rag-server.zuno-unifai.svc:13456
   UNIFAI_RAG_TAG    default knowledge.tech
   KEYCLOAK_TOKEN_URL
-                    default the in-cluster Keycloak Service's zuno realm
-                    token endpoint (the issuer stays the public https one,
-                    see persona_token())
+                    required, the public https token endpoint of the zuno
+                    realm (the trustyai-config chart derives it from
+                    clusterBaseDomain; ADR-0602 clause 6 / WP-224)
   EVAL_CLIENT_ID    default zuno-evaluations
   EVAL_CLIENT_SECRET  required, the client's secret
   EVAL_PERSONA      default eval-consultant-01 (WP-169) - retrieval quality must be
@@ -57,10 +57,12 @@ import httpx
 
 UNIFAI_RAG_URL = os.getenv("UNIFAI_RAG_URL", "http://unifai-rag-server.zuno-unifai.svc:13456")
 UNIFAI_RAG_TAG = os.getenv("UNIFAI_RAG_TAG", "knowledge.tech")
-KEYCLOAK_TOKEN_URL = os.getenv(
-    "KEYCLOAK_TOKEN_URL",
-    "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/token",
-)
+# ADR-0602 clause 6 / WP-224: always the public HTTPS token endpoint (the
+# chart sets it from clusterBaseDomain). No in-cluster http:// default: a
+# token minted there carries iss=http://zuno-service..., refused by every
+# consumer pinned on the https issuer, and the persona password would cross
+# the network unencrypted.
+KEYCLOAK_TOKEN_URL = os.getenv("KEYCLOAK_TOKEN_URL", "")
 EVAL_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
 EVAL_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET", "")
 EVAL_PERSONA = os.getenv("EVAL_PERSONA", "eval-consultant-01")
@@ -129,10 +131,12 @@ def persona_token(client: httpx.Client) -> str:
     """A fresh access token for EVAL_PERSONA. Fetched per question: a run
     outlives Keycloak's short access-token lifespan.
 
-    X-Forwarded-Proto: Keycloak takes the issuer's scheme from the request,
-    so a token fetched over the in-cluster http Service carries
-    iss=http://<public host>/realms/zuno, which UnifAI rejects (401, live
-    2026-10-23). The header makes it the public https issuer."""
+    The token is fetched over the public https Route (ADR-0602 clause 6 /
+    WP-224), so its iss is the https issuer UnifAI pins. X-Forwarded-Proto
+    is kept as a belt-and-braces for an operator who points
+    KEYCLOAK_TOKEN_URL back at the in-cluster http Service: Keycloak takes
+    the issuer's scheme from the request, and an http one is rejected
+    (401, live 2026-10-23)."""
     resp = client.post(
         KEYCLOAK_TOKEN_URL,
         headers={"X-Forwarded-Proto": "https"},
@@ -198,6 +202,10 @@ def answer(client: httpx.Client, question: str, contexts: list[str]) -> str:
 
 
 def main() -> int:
+    if not KEYCLOAK_TOKEN_URL:
+        print("ERROR: KEYCLOAK_TOKEN_URL is required (https://keycloak.<domain>/realms/zuno/"
+              "protocol/openid-connect/token)", file=sys.stderr)
+        return 2
     if not EVAL_CLIENT_SECRET or not DEMO_PERSONA_PASSWORD:
         print("ERROR: EVAL_CLIENT_SECRET and DEMO_PERSONA_PASSWORD are required "
               "to sign in as the evaluation persona")

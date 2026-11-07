@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "30"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "mcp-git-forge.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "git-forge-mcp") }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -19,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: git-forge-mcp
+      {{- with include "mcp-git-forge.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: git-forge-mcp
       priorityClassName: zuno-workload-default
@@ -29,8 +36,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: git-forge-mcp
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "mcp-git-forge.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "mcp-git-forge.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

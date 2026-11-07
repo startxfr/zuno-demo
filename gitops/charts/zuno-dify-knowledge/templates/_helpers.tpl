@@ -2,3 +2,42 @@
 {{- define "zuno-dify-knowledge.imageTrigger" -}}
 {{- list (dict "from" (dict "kind" "ImageStreamTag" "name" (printf "%s:%s" (base .Values.image.repository) .Values.image.tag) "namespace" "zuno-ai-build") "fieldPath" "spec.template.spec.containers[?(@.name==\"zuno-dify-knowledge\")].image") | toJson -}}
 {{- end -}}
+
+{{/*
+ADR-0603 M16 (WP-226): the image reference of a first-party container. Called
+with an image values map (repository, tag, digest, pullPolicy). When a release
+has rendered `digest` (platform/supply-chain/render_release_digests.py), the
+reference is repository@digest and the pull policy IfNotPresent: the bytes are
+fixed, a re-pull adds nothing. Without a digest it stays repository:tag with the
+chart's pull policy, the ADR-0059 `:latest` path.
+*/}}
+{{- define "zuno-dify-knowledge.imageRef" -}}
+{{- if .digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .digest) -}}
+{{- fail (printf "image digest %q is not sha256:<64 hex>" .digest) -}}
+{{- end -}}
+{{- printf "%s@%s" .repository .digest -}}
+{{- else -}}
+{{- printf "%s:%s" .repository .tag -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "zuno-dify-knowledge.imagePullPolicy" -}}
+{{- if .digest -}}IfNotPresent{{- else -}}{{ .pullPolicy }}{{- end -}}
+{{- end -}}
+
+{{/*
+ADR-0603 M16 (WP-226 review): pod-template annotations naming the rendered
+digests. The Applications ignore /spec/template/spec/containers/0/image (the
+:latest image trigger patches it), so a release moving @A to @B changes no
+field ArgoCD compares; this annotation does, and rolls the pods. Empty when no
+digest is rendered, so the :latest path renders exactly as before.
+*/}}
+{{- define "zuno-dify-knowledge.digestAnnotations" -}}
+{{- if .image.digest }}
+zuno.io/image-digest: {{ .image.digest | quote }}
+{{- end }}
+{{- if and .okf .okf.fetch .okf.fetch.image .okf.fetch.image.digest }}
+zuno.io/okf-fetch-image-digest: {{ .okf.fetch.image.digest | quote }}
+{{- end }}
+{{- end -}}

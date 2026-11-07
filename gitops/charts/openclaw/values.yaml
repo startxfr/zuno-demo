@@ -29,6 +29,15 @@ assistants:
 namespacePrefix: zuno-claw-
 clawName: assistant
 
+# ADR-0602/WP-223: each persona namespace's own SecretStore
+# (templates/secretstores.yaml). serviceName is the Vault client Service, fixed
+# by the forced releaseName in gitops/apps/vault/application-d1.yaml; tls
+# matches gitops/charts/external-secrets secretStores.tls. Each persona needs
+# its namespace and keys in platform/vault/secret-access.yaml.
+vaultSecretStore:
+  serviceName: zuno-vault
+  tls: true
+
 images:
   openclaw: ghcr.io/openclaw/openclaw@sha256:8789721d2e9b24b780a1504b56deb4c6bd5c7dbf96a1dd117e7c45c2ed72c8ac
   oauth2Proxy: quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916

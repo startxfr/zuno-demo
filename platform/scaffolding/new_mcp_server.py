@@ -6,7 +6,7 @@ streamable-HTTP transport, `GatewayTokenMiddleware`, `/healthz`,
 directory-by-directory.
 
 Generates:
-  - components/mcp-servers/<name>/{server.py,requirements.txt,Dockerfile,
+  - components/mcp-servers/<name>/{server.py,requirements.in,Dockerfile,
     README.md,tests/test_mcp_protocol.py}
   - gitops/charts/mcp-<name>/{Chart.yaml,values.yaml,templates/*}
   - gitops/apps/mcp-<name>/{application-d0.yaml,application-d1.yaml}
@@ -175,7 +175,9 @@ app.mount("/", mcp_asgi_app)
 '''
 
 
-def _requirements_txt() -> str:
+def _requirements_in() -> str:
+    # ADR-0603 M20 (WP-226): the direct dependencies; requirements.txt is the
+    # hashed lock compiled from it (platform/python/compile_locks.py).
     return "fastapi==0.141.1\nuvicorn[standard]==0.32.0\nhttpx==0.28.1\nmcp==2.0.0\n"
 
 
@@ -191,7 +193,7 @@ FROM ${BASE_IMAGE}
 # build time - apt upgrade picks up patched OS packages, pip upgrade picks
 # up patched pip/setuptools/wheel.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \\
-    pip install --no-cache-dir --upgrade pip setuptools wheel
+    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
 
 WORKDIR /app
 COPY requirements.txt .
@@ -225,7 +227,7 @@ shared technical credential sourced from an `ExternalSecret` resolving
 `zuno/{name}/technical`. Edit `server.py`/the chart together if this
 integration needs more than one credential or a different auth mode.
 
-See `server.py`, `Dockerfile`, `requirements.txt`,
+See `server.py`, `Dockerfile`, `requirements.in` (and its hashed lock `requirements.txt`),
 `tests/test_mcp_protocol.py`. Deployed by `gitops/charts/mcp-{name}` in
 the `zuno-ai-run` namespace.
 """
@@ -379,7 +381,8 @@ resources:
 credentials:
   vaultPath: {name}/technical
   secretName: {name}-technical-credentials
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h
 """
 
@@ -480,9 +483,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "25"
 spec:
   refreshInterval: {{{{ .Values.credentials.refreshInterval }}}}
+  # ADR-0602/WP-223: the namespace's own SecretStore; the key must be listed
+  # for this namespace in platform/vault/secret-access.yaml.
   secretStoreRef:
     name: {{{{ .Values.credentials.secretStoreName }}}}
-    kind: ClusterSecretStore
+    kind: SecretStore
   target:
     name: {{{{ .Values.credentials.secretName }}}}
     creationPolicy: Owner
@@ -592,7 +597,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-142"
 spec:
-  project: zuno
+  # ADR-0602 clause 5 / WP-224: workloads live in zuno-apps (no cluster-scoped
+  # kind, no openshift-gitops destination).
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -601,7 +608,7 @@ spec:
       releaseName: zuno-mcp-{name}-d0
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: zuno-ai-run
   syncPolicy:
     automated:
       prune: true
@@ -622,7 +629,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-141"
 spec:
-  project: zuno
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -651,7 +658,7 @@ spec:
 
 FILES = {
     "components/mcp-servers/{name}/server.py": lambda n, d: _server_py(n, d),
-    "components/mcp-servers/{name}/requirements.txt": lambda n, d: _requirements_txt(),
+    "components/mcp-servers/{name}/requirements.in": lambda n, d: _requirements_in(),
     "components/mcp-servers/{name}/Dockerfile": lambda n, d: _dockerfile(),
     "components/mcp-servers/{name}/README.md": lambda n, d: _readme_md(n, d),
     "components/mcp-servers/{name}/tests/test_mcp_protocol.py": lambda n, d: _test_mcp_protocol_py(n),
@@ -698,6 +705,8 @@ def main() -> int:
 
     print(
         f"\nScaffolded '{name}'. Next steps:\n"
+        f"  0. Compile the hashed lock the Dockerfile installs (pip-tools, ADR-0603): "
+        f"python3 platform/python/compile_locks.py components/mcp-servers/{name}\n"
         f"  1. Replace example_tool in components/mcp-servers/{name}/server.py with real tools.\n"
         f"  2. Add capabilities to platform/bindings/tools/tool-bindings.yaml and policies/tools/tool-policy.yaml.\n"
         f"  3. Add a matrix entry to .github/workflows/build-publish.yml if this server is NOT under "
@@ -708,6 +717,8 @@ def main() -> int:
         f"flag this if forgotten).\n"
         f"  5. Add a '{name} MCP server tests' step to .github/workflows/lint.yml's python job.\n"
         f"  6. Seed zuno/{name}/technical in ansible/roles/vault/tasks/install.yml.\n"
+        f"  7. Grant {name}/technical to the chart's namespace in platform/vault/secret-access.yaml "
+        f"(ADR-0602/WP-223; python3 platform/vault/check_secret_access.py fails until you do).\n"
     )
     return 0
 

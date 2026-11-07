@@ -12,7 +12,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-196"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -41,7 +41,13 @@ spec:
         # chart's raw placeholder default, live-confirmed 2026-09-03 as a
         # 503 on the ADR-0511/WP-54 quota-demo route (Tekos-only at the
         # time).
+        # ADR-0602 clause 6 / WP-224: the quota route's AuthPolicy validates
+        # tokens over https://keycloak.<this domain> (OIDC discovery), which
+        # Authorino trusts only on the Let's Encrypt certificate - mirror of
+        # gitops/apps/keycloak/application-d1.yaml ingress.acmeWildcardTLS.
+        clusterBaseDomain: apps.mycluster.example.com
         quotaEnforcement:
+          keycloakAcmeWildcardTLS: true
           routes:
             - name: tekos-quota-demo
               hostname: tekos-quota-demo.apps.mycluster.example.com

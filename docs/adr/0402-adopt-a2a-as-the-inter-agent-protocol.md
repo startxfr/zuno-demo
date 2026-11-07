@@ -1,6 +1,6 @@
 # ADR-0402: Adopt A2A as the inter-agent protocol
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-07, WP-173, WP-174: Arkos to Tekos delegation runs over A2A live on demo333, through the zuno a2a-gateway; the fork A2A server was dropped by decision on 2026-11-05)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -53,3 +53,9 @@ still waits for WP-173, because the operator refuses it and the platform does no
 The A2A server in the fork (WP-173 step 4) is dropped by decision of the user: the zuno a2a-gateway serves the agents, and the
 fork stays an A2A client only. "Receiving a delegation therefore needs an A2A server in the fork" above no longer holds. The
 delegating run is delivered by the fork's client work (R-535 in the fork's roadmap, WP-173 steps 1 to 3 and 5).
+
+## Update (2026-11-07) - Implemented
+
+The four decisions that rely on this vocabulary are `Implemented`: [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md),
+[ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) and [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md). WP-173 and WP-174 are Done: the fork's A2A client delegates, the
+zuno a2a-gateway serves the target, and no bespoke inter-agent contract was introduced.

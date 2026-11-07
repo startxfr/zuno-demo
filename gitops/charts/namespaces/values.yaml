@@ -7,6 +7,13 @@ namespace:
 policy:
   enabled: false
 
+# ADR-0602 / WP-224: the cluster's apps domain, for the EgressFirewall rules
+# that name Keycloak's public host and this cluster's own Routes
+# (templates/egressfirewall-namespace.yaml). The d1 Application passes
+# apps.mycluster.example.com, which ansible/tasks/apply_gitops_app.yml
+# substitutes; empty renders no EgressFirewall.
+clusterBaseDomain: ""
+
 # ADR-0329 (supersedes ADR-0023): agent workloads no longer get a
 # dedicated zuno-agent-<name> namespace. Every active agent's FE/BFF
 # deploys into the shared zuno-ai-run namespace instead (see
@@ -100,11 +107,34 @@ platformNamespaces:
       # ADR-0354: AAP Gateway's OIDC authenticator and any in-cluster
       # JWKS/token-endpoint calls to Keycloak (WP-072/WP-073).
       - zuno-aap
-    # Sidecar-injected + mTLS-enforced (service-mesh component, phase 3).
+    # Sidecar-injected (service-mesh component, phase 3). mTLS is enforced
+    # by peerAuthentication below, not by injection alone.
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
+    # ADR-0602 / WP-224: templates/peerauthentication-namespace.yaml. The mode
+    # is STRICT since the live rehearsal (demo333, 2026-11-06); ports are container ports.
+    peerAuthentication:
+      mode: STRICT
+      exceptions:
+        - name: keycloak-http-from-router
+          selector:
+            app: keycloak
+            app.kubernetes.io/instance: zuno
+          ports: [8080]
+          reason: >-
+            The router (Route zuno-lh5fs, edge TLS, keycloak.<domain>) forwards
+            plaintext to 8080; unmeshed zuno-aap (AAP Gateway OIDC, ADR-0354)
+            is also allowed in by this namespace's NetworkPolicy.
+        - name: redis-metrics-from-monitoring
+          selector:
+            app.kubernetes.io/instance: zuno-redis
+            app.kubernetes.io/name: redis
+          ports: [9121]
+          reason: >-
+            OpenShift monitoring (ServiceMonitor zuno-redis, port http-metrics)
+            scrapes the redis exporter without a sidecar.
   - name: zuno-vault
     displayName: Zuno Vault
     description: >-
@@ -132,8 +162,8 @@ platformNamespaces:
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # vault: ESO's ClusterSecretStore
-    # controller. keycloak: dedicated postgres database, ADR-0315.
+    # vault: ESO's SecretStore controller (ADR-0602/WP-223: one store per
+    # namespace, the controller still runs in zuno-vault). keycloak: dedicated postgres database, ADR-0315.
     # redhat-ods-applications: maas-api's dedicated maas database on
     # zuno-postgresql (MaaS prerequisite - see
     # gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml).
@@ -171,11 +201,31 @@ platformNamespaces:
     # forever, same failure class as ESO's secretstore-validate webhook
     # above.
     allowApiServerWebhooks: true
-    # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
+    # Sidecar-injected (service-mesh component, phase 2). mTLS is enforced by
+    # peerAuthentication below, not by injection alone.
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
+    # ADR-0602 / WP-224: templates/peerauthentication-namespace.yaml. PostgreSQL
+    # 5432/8432 never reach the sidecar (excludeInboundPorts, gitops/charts/
+    # postgresql/templates/postgrescluster.yaml), so their unmeshed callers
+    # (zuno-aap, zuno-dify, zuno-kagent, redhat-ai-gateway-infra) need no
+    # exception. STRICT since the live rehearsal (demo333, 2026-11-06).
+    peerAuthentication:
+      mode: STRICT
+      exceptions:
+        - name: postgres-instance-exporter-and-patroni
+          selector:
+            postgres-operator.crunchydata.com/cluster: zuno-postgresql
+            postgres-operator.crunchydata.com/data: postgres
+          ports: [9187, 8008]
+          reason: >-
+            9187: OpenShift monitoring (PodMonitor postgres-exporter, port
+            exporter) scrapes without a sidecar. 8008: Patroni members call each
+            other's REST API by pod IP through the portless headless Service
+            zuno-postgresql-pods, which the sidecar forwards as plaintext
+            passthrough, never as mTLS.
   - name: zuno-monitoring
     displayName: Zuno Infra AI Monitoring
     description: >-
@@ -364,6 +414,144 @@ platformNamespaces:
       # ADR-0535/WP-111: see zuno-ai-build's identical comment above -
       # policy.rhtas.com/include deliberately not set (live finding: the
       # webhook's digest-format gate isn't governed by spec.mode: warn).
+    # ADR-0602 / WP-224: templates/peerauthentication-namespace.yaml. The MCP
+    # servers (aap-mcp, confluence-mcp, git-forge-mcp, k8s-mcp,
+    # diagram-render) take no exception: their only caller is mcp-gateway, in
+    # the mesh. EPP gRPC 9002 is already sidecar-excluded by KServe. The mode
+    # is STRICT since the live rehearsal (demo333, 2026-11-06); ports are container ports.
+    peerAuthentication:
+      mode: STRICT
+      exceptions:
+        - name: ai-gateway-from-unmeshed-clients
+          selector:
+            app.kubernetes.io/name: ai-gateway
+          ports: [8080]
+          reason: >-
+            Unmeshed callers: zuno-unifai (multiagent, worker), the experience
+            namespaces (zuno-openwebui, zuno-dify, zuno-kagent token proxies)
+            and openshift-lightspeed.
+        - name: mcp-gateway-from-unmeshed-clients
+          selector:
+            app.kubernetes.io/name: mcp-gateway
+          ports: [8080]
+          reason: >-
+            Unmeshed callers: zuno-unifai (multiagent), the experience
+            namespaces, zuno-playground (OGX servers) and openshift-lightspeed.
+        - name: a2a-gateway-from-unifai
+          selector:
+            app.kubernetes.io/name: a2a-gateway
+          ports: [8080]
+          reason: Unmeshed caller zuno-unifai (multiagent delegations, ADR-0406).
+        - name: vllm-workloads-own-tls
+          selector:
+            app.kubernetes.io/part-of: llminferenceservice
+            kserve.io/component: workload
+          ports: [8000]
+          reason: >-
+            vLLM serves its own TLS on 8000: the MaaS gateway (openshift-ingress,
+            another mesh), ai-gateway (excludeOutboundPorts 8000), openshift-
+            lightspeed and the OpenShift/RHOAI monitoring scrapes (PodMonitors
+            *-kserve-llmisvc-engine) send TLS, never Istio mTLS.
+        - name: epp-metrics-from-monitoring
+          selector:
+            app.kubernetes.io/part-of: llminferenceservice
+            app.kubernetes.io/component: llminferenceservice-router-scheduler
+          ports: [9090]
+          reason: >-
+            OpenShift monitoring (ServiceMonitors kserve-llm-isvc-scheduler*,
+            port metrics) and redhat-ods-monitoring scrape the EPP without a
+            sidecar.
+        - name: embeddings-from-unmeshed-clients
+          selector:
+            serving.kserve.io/inferenceservice: embeddings
+          ports: [8080]
+          reason: >-
+            zuno-unifai (rag, rag-celery, multiagent) calls it over plain HTTP and
+            OpenShift monitoring scrapes it (ServiceMonitors embeddings-metrics,
+            vllm-predictors); neither is in the mesh.
+        - name: guardrails-from-router
+          selector:
+            app: zuno-guardrails
+          ports: [8000]
+          reason: The router forwards plaintext to 8000 (Route zuno-guardrails, edge TLS).
+        - name: guardrails-smoke-from-router-and-monitoring
+          selector:
+            app: zuno-guardrails-smoke
+          ports: [8080]
+          reason: >-
+            The router (Route zuno-guardrails-smoke-built-in, edge TLS) and
+            OpenShift monitoring (ServiceMonitor zuno-guardrails-smoke-service-
+            monitor) reach 8080 without a sidecar (5761 plaintext requests in 24 h
+            on 2026-11-06).
+        - name: evalhub-from-router-and-monitoring
+          selector:
+            app: eval-hub
+            instance: zuno-evalhub
+          ports: [8443, 8081]
+          reason: >-
+            8443: the router re-encrypts to it (Route zuno-evalhub). 8081:
+            OpenShift monitoring (ServiceMonitor zuno-evalhub-metrics) scrapes it
+            (5760 plaintext requests in 24 h on 2026-11-06).
+    # ADR-0602 / WP-224 and ADR-0590: templates/egressfirewall-namespace.yaml.
+    # Hosts verified against the live demo333 configuration on 2026-11-06.
+    egressFirewall:
+      # k8s-mcp, the EPP schedulers (InferencePool watch), eval-hub (Jobs),
+      # kube-rbac-proxy (SubjectAccessReview) and ai-gateway model readiness.
+      apiServer: true
+      # Gateways' JWKS and issuer (public Route since WP-224), acceptance-gate
+      # Jobs' token requests (KEYCLOAK_URL).
+      keycloak: true
+      routeHosts:
+        - name: unifai-ui-zuno-unifai
+          reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).
+      hosts:
+        - dnsName: api.openai.com
+          reason: ai-gateway provider openai (provider-routing.yaml, langchain_openai default).
+        - dnsName: generativelanguage.googleapis.com
+          reason: ai-gateway provider gemini (langchain_google_genai default).
+        - dnsName: api.anthropic.com
+          reason: ai-gateway provider anthropic (langchain_anthropic default).
+        - dnsName: api.mistral.ai
+          reason: ai-gateway providers mistral and mistral-codestral (ExternalName Service mistral-large).
+        - dnsName: oai.endpoints.kepler.ai.cloud.ovh.net
+          reason: ai-gateway providers ovhcloud-gpt-oss-120b and ovhcloud-sdxl (ExternalName Service gpt-oss-120b-ovhcloud).
+        - dnsName: startxfr.atlassian.net
+          reason: confluence-mcp (confluence-technical-credentials url).
+        - dnsName: api.github.com
+          reason: git-forge-mcp GitHub REST API (PyGithub default).
+        - dnsName: gitlab.com
+          reason: git-forge-mcp GitLab REST API (git-forge-gitlab-technical-credentials url).
+        - dnsName: s3.eu-west-2.amazonaws.com
+          reason: KServe storage-initializer of every model (S3_ENDPOINT/AWS_ENDPOINT_URL).
+        - dnsName: zuno-demo-sources.s3.eu-west-2.amazonaws.com
+          reason: Virtual-hosted name of the model bucket (storageUri s3://zuno-demo-sources).
+        # okf-fetch init containers (a2a-gateway, mcp-gateway) pull the signed
+        # OKF bundles from quay.io/zuno/okf-* and verify them with cosign
+        # --offline; blobs are redirected to Quay's CDN. Found live 2026-11-07:
+        # without these a new gateway pod stays in Init:CrashLoopBackOff.
+        - dnsName: quay.io
+          reason: okf-fetch pulls the signed OKF bundles (quay.io/zuno/okf-*) and their cosign signatures.
+        - dnsName: cdn01.quay.io
+          reason: Quay blob redirects for the same OKF bundle pulls.
+        - dnsName: cdn02.quay.io
+          reason: Quay blob redirects for the same OKF bundle pulls.
+        - dnsName: cdn03.quay.io
+          reason: Quay blob redirects for the same OKF bundle pulls.
+        # TEMPORARY (WP-224 rehearsal, 2026-11-07): only the acceptance-gate Job
+        # (ansible/roles/agents/tasks/run_acceptance_gate.yml) pip-installs its
+        # requirements from PyPI at start-up; garak and ragas run from built
+        # images. Both hosts sit behind Fastly, so the IP-level allow also admits
+        # other Fastly-hosted sites for every pod in the namespace. Remove both
+        # once the gate runs from a prebuilt image with hash-pinned dependencies.
+        - dnsName: pypi.org
+          reason: TEMPORARY - runtime pip install of the acceptance-gate Job only (Fastly IPs, shared); remove once the gate image is prebuilt.
+        - dnsName: files.pythonhosted.org
+          reason: TEMPORARY - package downloads for the same acceptance-gate pip install (Fastly IPs, shared).
+      # mcp-salesforce is not deployed on demo333; enabling it requires the
+      # org's instance host (from the Vault secret's url).
+      salesforce:
+        enabled: false
+        instanceHost: ""
   - name: zuno-mesh
     displayName: Zuno Infra Service Mesh
     description: >-

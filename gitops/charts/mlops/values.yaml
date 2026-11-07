@@ -23,7 +23,11 @@ images:
     repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mlops
     # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
     tag: latest
+    # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
+    # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
+    digest: ""
     # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
+    # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
     #
     # WP-087: this key was indented one level too far LEFT (a sibling of
     # `mlops:`, not a child), while files/pipeline.py.tpl has always read
@@ -41,9 +45,10 @@ images:
 externalSecrets:
   enabled: true
   refreshInterval: 1h
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
   storeRef:
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: SecretStore
+    name: vault
 
 # Same bucket/credential convention the retired rag-ingestion component already
 # established (ADR-0330) - not a new storage system (ADR-0302 point 3).

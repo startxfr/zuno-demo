@@ -10,7 +10,7 @@
   ansible.builtin.uri:
     url: "{{ _kc_api }}/clients?clientId=openclaw-{{ _openclaw_persona.name }}"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   register: _kc_client
   no_log: true
 
@@ -26,7 +26,7 @@
   ansible.builtin.uri:
     url: "{{ item }}"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop:
     - "{{ _kc_api }}/clients/{{ _kc_client.json[0].id }}/service-account-user"
     - "{{ _kc_api }}/users?username={{ _openclaw_persona.name }}&exact=true"
@@ -37,7 +37,7 @@
   ansible.builtin.uri:
     url: "{{ _kc_api }}/users/{{ item }}/groups?max=500"
     headers: "{{ _kc_headers }}"
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop:
     - "{{ _kc_users.results[0].json.id }}"
     - "{{ _kc_users.results[1].json[0].id }}"
@@ -50,7 +50,7 @@
     method: PUT
     headers: "{{ _kc_headers }}"
     status_code: [204]
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
   loop: "{{ _kc_groups.results[1].json | rejectattr('id', 'in', _kc_groups.results[0].json | map(attribute='id') | list) | list }}"
   loop_control:
     label: "{{ item.path }}"
