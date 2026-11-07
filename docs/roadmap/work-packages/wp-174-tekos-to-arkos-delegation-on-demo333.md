@@ -184,3 +184,12 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   without intervention. R-539 replayed: with a session `approve_all` rule the worker logs `approve_all: True` and the delegated write still waited
   for the user (reject answered, nothing ran), so an auto-approval does not cross the hop. R-538 (cap of 3 requests per session) was not reachable
   live because Arkos stops after the first refusal; accepted as covered upstream. The remaining ADR-0409 proofs are all closed or accepted.
+
+## Progress (2026-11-07): UnifAI 0.1.63 breaks the approval relay on Redis
+
+UnifAI 0.1.63 was pinned on demo333 on 2026-11-07 (acceptance gate 18/18). The same day the UnifAI team found that on Redis,
+`POST /session.approval` answers HTTP 500 to every decision: the endpoint calls `channel.is_pending()` first and the Redis
+channel proxy only has `submit()`. The human approval of a delegated write (ADR-0409, step 5 of the relay) therefore does
+not work on 0.1.63; it worked on 0.1.61 and 0.1.62. The gate does not cover this case. Decision (user, 2026-11-07): keep
+0.1.63 in place and wait for 0.1.64; no approval proof, no release from `devel` until then. The live proof of R-540 (409
+`approval_not_pending` on a stale request) waits for 0.1.64 as well.
