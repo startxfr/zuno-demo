@@ -1,6 +1,6 @@
 # WP-241: Drift check, nfs-provisioner role and the ECK decision
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-07)
 - **ADRs:** [ADR-0608](../../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md)
 - **Depends on:** [WP-240](wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) (the regenerated known-good file and its `external:` section)
 - **Related:** [WP-224](wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) (hand-applied objects during its rollout)
@@ -45,3 +45,9 @@ that the repository does not explain.
   or owned.
 - A UnifAI install on a cluster without the `nfs` class fails at its precheck with that name.
 - ADR-0608 can then move to `Implemented`.
+
+## Result (2026-11-07)
+
+nfs-provisioner adopted live (no restart, no spec change, Subscription pinned Manual on v0.0.9), known-good
+regenerated, `make d3 check drift` clean and strict on demo333. ECK: uninstall after the 2026-11-09 demonstration
+(Subscription and CSV in openshift-operators), then remove its entry from `platform/drift/external-operators.yaml`.

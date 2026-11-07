@@ -111,7 +111,7 @@ operators:
     catalog: community-operators
     namespace: nfs-provisioner
     channel: alpha
-    approval: Automatic
+    approval: Manual
     class: alpha
     version: "0.0.9"
   - package: openshift-cert-manager-operator

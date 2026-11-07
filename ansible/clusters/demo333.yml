@@ -388,3 +388,7 @@ zuno_connectivity_link_channel: "stable-1.5"
 # edge from 1.4, so the switch is followed by deleting CSV kueue-operator.v1.4.3
 # by hand (CRDs, CRs and the operand stay); see the WP-195 K2 plan.
 zuno_kueue_channel: "stable-v1.5"
+
+# ADR-0608 clause 6 (WP-241): `make d3 check drift` fails on any finding. Switched on 2026-11-07 after the first
+# clean run (nfs-provisioner adopted, ECK listed in platform/drift/external-operators.yaml until its removal).
+zuno_drift_strict: true
