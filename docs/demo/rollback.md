@@ -19,6 +19,7 @@ release is undone by a restore or a forward fix, never by moving its pin back. I
 | UnifAI | catalog digest (`gitops/charts/unifai/values.yaml`), stack images in `ansible/clusters/demo333.yml` (`zuno_unifai_values.stack.images`) | stack images: `pin_unifai_images.py v<previous> --cluster demo333`, commit, `make d2 install unifai`; operator: forward fix only | MongoDB and Qdrant: `make d3 restore unifai` from the last backup when a release migrated them |
 | Lightspeed | OLM (GA, automatic); `OLSConfig` in the lightspeed-config chart | `OLSConfig`: `git revert`; operator: none | none |
 | World model | `zuno_world_model_enabled` in `ansible/clusters/demo333.yml` (off today) | set it to `false` and run its role: the GPU node and the namespace go away (ADR-0604, tested once in WP-237) | weights stay in S3 |
+| Blender (workstation) | the Route `ai-gateway.apps.<domain>`, HTTPRoute, AuthPolicy and RateLimitPolicy (connectivity-link chart), the Keycloak client `blender`, `blender` in `experienceClients` (ADR-0610 clause 9) | remove the four edge objects from the connectivity-link values and push (the edge then answers 404); the add-on is a local file on the workstation | none on the platform |
 | nfs-provisioner | `startingCSV` + Manual (`gitops/charts/nfs-provisioner`) | operator: forward fix only; never uninstall while a PVC or PV uses `nfs` (the role refuses) | UnifAI's three shared volumes live on it |
 
 After any rollback: `make demo golden-path`, then `make d3 check operators` (the known-good gate) and
