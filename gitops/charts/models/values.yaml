@@ -1457,7 +1457,7 @@ externalModels:
   - name: mistral-large
     endpoint: api.mistral.ai
     provider: mistral
-    targetModel: mistral-large-latest
+    targetModel: mistral-large-4
     secretName: llm-provider-mistral-maas
     vault:
       path: providers/mistral

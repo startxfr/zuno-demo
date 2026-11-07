@@ -29,7 +29,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.4 | 30 | 4 | 31 | WP-101 |
 | v0.5 | 13 | — | 18 | WP-101 |
 | v0.6 | 4 | — | 6 | WP-101 |
-| v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
+| v0.7 | 9 | 1 | 19 | WP-115 |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
@@ -591,7 +591,7 @@ already fixed on that build (cause unconfirmed).
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-106 | [wp-106](work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md) | 0537 | none | Done (2026-09-03) | none — both phases live-verified 2026-09-02 (Dashboard hardware-profile badges shown for all five models; the annotation-triggered rollout incident recovered manually) |
-| WP-125 | [wp-125](work-packages/wp-125-external-models-through-maas.md) | 0541 | WP-27, WP-076, WP-106 | Repo work merged (blocked upstream, 2026-09-03) | none actionable today - root-cause the Envoy-proxy timeout to the real upstream through the MaaS gateway (see ADR-0541 Decision 1's 2026-09-03 note); do not attempt the `ai-gateway` cutover before then |
+| WP-125 | [wp-125](work-packages/wp-125-external-models-through-maas.md) | 0541 | WP-27, WP-076, WP-106 | Done (2026-11-07) | real completions through both MaaSModelRefs on RHOAI 3.6 (credential label `inference.llm-d.ai/ipp-managed`, Mistral on `mistral-large-4`); the ai-gateway cutover and the Finage test go to WP-219 |
 
 ### Phase 28 — TrustyAI evaluation and guardrails (added 2026-09-02)
 ADR-0534 extends the platform's existing TrustyAI integration (already

@@ -45,6 +45,16 @@ spec:
   target:
     name: {{ .secretName }}
     creationPolicy: Owner
+    # RHOAI 3.6 (WP-125, 2026-11-07): payload-processing's apikey-injection
+    # plugin only loads Secrets carrying inference.llm-d.ai/ipp-managed.
+    # Without it every ExternalModel call answers 500 "authType 'apikey'
+    # credentials not found". Merge keeps the api-key data from spec.data.
+    template:
+      mergePolicy: Merge
+      metadata:
+        labels:
+          zuno.io/managed-by: argocd
+          inference.llm-d.ai/ipp-managed: "true"
   data:
     - secretKey: api-key
       remoteRef:
