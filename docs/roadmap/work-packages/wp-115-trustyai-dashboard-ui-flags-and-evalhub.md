@@ -132,6 +132,12 @@ CR offers no pod annotation, label or automount knob.
 Evaluations page is used only against endpoints its job pods can reach without the KServe `DestinationRule` (a model
 outside the mesh, or an external OpenAI-compatible endpoint). No vendor report is filed.
 
+**Egress (user decision, 2026-11-07): no egress is opened for EvalHub.** A UI-launched run downloads its tokenizer and
+dataset at run time (`huggingface.co`, the Xet CDN `us.aws.cdn.hf.co`, and for ifeval `raw.githubusercontent.com`),
+and the zuno-ai-run EgressFirewall (WP-224, owned by ArgoCD through `gitops/charts/namespaces/values.yaml`) allows none
+of them. UI-launched evaluations are therefore not usable on demo333, by decision; the page, the RBAC and the
+NetworkPolicy stay in place for a cluster that allows that egress or pre-fills a cache PVC (like `lmeval-hf-cache`).
+
 Benchmark parameters that work in the form: `{"tokenizer": "Qwen/Qwen3.5-9B", "num_examples": 10}`, model name
 `qwen3.5-9b`. A run behind the zuno-ai-run firewall also needs `huggingface.co`, `us.aws.cdn.hf.co` (Xet) and, for
 ifeval, `raw.githubusercontent.com` (NLTK punkt_tab); those hosts were removed after the test and are not in git.
