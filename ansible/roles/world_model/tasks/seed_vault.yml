@@ -1,7 +1,19 @@
 ---
 # ADR-0604 (WP-235): the two secrets this experience generates, seeded only when missing
 # (vault_seed_if_missing.yml). keycloak/world-model is seeded by the vault role (experienceClients).
-# A short-lived ansible-seeder token (ADR-0602 clause 1), not the root token.
+# A short-lived ansible-seeder token (ADR-0602 clause 1), not the root token. vault_login.yml leaves the Vault pod lookup to
+# its caller: vault_seed_if_missing.yml execs into _vault_pod.
+- name: "world-model | locate the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+    field_selectors:
+      - status.phase=Running
+  register: _vault_pod
+
 - name: "world-model | log in to Vault as ansible-seeder"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
