@@ -22,10 +22,18 @@ WORKDIR /app
 # together. Unlike that image's cosign (keyless verify-blob only), this one
 # also signs, which is exactly why it runs as its own narrowly-scoped
 # identity (zuno-signer) rather than being folded into agent-runtime.
+#
+# ADR-0603 M18 (WP-226): the download is checked against the sha256 of the
+# release's cosign_checksums.txt (same pin and digest as
+# components/aap-execution-environment/Dockerfile); a mismatch fails the build.
+# Re-read the digest from the release's checksums file on any version bump,
+# never carry it forward.
 ARG COSIGN_VERSION=v2.4.1
+ARG COSIGN_SHA256=8b24b946dd5809c6bd93de08033bcf6bc0ed7d336b7785787c080f574b89249b
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sSL -o /usr/local/bin/cosign \
        "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+    && echo "${COSIGN_SHA256}  /usr/local/bin/cosign" | sha256sum -c - \
     && chmod +x /usr/local/bin/cosign \
     && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
@@ -36,10 +44,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # Sigstore trust root) and extracts it into an emptyDir. It needs oras, the
 # admission script and its trust material, laid out as in the repository so
 # the script finds platform/okf/sigstore/ from its own location.
+# Checksum from the release's oras_1.2.2_checksums.txt (ADR-0603 M18).
 ARG ORAS_VERSION=1.2.2
+ARG ORAS_SHA256=bff970346470e5ef888e9f2c0bf7f8ee47283f5a45207d6e7a037da1fb0eae0d
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
-    && curl -sSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" \
-       | tar -xz -C /usr/local/bin oras \
+    && curl -sSL -o /tmp/oras.tar.gz "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" \
+    && echo "${ORAS_SHA256}  /tmp/oras.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras && rm -f /tmp/oras.tar.gz \
     && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir pyyaml==6.0.2
 COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/

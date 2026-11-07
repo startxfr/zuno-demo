@@ -320,15 +320,14 @@
     # answers yet (no custom Lua health check exists for the
     # AnsibleAutomationPlatform CRD - observed live: the Application was
     # Healthy while the gateway pod was still failing its DB migration),
-    # so poll the real API before calling it. validate_certs false: the
-    # Route's edge certificate may be the router default rather than a
-    # publicly-trusted chain, and this is an admin call from the install
-    # shell, not a browser flow.
+    # so poll the real API before calling it. validate_certs follows
+    # zuno_validate_route_certs (ADR-0603 M3): the Route's edge certificate is
+    # the router default until ADR-0211's ACME wildcard is in place.
     - name: "aap | wait for the Gateway API to answer"
       ansible.builtin.uri:
         url: "{{ _aap_gateway_url }}/api/"
         method: GET
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_api_ping
       until: _aap_api_ping.status | default(0) == 200
@@ -342,7 +341,7 @@
         url_username: admin
         url_password: "{{ _aap_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_config_before
       no_log: true
@@ -372,7 +371,7 @@
             url_username: admin
             url_password: "{{ _aap_admin_password }}"
             force_basic_auth: true
-            validate_certs: false
+            validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
             body_format: json
             body:
               subscriptions_username: "{{ _aap_rhn_username }}"
@@ -408,7 +407,7 @@
             url_username: admin
             url_password: "{{ _aap_admin_password }}"
             force_basic_auth: true
-            validate_certs: false
+            validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
             body_format: json
             body:
               SUBSCRIPTIONS_USERNAME: "{{ _aap_rhn_username }}"
@@ -423,7 +422,7 @@
             url_username: admin
             url_password: "{{ _aap_admin_password }}"
             force_basic_auth: true
-            validate_certs: false
+            validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
             body_format: json
             body:
               subscription_id: "{{ _aap_chosen_sub.subscription_id }}"
@@ -440,7 +439,7 @@
         url_username: admin
         url_password: "{{ _aap_admin_password }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _aap_subscribe_verify
       no_log: true

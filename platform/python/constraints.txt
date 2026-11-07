@@ -1,0 +1,50 @@
+# ADR-0603 M20 (WP-226): one version per shared Python library across every
+# first-party component. Every requirements.in under components/ and
+# evaluations/ is compiled against this file:
+#
+#   python3 platform/python/compile_locks.py            # all components
+#   python3 platform/python/compile_locks.py components/ai-gateway
+#
+# which runs `pip-compile --generate-hashes` (pip-tools) with `-c` on this
+# file and writes the hashed requirements.txt next to each requirements.in.
+# A library listed here may appear in a lock at this version only;
+# platform/python/check_python_locks.py fails on any lock that drifts, and
+# on any library pinned at two versions in two locks (lint.yml).
+#
+# Bump a version here, then recompile every lock in the same commit.
+fastapi==0.141.1
+uvicorn==0.32.0
+pydantic==2.13.4
+PyJWT==2.13.0
+httpx==0.28.1
+PyYAML==6.0.2
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+# The rest of the OpenTelemetry 1.44 set (mcp pulls opentelemetry-api on its own).
+opentelemetry-api==1.44.0
+opentelemetry-proto==1.44.0
+opentelemetry-exporter-otlp-proto-common==1.44.0
+opentelemetry-semantic-conventions==0.65b0
+mcp==2.0.0
+kubernetes==35.0.0
+# Shared by ai-gateway and trustyai-eval (ragas 0.2 resolves these).
+langchain-core==0.3.86
+langchain-openai==0.2.14
+openai==1.109.1
+# The Google client stack of ai-gateway (langchain-google-genai 2.0 ->
+# google-ai-generativelanguage 0.6) caps protobuf below 6; the gateways that
+# reach protobuf through OpenTelemetry and a2a-sdk follow it.
+protobuf==5.29.6
+googleapis-common-protos==1.75.0
+google-api-core==2.33.0
+proto-plus==1.28.2
+# mlops validated its training stack on datasets 2.21 (see its requirements.in);
+# trustyai-eval (ragas 0.2, datasets unpinned) follows, and so does what
+# datasets 2.21 caps.
+datasets==2.21.0
+fsspec==2024.6.1
+dill==0.3.8
+multiprocess==0.70.16
+# langchain-core 0.3 caps packaging below 26; botocore caps python-dateutil below 3.
+packaging==25.0
+python-dateutil==2.9.0.post0

@@ -1,0 +1,44 @@
+boto3>=1.40,<2
+psycopg[binary]>=3.2,<4
+requests>=2.32,<3
+PyYAML>=6.0,<7
+httpx>=0.28,<0.29
+# GPU/training-only - imported lazily inside _run_lora_training so every
+# other stage (and this component's own unit tests) never need these
+# installed. CPU wheels are enough for MLOPS_CPU_SAFE=true; a real
+# training run targets a CUDA-capable node (the operator's own GPU
+# cluster, ADR-0301/0302's own explicit scope boundary).
+torch>=2.4,<3
+# >=5.16, NOT <5. Verified in the built image against the live cluster
+# (2026-08-27): no 4.x release knows this platform's training base at all -
+# 4.57.6 (the highest the old <5 ceiling resolved to) has neither
+# Qwen3_5ForConditionalGeneration nor `qwen3_5` in CONFIG_MAPPING_NAMES, so
+# EVERY Auto* class fails on the checkpoint, not just the one WP-34 picked.
+# transformers 5.0.0 still lacks it; 5.16.1 has both. The checkpoint ships
+# no custom modelling code (no auto_map, no .py files), so trust_remote_code
+# is not an escape either. API-compatibility was checked in the same image
+# before bumping: AutoTokenizer/Trainer/TrainingArguments/AutoModelFor*
+# all still exist, every TrainingArguments parameter this component passes
+# is still accepted, and peft imports cleanly against it.
+transformers>=5.16,<6
+peft>=0.13,<1
+datasets>=2.21,<3
+# >=1.1, not <1. transformers 5.x refuses to build TrainingArguments
+# without it - "Using the `Trainer` with `PyTorch` requires
+# accelerate>=1.1.0" - raised from __post_init__, so the failure lands the
+# moment the training stage constructs its arguments, after the base model
+# has already been downloaded and wrapped. A consequence of the
+# transformers bump above, not an independent choice.
+#
+# The rest of this file was re-validated against the built image at the
+# same time rather than bumped speculatively: torch 2.13, peft 0.20 and
+# datasets 2.21 all resolve and work with transformers 5.16.1 (accelerate
+# lands on 1.14), and TrainingArguments/Trainer/Dataset all construct.
+accelerate>=1.1,<2
+# The acceptance gate's scenario 19 imports the Kubernetes client
+# directly (evaluations/tekos/run_scenarios.py). Pinned to the same major
+# the gate's own requirements.txt pins, so the image and the standalone
+# gate Job exercise one version. Without it that scenario failed with a
+# bare "No module named 'kubernetes'" and counted against the ADR-0028
+# rate as if the agent had misbehaved.
+kubernetes>=35,<36

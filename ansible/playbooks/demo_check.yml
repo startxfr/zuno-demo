@@ -260,7 +260,7 @@
         url_username: admin
         url_password: "{{ _demo_check_aap_secret.resources[0].data.password | b64decode }}"
         force_basic_auth: true
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
       register: _demo_check_aap_wft
       ignore_errors: true

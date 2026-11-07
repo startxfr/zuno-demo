@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "60"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "ai-gateway.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "ai-gateway") }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -59,8 +62,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ai-gateway
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "ai-gateway.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "ai-gateway.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

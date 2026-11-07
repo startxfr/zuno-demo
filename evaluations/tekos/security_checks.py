@@ -386,6 +386,7 @@ def unifai_ignores_a_client_supplied_identity_header() -> CheckResult:
     deletes it); anything but 401 would be an impersonation."""
     import httpx as _httpx
 
+    # verify=False kept (ADR-0603 M3): the request carries no credential and asserts a refusal; lab Routes may serve the router default cert.
     with _httpx.Client(follow_redirects=False, timeout=20, verify=False) as c:
         resp = c.post(
             f"{_unifai().ui_url}/api2/sessions/user.session.create",

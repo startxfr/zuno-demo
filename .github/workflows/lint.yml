@@ -55,6 +55,16 @@ jobs:
       # (`make d2 check supply-chain`).
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
+      # ADR-0603 M20 (WP-226): every Python lock is hashed, fresh against its
+      # requirements.in, and one version per shared library.
+      - name: Hashed Python lockfiles, one version per library (ADR-0603)
+        run: |
+          python3 platform/python/check_python_locks.py
+          python3 platform/python/tests/test_check_python_locks.py
+      # ADR-0603 M16 (WP-226): a digest in a chart's values is a signed pin of
+      # a ledgered release, never a hand edit.
+      - name: Rendered image digests match the release ledger (ADR-0603)
+        run: python3 platform/supply-chain/render_release_digests.py --check
       - name: MCP server conformance (ADR-0119)
         run: python3 platform/supply-chain/check_mcp_server_conformance.py
       # ADR-0106/WP-165: OKF schema and policy validation, the quota-policy
@@ -117,6 +127,11 @@ jobs:
       # argument crash-looped qwen35-9b on 2026-10-25 (60d6e81e).
       - name: vLLM args survive the KServe start script
         run: python3 -m pytest -q platform/models/tests
+      # ADR-0603 M16 (WP-226): rendering a ledgered digest pins the Deployment
+      # (repository@digest, IfNotPresent, no :latest trigger); needs helm.
+      - name: render_release_digests.py tests (ADR-0603)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_render_release_digests.py
       # The check renders the keycloak and postgresql charts, which both depend
       # on the startx "operator" chart (alias:startx); keycloak's was built
       # above, postgresql's was not and `helm template` refused to render it.
@@ -275,7 +290,7 @@ jobs:
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |
-          pip install pyyaml httpx
+          pip install -r tekos/requirements.txt
           python3 tests/test_quality_gate.py
       - name: evaluations benchmark harness tests (ADR-0305)
         working-directory: evaluations
@@ -394,7 +409,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: pip install ansible && ansible-galaxy collection install kubernetes.core
+      # ADR-0603 M20 (WP-226): ansible pinned, collections from the pinned
+      # ansible/requirements.yml (installed to ~/.ansible/collections, which
+      # takes precedence over the copies bundled in the ansible package).
+      - run: pip install ansible==12.3.0 && ansible-galaxy collection install -r ansible/requirements.yml
       - name: Syntax-check every playbook
         run: |
           set -e

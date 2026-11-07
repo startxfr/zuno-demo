@@ -37,6 +37,6 @@
       ansible.builtin.uri:
         url: "https://{{ _aap_probe_route.resources[0].spec.host }}/api/"
         method: GET
-        validate_certs: false
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
         timeout: 5

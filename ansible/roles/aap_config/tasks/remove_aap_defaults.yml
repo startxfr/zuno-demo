@@ -22,7 +22,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _aap_config_defaults_lookup
   loop:
@@ -42,7 +42,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     # 204 = deleted synchronously; 202 = deletion accepted and queued as a
     # background task, which is what the Controller answers for Project
     # deletes on a fresh AAP install (ADR-0517 live finding, demo333

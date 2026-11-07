@@ -15,7 +15,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _wire_jt_lookup
   until: (_wire_jt_lookup.json.count | default(0) | int) > 0
@@ -30,7 +30,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _wire_jt_credential_lookup
   until: (_wire_jt_credential_lookup.json.count | default(0) | int) > 0
@@ -45,7 +45,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     status_code: 200
   register: _wire_jt_credentials
   no_log: true
@@ -57,7 +57,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       id: "{{ _wire_jt_credential_lookup.json.results[0].id }}"
@@ -81,7 +81,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       survey_enabled: true
@@ -121,7 +121,7 @@
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
     body_format: json
     body:
       allow_simultaneous: true

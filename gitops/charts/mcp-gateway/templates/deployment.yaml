@@ -8,8 +8,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "15"
+    {{- if not .Values.image.digest }}
+    {{- /* A digest-pinned image must not be rewritten by the :latest trigger. */}}
     image.openshift.io/triggers: |-
       {{ include "mcp-gateway.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "mcp-gateway") }}
+    {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -62,8 +65,8 @@ spec:
         # ADR-0580/WP-161: pull, verify offline, extract. Non-zero exit on any
         # verification failure keeps the pod in Init.
         - name: okf-fetch
-          image: "{{ .Values.okf.fetch.image.repository }}:{{ .Values.okf.fetch.image.tag }}"
-          imagePullPolicy: {{ .Values.okf.fetch.image.pullPolicy }}
+          image: {{ include "mcp-gateway.imageRef" .Values.okf.fetch.image | quote }}
+          imagePullPolicy: {{ include "mcp-gateway.imagePullPolicy" .Values.okf.fetch.image }}
           command:
             - python3
             - /app/platform/supply-chain/admit_okf_bundle.py
@@ -89,8 +92,8 @@ spec:
       {{- end }}
       containers:
         - name: mcp-gateway
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "mcp-gateway.imageRef" .Values.image | quote }}
+          imagePullPolicy: {{ include "mcp-gateway.imagePullPolicy" .Values.image }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

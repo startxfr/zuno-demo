@@ -1,0 +1,24 @@
+fastapi==0.141.1
+uvicorn[standard]==0.32.0
+pydantic==2.13.4
+PyJWT[crypto]==2.13.0
+httpx==0.28.1
+PyYAML==6.0.2
+langchain-core==0.3.86
+langchain-openai==0.2.14
+# ADR-0415: app/image_providers.py calls the `openai` SDK's Images API
+# directly (no LangChain wrapper exists for image generation) - already a
+# transitive dependency of langchain-openai above, pinned explicitly here
+# since this is now a direct import, not just a transitive one.
+# ADR-0603 M20 (WP-226): langchain-core, langchain-openai and openai moved to
+# the versions trustyai-eval resolves (one version per library, see
+# platform/python/constraints.txt); httpx 0.28 also needs openai >= 1.55.3.
+openai==1.109.1
+langchain-anthropic==0.2.3
+langchain-google-genai==2.0.4
+langchain-mistralai==0.2.1
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+# ADR-0104: semantic cache backend (Redis) and the embedding-service call
+# app/semantic_cache.py makes for its bucketing key.
+redis==8.1.0

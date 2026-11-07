@@ -4,7 +4,11 @@ image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ai-gateway
   # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
   tag: latest
+  # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
+  # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
+  digest: ""
   # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
+  # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always
 
 replicas: 1

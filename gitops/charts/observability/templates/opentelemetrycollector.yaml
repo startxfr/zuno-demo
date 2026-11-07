@@ -37,6 +37,7 @@ spec:
       otlp/tempo:
         endpoint: tempo-tempo.zuno-monitoring.svc.cluster.local:4317
         tls:
+          # ADR-0603 M3: kept - in-namespace hop to Tempo, which serves plain OTLP gRPC; spans carry no credential.
           insecure: true
       # ADR-0102 (roadmap WP-12): before this, every metric any service in
       # this repo emits (ai-gateway's

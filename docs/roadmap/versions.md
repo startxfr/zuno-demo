@@ -310,7 +310,7 @@ The band also holds the agent lifecycle: the `deprecated` and `retired` states, 
 
 The band also holds the security hardening that came out of the 2026-11-06 review: ADR-0602 (the findings that break a trust boundary: Vault, secret reach, mesh enforcement, GitOps scope, shared passwords, audience, guardrails, metering, delegated scope) and ADR-0603 (the medium findings, the supply chain and the hygiene gaps). Six work packages: quick wins first (WP-222), then secrets and identity (WP-223), network and GitOps (WP-224), the AI and agent surface (WP-225), the supply chain (WP-226) and a `hardened` deployment profile that switches them all on (WP-227).
 
-**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209 (Operator pending 2026-11-07), WP-221, WP-223 to WP-227 (WP-222 Done 2026-11-07, live checks waived).
+**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209 (Operator pending 2026-11-07), WP-221, WP-224 to WP-227 (WP-222 Done 2026-11-07, live checks waived; WP-223 Done 2026-11-07, demo333 Vault migrated; WP-224 rolled out 2026-11-07, Operator pending; WP-226 Operator pending 2026-11-07).
 
 ## v0.16
 

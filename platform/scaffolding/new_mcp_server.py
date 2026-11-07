@@ -6,7 +6,7 @@ streamable-HTTP transport, `GatewayTokenMiddleware`, `/healthz`,
 directory-by-directory.
 
 Generates:
-  - components/mcp-servers/<name>/{server.py,requirements.txt,Dockerfile,
+  - components/mcp-servers/<name>/{server.py,requirements.in,Dockerfile,
     README.md,tests/test_mcp_protocol.py}
   - gitops/charts/mcp-<name>/{Chart.yaml,values.yaml,templates/*}
   - gitops/apps/mcp-<name>/{application-d0.yaml,application-d1.yaml}
@@ -175,7 +175,9 @@ app.mount("/", mcp_asgi_app)
 '''
 
 
-def _requirements_txt() -> str:
+def _requirements_in() -> str:
+    # ADR-0603 M20 (WP-226): the direct dependencies; requirements.txt is the
+    # hashed lock compiled from it (platform/python/compile_locks.py).
     return "fastapi==0.141.1\nuvicorn[standard]==0.32.0\nhttpx==0.28.1\nmcp==2.0.0\n"
 
 
@@ -225,7 +227,7 @@ shared technical credential sourced from an `ExternalSecret` resolving
 `zuno/{name}/technical`. Edit `server.py`/the chart together if this
 integration needs more than one credential or a different auth mode.
 
-See `server.py`, `Dockerfile`, `requirements.txt`,
+See `server.py`, `Dockerfile`, `requirements.in` (and its hashed lock `requirements.txt`),
 `tests/test_mcp_protocol.py`. Deployed by `gitops/charts/mcp-{name}` in
 the `zuno-ai-run` namespace.
 """
@@ -656,7 +658,7 @@ spec:
 
 FILES = {
     "components/mcp-servers/{name}/server.py": lambda n, d: _server_py(n, d),
-    "components/mcp-servers/{name}/requirements.txt": lambda n, d: _requirements_txt(),
+    "components/mcp-servers/{name}/requirements.in": lambda n, d: _requirements_in(),
     "components/mcp-servers/{name}/Dockerfile": lambda n, d: _dockerfile(),
     "components/mcp-servers/{name}/README.md": lambda n, d: _readme_md(n, d),
     "components/mcp-servers/{name}/tests/test_mcp_protocol.py": lambda n, d: _test_mcp_protocol_py(n),
@@ -703,6 +705,8 @@ def main() -> int:
 
     print(
         f"\nScaffolded '{name}'. Next steps:\n"
+        f"  0. Compile the hashed lock the Dockerfile installs (pip-tools, ADR-0603): "
+        f"python3 platform/python/compile_locks.py components/mcp-servers/{name}\n"
         f"  1. Replace example_tool in components/mcp-servers/{name}/server.py with real tools.\n"
         f"  2. Add capabilities to platform/bindings/tools/tool-bindings.yaml and policies/tools/tool-policy.yaml.\n"
         f"  3. Add a matrix entry to .github/workflows/build-publish.yml if this server is NOT under "

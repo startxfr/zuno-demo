@@ -685,6 +685,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 admit agents RELEASE=v0.1.1 UPDATE_LOCK=1   # admit a zuno-demo-agents release and pin it (ADR-0580)' \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
+    'Example: make d3 release TAG=v0.2.0 RENDER_DIGESTS=1   # also writes the ledgered digests into the chart values (ADR-0603 M16; a deployment pin, needs the go)' \
     'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
   exit 0; \
 fi; \
@@ -749,7 +750,8 @@ case "$$verb" in \
     if [[ -z "$${TAG:-}" ]]; then echo "day3 release requires TAG=<release_tag>, e.g. TAG=v0.2.0 (must already be a real, pushed git tag)" >&2; exit 2; fi; \
     tag="$$TAG"; \
     aap_route job zuno-day3-release "{\"target_component\": \"$$component\", \"release_tag\": \"$$tag\"}"; rc=$$?; \
-    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_release.yml -e "target_component=$$component" -e "release_tag=$$tag" $(EXTRA_VARS); else exit $$rc; fi ;; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_release.yml -e "target_component=$$component" -e "release_tag=$$tag" $(EXTRA_VARS) || exit $$?; elif [[ $$rc -ne 0 ]]; then exit $$rc; fi; \
+    case "$${RENDER_DIGESTS:-0}" in 1|true|yes) python3 platform/supply-chain/render_release_digests.py --release "$$tag" ;; esac ;; \
   scenario-failover-node) \
     if [[ ! -t 0 ]]; then \
       echo "day3 scenario-failover-node requires an interactive terminal - it mutates live shared GPU infra and needs a human to confirm the failover before restoring (ADR-0536). Refusing to run non-interactively." >&2; \

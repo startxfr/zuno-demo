@@ -62,6 +62,16 @@ first path and never needs anything below this note.
    make day3|d3 release TAG=v0.2.0
    ```
 
+   **Rendering the digests (ADR-0603 M16, WP-226), opt-in.** The ledger is
+   what was built and signed; `RENDER_DIGESTS=1` (or
+   `platform/supply-chain/render_release_digests.py --release <tag>` after
+   the release) writes those digests into the charts' `digest` keys, so the
+   Deployments run `repository@sha256:...` with `IfNotPresent` and no
+   `:latest` trigger. Merged to `main`, that pins what ArgoCD deploys and
+   stops ADR-0059's auto-redeploy for those components until `--clear`. It
+   is a deployment decision: it needs the user's go for that release, like
+   every pin. A chart whose `digest` is empty renders exactly as before.
+
 This project has never cut a path-2 release: every GitOps `Application`
 (`gitops/apps/*/application.yaml`, `gitops/root-app-of-apps.yaml`) still
 tracks `targetRevision: main`. ADR-0115 wants that replaced with an

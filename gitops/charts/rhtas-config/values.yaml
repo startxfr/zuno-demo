@@ -70,6 +70,14 @@ policyOperand:
     # First-party images only (ADR-0535 Scope: Priority 1) -
     # image-registry.../zuno-ai-build/<name> covers all 14.
     imageGlob: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/**"
+    # ADR-0603 M17 (WP-226): `warn` reports an unsigned first-party image,
+    # `enforce` refuses it. Stays `warn` in git until the dry run on a test
+    # namespace is clean (WP-226 Operator pending); the switch is this one
+    # line. The policy only sees namespaces labelled
+    # policy.rhtas.com/include=true, and the webhook refuses tag references
+    # there in either mode, so a namespace opts in only once its charts
+    # render digests (platform/supply-chain/render_release_digests.py).
+    mode: warn
 
   # WP-178 / ADR-0586: cluster-side admission of the UnifAI images, with the same policy-controller. A
   # ClusterImagePolicy verifies the keyless signature of `quay.io/zuno/unifai-**` against the public Sigstore

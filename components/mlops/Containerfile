@@ -36,7 +36,12 @@ FROM ${BASE_IMAGE}
 
 USER 0
 COPY components/mlops/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+# ADR-0603 M20 (WP-226): requirements.txt is a hashed pip-compile lock. pip
+# is upgraded first, as in the other images: older pip releases refuse a lock
+# whose transitive requirements name an extra (`uvicorn` next to
+# `uvicorn[standard]`) in hash-checking mode.
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 
 COPY components/mlops/src/mlops.py /opt/app-root/src/mlops.py

@@ -35,3 +35,20 @@ zuno_security_profile: demo
 # text (raw table, always printed regardless) | json | csv. Override
 # per-run with EXTRA_VARS="-e report_format=<fmt>" or REPORT_FORMAT=<fmt>.
 day2_report_format: text
+
+# ADR-0603 M3 (WP-226): certificate verification of the calls Ansible makes to
+# the cluster's own Routes (*.apps.<domain>: Keycloak admin and password
+# grants, the AAP gateway, the component prechecks). Every such `uri` task
+# reads `validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"`.
+# Off by default for one lab-only reason: until ADR-0211's ACME wildcard is
+# issued (zuno_certmanager_acme_enabled, a per-cluster choice), the Routes
+# serve the router's self-signed default certificate, which no control host
+# trusts. demo333's Routes do carry the Let's Encrypt wildcard (checked
+# 2026-11-07: keycloak, aap, rh-ai, grafana verify with the system trust
+# store), so the switch to true is a WP-226 Operator pending step: one run
+# with EXTRA_VARS="-e zuno_validate_route_certs=true", then this default.
+# It lives here, not in ansible/clusters/<cluster>.yml, because most of the
+# roles concerned (aap, aap_config, kagent, dify, openclaw) do not load the
+# cluster file. Calls to in-cluster Services signed by the service CA keep
+# their own reason in place.
+zuno_validate_route_certs: false

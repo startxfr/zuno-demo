@@ -124,8 +124,10 @@ mechanism as `make d2 check supply-chain`) → record the release
 (`--record-release`, via `release_ledger.py` - a small module extracted
 from `pin_release.py`'s original ledger-writing logic, shared by both
 scripts). **No `values.yaml` or `gitops/apps/*/targetRevision` is ever
-written** - the `pinned-releases.yaml` ledger entry (real digest,
-`signed: true`, per component) is the release artifact.
+written** by the release itself - the `pinned-releases.yaml` ledger entry
+(real digest, `signed: true`, per component) is the release artifact.
+Rendering its digests into the chart values is the separate, opt-in step
+below (`render_release_digests.py`, ADR-0603).
 
 `check_release_ledger.py` validates that ledger's structural integrity -
 static, no cluster access, wired into `make day2|d2 check supply-chain`
@@ -140,6 +142,37 @@ python3 platform/supply-chain/check_release_ledger.py
 See [RELEASING.md](../../RELEASING.md)'s path 3 and
 [docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md](../../docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md)
 for the full design.
+
+## render_release_digests.py (ADR-0603 M16, WP-226)
+
+The consumer of the ledger. For one ledgered release it writes each pin's
+digest into the `digest` key next to the ledgered `tag` field of the chart
+values (`image.digest`, `okf.fetch.image.digest`, `images.mlops.digest`).
+The charts' `imageRef` helper then renders `repository@sha256:...`, pulls
+`IfNotPresent` and drops the `:latest` image trigger. With every `digest`
+empty (the default) the charts render byte for byte what they rendered
+before WP-226, so `main` keeps ADR-0059's `:latest` path until a release is
+rendered.
+
+Rendering pins what ArgoCD deploys, so it needs the user's go for that
+release and is never implicit: `make d3 release TAG=<tag> RENDER_DIGESTS=1`
+runs it after the ledger is written, or by hand:
+
+```bash
+python3 platform/supply-chain/render_release_digests.py --release v0.15.0 --dry-run
+python3 platform/supply-chain/render_release_digests.py --release v0.15.0
+python3 platform/supply-chain/render_release_digests.py --clear     # back to :latest
+python3 platform/supply-chain/render_release_digests.py --check     # lint.yml
+```
+
+It refuses (and writes nothing) when a pin has no `sha256:` digest (the
+historical `digest: null` entries), is not `signed: true`, or targets a chart
+without a `digest` key. `--check` fails on any first-party digest that is not
+a signed pin of the ledger for that chart and field. `tag_local_release.py`'s
+`COMPONENTS` now covers every chart that can render a digest (a2a-gateway,
+zuno-dify-knowledge, zuno-token-proxy, and supply-chain-signer for the two
+`okf-fetch` init containers were added). Tests:
+`python3 tests/test_render_release_digests.py` (uses helm when present).
 
 ## admit_okf_bundle.py / okf_narrowing.py (ADR-0578, ADR-0580)
 
