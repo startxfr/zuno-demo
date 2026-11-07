@@ -60,5 +60,7 @@ on a master has cascaded before). Then `make d2 build world-model`.
 
 ## Verification
 
-Tests pass locally; the image runs on CPU and `python -c "import torch, world_engine, diffusers"` succeeds in it; the
-smoke Job manifest passes `oc apply --dry-run=client`.
+Tests pass locally; the smoke Job manifest passes `oc apply --dry-run=client`. The image build checks that torch,
+diffusers (with `Flux2KleinPipeline`) and av import and that `world_engine`, `taehv` and `gemlite` are installed. It cannot
+import `world_engine`: `gemlite` queries the CUDA device at import time and a build pod has no NVIDIA driver (the first
+in-cluster build, 2026-11-07, failed on exactly that). The smoke Job (WP-232) is where `world_engine` is first imported.
