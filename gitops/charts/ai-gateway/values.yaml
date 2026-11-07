@@ -238,6 +238,8 @@ experienceClients:
   # ADR-0599/ADR-0600 (WP-202): through their zuno-token-proxy (ADR-0601).
   - dify
   - kagent
+  # ADR-0604 (WP-233): world-model prompt enhancement, C1 and local only.
+  - world-model
   - zuno-evaluations
   - zuno-stresstest
 

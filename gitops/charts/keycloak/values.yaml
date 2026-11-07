@@ -218,3 +218,5 @@ experienceClients:
   - name: openclaw-sale-01
   - name: dify
   - name: kagent
+  # ADR-0604 (WP-233): the world-model experience, user token passed through, no service account.
+  - name: world-model
