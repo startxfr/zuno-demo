@@ -124,6 +124,25 @@ class Delegation(unittest.TestCase):
         self.assertEqual(g.judge_delegation("").status, g.FAIL)
 
 
+class GuardrailsAndTrace(unittest.TestCase):
+    def test_detection_line_for_dify_passes(self):
+        log = ("INFO ai_gateway.guardrails guardrails clean (mode=observe): run_id= agent=open-webui contents=2\n"
+               "WARNING ai_gateway.guardrails guardrails DETECTED (mode=observe): run_id= agent=dify detections=['x']\n")
+        r = g.judge_guardrails(log)
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("mode=observe", r.detail)
+
+    def test_detection_for_another_client_does_not_count(self):
+        log = "guardrails DETECTED (mode=observe): run_id= agent=open-webui detections=['x']\n"
+        self.assertEqual(g.judge_guardrails(log).status, g.FAIL)
+
+    def test_trace(self):
+        self.assertEqual(g.judge_trace("", []).status, g.FAIL)
+        r = g.judge_trace("0" * 32, [{"name": "ai-gateway chat"}, {"name": "rag.search"}])
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("2 span(s)", r.detail)
+
+
 class Aggregate(unittest.TestCase):
     def test_last_json_line(self):
         self.assertEqual(g.last_json_line("noise\n{\"a\": 1}\ntrailing"), {"a": 1})
@@ -141,7 +160,9 @@ class Aggregate(unittest.TestCase):
 
     def test_every_moment_has_a_probe(self):
         self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "dify", "kagent",
-                                         "openclaw", "lightspeed", "delegation-approval", "world-model"})
+                                         "openclaw", "lightspeed", "guardrails", "trace", "delegation-approval",
+                                         "world-model"})
+        self.assertLess(list(g.PROBES).index("unifai-tekos"), list(g.PROBES).index("trace"))
 
 
 if __name__ == "__main__":
