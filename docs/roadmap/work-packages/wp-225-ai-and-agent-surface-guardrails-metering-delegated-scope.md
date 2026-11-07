@@ -59,7 +59,11 @@ metered paths off, so a merge changes no caller. The pod template gains three al
 (`GUARDRAILS_FAIL_CLOSED_FROM`, `GUARDRAILS_SCAN_TOOL_RESULTS`, `GUARDRAILS_STREAM_HOLD_BACK_CHARS`), so the sync rolls the pod once.
 
 Classification is not redone here. The guardrails mode, the fail-closed threshold and the eligibility of a metered path all use
-the effective level of WP-209: `app/classification_floor.py` raised by the ADR-0594 markers.
+the same effective level as a chat call: the client's model alias selects the task (ADR-0596), `app/classification_floor.py`
+applies the agent, task and per-client floors (WP-209), and the ADR-0594 markers of the tool results raise it. On the metered
+paths the markers are read from Anthropic `tool_result` blocks and Responses `*_call_output` items, with the chat path's raise and
+fail-closed rules; markers in `document` and `search_result` blocks raise the level too, but an unmarked one does not count as an
+unmarked tool result (it is supplied by the caller).
 
 ### What was built
 
@@ -71,24 +75,33 @@ the effective level of WP-209: `app/classification_floor.py` raised by the ADR-0
 2. **Tool results and RAG text (clause 8).** The scan covers the last user message plus the current turn's tool results and
    retrieved context. On chat that means the `tool` messages after the last user message. On Anthropic it means
    `tool_result`, `document` and `search_result` blocks. On Responses it means `*_call_output` items. A refusal names its
-   stage (`prompt`, `tool_result`, `retrieved` or `reply`). System prompts and earlier turns are still not sent. An earlier
-   turn's tool results were scanned in the turn that produced them. `guardrails.scanToolResults: false` restores the old
-   scan.
+   stage (`prompt`, `tool_result`, `retrieved`, `system` or `reply`). Earlier turns are not sent: their tool results were
+   scanned in the turn that produced them. **Shipped off** (`guardrails.scanToolResults: false`, in observe and block alike),
+   so a merge keeps today's scan of the last user message; a cluster turns it on with
+   `zuno_ai_gateway_guardrails_scan_tool_results`. In `block`, the metered paths also scan the system-level text (Anthropic
+   `system`; Responses `instructions` and `system`/`developer` input messages), where a client may carry retrieved context;
+   chat system prompts, and system text in `observe`, are still not sent.
 3. **Streams (clause 8).** In `block`, `app/stream_guard.py` holds a streamed reply back until
    `guardrails.streamHoldBackChars` characters are pending (400; 0 buffers the whole reply). It checks them with a
-   256-character overlap, so a pattern that straddles two segments is seen. A clean segment is released. On a detection it
-   ends the stream with the protocol's error event and closes the upstream:
+   256-character overlap, so a pattern that straddles two segments is seen. After a clean check the events are released
+   except those whose text reaches into the last 256 checked characters, so the first part of a match the next segment
+   completes is never sent; the tail goes out after the end-of-stream check. On a detection it ends the stream with the
+   protocol's error event and closes the upstream:
    - OpenAI chat: `data: {"error": ...}`, then `[DONE]`;
    - Anthropic: `event: error` with `{"type":"error","error":{...}}`;
    - Responses: `event: error`.
 
-   `observe` streams still pass through untouched.
+   Scanned in a stream: text, tool-input and reasoning deltas (Anthropic `thinking_delta`, Responses
+   `response.reasoning_text.delta` and summary deltas, refusal deltas), text carried by a `content_block_start`, the full text
+   a `.done` event or `response.completed` repeats, and the string content of any event type not known to carry none.
+   Non-streamed replies include `thinking` blocks and `reasoning` output items. `observe` streams still pass through untouched.
 4. **Model-based classifier (clause 8).** `app/guardrails_classifier.py` defines one interface:
    `classify(contents) -> detections`, raising on an outage. It ships one implementation, `detectors-api`, the FMS
    Guardrails detector API that TrustyAI's Hugging Face detector runtime serves. Configuration is
    `guardrails.classifier.{type,url,detectorId,threshold}`, with `type: ""` (off) by default. No model is wired. A detection
    is named `classifier:<detection>`, and matched text is never kept. Other implementations register with
-   `register(name, factory)`.
+   `register(name, factory)`. A type set without its URL or detector id fails the chart render, and in the code counts as an
+   outage (fail closed where `block` applies).
 5. **Metering (clause 9).** The ai-gateway serves three paths:
    - `POST /v1/messages`, plus `/v1/messages/count_tokens`, which is forwarded unmetered;
    - `POST /v1/responses`.
@@ -99,43 +112,58 @@ the effective level of WP-209: `app/classification_floor.py` raised by the ADR-0
      never handed to the pass-through.
    - Counting: usage goes to `zuno.model_tokens` and the token-budget ledger, as a chat call does. Anthropic usage is
      `input_tokens`, plus the cache tokens, plus `output_tokens`. Responses usage is the reply's `usage`. A stream reads
-     both from the SSE events.
+     both from the SSE events. When no usage arrives (a disconnect, a guard cut, no `response.completed`, an unreadable 200
+     body) the prompt is estimated from the request body and the completion from the generated text, at four characters
+     per token. The upstream is closed and the call metered even when the response body never starts.
    - Ceiling: optional, per key (the persona), per tenant (a Keycloak group, one shared counter) or as a default
-     (`meteredPaths.keyCeilings`, `app/key_ceilings.py`). `exempt` names personas or client ids that are never capped.
+     (`meteredPaths.keyCeilings`, `app/key_ceilings.py`). `exemptPersonas` and `exemptClients` are never capped (`exempt`,
+     one list for both, is still read). Each call reserves its estimate (prompt plus the requested output cap) until it ends,
+     so parallel calls overrun a ceiling by one call at most; `maxConcurrentStreams` caps a key's open streams. Reservations
+     and stream counts are per replica.
      Past a ceiling, the caller gets the protocol's 429 with `Retry-After`: Anthropic `rate_limit_error`, or OpenAI
      `type: tokens, code: rate_limit_exceeded`. Default `0` with no entries means no ceiling. A malformed value also means
      no ceiling: the paths are open by decision.
+   - Responses state: `background: true`, `previous_response_id` and `conversation` are refused with a protocol-shaped
+     400 (state kept upstream would escape the scan and the metering), and `store` is forced to `false`.
    - Off: with `meteredPaths.enabled: false` the paths answer 404, as today.
 
    The Claude Code key minted on MaaS is not touched: it calls MaaS directly, and MaaS still does not count it
    (WP-220, accepted).
 
 New chart values, all in `gitops/charts/ai-gateway/values.yaml`:
-- `guardrails.failClosedFrom` (`C2`), `guardrails.scanToolResults` (`true`), `guardrails.streamHoldBackChars` (`400`);
+- `guardrails.failClosedFrom` (`C2`), `guardrails.scanToolResults` (`false`), `guardrails.streamHoldBackChars` (`400`);
 - `guardrails.classifier.{type,url,detectorId,threshold}` (`""`, `""`, `""`, `"0.5"`);
-- `meteredPaths.enabled` (`false`), `meteredPaths.models` (`{}`), `meteredPaths.keyCeilings.{window,default,keys,tenants,exempt}`
-  (`1h`, `0`, `{}`, `{}`, `[]`).
+- `meteredPaths.enabled` (`false`), `meteredPaths.models` (`{}`),
+  `meteredPaths.keyCeilings.{window,default,keys,tenants,exemptPersonas,exemptClients,maxConcurrentStreams}`
+  (`1h`, `0`, `{}`, `{}`, `[]`, `[]`, `0`).
 
-The llm role passes `zuno_ai_gateway_guardrails_fail_closed_from`, `zuno_ai_gateway_metered_paths`,
+The llm role passes `zuno_ai_gateway_guardrails_fail_closed_from`, `zuno_ai_gateway_guardrails_scan_tool_results`,
+`zuno_ai_gateway_metered_paths`,
 `zuno_ai_gateway_metered_paths_models` and `zuno_ai_gateway_key_ceilings`.
 
 No change is needed in zuno-demo-agents. `guardrails-policy.yaml` names the modes and their minimum per class; the
 fail-closed threshold and the scan scope are platform configuration. The corp minimum stays `observe` for every class.
 Raising one to `block` is the ADR-0534 evidence decision, not part of this lot.
 
-Tests: `tests/test_wp225_guardrails_metering.py` (33 tests, in the CI list). It includes the four required negative tests:
+Tests: `tests/test_wp225_guardrails_metering.py` (57 tests, in the CI list, after the review of 2026-11-07). It includes the
+four required negative tests:
 - an injected tool result is blocked (chat and `/v1/messages`);
 - a detector outage blocks C2 and serves C1 (prompt, reply, stream, classifier);
 - a mid-stream detection cuts the stream (OpenAI and Anthropic SSE);
 - a key past its ceiling on `/v1/messages` is refused while an exempt key passes.
 
-`test_guardrails.py` now pins fail-open at C1 only.
+`test_guardrails.py` now pins fail-open at C1 only. The review fixes add tests for the client floor and the model alias on
+both paths, a C3 marker in a tool result, the straddle prefix never emitted, reasoning and the other text carriers, the usage
+estimate, reservations and the stream cap, a body that never starts, 502s, a misconfigured classifier, the exemption split,
+the system-text scan, the Responses state refusals, a Responses stream cut and the chart rendering no metered variable when off.
 
 Limits:
 - A gateway path is reachable in-cluster only (the ai-gateway has no Route). Giving an IDE a `/v1/messages` endpoint on the
   gateway would need a Route and a Keycloak token helper; that is not part of this lot.
-- RAG text that a client puts into a system message is not scanned, because system prompts are excluded by design.
-- A stream cut before its final usage event estimates the completion tokens at four characters per token.
+- On chat, RAG text that a client puts into a system message is not scanned (system prompts are excluded there); the
+  metered paths scan it in `block` only.
+- Without usage from the upstream, tokens are estimated at four characters per token.
+- In `block`, a stream lags the model by up to the hold-back plus 256 characters.
 
 ### Live probes (each needs an ai-gateway build and the user's go)
 
@@ -153,6 +181,6 @@ Limits:
    `/v1/messages`, plain and streamed, then `/v1/responses`, with a user token. Each moves `zuno_model_tokens_total` for
    `local-gpt-oss-maas` by input plus output tokens. `/v1/responses` on vLLM gpt-oss-20b is not proven yet; WP-220 proved
    `/v1/messages` only.
-6. **Ceiling.** Set `keyCeilings: {default: 1000, exempt: [<the developer persona>]}`. A second `/v1/messages` call from
+6. **Ceiling.** Set `keyCeilings: {default: 1000, exemptPersonas: [<the developer persona>]}`. A second `/v1/messages` call from
    another persona returns 429 `rate_limit_error` with `Retry-After`, and the exempt persona is still served. Then reset
    `default: 0`.

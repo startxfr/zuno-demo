@@ -95,13 +95,27 @@ class DetectorsApiClassifier:
         return out
 
 
+class MisconfiguredClassifier:
+    """Stands for a classifier that was asked for but cannot run (a missing URL or
+    detector id, an unknown type). Every call raises, so the evaluation counts as
+    unavailable: `block` fails closed from GUARDRAILS_FAIL_CLOSED_FROM up instead of
+    silently running without the classifier the deployment asked for."""
+
+    def __init__(self, reason: str):
+        self.name = "misconfigured"
+        self.reason = reason
+
+    async def classify(self, contents: List[str]) -> List[Dict[str, Any]]:
+        raise RuntimeError(f"guardrails classifier misconfigured: {self.reason}")
+
+
 def _detectors_api() -> Optional[Classifier]:
     url = os.getenv("GUARDRAILS_CLASSIFIER_URL", "").strip()
     detector_id = os.getenv("GUARDRAILS_CLASSIFIER_DETECTOR_ID", "").strip()
     if not url or not detector_id:
         logger.error("GUARDRAILS_CLASSIFIER=detectors-api needs GUARDRAILS_CLASSIFIER_URL and "
-                     "GUARDRAILS_CLASSIFIER_DETECTOR_ID; classifier off")
-        return None
+                     "GUARDRAILS_CLASSIFIER_DETECTOR_ID; every evaluation counts as unavailable")
+        return MisconfiguredClassifier("detectors-api needs a URL and a detector id")
     timeout = float(os.getenv("GUARDRAILS_TIMEOUT_SECONDS", "10"))
     return DetectorsApiClassifier(url, detector_id, _threshold(), timeout)
 
@@ -115,12 +129,13 @@ def register(name: str, factory: Callable[[], Optional[Classifier]]) -> None:
 
 
 def active() -> Optional[Classifier]:
-    """The configured classifier, or None when off (the default) or misconfigured."""
+    """The configured classifier; None when off (the default); a
+    MisconfiguredClassifier (which raises) when asked for but unusable."""
     name = os.getenv("GUARDRAILS_CLASSIFIER", "").strip().lower()
     if not name or name == "off":
         return None
     factory = _FACTORIES.get(name)
     if factory is None:
-        logger.error("unknown GUARDRAILS_CLASSIFIER=%r; classifier off", name)
-        return None
+        logger.error("unknown GUARDRAILS_CLASSIFIER=%r; every evaluation counts as unavailable", name)
+        return MisconfiguredClassifier(f"unknown type {name!r}")
     return factory()

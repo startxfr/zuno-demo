@@ -63,6 +63,8 @@
         modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
         # ADR-0602 clause 8 (WP-225): block fails closed from this class up.
         failClosedFrom: "{{ zuno_ai_gateway_guardrails_fail_closed_from | default('C2') }}"
+        # Shipped off: the scan stays the last user message until a cluster turns it on.
+        scanToolResults: "{{ zuno_ai_gateway_guardrails_scan_tool_results | default(false) | bool }}"
       # ADR-0602 clause 9 (WP-225): metered /v1/messages and /v1/responses (off),
       # the served models and the optional per-key ceilings (none by default).
       meteredPaths:

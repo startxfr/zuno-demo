@@ -17,8 +17,9 @@ of the current turn (ADR-0602 clause 8: an injection planted in a Confluence
 page or a crawled web page arrives as a tool result), and the model's reply,
 verbatim - the things detections are ABOUT. Never sent: the caller's bearer
 token, system prompts, or the tool results of earlier turns (they were scanned
-in the turn that produced them). GUARDRAILS_SCAN_TOOL_RESULTS=false restores
-the last-user-message-only scan.
+in the turn that produced them). The tool-result scan is behind
+GUARDRAILS_SCAN_TOOL_RESULTS=true (chart `guardrails.scanToolResults`, shipped
+false): off, only the last user message is scanned, as before.
 
 Per agent (ADR-0579 clause 3, WP-164 lot 3): GUARDRAILS_AGENT_MODES_PATH
 names a file generated from the agents release (corp minimum mode per
@@ -98,7 +99,10 @@ def fails_closed(classification: str) -> bool:
 
 
 def scan_tool_results() -> bool:
-    return os.getenv("GUARDRAILS_SCAN_TOOL_RESULTS", "true").strip().lower() not in ("0", "false", "no", "off")
+    """Scan the current turn's tool results and retrieved context (chart
+    `guardrails.scanToolResults`). Off by default, so a merge leaves the scan as it
+    was (the last user message); a deployment turns it on deliberately."""
+    return os.getenv("GUARDRAILS_SCAN_TOOL_RESULTS", "false").strip().lower() in ("1", "true", "yes", "on")
 
 
 MODES = ("off", "observe", "block")

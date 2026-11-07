@@ -327,8 +327,11 @@ guardrails:
   failClosedFrom: C2
   # Scan the current turn's tool results and retrieved context (OpenAI `tool`
   # messages, Anthropic tool_result/document/search_result blocks, Responses
-  # *_call_output items) like the user's text. false = last user message only.
-  scanToolResults: true
+  # *_call_output items) like the user's text, in observe and block. Shipped
+  # false so a merge keeps today's scan (the last user message only); turn it on
+  # per cluster (zuno_ai_gateway_guardrails_scan_tool_results) once the detector
+  # load of whole tool results is measured.
+  scanToolResults: false
   # A streamed reply in block mode is held back until this many characters
   # are pending, checked, then released or cut with the protocol's error event.
   # 0 = buffer the whole reply and check it once at the end.
@@ -338,7 +341,8 @@ guardrails:
   # `detectors-api` calls any detector served through the FMS Guardrails
   # detector API (TrustyAI's Hugging Face detector runtime): POST
   # <url>/api/v1/text/contents with header detector-id. Its outage counts as
-  # a detector outage (failClosedFrom above).
+  # a detector outage (failClosedFrom above). A type set without url and
+  # detectorId fails the render; the code treats it as unavailable too.
   classifier:
     type: ""          # "" (off) | detectors-api
     url: ""
@@ -363,16 +367,22 @@ meteredPaths:
   # Optional per-key token ceiling on these two paths (app/key_ceilings.py).
   # A key is the caller's persona (the person, or an OpenClaw persona); a
   # tenant a Keycloak group, whose members share one counter. `default: 0` and
-  # no entries = no ceiling (today's behaviour). `exempt` (persona or Keycloak
-  # client id) is never capped, whatever the default. Over a ceiling the call
-  # gets the protocol's 429 (Anthropic rate_limit_error, OpenAI code
-  # rate_limit_exceeded) with Retry-After. Counters follow quotaLedger.store.
+  # no entries = no ceiling (today's behaviour). `exemptPersonas` and
+  # `exemptClients` (Keycloak client ids) are never capped, whatever the
+  # default. A call reserves its estimate (prompt + max output) until it ends,
+  # so parallel calls overrun a ceiling by one call at most.
+  # `maxConcurrentStreams` caps the open streams of one key (0 = no cap). Over a
+  # ceiling the call gets the protocol's 429 (Anthropic rate_limit_error, OpenAI
+  # code rate_limit_exceeded) with Retry-After. Consumed tokens follow
+  # quotaLedger.store; reservations and stream counts are per replica.
   keyCeilings:
     window: 1h
     default: 0
     keys: {}
     tenants: {}
-    exempt: []
+    exemptPersonas: []
+    exemptClients: []
+    maxConcurrentStreams: 0
 
 # ADR-0594 (WP-191): signed classification markers on MCP tool results. The key
 # Secret is generated in zuno-ai-run by the mcp-gateway chart; both gateways read it.

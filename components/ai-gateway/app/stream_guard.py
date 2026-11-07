@@ -8,8 +8,11 @@ stream is forwarded in checked segments:
   reply text are pending (chart `guardrails.streamHoldBackChars`, default 400);
 - the pending text, with the last OVERLAP_CHARS already checked before it (so a
   pattern that straddles two segments is still seen), is evaluated;
-- clean: the held events go out; detection: nothing of the segment goes out,
-  the stream ends with the protocol's error event, and the upstream is closed;
+- clean: the held events go out except those whose text reaches into the last
+  OVERLAP_CHARS checked (the start of a match the next segment may complete);
+  they go out after the next check, or after the end-of-stream check;
+- detection: nothing unreleased goes out, the stream ends with the protocol's
+  error event, and the upstream is closed;
 - the detector unavailable: the segment goes out when the level fails open
   (below GUARDRAILS_FAIL_CLOSED_FROM), and the stream is cut when it fails closed.
 
@@ -56,22 +59,37 @@ async def guard(
     fail_closed: bool,
     on_cut: Optional[Callable[[str, List[Dict[str, Any]]], None]] = None,
 ) -> AsyncIterator[str]:
-    """Yield the raw events of `events`, checked in segments; see the module docstring."""
+    """Yield the raw events of `events`, checked in segments; see the module docstring.
+
+    Each held event remembers the reply offset its text ends at. A check covers
+    the text from (checked - OVERLAP_CHARS) to the end, so a match straddling two
+    segments is seen; and after a clean check only the events ending at or before
+    (checked - OVERLAP_CHARS) are released, so the first part of such a match is
+    never sent before the second part has been checked. The tail goes out after
+    the end-of-stream check."""
     segment = hold_back_chars()
-    held: List[str] = []
-    pending = ""   # reply text held and not yet checked
-    checked = ""   # the tail of the reply text already checked (for the overlap)
+    held: List[Tuple[str, int]] = []  # (raw event, reply offset its text ends at)
+    reply = ""      # the whole reply text so far
+    checked = 0     # offset up to which the reply has been checked
+
+    def releasable() -> List[str]:
+        nonlocal held
+        safe = max(0, checked - OVERLAP_CHARS)
+        out: List[str] = []
+        while held and held[0][1] <= safe:
+            out.append(held.pop(0)[0])
+        return out
 
     async def check() -> Optional[str]:
-        """None when the held events may go out, else the error event to end with."""
-        nonlocal pending, checked
-        if not pending.strip():
-            checked = (checked + pending)[-OVERLAP_CHARS:]
-            pending = ""
+        """None when the reply so far is clean (or fails open), else the error event."""
+        nonlocal checked
+        if len(reply) <= checked:
             return None
-        found = await evaluate(checked + pending)
-        checked = (checked + pending)[-OVERLAP_CHARS:]
-        pending = ""
+        window = reply[max(0, checked - OVERLAP_CHARS):]
+        checked = len(reply)
+        if not window.strip():
+            return None
+        found = await evaluate(window)
         if found:
             if on_cut:
                 on_cut("blocked", found)
@@ -85,28 +103,24 @@ async def guard(
     close = getattr(events, "aclose", None)
     try:
         async for raw, text in events:
-            held.append(raw)
-            pending += text or ""
-            if not pending:
-                # Nothing unchecked is held: let it through now.
-                for item in held:
-                    yield item
-                held = []
-                continue
-            if segment and len(pending) >= segment:
+            reply += text or ""
+            held.append((raw, len(reply)))
+            if segment and len(reply) - checked >= segment:
                 cut = await check()
                 if cut is not None:
                     yield cut
                     return
-                for item in held:
-                    yield item
-                held = []
+            # Events that end before anything unchecked (or in the clean, released
+            # prefix) go out now, so a text-less event never waits for text.
+            for item in releasable():
+                yield item
         cut = await check()
         if cut is not None:
             yield cut
             return
-        for item in held:
+        for item, _end in held:
             yield item
+        held = []
     finally:
         if close is not None:
             try:

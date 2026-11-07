@@ -1671,12 +1671,31 @@ def _metered_client(cfg: Dict[str, Any]):
     return httpx.AsyncClient(timeout=float(cfg.get("timeout_seconds", 60)), verify=ca_bundle or True)
 
 
-def _meter(identity: CallerIdentity, quota_class: str, project_id: Optional[str], prompt: int, completion: int) -> None:
-    """The same quota path as a chat call: the token-budget ledger, plus the
-    metered-path ceiling (a no-op unless configured)."""
+def _meter(
+    identity: CallerIdentity, quota_class: str, project_id: Optional[str],
+    reservation: "key_ceilings.Reservation", prompt: int, completion: int,
+) -> None:
+    """The same quota path as a chat call: the token-budget ledger; and the
+    metered-path ceiling, whose reservation the real usage replaces."""
     tokens = prompt + completion
     quota.ledger.consume(quota_class, identity.persona, identity.groups, project_id, tokens)
-    key_ceilings.ceilings.consume(identity.persona, identity.client, identity.groups, tokens)
+    key_ceilings.ceilings.settle(reservation, tokens)
+
+
+class _MeteredStreamingResponse(StreamingResponse):
+    """A StreamingResponse that runs `on_close` whatever happens to it: the body
+    iterated to the end, cut, the client gone before the first byte, or the body
+    never started. The upstream is closed and the call metered in every case."""
+
+    def __init__(self, content, *, on_close, **kwargs):
+        super().__init__(content, **kwargs)
+        self._on_close = on_close
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await self._on_close()
 
 
 async def _metered_call(
@@ -1689,133 +1708,173 @@ async def _metered_call(
         raise HTTPException(status_code=404, detail="Not Found")
     if not isinstance(body, dict):
         return metered_paths.error(api, 400, "invalid_request", "the request body must be a JSON object")
+    problem = metered_paths.request_problem(api, body)
+    if problem:
+        return metered_paths.error(api, 400, "unsupported_parameter", problem)
+    model = str(body.get("model") or "")
     set_caller_client(identity.client)
     set_caller_persona(identity.persona)
+    # The same classification as a chat call: the client's model alias selects a
+    # task (ADR-0596), the WP-209 floor includes the per-client floor, and the
+    # ADR-0594 markers of the tool results raise the level and can make it local-only.
+    task = model_tasks.task_for(identity.client, model, task)
     set_caller_task(task)
-    # WP-209: the same effective level as a chat call.
-    classification = classification_floor.floors.effective(
-        classification_floor.declared_level(classification_header), agent, task,
-    ).effective
+    floor = classification_floor.floors.effective(
+        classification_floor.declared_level(classification_header), agent, task, identity.client,
+    )
+    classification = floor.effective
     local_only = local_only_header.strip().lower() == "true" or model_routing_policy.local_only_for_classification(
         agent, task, classification
     )
+    marks = tool_markers.assess(metered_paths.marker_messages(api, body), classification, local_only, identity.client)
+    if marks.changed:
+        logger.info(
+            "metered %s: classification raised by tool results: %s -> %s, local_only %s -> %s (%s) client=%s",
+            api, classification, marks.classification, local_only, marks.local_only,
+            ", ".join(sorted(set(marks.reasons))), identity.client,
+        )
+        classification = marks.classification
+        local_only = marks.local_only or model_routing_policy.local_only_for_classification(
+            agent, task, classification
+        )
     request_id = request_id_header.strip() or str(uuid.uuid4())
     run_id = run_id_header.strip() or None
     quota_class, project_id = _platform_context(identity, quota_class_header, project_id_header)
-    model = str(body.get("model") or "")
 
     provider, cfg, why = _metered_upstream(model, classification, local_only, agent, task)
     if provider is None:
         status = 404 if "not served" in why else 400
         return metered_paths.error(api, status, "model_not_available", why)
-    upstream_body = {**body, "model": cfg.get("maas_model_ref", cfg.get("model", model))}
+    upstream_body = metered_paths.upstream_body(api, body, cfg.get("maas_model_ref", cfg.get("model", model)))
     headers = _metered_upstream_headers(cfg, identity, request_id, quota_class, project_id, forwarded)
+    unreachable = f"the model behind {model!r} is unreachable"
 
     if count_tokens:
         # Counting generates nothing: not metered, not scanned.
-        async with _metered_client(cfg) as client:
-            resp = await client.post(metered_paths.upstream_url(cfg, api, "/count_tokens"),
-                                     json=upstream_body, headers=headers)
+        try:
+            async with _metered_client(cfg) as client:
+                resp = await client.post(metered_paths.upstream_url(cfg, api, "/count_tokens"),
+                                         json=upstream_body, headers=headers)
+        except httpx.HTTPError as exc:
+            logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
+            return metered_paths.error(api, 502, "upstream_unavailable", unreachable)
         return Response(resp.content, status_code=resp.status_code,
                         media_type=resp.headers.get("content-type", "application/json"))
 
-    # The ceiling, then the token budget: both refuse in the protocol's 429 shape.
-    ceiling = key_ceilings.ceilings.check(identity.persona, identity.client, identity.groups)
+    streaming = bool(body.get("stream"))
+    prompt_estimate = metered_paths.estimate_prompt_tokens(api, body)
+    # The ceiling (with a reservation, so parallel calls see each other), then the
+    # token budget: both refuse in the protocol's 429 shape.
+    ceiling, reservation = key_ceilings.ceilings.admit(
+        identity.persona, identity.client, identity.groups,
+        estimate=prompt_estimate + metered_paths.requested_output_tokens(api, body), stream=streaming,
+    )
     if ceiling is not None:
         logger.warning("metered-path ceiling reached: api=%s %s=%s ceiling=%d/%s",
                        api, ceiling.dimension, ceiling.subject, ceiling.ceiling, ceiling.window)
         return metered_paths.error(api, 429, "rate_limit_exceeded", ceiling.message(),
                                    headers={"Retry-After": str(ceiling.retry_after)},
                                    dimension=ceiling.dimension)
-    denial = quota.ledger.check(quota_class, identity.persona, identity.groups, project_id)
-    if denial is not None and _budget_fault_rides_through(denial, quota_class):
-        denial = None
-    if denial is not None:
-        return metered_paths.error(
-            api, 429, "quota_exceeded",
-            f"token budget exhausted: {denial.dimension} budget of {denial.budget} tokens per {denial.window}",
-            headers={"Retry-After": str(denial.retry_after)} if denial.retry_after else None,
-            dimension=denial.dimension,
-        )
 
-    gr_mode = guardrails.mode_for(classification, agent)
-    gr_items = metered_paths.scan_items(api, body) if gr_mode != "off" else []
-    gr_prompt = next((it.text for it in gr_items if it.kind == "prompt"), "")
-    gr_extra = [it.text for it in gr_items if it.kind != "prompt"]
-    fail_closed = guardrails.fails_closed(classification)
-    if gr_mode == "block":
-        found = await guardrails.evaluate(
-            [it.text for it in gr_items], agent=agent or "unknown", run_id=run_id or "",
-            project_id=project_id, mode="block",
-        )
-        if found:
-            stage = guardrails.stage_of(found, gr_items)
-            return metered_paths.error(api, 400, "guardrails_blocked",
-                                       f"the {stage} was refused by the guardrails policy", stage=stage,
-                                       detections=sorted({str(d.get("detection")) for d in found}))
-        if found is None and fail_closed:
-            return metered_paths.error(api, 503, "guardrails_unavailable",
-                                       guardrails.unavailable_body("prompt")["error"]["message"], stage="prompt")
+    def refuse(response: Response) -> Response:
+        key_ceilings.ceilings.settle(reservation, 0)
+        return response
 
-    url = metered_paths.upstream_url(cfg, api)
-    span_args = dict(
-        provider=provider, model=upstream_body["model"], classification=classification,
-        request_id=request_id, caller_sub=identity.sub, groups=identity.groups, agent=agent,
-        run_id=run_id, model_kind="local", project_id=project_id,
-    )
+    try:
+        denial = quota.ledger.check(quota_class, identity.persona, identity.groups, project_id)
+        if denial is not None and _budget_fault_rides_through(denial, quota_class):
+            denial = None
+        if denial is not None:
+            return refuse(metered_paths.error(
+                api, 429, "quota_exceeded",
+                f"token budget exhausted: {denial.dimension} budget of {denial.budget} tokens per {denial.window}",
+                headers={"Retry-After": str(denial.retry_after)} if denial.retry_after else None,
+                dimension=denial.dimension,
+            ))
 
-    if not body.get("stream"):
-        with model_call_span(**span_args) as call:
-            try:
-                async with _metered_client(cfg) as client:
-                    resp = await client.post(url, json=upstream_body, headers=headers)
-            except httpx.HTTPError as exc:
-                breaker.record_failure(provider, exc)
-                logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
-                return metered_paths.error(api, 502, "upstream_unavailable", f"the model behind {model!r} is unreachable")
-            if resp.status_code != 200:
-                return Response(resp.content, status_code=resp.status_code,
-                                media_type=resp.headers.get("content-type", "application/json"))
-            payload = resp.json()
-            prompt_tokens, completion_tokens = metered_paths.usage_of(api, payload)
-            call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
-            _meter(identity, quota_class, project_id, prompt_tokens, completion_tokens)
+        gr_mode = guardrails.mode_for(classification, agent)
+        # Block mode also scans the system-level text: a client may carry
+        # retrieved context there (ADR-0602 clause 8).
+        gr_items = metered_paths.scan_items(api, body, include_system=gr_mode == "block") if gr_mode != "off" else []
+        gr_prompt = next((it.text for it in gr_items if it.kind == "prompt"), "")
+        gr_extra = [it.text for it in gr_items if it.kind not in ("prompt", "system")]
+        fail_closed = guardrails.fails_closed(classification)
         if gr_mode == "block":
             found = await guardrails.evaluate(
-                [metered_paths.reply_text(api, payload)], agent=agent or "unknown", run_id=run_id or "",
+                [it.text for it in gr_items], agent=agent or "unknown", run_id=run_id or "",
                 project_id=project_id, mode="block",
             )
             if found:
-                return metered_paths.error(api, 400, "guardrails_blocked",
-                                           "the reply was refused by the guardrails policy", stage="reply",
-                                           detections=sorted({str(d.get("detection")) for d in found}))
+                stage = guardrails.stage_of(found, gr_items)
+                return refuse(metered_paths.error(
+                    api, 400, "guardrails_blocked", f"the {stage} was refused by the guardrails policy",
+                    stage=stage, detections=sorted({str(d.get("detection")) for d in found})))
             if found is None and fail_closed:
-                return metered_paths.error(api, 503, "guardrails_unavailable",
-                                           guardrails.unavailable_body("reply")["error"]["message"], stage="reply")
-        elif gr_mode == "observe":
-            guardrails.observe_exchange(message=gr_prompt, reply=metered_paths.reply_text(api, payload),
-                                        agent=agent or "unknown", run_id=run_id or "",
-                                        project_id=project_id, extra=gr_extra)
-        return JSONResponse(payload)
+                return refuse(metered_paths.error(
+                    api, 503, "guardrails_unavailable", guardrails.unavailable_body("prompt")["error"]["message"],
+                    stage="prompt"))
 
-    client = _metered_client(cfg)
-    try:
-        resp = await client.send(client.build_request("POST", url, json=upstream_body, headers=headers), stream=True)
-    except httpx.HTTPError as exc:
-        await client.aclose()
-        breaker.record_failure(provider, exc)
-        logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
-        return metered_paths.error(api, 502, "upstream_unavailable", f"the model behind {model!r} is unreachable")
-    if resp.status_code != 200:
-        content = await resp.aread()
-        await resp.aclose()
-        await client.aclose()
-        return Response(content, status_code=resp.status_code,
-                        media_type=resp.headers.get("content-type", "application/json"))
+        url = metered_paths.upstream_url(cfg, api)
+        span_args = dict(
+            provider=provider, model=upstream_body["model"], classification=classification,
+            request_id=request_id, caller_sub=identity.sub, groups=identity.groups, agent=agent,
+            run_id=run_id, model_kind="local", project_id=project_id,
+        )
+
+        if not streaming:
+            return await _metered_unary(
+                api, url, cfg, upstream_body, headers, span_args, identity, quota_class, project_id,
+                reservation, prompt_estimate, gr_mode, gr_prompt, gr_extra, fail_closed, agent, run_id,
+                provider, unreachable,
+            )
+
+        client = _metered_client(cfg)
+        try:
+            resp = await client.send(client.build_request("POST", url, json=upstream_body, headers=headers),
+                                     stream=True)
+        except httpx.HTTPError as exc:
+            await client.aclose()
+            breaker.record_failure(provider, exc)
+            logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
+            return refuse(metered_paths.error(api, 502, "upstream_unavailable", unreachable))
+        if resp.status_code != 200:
+            content = await resp.aread()
+            await resp.aclose()
+            await client.aclose()
+            return refuse(Response(content, status_code=resp.status_code,
+                                   media_type=resp.headers.get("content-type", "application/json")))
+    except BaseException:
+        key_ceilings.ceilings.settle(reservation, 0)
+        raise
+
+    meter = metered_paths.StreamMeter(api)
+    reply: List[str] = []
+    closed = {"done": False}
+
+    def usage() -> "tuple[int, int]":
+        prompt = meter.prompt if meter.usage_seen and meter.prompt else prompt_estimate
+        completion = meter.completion
+        if not completion and meter.generated:
+            # Cut, or disconnected, before the final usage event.
+            completion = meter.generated // _CHARS_PER_TOKEN + 1
+        return prompt, completion
+
+    async def finish() -> None:
+        """Close the upstream and meter the call, once."""
+        if closed["done"]:
+            return
+        closed["done"] = True
+        try:
+            await resp.aclose()
+            await client.aclose()
+        finally:
+            prompt, completion = usage()
+            _meter(identity, quota_class, project_id, reservation, prompt, completion)
+            if gr_mode == "observe":
+                guardrails.observe_exchange(message=gr_prompt, reply="".join(reply), agent=agent or "unknown",
+                                            run_id=run_id or "", project_id=project_id, extra=gr_extra)
 
     async def events() -> AsyncIterator["tuple[str, str]"]:
-        meter = metered_paths.StreamMeter(api)
-        reply: List[str] = []
         try:
             with model_call_span(**span_args) as call:
                 try:
@@ -1825,18 +1884,10 @@ async def _metered_call(
                             reply.append(text)
                         yield raw, text
                 finally:
-                    completion = meter.completion
-                    if not completion and reply:
-                        # Cut before the final usage event: estimate what was generated.
-                        completion = len("".join(reply)) // _CHARS_PER_TOKEN + 1
-                    call.record_usage(prompt_tokens=meter.prompt, completion_tokens=completion)
-                    _meter(identity, quota_class, project_id, meter.prompt, completion)
+                    prompt, completion = usage()
+                    call.record_usage(prompt_tokens=prompt, completion_tokens=completion)
         finally:
-            await resp.aclose()
-            await client.aclose()
-            if gr_mode == "observe":
-                guardrails.observe_exchange(message=gr_prompt, reply="".join(reply), agent=agent or "unknown",
-                                            run_id=run_id or "", project_id=project_id, extra=gr_extra)
+            await finish()
 
     if gr_mode == "block":
         stream = stream_guard.guard(
@@ -1855,8 +1906,62 @@ async def _metered_call(
             finally:
                 await inner.aclose()
         stream = stream_raw()
-    return StreamingResponse(stream, media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return _MeteredStreamingResponse(stream, on_close=finish, media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+async def _metered_unary(
+    api, url, cfg, upstream_body, headers, span_args, identity, quota_class, project_id,
+    reservation, prompt_estimate, gr_mode, gr_prompt, gr_extra, fail_closed, agent, run_id,
+    provider, unreachable,
+) -> Response:
+    with model_call_span(**span_args) as call:
+        try:
+            async with _metered_client(cfg) as client:
+                resp = await client.post(url, json=upstream_body, headers=headers)
+        except httpx.HTTPError as exc:
+            key_ceilings.ceilings.settle(reservation, 0)
+            breaker.record_failure(provider, exc)
+            logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
+            return metered_paths.error(api, 502, "upstream_unavailable", unreachable)
+        if resp.status_code != 200:
+            key_ceilings.ceilings.settle(reservation, 0)
+            return Response(resp.content, status_code=resp.status_code,
+                            media_type=resp.headers.get("content-type", "application/json"))
+        try:
+            payload = resp.json()
+            if not isinstance(payload, dict):
+                raise ValueError("not a JSON object")
+        except ValueError:
+            # The model ran (a 200) but the reply is unreadable: metered by estimate.
+            call.record_usage(prompt_tokens=prompt_estimate, completion_tokens=0)
+            _meter(identity, quota_class, project_id, reservation, prompt_estimate, 0)
+            logger.warning("metered upstream %s answered 200 with a body that is not a JSON object", provider)
+            return metered_paths.error(api, 502, "upstream_invalid_reply", "the model's reply is not valid JSON")
+        prompt_tokens, completion_tokens = metered_paths.usage_of(api, payload)
+        if not prompt_tokens and not completion_tokens:
+            prompt_tokens = prompt_estimate
+            text = metered_paths.reply_text(api, payload)
+            completion_tokens = len(text) // _CHARS_PER_TOKEN + 1 if text else 0
+        call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+        _meter(identity, quota_class, project_id, reservation, prompt_tokens, completion_tokens)
+    if gr_mode == "block":
+        found = await guardrails.evaluate(
+            [metered_paths.reply_text(api, payload)], agent=agent or "unknown", run_id=run_id or "",
+            project_id=project_id, mode="block",
+        )
+        if found:
+            return metered_paths.error(api, 400, "guardrails_blocked",
+                                       "the reply was refused by the guardrails policy", stage="reply",
+                                       detections=sorted({str(d.get("detection")) for d in found}))
+        if found is None and fail_closed:
+            return metered_paths.error(api, 503, "guardrails_unavailable",
+                                       guardrails.unavailable_body("reply")["error"]["message"], stage="reply")
+    elif gr_mode == "observe":
+        guardrails.observe_exchange(message=gr_prompt, reply=metered_paths.reply_text(api, payload),
+                                    agent=agent or "unknown", run_id=run_id or "",
+                                    project_id=project_id, extra=gr_extra)
+    return JSONResponse(payload)
 
 
 def _forwarded(request: Request) -> Dict[str, str]:

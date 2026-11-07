@@ -146,6 +146,9 @@ spec:
             - name: GUARDRAILS_STREAM_HOLD_BACK_CHARS
               value: {{ .Values.guardrails.streamHoldBackChars | quote }}
             {{- with .Values.guardrails.classifier }}
+            {{- if and .type (or (not .url) (not .detectorId)) (eq .type "detectors-api") }}
+            {{- fail "guardrails.classifier.type detectors-api needs guardrails.classifier.url and guardrails.classifier.detectorId" }}
+            {{- end }}
             {{- if .type }}
             # WP-225: the model-based classifier next to the regular expressions.
             - name: GUARDRAILS_CLASSIFIER

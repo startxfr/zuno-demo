@@ -157,15 +157,23 @@ def anthropic_scan_items(body: Dict[str, Any]) -> List[ScanItem]:
 
 
 def _part_texts(content: Any) -> List[str]:
-    """Text of a Responses content value: a string, or parts of type input_text/output_text/text."""
+    """Text of a Responses content value: a string, or parts carrying `text`
+    (input_text, output_text, text, reasoning_text, summary_text) or `refusal`."""
     if isinstance(content, str):
         return [content]
     out: List[str] = []
     for part in content if isinstance(content, list) else []:
-        if isinstance(part, dict) and part.get("type") in ("input_text", "output_text", "text") \
-                and isinstance(part.get("text"), str):
+        if not isinstance(part, dict):
+            continue
+        if isinstance(part.get("text"), str):
             out.append(part["text"])
+        elif isinstance(part.get("refusal"), str):
+            out.append(part["refusal"])
     return out
+
+
+def _output_texts(output: Any) -> List[str]:
+    return [output] if isinstance(output, str) else _part_texts(output)
 
 
 def responses_scan_items(body: Dict[str, Any]) -> List[ScanItem]:
@@ -187,38 +195,164 @@ def responses_scan_items(body: Dict[str, Any]) -> List[ScanItem]:
         for entry in entries[(start + 1) if start is not None else 0:]:
             kind = str(entry.get("type") or "")
             if kind.endswith("_call_output") and "output" in entry:
-                output = entry["output"]
-                texts = [output] if isinstance(output, str) else _part_texts(output)
-                items.extend(ScanItem("tool_result", t) for t in texts)
+                items.extend(ScanItem("tool_result", t) for t in _output_texts(entry["output"]))
     return [it for it in items if it.text.strip()]
 
 
-def scan_items(api: str, body: Dict[str, Any]) -> List[ScanItem]:
-    return anthropic_scan_items(body) if api == ANTHROPIC else responses_scan_items(body)
+def system_scan_items(api: str, body: Dict[str, Any]) -> List[ScanItem]:
+    """The caller's system-level text: Anthropic `system`; Responses `instructions`
+    and `system`/`developer` input messages. Scanned in block mode only, since a
+    client may put retrieved context there (ADR-0602 clause 8)."""
+    texts: List[str] = []
+    if api == ANTHROPIC:
+        texts = _block_texts(body.get("system"))
+    else:
+        if isinstance(body.get("instructions"), str):
+            texts.append(body["instructions"])
+        raw = body.get("input")
+        for entry in raw if isinstance(raw, list) else []:
+            if isinstance(entry, dict) and entry.get("role") in ("system", "developer"):
+                texts.extend(_part_texts(entry.get("content")))
+    return [ScanItem("system", t) for t in texts if t.strip()]
+
+
+def scan_items(api: str, body: Dict[str, Any], include_system: bool = False) -> List[ScanItem]:
+    items = anthropic_scan_items(body) if api == ANTHROPIC else responses_scan_items(body)
+    return items + system_scan_items(api, body) if include_system else items
+
+
+class _Message:
+    """A ChatMessage-like view (role, content) for app/tool_markers.py."""
+
+    def __init__(self, role: str, content: str):
+        self.role, self.content = role, content
+
+
+def marker_messages(api: str, body: Dict[str, Any]) -> List[_Message]:
+    """Every tool result of the request, as a `tool` message, so app/tool_markers.py
+    reads the ADR-0594 markers the mcp-gateway signed into it, with the same raise
+    and fail-closed rules as on chat. Documents and search results are user-supplied,
+    not tool output: their markers raise, but an unmarked one is not a tool result."""
+    out: List[_Message] = []
+    if api == ANTHROPIC:
+        for m in body.get("messages") or []:
+            if not isinstance(m, dict) or not isinstance(m.get("content"), list):
+                continue
+            for block in m["content"]:
+                if not isinstance(block, dict):
+                    continue
+                kind = block.get("type")
+                if kind == "tool_result":
+                    out.append(_Message("tool", "\n\n".join(_block_texts(block.get("content")))))
+                elif kind == "document":
+                    out.append(_Message("user", "\n\n".join(_anthropic_document_text(block))))
+                elif kind == "search_result":
+                    out.append(_Message("user", "\n\n".join(_block_texts(block.get("content")))))
+    else:
+        raw = body.get("input")
+        for entry in raw if isinstance(raw, list) else []:
+            if isinstance(entry, dict) and str(entry.get("type") or "").endswith("_call_output"):
+                out.append(_Message("tool", "\n\n".join(_output_texts(entry.get("output")))))
+    return out
+
+
+def request_problem(api: str, body: Dict[str, Any]) -> Optional[str]:
+    """A Responses request the pass-through refuses: state kept upstream would escape
+    the gateway's scan and metering (background runs, stored responses chained by id)."""
+    if api != RESPONSES:
+        return None
+    if body.get("background"):
+        return "background responses are not served on this path"
+    if body.get("previous_response_id"):
+        return "previous_response_id is not served on this path: send the whole input"
+    if body.get("conversation"):
+        return "conversation state is not served on this path: send the whole input"
+    return None
+
+
+def upstream_body(api: str, body: Dict[str, Any], model: str) -> Dict[str, Any]:
+    out = {**body, "model": model}
+    if api == RESPONSES:
+        out["store"] = False  # nothing kept upstream, nothing to chain to later
+    return out
+
+
+def estimate_prompt_tokens(api: str, body: Dict[str, Any]) -> int:
+    """Four characters per token over what the model reads, for a call whose
+    upstream reported no usage (a disconnect, a cut, a missing final event)."""
+    keys = ("system", "messages", "tools") if api == ANTHROPIC else ("instructions", "input", "tools")
+    return len(json.dumps({k: body.get(k) for k in keys if k in body})) // 4 + 1
+
+
+def requested_output_tokens(api: str, body: Dict[str, Any]) -> int:
+    value = body.get("max_tokens" if api == ANTHROPIC else "max_output_tokens")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
 
 
 # ---------------------------------------------------------------------------
 # The reply: its text (for guardrails) and its usage (for metering).
 
+def _anthropic_block_text(block: Any) -> str:
+    if not isinstance(block, dict):
+        return ""
+    kind = block.get("type")
+    if kind == "text":
+        return block.get("text") or ""
+    if kind == "thinking":
+        return block.get("thinking") or ""
+    if kind in ("tool_use", "server_tool_use"):
+        return json.dumps(block.get("input") or {}) if block.get("input") else ""
+    return "\n".join(_strings(block))
+
+
+def _responses_item_text(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    kind = item.get("type")
+    if kind == "message":
+        return "\n".join(_part_texts(item.get("content")))
+    if kind == "function_call":
+        return str(item.get("arguments") or "")
+    if kind == "reasoning":
+        return "\n".join(_part_texts(item.get("content")) + _part_texts(item.get("summary")))
+    return "\n".join(_strings(item))
+
+
 def reply_text(api: str, payload: Dict[str, Any]) -> str:
-    parts: List[str] = []
+    """Everything the caller is shown: text, tool-call arguments and reasoning."""
     if api == ANTHROPIC:
-        for block in payload.get("content") or []:
-            if not isinstance(block, dict):
-                continue
-            if block.get("type") == "text":
-                parts.append(block.get("text") or "")
-            elif block.get("type") == "tool_use":
-                parts.append(json.dumps(block.get("input") or {}))
+        parts = [_anthropic_block_text(b) for b in payload.get("content") or []]
     else:
-        for item in payload.get("output") or []:
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "message":
-                parts.extend(_part_texts(item.get("content")))
-            elif item.get("type") == "function_call":
-                parts.append(str(item.get("arguments") or ""))
+        parts = [_responses_item_text(i) for i in payload.get("output") or []]
     return "\n".join(p for p in parts if p)
+
+
+# Keys whose string values are text a client renders; read from an event or
+# an item of a type this module does not know, so a new type is scanned too.
+_TEXT_KEYS = ("text", "delta", "thinking", "partial_json", "arguments", "refusal", "content", "output",
+              "summary")
+# Metadata of a known shape that carries no model text.
+_SKIP_KEYS = ("id", "type", "model", "role", "status", "object", "signature", "call_id", "name",
+              "item_id", "stop_reason", "stop_sequence", "usage", "metadata", "instructions", "tools")
+
+
+def _strings(value: Any, depth: int = 0) -> List[str]:
+    if depth > 6:
+        return []
+    out: List[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in _SKIP_KEYS:
+                continue
+            if isinstance(item, str):
+                if key in _TEXT_KEYS:
+                    out.append(item)
+            else:
+                out.extend(_strings(item, depth + 1))
+    elif isinstance(value, list):
+        for item in value:
+            out.extend(_strings(item, depth + 1))
+    return out
 
 
 def _int(value: Any) -> int:
@@ -248,42 +382,82 @@ def usage_of(api: str, payload: Dict[str, Any]) -> Tuple[int, int]:
     return responses_usage(payload.get("usage"))
 
 
+# Event types known to carry no model text (anything else is scanned).
+_ANTHROPIC_SILENT = {"message_start", "message_delta", "message_stop", "content_block_stop", "ping", "error"}
+_RESPONSES_SILENT = {"response.created", "response.in_progress", "response.queued", "error",
+                     "response.output_item.added", "response.content_part.added"}
+_RESPONSES_DELTAS = {"response.output_text.delta", "response.function_call_arguments.delta",
+                     "response.reasoning_text.delta", "response.reasoning_summary_text.delta",
+                     "response.refusal.delta"}
+
+
 class StreamMeter:
-    """Reads the usage and the reply text out of the upstream's SSE events."""
+    """Reads the usage and the reply text out of the upstream's SSE events.
+
+    `observe` returns the text an event shows the caller, for the guard: deltas,
+    reasoning deltas, the text of a content block start, the full text a `.done`
+    or `response.completed` event repeats (scanned again: an upstream could send
+    something else there), and the string content of an unknown event type.
+    `generated` counts the delta text only, for the completion estimate."""
 
     def __init__(self, api: str):
         self.api = api
         self.prompt = 0
         self.completion = 0
+        self.usage_seen = False
+        self.generated = 0
+
+    def _usage(self, pair: Tuple[int, int]) -> None:
+        if pair[0] or pair[1]:
+            self.usage_seen = True
+        self.prompt = max(self.prompt, pair[0])
+        self.completion = max(self.completion, pair[1])
 
     def observe(self, data: Any) -> str:
-        """Record usage carried by one event; return the reply text it adds."""
+        """Record usage carried by one event; return the reply text it shows."""
         if not isinstance(data, dict):
             return ""
         kind = data.get("type")
         if self.api == ANTHROPIC:
             if kind == "message_start":
-                prompt, completion = anthropic_usage((data.get("message") or {}).get("usage"))
-                self.prompt = max(self.prompt, prompt)
-                self.completion = max(self.completion, completion)
-            elif kind == "message_delta":
+                message = data.get("message") or {}
+                self._usage(anthropic_usage(message.get("usage")))
+                return "\n".join(t for t in (_anthropic_block_text(b) for b in message.get("content") or []) if t)
+            if kind == "message_delta":
                 # output_tokens is cumulative; a recent API repeats input_tokens here.
-                prompt, completion = anthropic_usage(data.get("usage"))
-                self.prompt = max(self.prompt, prompt)
-                self.completion = max(self.completion, completion)
-            elif kind == "content_block_delta":
+                self._usage(anthropic_usage(data.get("usage")))
+                return ""
+            if kind in _ANTHROPIC_SILENT:
+                return ""
+            if kind == "content_block_start":
+                return _anthropic_block_text(data.get("content_block"))
+            if kind == "content_block_delta":
                 delta = data.get("delta") or {}
-                if delta.get("type") == "text_delta":
-                    return delta.get("text") or ""
-                if delta.get("type") == "input_json_delta":
-                    return delta.get("partial_json") or ""
-            return ""
+                text = {"text_delta": delta.get("text"), "input_json_delta": delta.get("partial_json"),
+                        "thinking_delta": delta.get("thinking")}.get(delta.get("type"))
+                if delta.get("type") == "signature_delta":
+                    return ""
+                if text is None:
+                    text = "\n".join(_strings(delta))
+                self.generated += len(text or "")
+                return text or ""
+            return "\n".join(_strings(data))
         if kind in ("response.completed", "response.incomplete", "response.failed"):
-            self.prompt, self.completion = responses_usage((data.get("response") or {}).get("usage"))
-        elif kind in ("response.output_text.delta", "response.function_call_arguments.delta"):
+            response = data.get("response") or {}
+            self._usage(responses_usage(response.get("usage")))
+            return reply_text(RESPONSES, response)
+        if kind in _RESPONSES_SILENT:
+            return ""
+        if kind in _RESPONSES_DELTAS:
             delta = data.get("delta")
-            return delta if isinstance(delta, str) else ""
-        return ""
+            text = delta if isinstance(delta, str) else ""
+            self.generated += len(text)
+            return text
+        if kind == "response.output_item.done":
+            return _responses_item_text(data.get("item"))
+        if kind == "response.content_part.done":
+            return "\n".join(_part_texts([data.get("part")]))
+        return "\n".join(_strings({k: v for k, v in data.items() if k != "response"}))
 
 
 async def sse_events(lines: AsyncIterator[str]) -> AsyncIterator[Tuple[str, Any]]:
