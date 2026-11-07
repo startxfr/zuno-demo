@@ -29,6 +29,10 @@ spec:
         - {name: openclaw-client, key: client-secret}
       defaultHeaders:
         X-Zuno-Agent: openclaw
+        # The model calls name their task too, so the routing policy entry (openclaw, chat) applies (zuno-demo-agents
+        # experience-clients/openclaw/tasks/chat.md prefers the reasoning model). Without it the task was empty and the
+        # ai-gateway walked its providers in file order. `zuno-code` still selects the code task (ADR-0596).
+        X-Zuno-Task: {{ $.Values.gateways.mcpTask | quote }}
         X-Zuno-Data-Classification: {{ $.Values.gateways.dataClassification | quote }}
     - name: zuno-mcp
       type: oauth2
