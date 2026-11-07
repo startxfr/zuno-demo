@@ -8,8 +8,10 @@ Audience: the presenter, and the platform team preparing a workstation. Decision
 > **Status: being rolled out on demo333 ([WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)).**
 > The entry, the Keycloak client and the C3 floor come with WP-244; `gpt-oss-20b` answers first once the agents release
 > that declares `experience-clients/blender` is promoted (before that, the corp order answers, qwen3.6-27b first, slower).
-> The add-on was checked outside Blender (syntax, static check, TLS settings); its first run in Blender is part of
-> WP-244.
+> The add-on was run in Blender 4.2.3 LTS (headless, 2026-11-07): it registers its five operators, **Run** builds a
+> sample table (six objects, a bevel modifier, a material) as one undo step, a script importing `os` is refused before
+> it runs, and a model answer wrapped in Markdown is reduced to its code. The first run against the live entry is
+> WP-244's acceptance check.
 
 ## The message
 

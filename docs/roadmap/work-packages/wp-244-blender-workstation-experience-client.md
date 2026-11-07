@@ -59,3 +59,12 @@ The Blender add-on of `docs/demo/blender-3d.md` signs in with the device flow, s
 re-run both roles: ArgoCD prunes the Route, HTTPRoute, AuthPolicy and RateLimitPolicy, and the NetworkPolicy peer
 goes. Remove the `blender` client from the realm file (the reconcile Job does not delete clients: delete it in the Keycloak console).
 The add-on is a local file.
+
+## Progress
+
+- 2026-11-07: pushed 5fd22409; Keycloak client `blender` created by the reconcile Job (device endpoint answers, password
+  grant refused with 400); ai-gateway rolled with `blender` in EXPERIENCE_CLIENTS. zuno-demo-agents b8ac031 (VERSION
+  0.14.3) pushed, CI green, release and promotion pending. `make d1 install llm` and `make d1 install connectivity-link`
+  pending (the entry and the C3 floor are not live yet).
+- 2026-11-07: add-on run in Blender 4.2.3 LTS headless: five operators registered, Run builds six objects with a modifier
+  and a material, `import os` refused before execution, Markdown-wrapped answers reduced to code.
