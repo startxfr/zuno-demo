@@ -1,0 +1,31 @@
+# ADR-0604 §8.4: outside the cluster, only Keycloak (the front door's login and the JWKS) and the model bucket in S3
+# (virtual-hosted and path style). Everything else is denied: nothing here can reach an external model provider.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  egress:
+    - type: Allow
+      to:
+        dnsName: {{ include "world-model.keycloakHost" . }}
+      ports:
+        - protocol: TCP
+          port: 443
+    - type: Allow
+      to:
+        dnsName: s3.{{ .Values.modelStorage.region }}.amazonaws.com
+      ports:
+        - protocol: TCP
+          port: 443
+    - type: Allow
+      to:
+        dnsName: {{ .Values.modelStorage.bucket }}.s3.{{ .Values.modelStorage.region }}.amazonaws.com
+      ports:
+        - protocol: TCP
+          port: 443
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0

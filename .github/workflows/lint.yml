@@ -231,6 +231,8 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
           python3 -m pytest -q tests
+      - name: world-model chart pulls the pinned weights (ADR-0604)
+        run: python3 platform/world-model/tests/check_pins.py
       - name: world-model-web tests (ADR-0604)
         working-directory: components/world-model-web
         run: |

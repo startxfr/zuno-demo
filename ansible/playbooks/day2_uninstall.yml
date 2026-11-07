@@ -14,6 +14,8 @@
     day2_components:
       # ADR-0587 (WP-179): experience clients first, they consume the rest.
       # ADR-0599/ADR-0600 (WP-202): Dify and kagent first, like the other experience clients.
+      # ADR-0604 (WP-235): before everything it relies on, and before the GPU node (make d0 uninstall world-model-gpu).
+      - world_model
       - kagent
       - dify
       - openclaw

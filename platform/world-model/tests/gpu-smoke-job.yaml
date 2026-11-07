@@ -1,7 +1,7 @@
 # ADR-0604 WP-232: the GPU smoke test of the world-model runtime image, run once on the on-demand node
 # (`make d0 install world-model-gpu` first). It prints one JSON report and changes nothing.
 #
-#   oc -n zuno-world-model create configmap world-model-fetch --from-file=platform/world-model/fetch_models.py
+#   oc -n zuno-world-model create configmap world-model-fetch --from-file=gitops/charts/world-model/files/fetch_models.py
 #   oc -n zuno-world-model apply -f platform/world-model/tests/gpu-smoke-job.yaml
 #   oc -n zuno-world-model logs job/world-model-gpu-smoke -c smoke > report.json
 #
@@ -52,7 +52,7 @@ spec:
           env:
             - {name: WORLD_MODEL_S3_BUCKET, value: zuno-demo-sources}
             - {name: WORLD_MODEL_S3_PREFIX, value: models/world-model}
-            - {name: AWS_REGION, value: eu-central-1}
+            - {name: AWS_REGION, value: eu-west-2}  # the model bucket's region, not the cluster's
             - name: WORLD_MODEL_REVISIONS
               value: >-
                 {"Overworld/Waypoint-1.5-1B": "391f92827075edcf4a8b3c8a2ddae010698f8636",

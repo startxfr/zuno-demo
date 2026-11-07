@@ -1,0 +1,37 @@
+---
+# ADR-0604 D1: realm groups are create-only on a live realm (the import never updates them), so the group that may
+# open the demo is created here when missing, and each listed member is added when missing. Nothing is removed.
+- name: "world-model | read the Keycloak automation credentials (ADR-0595)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/read_keycloak_automation_credentials.yml"
+
+- name: "world-model | create the {{ world_model_group }} group and add its members (create-only)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-auth
+    pod: "{{ world_model_keycloak_pod }}"
+    command: >-
+      bash -c '
+      K=/opt/keycloak/bin/kcadm.sh; C="--config /tmp/kcadm-world-model.config";
+      trap "rm -f /tmp/kcadm-world-model.config" EXIT;
+      $K config credentials $C --server http://localhost:8080 --realm master
+      --user {{ _kc_automation_user | quote }}
+      --password {{ _kc_automation_password | quote }} >/dev/null || exit 1;
+      gid=$($K get groups -r zuno $C -q search={{ world_model_group }} -q exact=true --fields id,name --format csv --noquotes | grep ",{{ world_model_group }}$" | cut -d, -f1);
+      if [ -z "$gid" ]; then
+        gid=$($K create groups -r zuno $C -s name={{ world_model_group }} -i) && echo "created group {{ world_model_group }}";
+      fi;
+      for u in {{ world_model_group_members | join(" ") }}; do
+        uid=$($K get users -r zuno $C -q username=$u -q exact=true --fields id --format csv --noquotes | head -1);
+        if [ -z "$uid" ]; then echo "user $u absent, skipped"; continue; fi;
+        if $K get users/$uid/groups -r zuno $C --fields name --format csv --noquotes | grep -qx {{ world_model_group }}; then
+          echo "member $u present";
+        else
+          $K update users/$uid/groups/$gid -r zuno $C -n && echo "added member $u";
+        fi;
+      done'
+  register: _world_model_kc_group
+  changed_when: "'created group' in _world_model_kc_group.stdout or 'added member' in _world_model_kc_group.stdout"
+  no_log: true
+
+- name: "world-model | report the group"
+  ansible.builtin.debug:
+    msg: "{{ _world_model_kc_group.stdout_lines | default([]) }}"

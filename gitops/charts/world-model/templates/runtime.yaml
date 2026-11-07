@@ -1,0 +1,110 @@
+# ADR-0604 D5, D6, §7.2: the one GPU pod. Recreate, not a rolling update: a second pod cannot surge under a one-GPU
+# quota and would sit Pending behind the old one. It only schedules on the on-demand node (label + taint of
+# gitops/apps/machines-world-model); with the demo off the node is gone and this chart is not installed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world-model-runtime
+  labels:
+    app.kubernetes.io/name: world-model-runtime
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: world-model-runtime
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: world-model-runtime
+    spec:
+      serviceAccountName: world-model-runtime
+      automountServiceAccountToken: false
+      nodeSelector:
+        {{- toYaml .Values.runtime.nodeSelector | nindent 8 }}
+      tolerations:
+        - key: {{ .Values.runtime.toleration.key }}
+          operator: Exists
+          effect: NoSchedule
+      {{- include "world-model.podSecurity" . | nindent 6 }}
+      initContainers:
+        - name: fetch-models
+          image: {{ .Values.images.storageInitializer }}
+          command: ["python3", "/fetch/fetch_models.py", "/models"]
+          env:
+            - {name: WORLD_MODEL_S3_BUCKET, value: {{ .Values.modelStorage.bucket | quote }}}
+            - {name: WORLD_MODEL_S3_PREFIX, value: {{ .Values.modelStorage.prefix | quote }}}
+            - {name: AWS_REGION, value: {{ .Values.modelStorage.region | quote }}}
+            - {name: WORLD_MODEL_REVISIONS, value: {{ .Values.modelStorage.revisions | toJson | quote }}}
+          envFrom:
+            - secretRef: {name: world-model-s3}
+          resources:
+            requests: {cpu: 500m, memory: 512Mi}
+            limits: {cpu: "2", memory: 2Gi}
+          {{- include "world-model.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+            - {name: fetch, mountPath: /fetch, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      containers:
+        - name: runtime
+          image: {{ .Values.images.runtime }}
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - {name: WORLD_MODEL_ENGINE, value: {{ .Values.runtime.engine | quote }}}
+            - {name: WORLD_MODEL_IMAGE, value: {{ .Values.runtime.image | quote }}}
+            - {name: WORLD_MODEL_ENCODER, value: {{ .Values.runtime.encoder | quote }}}
+            - {name: WORLD_MODEL_QUANT, value: {{ .Values.runtime.quant | quote }}}
+            - {name: WORLD_MODEL_DIR, value: /models}
+            # `video` lets the container toolkit mount libnvidia-encode, which PyAV's h264_nvenc needs.
+            - {name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility,video"}
+            - name: WORLD_MODEL_INTERNAL_TOKEN
+              valueFrom: {secretKeyRef: {name: world-model-internal, key: token}}
+          # Ready only once both models are loaded and warmed: a visitor never meets the cold start.
+          startupProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            failureThreshold: {{ .Values.runtime.startupFailureThreshold }}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          # Only "the process answers": a slow generation step must never get a healthy GPU pod killed.
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.runtime.resources | nindent 12 }}
+          {{- include "world-model.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: models, mountPath: /models, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: models
+          emptyDir:
+            sizeLimit: {{ .Values.runtime.cacheSizeLimit }}
+        - name: tmp
+          emptyDir: {}
+        - name: fetch
+          configMap:
+            name: world-model-fetch
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-model-runtime
+  labels:
+    app.kubernetes.io/name: world-model-runtime
+    zuno.io/managed-by: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: world-model-runtime
+  ports:
+    - {name: http, port: 8080, targetPort: http}

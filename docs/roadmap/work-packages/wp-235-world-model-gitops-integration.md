@@ -1,6 +1,6 @@
 # WP-235: World-model GitOps integration (delivers ADR-0604 D5, D6, §7, §8)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0604
 - **Depends on:** WP-229, WP-234
 - **Blocks:** WP-236
@@ -41,6 +41,19 @@ ADR-0604 D5 item 2, D6, §7.1, §7.2, §8.
 4. Registration: `Makefile` `DAY2_RUN_COMPONENTS` and `DAY2_BUILD_COMPONENTS`; `ansible/playbooks/day2_{install,check,
    uninstall,build}.yml`; `gitops/charts/aap-config/values.yaml` survey lists and the install and check DAG nodes;
    `platform/security/check_workload_hardening.py` `DEPLOYMENT_CHARTS`; `components/README.md`.
+
+## Result (2026-11-07)
+
+`gitops/charts/world-model` (runtime, web, front door, secrets, network policy, egress firewall, monitors; hardening and
+secret-access checks pass), `gitops/apps/world-model/application-d1.yaml`, `ansible/roles/world_model` (install converges to the
+switch and was run locally with it off: nothing changes; precheck is the preflight), the registrations (Makefile, Day-2
+playbooks, AAP survey and both workflows, hardening lists, the secret grants and the `zuno-world-model` SecretStore),
+and `platform/world-model/tests/check_pins.py`. Findings: the model bucket is in `eu-west-2` (not the cluster's region);
+the Keycloak access token lives 15 minutes so the front door must refresh it; `fetch_models.py` now lives in the chart (one source).
+
+**Live effects of the push:** the external-secrets Application adds a SecretStore in `zuno-world-model` (the Vault role
+`ns-zuno-world-model` must exist first: `make d0 install vault` from this tree) and `aap-config` reconciles the new workflow
+node. Nothing else: no Application is applied while the switch is off.
 
 ## Verification
 

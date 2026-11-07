@@ -48,7 +48,7 @@ ADR-0604 D2, D3 (single-GPU contract), D4 (encoder, coalescing), §4.2, §4.3, �
 ## Result (2026-11-07)
 
 `components/world-model-runtime` (app, 13 mock tests passing, two hashed locks, Dockerfile with sha256-checked
-`world_engine`/`taehv`/`gemlite` archives), `app/smoke.py`, `platform/world-model/fetch_models.py` (S3 to the model cache,
+`world_engine`/`taehv`/`gemlite` archives), `app/smoke.py`, `gitops/charts/world-model/files/fetch_models.py` (S3 to the model cache,
 pinned revisions only, run in the mirrored storage-initializer image), `platform/world-model/tests/gpu-smoke-job.yaml`,
 `ansible/roles/world_model_build`, the build matrix entry and the lint.yml test step. The world-model-web image joins
 the build role in WP-234.
