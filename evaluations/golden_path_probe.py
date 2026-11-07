@@ -435,17 +435,8 @@ def probe_trace(ctx: Context) -> Result:
     import httpx
     from unifai_target import tempo_run_trace
 
-    port = _free_port()
-    cmd = ["oc"] + (["--context", os.environ["OC_CONTEXT"]] if os.getenv("OC_CONTEXT") else []) + [
-        "-n", "zuno-monitoring", "port-forward", "svc/tempo-tempo", f"{port}:3200"]
-    forward = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        time.sleep(3)
-        with httpx.Client(timeout=20) as http:
-            trace_id, spans = tempo_run_trace(ctx.tekos_run_id, f"http://127.0.0.1:{port}", wait_seconds=40, client=http)
-    finally:
-        forward.terminate()
-        forward.wait(timeout=10)
+    with _PortForward("zuno-monitoring", "tempo-tempo", 3200) as port, httpx.Client(timeout=20) as http:
+        trace_id, spans = tempo_run_trace(ctx.tekos_run_id, f"http://127.0.0.1:{port}", wait_seconds=40, client=http)
     return judge_trace(trace_id, spans)
 
 
@@ -498,6 +489,39 @@ def probe_openclaw(ctx: Context) -> Result:
     return Result("openclaw", PASS, f"every assistant answered through its egress proxy ({', '.join(namespaces)})")
 
 
+class _PortForward:
+    """`oc port-forward` to a Service for the duration of a `with` block; waits until the local port accepts."""
+
+    def __init__(self, namespace: str, service: str, remote_port: int, wait_seconds: float = 20) -> None:
+        self.port = _free_port()
+        cmd = ["oc"] + (["--context", os.environ["OC_CONTEXT"]] if os.getenv("OC_CONTEXT") else []) + [
+            "-n", namespace, "port-forward", f"svc/{service}", f"{self.port}:{remote_port}"]
+        self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._wait = wait_seconds
+
+    def __enter__(self) -> int:
+        import socket
+
+        deadline = time.monotonic() + self._wait
+        while time.monotonic() < deadline:
+            with socket.socket() as sock:
+                if sock.connect_ex(("127.0.0.1", self.port)) == 0:
+                    return self.port
+            if self._proc.poll() is not None:
+                break
+            time.sleep(0.5)
+        self.__exit__()
+        raise RuntimeError("the port-forward did not open within the wait")
+
+    def __exit__(self, *_exc) -> None:
+        if self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+
+
 def _free_port() -> int:
     import socket
 
@@ -517,26 +541,12 @@ def probe_lightspeed(ctx: Context) -> Result:
     if token.returncode != 0 or not token.stdout.strip():
         return Result("lightspeed", MANUAL, "OLSConfig Ready; no OpenShift token in this oc session (certificate "
                                             "login): ask the question in the console (checklist)")
-    import socket
     import httpx
 
-    port = _free_port()
-    cmd = ["oc"] + (["--context", os.environ["OC_CONTEXT"]] if os.getenv("OC_CONTEXT") else []) + [
-        "-n", "openshift-lightspeed", "port-forward", "svc/lightspeed-app-server", f"{port}:8443"]
-    forward = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            with socket.socket() as sock:
-                if sock.connect_ex(("127.0.0.1", port)) == 0:
-                    break
-            time.sleep(0.5)
+    with _PortForward("openshift-lightspeed", "lightspeed-app-server", 8443) as port:
         r = httpx.post(f"https://127.0.0.1:{port}/v1/query", verify=False, timeout=150,
                        headers={"Authorization": f"Bearer {token.stdout.strip()}"},
                        json={"query": "In one sentence, what is a Pod in OpenShift?"})
-    finally:
-        forward.terminate()
-        forward.wait(timeout=10)
     return judge_lightspeed_answer(r.status_code, r.json() if r.headers.get("content-type", "").startswith("application/json") else {})
 
 
