@@ -1,7 +1,7 @@
 # WP-225: AI and agent surface: guardrails, metering, delegated scope (delivers ADR-0602, ADR-0603)
 
 - **State:** Not started
-- **ADRs:** ADR-0602, ADR-0603, ADR-0565
+- **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** WP-222, WP-209 (classification floor; do not duplicate its work)
 - **Blocks:** WP-227
 - **Estimated files touched:** ~20

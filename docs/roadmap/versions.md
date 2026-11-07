@@ -25,7 +25,7 @@ state are not restated here.
 | v0.14 | `v0.14.0` | 2026-11-06 | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; in-cluster ledger run 2026-11-06 |
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
-| v0.15 | planned 2026-11-08 | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238), before the demonstration of 2026-11-09; named exception expected: WP-225, which also cites ADR-0565 and belongs to the v0.16 hardening |
+| v0.15 | planned 2026-11-08 | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238), before the demonstration of 2026-11-09; named exceptions expected: ADR-0605 closes after the freeze baseline and the demonstration runs (WP-238), and D11 (carried from v0.14) |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
 | v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557) |
 
@@ -308,8 +308,7 @@ stays `C1` by decision). A live demonstration is given only after a golden-path 
 each demonstration moment, inside a freeze window that starts with that check (ADR-0605, WP-238). The band was
 re-scoped on 2026-11-07 for the demonstration of 2026-11-09 09:00: the work that cannot close before it moved to v0.16.
 
-**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Accepted`.** Open work packages: WP-238; WP-225 also cites ADR-0565 and is
-v0.16 work (named exception of the v0.15 tag).
+**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Accepted`.** Open work packages: WP-238.
 
 ## v0.16
 

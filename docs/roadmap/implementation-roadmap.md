@@ -37,7 +37,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 2 | 1 | 5 | WP-225, WP-238 |
+| v0.15 | 2 | 1 | 4 | WP-238 |
 | v0.16 | 9 | 7 | 15 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-239, WP-240, WP-241, WP-242, WP-243 |
 | v0.17 | 2 | 2 | 9 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -1060,7 +1060,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Done | merged to `devel` locally, not pushed; live checks waived by the user; push, gateway builds and sync wait for the user's go |
 | WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Done | demo333 migrated 2026-11-07 (raft + AWS KMS + TLS, root token revoked, recovery 3/2); eso-reader kept until `main` carries WP-223 (zuno-rhtas-d1 tracks main) |
 | WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222, WP-223 | Operator pending | pushed 55ebf41f and rolled out on demo333 2026-11-07 (STRICT x3, zuno-ai-run firewall Argo-owned, three AppProjects); left: zuno-unifai firewall rehearsal, agents scaffold, GitHub settings |
-| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603, 0565 | WP-222, WP-209 | Not started | classification itself stays with WP-209 |
+| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603 | WP-222, WP-209 | Not started | classification itself stays with WP-209 (ADR-0565) |
 | WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Operator pending | committed locally on `wp-226-supply-chain`, not pushed; rebuilds, warn dry run, enforce, first rendered release and route-cert switch wait for the user's go |
 | WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
 
