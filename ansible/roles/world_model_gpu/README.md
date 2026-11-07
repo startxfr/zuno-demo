@@ -13,8 +13,10 @@ ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSet 
 | `make d0 check world-model-gpu` | any | Reports the node against the switch; reads Nodes only, so it also runs under AAP |
 
 The switch lives in `ansible/clusters/<cluster>.yml` (committed: AAP reads the SCM checkout) and can be overridden
-locally from `ansible/confidential.yml`. `zuno_machines_az_override['zuno-gpu-world-model-a']` moves the node to another
-zone letter that offers g7e.
+locally from `ansible/confidential.yml`. `zuno_world_model_gpu_az` (cluster file; demo333 sets `b`, because g7e.4xlarge had no
+capacity in eu-central-1a on 2026-11-07) moves the node to another zone letter that offers g7e. It is a variable of its own
+because `zuno_machines_az_override` is one map that a workstation's `confidential.yml` replaces whole: an entry added to the
+cluster file would not apply there. The map's entry for this MachineSet still works and the dedicated variable wins over it.
 
 **Local only.** The AAP installer credential has no Machine API rights by design
 (`gitops/charts/aap-config/templates/clusterrole-installer.yaml`); this role runs with the operator's own credentials,

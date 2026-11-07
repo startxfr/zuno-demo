@@ -37,7 +37,7 @@ ADR-0604 D5 items 1 to 4, §1.2 (Machine API boundary, driver upgrade policy).
    - switch off: if `zuno-world-model-d1` exists, fail and name `make d2 uninstall world-model`; otherwise delete
      `zuno-machines-world-model-d0` if present and stop;
    - switch on: `resolve_cluster_aws_identity.yml`; build a list with **only** `zuno-gpu-world-model-a`
-     (`g7e.4xlarge`, AZ `a` unless `zuno_machines_az_override` says otherwise, group `gpu-world-model`, gp3 250 GB,
+     (`g7e.4xlarge`, AZ `a` unless `zuno_world_model_gpu_az` or `zuno_machines_az_override` says otherwise, group `gpu-world-model`, gp3 250 GB,
      replicas 1, labels `nvidia.com/mig.config: all-disabled` and `zuno.io/gpu-workload: world-model`, taint
      `zuno.io/gpu-world-model=true:NoSchedule`); always inject `machineSet.list`, `cluster.id` and `cluster.region` (the
      chart default list would otherwise render a second copy of the fleet); `apply_gitops_app.yml`; wait (25 min) for the

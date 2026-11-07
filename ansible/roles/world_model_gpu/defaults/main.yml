@@ -4,6 +4,11 @@
 # ansible/confidential.yml. Off unless a cluster says otherwise.
 zuno_world_model_enabled: false
 
+# The availability-zone letter of the node ("" = the one the Application declares). A cluster file sets it because
+# zuno_machines_az_override is one map that a workstation's ansible/confidential.yml replaces whole (it already holds
+# the GPU pool's entry there), so an entry added to the cluster file would silently not apply on that workstation.
+zuno_world_model_gpu_az: ""
+
 world_model_gpu_app_name: zuno-machines-world-model-d0
 world_model_gpu_machineset: zuno-gpu-world-model-a
 world_model_gpu_node_label: "zuno.io/gpu-workload=world-model"
