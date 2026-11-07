@@ -1,6 +1,6 @@
 # WP-211: Keycloak internal/external mode
 
-- **State:** Not started (2026-11-07: detailed brief written; three lots, decisions D1 to D5 below wait for the user)
+- **State:** Repo work merged - lot A of three only (2026-11-07: lot A done and pushed, internal rendering and behaviour unchanged; lots B and C open, decisions D1 to D5 wait for the user)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (the reconcile mechanics reused)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-216](wp-216-external-secrets-internal-external-mode.md) and [WP-217](wp-217-cert-manager-internal-external-mode.md) (mode-key mechanics: `mode.yml`, symmetric gating), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) (persona passwords)
@@ -138,8 +138,8 @@ selfHeal-managed on the external Keycloak itself: the realm is reconciled by the
 
 | Lot | Content | Live risk | Can ship alone |
 |---|---|---|---|
-| **A: seams, internal unchanged** | `resolve_keycloak_endpoint.yml`; every literal above becomes a value with today's default; open_webui on REST; `zuno-auth` reads moved to Vault; code fallbacks fixed | none: proven by a rendered-manifest diff (`helm template` of every touched chart, before and after, with the live values) and `make d1 check` | yes |
-| **B: external mode** | mode key and payload, `mode.yml` and symmetric gating in the keycloak role, chart guard, reconcile Job realm creation and secret materialization, supplied CA, check assertions | none in internal mode (default unchanged) | yes, after A |
+| **A: seams, internal unchanged** | `resolve_keycloak_endpoint.yml`; every literal above becomes a value with today's default; code fallbacks fixed | none: proven by a rendered-manifest diff (`helm template` of every touched chart, before and after, with the live values) and `make d1 check` | yes |
+| **B: external mode** | open_webui admin group on the Admin REST API; `zuno-auth` Secret reads moved to Vault (both change runtime behaviour, so they need a live proof and moved here from lot A on 2026-11-07); mode key and payload, `mode.yml` and symmetric gating in the keycloak role, chart guard, reconcile Job realm creation and secret materialization, supplied CA, check assertions | none in internal mode (default unchanged) | yes, after A |
 | **C: live there-and-back** | rehearsal below | SSO outage for the whole platform during the flips | needs a window and the user's go |
 
 ## Live rehearsal (lot C, demo333, after the 2026-11-09 demo)
@@ -214,3 +214,29 @@ experience logins.
 - Internal mode renders and behaves exactly as before (empty rendered diff, `make d1 check` green).
 - External mode runs every consumer above against the external endpoint, with users, ids and group memberships intact
   both ways, and `make d1 check`, `make d2 check agents` and `make d2 check supply-chain` green in both modes.
+
+## Lot A delivered (2026-11-07)
+
+- `ansible/tasks/resolve_keycloak_endpoint.yml` sets `zuno_keycloak_url`, `_realm`, `_issuer_url`, `_token_url`,
+  `_auth_url` and `_internal_url` (built-in values only). It is an include, not `group_vars`: the AAP Controller
+  inventory has no `group_vars` (see `gitops/charts/aap-config/templates/ansibleinventory.yaml`), so a group variable
+  would be undefined in AAP-launched jobs. It is included right before each consumer task, after
+  `cluster_base_domain` is resolved: aap_config (SSO authenticator), agents (acceptance gate), day3 (stresstest create
+  and run), dify, kagent and openclaw (SA groups), open_webui (precheck probe), rhtas_config (ClusterImagePolicy
+  issuer), `run_image_signing_job.yml`, `verify_image_signatures.yml`, `day3_release.yml`. No Keycloak literal is left
+  in `ansible/` outside that file.
+- Chart seams, empty by default, with today's literal as the fallback: dify, kagent, open-webui
+  `global.zuno.keycloakIssuerUrl` and `keycloakHost` (global because the Open WebUI env is evaluated by `tpl` inside
+  the subchart); openclaw `keycloak.host`; unifai `stack.identity.keycloakUrl` and `keycloakHost`; models
+  `keycloakIssuerUrl`; openshift-oauth `oauth.keycloakUrl`; namespaces `keycloakHost`.
+- The three gateways' code fallback is `https://keycloak.apps.mycluster.example.com/realms/zuno` (was the stale
+  `keycloak-zuno.` host; the deployments always set `KEYCLOAK_ISSUER`).
+
+Proof: `helm template` of the 12 Applications of the touched charts with their live values, before and after:
+identical byte for byte (dify, kagent and open-webui rendered without their subcharts); models also identical with
+the `ModelsAsService` API enabled; the Open WebUI `OPENID_PROVIDER_URL` evaluated through `tpl` is unchanged.
+Positive tests: setting each new value changes the rendered issuer or host. An assertion playbook shows that every
+resolved string equals the literal it replaced. `--syntax-check` of the day0 to day3 playbooks is green. The
+ai-gateway and mcp-gateway suites show the same failures as origin/devel, none new. Live and read-only:
+`day2_check open-webui` (its probe runs through the new include) reports installed, and `day2_check supply-chain`
+reports "PASS - all 12 image(s) verified".

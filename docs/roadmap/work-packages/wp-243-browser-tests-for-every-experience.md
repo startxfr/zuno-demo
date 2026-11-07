@@ -1,6 +1,6 @@
 # WP-243: Browser tests for every experience
 
-- **State:** Not started
+- **State:** Done (2026-11-07)
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** [WP-238](wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) (the probes and the manual checklist this replaces)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)
@@ -28,3 +28,17 @@ expected screen, and `make demo check` can run them.
 
 - Each test passes on demo333 and fails when its experience is scaled to zero.
 - The manual checklist holds only what a browser test cannot check.
+
+## Result (2026-11-07)
+
+`evaluations/browser/` (Playwright 1.48.0 in the `mcr.microsoft.com/playwright:v1.48.0-jammy` image through podman,
+`run.sh` reads the persona and OpenClaw UI passwords with `oc` and never prints them), run by `make demo browser`. Five
+checks pass on demo333: UnifAI (the "Login using SSO" button, then Keycloak, as consultant-02), Open WebUI (sale-01,
+the chat input), kagent (ai-ops-01, the onboarding wizard skipped, `zuno-sre` listed), Dify (through its front door as
+consultant-02, to Dify's own sign-in), OpenClaw (front door as sale-01, then the Control UI password and a successful
+gateway connection; a first version passed on the "Could not connect" page and was corrected). Zuno Code needs no
+check of its own: it is a model choice inside Open WebUI, proven by the golden path. The checklist of
+`docs/demo/golden-path.md` now holds only what a person sees better than a script.
+
+Named gap: the negative case of the acceptance (each check fails when its experience is scaled to zero) was not run on
+demo333 before the 2026-11-09 demonstration; it is run in the post-demo window.

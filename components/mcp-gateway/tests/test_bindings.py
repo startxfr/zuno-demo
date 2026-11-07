@@ -275,7 +275,10 @@ class _StubAgent:
     bundle that still declares only the LEGACY tool name."""
 
     def __init__(self) -> None:
+        self.name = "tekos"
         self.tasks = {"some-task": ["search_confluence"]}
+        # WP-225 lot C: evaluate() checks the caller's entitlement to the agent (ADR-0040).
+        self.access_groups = ["consultant"]
 
     def declared_tools(self):
         return ["search_confluence"]

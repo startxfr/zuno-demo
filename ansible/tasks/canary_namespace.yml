@@ -1,0 +1,89 @@
+---
+# ADR-0609 clause 1 (WP-242): create or remove the canary namespace of one work package.
+#
+#   zuno-canary-<wp>   labels zuno.io/canary=true and zuno.io/work-package=<WP>, restricted pod security, outside the
+#                      mesh; a ResourceQuota; a default-deny NetworkPolicy (ingress from the namespace only, egress to
+#                      DNS and the namespace only) plus the egress rules the work package lists; no GPU unless asked.
+#
+# Inputs:
+#   canary_wp       the work package, e.g. "WP-211" (required)
+#   canary_state    present | absent (default present)
+#   canary_egress   extra egress rules, verbatim NetworkPolicy `egress` items (default []), e.g.
+#                   [{to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: zuno-auth}}}],
+#                     ports: [{protocol: TCP, port: 8443}]}]
+#   canary_quota    dict merged over the default quota (requests.cpu 4, requests.memory 8Gi, limits.memory 16Gi, pods 20)
+#   canary_gpus     number of nvidia.com/gpu allowed (default 0)
+# Output:
+#   canary_namespace
+- name: "canary | validate the inputs"
+  ansible.builtin.assert:
+    that:
+      - canary_wp is defined
+      - canary_wp is match('^WP-[0-9]+$')
+      - (canary_state | default('present')) in ['present', 'absent']
+    fail_msg: "canary_namespace.yml needs canary_wp (WP-NNN) and canary_state present|absent"
+
+- name: "canary | name the namespace"
+  ansible.builtin.set_fact:
+    canary_namespace: "zuno-canary-{{ canary_wp | lower }}"
+    _canary_quota: "{{ {'requests.cpu': '4', 'requests.memory': '8Gi', 'limits.memory': '16Gi', 'pods': '20',
+                        'requests.nvidia.com/gpu': (canary_gpus | default(0) | string)} | combine(canary_quota | default({})) }}"
+    _canary_base_egress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+        ports:
+          - {protocol: UDP, port: 5353}
+          - {protocol: TCP, port: 5353}
+      - to:
+          - podSelector: {}
+
+- name: "canary | create {{ canary_namespace }} with its quota and default-deny policy"
+  when: (canary_state | default('present')) == 'present'
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      - apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: "{{ canary_namespace }}"
+          labels:
+            zuno.io/canary: "true"
+            zuno.io/work-package: "{{ canary_wp }}"
+            zuno.io/managed-by: zuno-ansible
+            pod-security.kubernetes.io/enforce: restricted
+            pod-security.kubernetes.io/warn: restricted
+      - apiVersion: v1
+        kind: ResourceQuota
+        metadata:
+          name: canary
+          namespace: "{{ canary_namespace }}"
+          labels:
+            zuno.io/managed-by: zuno-ansible
+        spec:
+          hard: "{{ _canary_quota }}"
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: canary-default-deny
+          namespace: "{{ canary_namespace }}"
+          labels:
+            zuno.io/managed-by: zuno-ansible
+        spec:
+          podSelector: {}
+          policyTypes: [Ingress, Egress]
+          ingress:
+            - from:
+                - podSelector: {}
+          egress: "{{ _canary_base_egress + (canary_egress | default([])) }}"
+
+- name: "canary | remove {{ canary_namespace }}"
+  when: (canary_state | default('present')) == 'absent'
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Namespace
+    name: "{{ canary_namespace }}"
+    wait: true
+    wait_timeout: 300

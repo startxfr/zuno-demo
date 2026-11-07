@@ -1,6 +1,6 @@
 # ADR-0609: Rehearse on canary namespaces of demo333
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team
@@ -70,3 +70,12 @@ of the drift check (ADR-0608).
 ## Work packages
 
 [WP-242](../roadmap/work-packages/wp-242-canary-namespace-pattern.md).
+
+## Update 2026-11-07 (WP-242): implemented
+
+`ansible/tasks/canary_namespace.yml` (entry point `ansible/playbooks/canary_namespace.yml`) creates and removes
+`zuno-canary-<wp>` as clause 1 describes; `docs/platform/canary-rehearsal.md` holds the lists of clauses 2 and 3 and
+how a work package records "not rehearsed"; `make d3 check drift` reports a canary whose work package is closed. The
+pattern was rehearsed once on demo333 on 2026-11-07 (`zuno-canary-wp-242`): labels, quota and default-deny policy in
+place, restricted pod security enforced (an unprivileged pod without a security context was refused), DNS resolved and
+a call to the ai-gateway timed out (egress blocked), then the namespace was removed.

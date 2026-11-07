@@ -25,6 +25,10 @@ spec:
     requests.memory: {{ .resourceQuota.requests.memory | quote }}
     limits.cpu: {{ .resourceQuota.limits.cpu | quote }}
     limits.memory: {{ .resourceQuota.limits.memory | quote }}
+    {{- with .resourceQuota.gpu }}
+    # ADR-0604 (WP-229): whole GPUs this namespace may request.
+    requests.nvidia.com/gpu: {{ . | quote }}
+    {{- end }}
 ---
 {{- end }}
 {{- end }}

@@ -57,6 +57,12 @@ operator:
 # cannot be committed) - see ansible/roles/rhtas_config/tasks/install.yml.
 policyOperand:
   enabled: false
+  # WP-226 (live finding 2026-11-07): the webhook must trust the OpenShift
+  # service CA to reach image-registry.openshift-image-registry.svc:5000,
+  # or it verifies no internal image at all.
+  registryCaBundle:
+    enabled: true
+    configMapName: zuno-policy-registry-service-ca
   trustRoot:
     tufMirrorUrl: http://tuf.zuno-rhtas.svc.cluster.local
     rootJsonBase64: ""
@@ -77,7 +83,11 @@ policyOperand:
     # policy.rhtas.com/include=true, and the webhook refuses tag references
     # there in either mode, so a namespace opts in only once its charts
     # render digests (platform/supply-chain/render_release_digests.py).
-    mode: warn
+    # `enforce` since 2026-11-07 (user's go): the warn dry run on
+    # zuno-wp226-cip-test was clean once the webhook trusted the registry's
+    # service CA; no opted-in namespace (unifai-operator, zuno-unifai) runs a
+    # first-party image, so only opted-in test namespaces are affected.
+    mode: enforce
 
   # WP-178 / ADR-0586: cluster-side admission of the UnifAI images, with the same policy-controller. A
   # ClusterImagePolicy verifies the keyless signature of `quay.io/zuno/unifai-**` against the public Sigstore

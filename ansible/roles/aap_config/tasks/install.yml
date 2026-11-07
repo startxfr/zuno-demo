@@ -1088,12 +1088,15 @@
       stays local-only until a re-run.
   when: (_aap_config_kc_client_secret.resources | default([]) | length) == 0
 
+- name: "aap-config | resolve the Keycloak endpoint (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
 - name: "aap-config | wire the Keycloak SSO authenticator"
   when: (_aap_config_kc_client_secret.resources | default([]) | length) > 0
   block:
     - name: "aap-config | fetch the zuno realm's public key"
       ansible.builtin.uri:
-        url: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
+        url: "{{ zuno_keycloak_issuer_url }}"
         method: GET
         validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
         status_code: 200
@@ -1145,8 +1148,8 @@
             KEY: aap
             SECRET: "{{ _aap_config_kc_client_secret.resources[0].data.client_secret | b64decode }}"
             PUBLIC_KEY: "{{ _aap_config_realm_info.json.public_key }}"
-            AUTHORIZATION_URL: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/auth"
-            ACCESS_TOKEN_URL: "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/token"
+            AUTHORIZATION_URL: "{{ zuno_keycloak_auth_url }}"
+            ACCESS_TOKEN_URL: "{{ zuno_keycloak_internal_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/token"
             GROUPS_CLAIM: groups
         status_code: 201
       register: _aap_config_authenticator_created

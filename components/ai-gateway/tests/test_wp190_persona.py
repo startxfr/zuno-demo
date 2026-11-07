@@ -1,6 +1,7 @@
 """ADR-0593 (WP-190 phase 1): the per-user budget, the quota windows, the MaaS
-attestation and the `user` label are keyed by persona, so one person has one
-budget across Open WebUI, UnifAI and OpenClaw.
+attestation and the zuno.persona span attribute are keyed by persona, so one person
+has one budget across Open WebUI, UnifAI and OpenClaw. The `user` metric label was
+dropped by WP-225 lot B (ADR-0603 M15).
 
 Found in the WP-184 shared-quota proof (2026-11-03): OpenClaw's token belongs to the
 service account of client `openclaw-<persona>`, so its `sub` differs from the
@@ -164,7 +165,9 @@ class _Recorder:
     record = add
 
 
-def test_the_user_label_is_the_persona_and_the_span_keeps_the_sub() -> None:
+def test_no_user_label_the_span_keeps_the_persona_and_the_sub() -> None:
+    """WP-225 lot B (ADR-0603 M15): the counters carry no per-user label; the
+    persona and the sub stay on the span."""
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -183,12 +186,14 @@ def test_the_user_label_is_the_persona_and_the_span_keeps_the_sub() -> None:
     finally:
         telemetry._caller_persona.reset(t1)
         telemetry._caller_client.reset(t2)
-    assert calls.points and calls.points[0]["user"] == "sale-01", calls.points
+    assert calls.points and "user" not in calls.points[0], calls.points
+    assert calls.points[0]["client"] == "", calls.points
     span = exporter.get_finished_spans()[0]
     assert span.attributes["zuno.user_sub"] == _SA_SUB
+    assert span.attributes["zuno.persona"] == "sale-01"
 
 
-def test_without_a_persona_the_label_stays_the_sub() -> None:
+def test_without_a_persona_there_is_still_no_user_label() -> None:
     calls = _Recorder()
     token = telemetry._caller_persona.set("")
     try:
@@ -199,7 +204,7 @@ def test_without_a_persona_the_label_stays_the_sub() -> None:
                 pass
     finally:
         telemetry._caller_persona.reset(token)
-    assert calls.points[0]["user"] == "u-1"
+    assert "user" not in calls.points[0], calls.points
 
 
 TESTS = [v for k, v in dict(globals()).items() if k.startswith("test_")]

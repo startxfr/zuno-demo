@@ -1,0 +1,10 @@
+# Operators that run on a cluster but that no role or chart of this repository installs (ADR-0608 clause 1).
+# Each entry names an owner and a reason; platform/drift/check_drift.py does not report a listed package.
+# An entry is temporary unless its reason says why the operator lives outside the repository for good.
+operators:
+  - package: elasticsearch-eck-operator-certified
+    namespace: openshift-operators
+    owner: platform owner (decision 2026-11-07)
+    reason: >-
+      Unused: no Elasticsearch or Kibana resource on demo333. To be uninstalled (Subscription and CSV) after the
+      demonstration of 2026-11-09, then this entry is removed (WP-241 step 2).

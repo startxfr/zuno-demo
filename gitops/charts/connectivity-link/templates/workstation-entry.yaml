@@ -1,0 +1,147 @@
+# ADR-0610 (WP-244): the ai-gateway's entry for workstation experience clients (the Blender add-on).
+#
+# The ai-gateway has no entry outside the cluster of its own. This renders one hostname on the shared
+# zuno-agent-gateway (quota-demo-gateway.yaml owns the Gateway, its Service and its ConfigMap):
+#   Route (openshift-ingress, reencrypt, the router's *.apps wildcard)
+#     -> zuno-agent-gateway (Istio, Gateway API)
+#     -> HTTPRoute (zuno-ai-run): POST /v1/chat/completions and GET /v1/models only, everything else 404
+#     -> AuthPolicy: Keycloak issuer and the zuno-admin-api audience pinned (ADR-0602 clause 6), the token's azp
+#        must be a declared workstation client and, when allowedGroups is set, the user must be in one of them
+#     -> RateLimitPolicy: requests per user (auth.identity.sub)
+#     -> ai-gateway:8080, which checks the token again and applies its floors, quotas and guardrails.
+# The ai-gateway's NetworkPolicy admits the gateway pod when its own workstationEntry.enabled is on
+# (ansible zuno_ai_gateway_workstation_entry); turn both on together.
+#
+# Rollback: workstationEntry.enabled false in gitops/apps/connectivity-link/application-d1.yaml, re-run
+# the connectivity_link role; ArgoCD prunes the four objects. Nothing else references them.
+{{- if .Values.workstationEntry.enabled }}
+{{- /* Same guard as quota-demo-route.yaml: Authorino discovers the issuer over HTTPS and trusts only the
+     Let's Encrypt certificate (ADR-0211); on the Vault-issued one every request would 500. */}}
+{{- if not .Values.workstationEntry.keycloakAcmeWildcardTLS }}
+{{- fail "workstationEntry.enabled needs workstationEntry.keycloakAcmeWildcardTLS=true: the AuthPolicy validates tokens over https://keycloak.<clusterBaseDomain> and Authorino trusts only the Let's Encrypt certificate there (ADR-0211)." }}
+{{- end }}
+{{- if not .Values.workstationEntry.allowedClients }}
+{{- fail "workstationEntry.allowedClients is empty: name at least one workstation Keycloak client (azp)." }}
+{{- end }}
+{{- $w := .Values.workstationEntry }}
+{{- $issuer := $w.keycloakIssuerUrl | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) }}
+{{- $hostname := $w.hostname | default (printf "ai-gateway.%s" .Values.clusterBaseDomain) }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: zuno-agent-gateway-workstation-ai-gateway
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: zuno-workstation-entry
+  annotations:
+    # A gpt-oss-20b script takes 15 to 40 s, a cold model longer; the router's default is 30 s.
+    haproxy.router.openshift.io/timeout: {{ $w.timeout | quote }}
+spec:
+  host: {{ $hostname }}
+  port:
+    targetPort: 443
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: zuno-agent-gateway-istio
+    weight: 100
+  wildcardPolicy: None
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ai-gateway-workstation
+  namespace: {{ $w.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-workstation-entry
+spec:
+  parentRefs:
+    - name: zuno-agent-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - {{ $hostname }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/chat/completions
+          method: POST
+        - path:
+            type: Exact
+            value: /v1/models
+          method: GET
+      timeouts:
+        request: {{ $w.timeout }}
+      backendRefs:
+        - name: {{ $w.backendService }}
+          port: {{ $w.backendPort }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: ai-gateway-workstation-jwt
+  namespace: {{ $w.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-workstation-entry
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: ai-gateway-workstation
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: {{ $issuer }}
+    authorization:
+      zuno-audience-and-client:
+        patternMatching:
+          patterns:
+            - any:
+                - selector: auth.identity.aud
+                  operator: incl
+                  value: {{ .Values.quotaEnforcement.requiredAudience | quote }}
+                - selector: auth.identity.aud
+                  operator: eq
+                  value: {{ .Values.quotaEnforcement.requiredAudience | quote }}
+            - any:
+              {{- range $w.allowedClients }}
+                - selector: auth.identity.azp
+                  operator: eq
+                  value: {{ . | quote }}
+              {{- end }}
+            {{- with $w.allowedGroups }}
+            # A public device-grant client lets any realm user mint a token: only these groups pass (full path,
+            # as the client's groups mapper writes them).
+            - any:
+              {{- range . }}
+                - selector: auth.identity.groups
+                  operator: incl
+                  value: {{ printf "/%s" (trimPrefix "/" .) | quote }}
+              {{- end }}
+            {{- end }}
+---
+# Request rate per user on the entry; the ai-gateway's per-persona budgets bound the tokens.
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: ai-gateway-workstation
+  namespace: {{ $w.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-workstation-entry
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: ai-gateway-workstation
+  limits:
+    per-user:
+      rates:
+        - limit: {{ $w.rateLimit.limit }}
+          window: {{ $w.rateLimit.window }}
+      counters:
+        - expression: 'auth.identity.sub'
+{{- end }}

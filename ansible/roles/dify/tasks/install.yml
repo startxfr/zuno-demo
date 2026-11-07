@@ -92,6 +92,9 @@
       clusterBaseDomain: "{{ cluster_base_domain }}"
       aiHeaders: "{{ dify_ai_headers }}"
       mcpHeaders: "{{ dify_mcp_headers }}"
+      # WP-225 lot C: callers must present the key of Vault dify/token-proxy.
+      inboundAuth:
+        enabled: "{{ dify_token_proxy_inbound_auth | bool }}"
       egress:
         clusterCIDRs: "{{ _dify_cluster_cidrs }}"
 
@@ -103,6 +106,8 @@
     gitops_app_name: "zuno-dify-knowledge-d1"
     gitops_app_extra_helm_values:
       namespace: "{{ dify_namespace }}"
+      proxyAuth:
+        enabled: "{{ dify_token_proxy_inbound_auth | bool }}"
 
 - name: "dify | apply the Dify Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

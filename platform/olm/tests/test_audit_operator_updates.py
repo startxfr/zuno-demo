@@ -131,5 +131,58 @@ class Main(unittest.TestCase):
         self.assertIn('version: "1.0.0"', out)
 
 
+
+class KnownGoodGate(unittest.TestCase):
+    """ADR-0607 clauses 1 and 8 (WP-240)."""
+
+    def rows(self, *subs):
+        doc = {"subscriptions": list(subs), "packagemanifests": [
+            pm("rhods-operator", {"beta": "rhods-operator.3.6.0-ea.2"}),
+            pm("grafana-operator", {"v5": "grafana-operator.v5.26.0"}, source="community-operators"),
+            pm("unifai-operator", {"alpha": "unifai-operator.v0.1.64"}, source="unifai-operator-catalog")]}
+        return a.audit(doc)
+
+    def known(self, *entries):
+        return {"operators": [{"package": p, "namespace": n, "version": v} for p, n, v in entries]}
+
+    def test_classes(self):
+        self.assertEqual(a.support_class("redhat-operators", "beta", "3.6.0-ea.2"), "early-access")
+        self.assertEqual(a.support_class("unifai-operator-catalog", "alpha", "0.1.64"), "alpha")
+        self.assertEqual(a.support_class("claw-operator-catalog", "staging", "0.0.227-commit-f5aa592"), "staging")
+        self.assertEqual(a.support_class("community-operators", "v5", "5.25.0"), "community")
+        self.assertEqual(a.support_class("redhat-operators", "stable", "0.22.0-5"), "ga")
+
+    def test_matching_set_passes(self):
+        rows = self.rows(sub("rhods-operator", "beta", "rhods-operator.3.6.0-ea.2", ns="redhat-ods-operator"))
+        self.assertEqual(a.compare_known_good(rows, self.known(("rhods-operator", "redhat-ods-operator", "3.6.0-ea.2"))), [])
+
+    def test_pre_ga_drift_fails(self):
+        rows = self.rows(sub("unifai-operator", "alpha", "unifai-operator.v0.1.64", source="unifai-operator-catalog"))
+        out = a.compare_known_good(rows, self.known(("unifai-operator", "openshift-operators", "0.1.63")))
+        self.assertEqual(len(out), 1)
+        self.assertTrue(out[0].startswith("FAIL unifai-operator"))
+
+    def test_community_drift_is_info(self):
+        rows = self.rows(sub("grafana-operator", "v5", "grafana-operator.v5.26.0", source="community-operators"))
+        out = a.compare_known_good(rows, self.known(("grafana-operator", "openshift-operators", "5.25.0")))
+        self.assertTrue(out[0].startswith("INFO grafana-operator"))
+
+    def test_unrecorded_and_missing_fail(self):
+        rows = self.rows(sub("rhods-operator", "beta", "rhods-operator.3.6.0-ea.2", ns="redhat-ods-operator"))
+        out = a.compare_known_good(rows, self.known(("eck", "openshift-operators", "3.5.0")))
+        self.assertTrue(any("not in the known-good set" in f for f in out))
+        self.assertTrue(any("eck" in f and "not installed" in f for f in out))
+
+    def test_against_exit_code_and_class_in_file(self):
+        doc = {"subscriptions": [sub("unifai-operator", "alpha", "unifai-operator.v0.1.64", source="unifai-operator-catalog")],
+               "packagemanifests": [pm("unifai-operator", {"alpha": "unifai-operator.v0.1.64"}, source="unifai-operator-catalog")]}
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+            fh.write('operators:\n  - package: unifai-operator\n    namespace: openshift-operators\n    version: "0.1.63"\n')
+        rc, out = Main.run_main(self, doc, "--against", fh.name)
+        self.assertEqual(rc, a.EXIT_KNOWN_GOOD_DRIFT)
+        rc, out = Main.run_main(self, doc, "--format", "known-good")
+        self.assertIn("class: alpha", out)
+
 if __name__ == "__main__":
     unittest.main()

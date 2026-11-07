@@ -62,6 +62,25 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
+            {{- if .Values.callAssertion.publicKey }}
+            - name: MCP_CALL_ASSERTION_PUBLIC_KEY
+              value: {{ .Values.callAssertion.publicKey | quote }}
+            - name: MCP_CALL_ASSERTION_MAX_BODY_BYTES
+              value: {{ .Values.callAssertion.maxBodyBytes | int64 | quote }}
+            {{- end }}
+            {{- if .Values.callAssertion.required }}
+            {{- if not .Values.callAssertion.publicKey }}
+            {{- fail "callAssertion.required needs callAssertion.publicKey" }}
+            {{- end }}
+            - name: MCP_CALL_ASSERTION_REQUIRED
+              value: "true"
+            {{- end }}
+            # ADR-0603 M12 (WP-225 lot B): owner scoping by the signed caller context.
+            - name: SALESFORCE_OWNER_SCOPING
+              value: {{ ternary "owner" "off" .Values.ownerScoping.enabled | quote }}
+            - name: SALESFORCE_ALL_RECORDS_GROUPS
+              value: {{ join "," (.Values.ownerScoping.allRecordsGroups | default list) | quote }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

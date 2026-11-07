@@ -1,0 +1,45 @@
+---
+# `make d3 check drift` (ADR-0608 clause 6, WP-241): what runs on the cluster that the repository does not
+# explain - undeclared Subscriptions, storage classes the charts name but the cluster lacks, hand-applied or
+# unowned security objects in zuno-* namespaces, first-party images built from commits on no origin branch.
+# Read-only (platform/drift/check_drift.py, needs `oc` logged in on the machine that runs it).
+#
+# Report-only until the first clean run on a cluster: set zuno_drift_strict: true in
+# ansible/clusters/<cluster>.yml once it is clean, and any finding then fails this check.
+- name: "drift | look for oc and a git checkout (an AAP execution environment has neither)"
+  ansible.builtin.shell: "command -v oc >/dev/null && git -C {{ zuno_repo_root | quote }} rev-parse --git-dir >/dev/null"
+  register: _drift_tools
+  changed_when: false
+  failed_when: false
+
+- name: "drift | skipped: run it from a workstation"
+  ansible.builtin.debug:
+    msg: "drift check skipped: it needs `oc` logged in and a git checkout of the repository (run `make d3 check drift` from a workstation)"
+  when: _drift_tools.rc != 0
+
+- name: "drift | compare the cluster with the repository"
+  when: _drift_tools.rc == 0
+  ansible.builtin.command:
+    argv: "{{ ['python3', zuno_repo_root ~ '/platform/drift/check_drift.py']
+              + (['--strict'] if zuno_drift_strict | default(false) | bool else []) }}"
+  register: _drift
+  changed_when: false
+  failed_when: _drift.rc not in ([0] if zuno_drift_strict | default(false) | bool else [0, 1])
+
+- name: "drift | report"
+  ansible.builtin.debug:
+    msg: "{{ _drift.stdout_lines | default(['skipped']) }}"
+
+- name: "drift | record state"
+  ansible.builtin.set_fact:
+    _state_is_installed: true
+
+- name: "drift | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "drift | record the summary"
+  ansible.builtin.lineinfile:
+    path: "{{ state_report_file }}"
+    line: "drift: {{ ((_drift.stdout_lines | default(['RESULT: skipped (no oc or git checkout)'])) | select('match', '^RESULT') | first | default('RESULT: unknown')) | regex_replace('^RESULT: ', '') }}"
+    create: true
+    mode: "0644"

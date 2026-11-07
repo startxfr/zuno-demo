@@ -73,6 +73,18 @@ spec:
         - namespaceSelector:
             matchLabels:
               zuno.io/experience-client: "true"
+        {{- if .Values.workstationEntry.enabled }}
+        # ADR-0610 (WP-244): workstation experience clients (the Blender add-on) reach this gateway through
+        # the Kuadrant gateway zuno-agent-gateway (connectivity-link chart, workstation-entry.yaml), which
+        # checks issuer, audience and azp first and admits only /v1/chat/completions and /v1/models.
+        # One peer element = namespace AND pod labels: only that gateway's proxy pod.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: zuno-agent-gateway
+        {{- end }}
       ports:
         - protocol: TCP
           port: 8080

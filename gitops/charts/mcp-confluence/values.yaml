@@ -35,3 +35,34 @@ credentials:
   # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
   secretStoreName: vault
   refreshInterval: 1h
+
+# ADR-0603 M12 (WP-225 lot B): the Confluence spaces each Keycloak group may reach
+# through the shared technical identity, checked in the server against the caller
+# context the mcp-gateway signs (never a tool argument). {group: [space key pattern]},
+# fnmatch, case-insensitive; "*" is every space (a space key has no "/", so `*` and
+# `?` simply match characters of the key). Empty: no allowlist, today's
+# behaviour. Once set, a caller whose groups list no matching pattern is refused, and
+# a search without a space covers only the caller's spaces.
+#   groups:
+#     consultant: [TECH, OPS]
+#     ocp-paas-ops: ["*"]
+# scope: "all" checks reads and writes; "write" only create_page and update_page.
+spaceAllowlist:
+  groups: {}
+  scope: all
+
+# ADR-0602 clause 10 / ADR-0603 M14 (WP-225 lot C): verify the mcp-gateway's
+# per-call assertion (Authorization: Bearer <EdDSA JWT, typ zuno-call+jwt>: aud this
+# server, sub the caller, act the gateway, the tool, exp <= 60 s, jti consumed once).
+# publicKey: the PEM of Vault mcp/gateway-call-assertion public_key. Set, an
+# assertion is verified when one is sent (a forged, expired, misaddressed,
+# other-tool or replayed one is refused) and a request without one is still
+# served. required: true refuses every request without a valid assertion; set it
+# only after the mcp-gateway runs with outboundIdentity.mode assertion. Both off by
+# default (today's behaviour).
+# maxBodyBytes: the largest request body read to check a tools/call (a larger one
+# is refused with 413); 16 MiB leaves room for a git.file.write of a large file.
+callAssertion:
+  publicKey: ""
+  required: false
+  maxBodyBytes: 16777216

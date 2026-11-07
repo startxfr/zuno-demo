@@ -60,6 +60,18 @@ toolsEnabled: true
 # Namespace of the UnifAI stack whose multi-agent pods may call this service.
 unifaiNamespace: zuno-unifai
 
+# ADR-0603 M14 (WP-225 lot C): sign X-Zuno-Agent-Chain on every call to the
+# ai-gateway and the mcp-gateway: the agent this gateway runs, its task and the
+# delegators it checked, bound to the caller's bearer, exp <= 60 s
+# (app/signed_chain.py). The Ed25519 key pair is in Vault (vaultKey, fields
+# private_key and public_key; the key must be granted to zuno-ai-run in
+# platform/vault/secret-access.yaml); the gateways get public_key as
+# agentChain.publicKey. Off by default: no header, as before.
+agentChain:
+  sign: false
+  vaultKey: a2a/agent-chain
+  vaultProperty: private_key
+
 # ADR-0580/WP-161: agent definitions come from the admitted zuno-demo-agents release, pulled and
 # verified offline by an init container (same mechanism as mcp-gateway). A failed verification
 # keeps the pod in Init (fail closed). ansible/roles/a2a_gateway enables it with the locked digest.

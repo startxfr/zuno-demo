@@ -88,3 +88,17 @@ their missing items through WP-238 (probes) and WP-243 (browser tests).
 band and page fixes),
 [WP-243](../roadmap/work-packages/wp-243-browser-tests-for-every-experience.md) (one browser test per experience,
 v0.16).
+
+## Update 2026-11-07 (WP-238, WP-239, WP-243): the definition of done applied to the admitted experiences
+
+For the experiences already admitted (UnifAI, Open WebUI, OpenClaw, Dify, kagent, Zuno Code, Lightspeed):
+- a work package each: yes (WP-179 to WP-208 and WP-194);
+- a golden-path probe each: `make demo golden-path` gets a real answer from every one of them (WP-238);
+- a browser check each: `make demo browser` (WP-243);
+- a demonstration script: `docs/demo/three-experiences.md` and `five-experiences.md`;
+- a `client` value in the ai-gateway's `experienceClients`: yes;
+- a written rollback each: `docs/demo/rollback.md`.
+
+Clauses 2 to 7 are in force, and the number check and the template are in place (WP-239). This record stays
+`Accepted` until each rollback has been tested once, which clause 1 requires; the tests run in the window after the
+2026-11-09 demonstration. The world model (ADR-0604) is the first experience admitted under this record, in v0.16.

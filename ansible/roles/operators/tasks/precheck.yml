@@ -1,9 +1,12 @@
 ---
 # `make d3 check operators`: which OLM operators of the cluster can be
-# updated, and how (platform/olm/audit_operator_updates.py). Read-only and
-# report-only: an available update is information, not a failure, so a vendor
-# shipping a patch never turns `make d3 check` red. Only an audit that cannot
-# run (exit 2) fails this check.
+# updated, and how (platform/olm/audit_operator_updates.py). Read-only. An
+# available update is information, not a failure, so a vendor shipping a patch
+# never turns `make d3 check` red. Two things fail it: an audit that cannot run
+# (exit 2), and the known-good gate of ADR-0607 clause 8 (exit 3): a pre-GA
+# operator running another version than platform/olm/known-good-<cluster>.yaml
+# records, or a Subscription missing from that file. The gate runs only when
+# the file exists for the cluster.
 #
 # Why it exists (demo333, 2026-11-04): every Subscription said
 # `AtLatestKnown`, yet seven operators had newer versions. Two were waiting
@@ -41,9 +44,19 @@
     kind: InstallPlan
   register: _operators_ips
 
+- name: "operators | resolve the cluster name (for its known-good file)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
+  when: cluster_name is not defined
+
+- name: "operators | look for the cluster's known-good file (ADR-0607 clause 8)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/platform/olm/known-good-{{ cluster_name | default(zuno_cluster_name | default('unknown')) }}.yaml"
+  register: _operators_known_good
+
 - name: "operators | audit the available updates"
   ansible.builtin.command:
-    argv: ["python3", "{{ zuno_repo_root }}/platform/olm/audit_operator_updates.py"]
+    argv: "{{ ['python3', zuno_repo_root ~ '/platform/olm/audit_operator_updates.py']
+              + (['--against', _operators_known_good.stat.path] if _operators_known_good.stat.exists else []) }}"
     stdin: >-
       {{ {'subscriptions': _operators_subs.resources,
           'csvs': (_operators_csvs.results | map(attribute='resources') | flatten),

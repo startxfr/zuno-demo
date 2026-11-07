@@ -22,6 +22,11 @@ zuno_google_oauth_client_secret: "xxxxxx"
 # Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false
 
+# --- World-model demo (ADR-0604) -------------------------------------------
+# Committed per cluster in ansible/clusters/<cluster>.yml; set it here only to
+# override locally. true provisions the on-demand GPU node (billed by the hour).
+# zuno_world_model_enabled: false
+
 # Example uses AWS SES; any SMTP provider works the same way.   1. Verify the
 # sending domain/address in SES (required before sending;      new accounts
 # start sandboxed to verified recipients only).   2. Note the SMTP endpoint for
@@ -514,16 +519,26 @@ zuno_vault_kms_secret_access_key: "xxxxxx"
 #   zuno_connectivity_link_channel     RHCL channel (e.g. stable-1.5).
 #   zuno_kueue_channel                 Kueue channel (e.g. stable-v1.5).
 #
-# Where startingCSV is set, and why only there: only RHOAI gets a startingCSV,
-# built from the effective pin by ansible/roles/openshift_ai/tasks/precheck.yml
-# (`<subscription.operator.csv>.<zuno_openshift_ai_version>`, defaulting to
-# gitops/charts/openshift-ai/values.yaml's subscription.version) and enforced
-# by install.yml, which refuses to approve an InstallPlan for another CSV.
-# RHOAI is the operator whose unattended minor-version drift is judged
-# unacceptable. Pinning every operator is rejected on purpose: it would
-# re-hardcode what ADR-0048 removed. For the rest, the known-good set is
-# recorded as data in platform/olm/known-good-<cluster>.yaml (regenerate with
-# `make d3 check operators`; see platform/olm/audit_operator_updates.py).
+# Where a version is pinned (ADR-0607 clause 2): every pre-GA operator
+# (tech-preview, early-access, alpha, staging) is pinned, GA operators are not.
+# - RHOAI: a startingCSV built from the effective pin by
+#   ansible/roles/openshift_ai/tasks/precheck.yml
+#   (`<subscription.operator.csv>.<zuno_openshift_ai_version>`, defaulting to
+#   gitops/charts/openshift-ai/values.yaml's subscription.version), enforced by
+#   install.yml, which refuses to approve an InstallPlan for another CSV.
+# - claw-operator: catalog digest + startingCSV + Manual approval
+#   (gitops/charts/openclaw/values.yaml, platform/supply-chain/pin_claw_catalog.py).
+# - unifai-operator: catalog digest, so Automatic approval is safe (ADR-0574):
+#   the commit that moves the digest is the approval, with the owner's go per
+#   release (platform/supply-chain/pin_operator_catalog.py).
+# Pinning every GA operator is still rejected: it would re-hardcode what
+# ADR-0048 removed. The installed set, with each operator's support class, is
+# recorded in platform/olm/known-good-<cluster>.yaml, and `make d3 check
+# operators` fails when a pre-GA operator differs from it (ADR-0607 clause 8).
+# Regenerate it in the same commit as every pin:
+#   python3 platform/olm/audit_operator_updates.py --oc-context <ctx> \
+#     --format known-good --cluster <cluster> > platform/olm/known-good-<cluster>.yaml
+# The routine is docs/platform/pre-ga-upgrade.md.
 #
 # zuno_openshift_ai_version: "3.5.0"
 # zuno_openshift_ai_channel: "stable-3.5"

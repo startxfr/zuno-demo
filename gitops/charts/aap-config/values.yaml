@@ -90,7 +90,7 @@ jobTemplates:
     playbook: ansible/playbooks/day1_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day1-build
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
@@ -102,13 +102,13 @@ jobTemplates:
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
 
   - name: zuno-day2-check
     playbook: ansible/playbooks/day2_check.yml
@@ -239,6 +239,11 @@ workflowTemplates:
         successNodes: [redis]
       - id: nvidia-gpu
         successNodes: [redis]
+      # ADR-0608/WP-241: an independent wave-0 branch. It needs only OLM and
+      # no Day 1 component needs it: its `nfs` StorageClass is for Day 2's
+      # unifai (sharedStorageClass), whose workflow runs after this one.
+      - id: nfs-provisioner
+        successNodes: []
       # Wave 1: needs smtp + custom-metrics-autoscaler + nvidia-gpu done.
       - id: redis
         successNodes: [observability]

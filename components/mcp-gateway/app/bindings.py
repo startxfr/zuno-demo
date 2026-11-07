@@ -57,6 +57,9 @@ VALID_TRANSPORTS = {"streamable-http", "in-process"}
 # See platform/bindings/tools/README.md for what each mode means and
 # app/main.py's invoke_tool for enforcement.
 VALID_AUTH_MODES = {"delegated-user", "service-identity", "provider-delegated"}
+# WP-225 lot C review: the modes that act with the user's own credential; each must
+# declare user_token: true.
+DELEGATED_AUTH_MODES = {"delegated-user", "provider-delegated"}
 
 
 @dataclass
@@ -80,6 +83,21 @@ class Binding:
     # `backends:` map, if any - set by BindingRegistry.reload(), never by
     # a caller. Used only as a fallback when `endpoint` is absent.
     backend_default_endpoint: Optional[Dict[str, str]] = None
+    # ADR-0603 M12 (WP-225 lot B): streamable-http only. `caller_context: true`
+    # sends the signed X-Zuno-Caller-* headers (app/caller_context.py) to this
+    # backend: only the Zuno servers that scope with it (confluence, git-forge,
+    # salesforce, aap) set it, so a third-party backend never receives a
+    # caller's identity. `gateway_token: false` withholds X-Zuno-Gateway-Token
+    # from a backend that does not check it (the upstream kubernetes-mcp-server).
+    caller_context: bool = False
+    gateway_token: bool = True
+    # ADR-0602 clause 10 (WP-225 lot C): streamable-http only. `user_token: true`
+    # means the backend needs the caller's own Keycloak token (a provider-delegated
+    # backend): it keeps the forwarded bearer when MCP_OUTBOUND_IDENTITY=assertion
+    # replaces it with the gateway's per-call assertion everywhere else
+    # (app/call_assertion.py). Required (true) for the delegated-user and
+    # provider-delegated modes (_validate).
+    user_token: bool = False
 
     def all_names(self) -> List[str]:
         """The capability plus its aliases - the equivalence set used for
@@ -137,6 +155,9 @@ class BindingRegistry:
                         handler=item.get("handler"),
                         input_schema=item.get("input_schema"),
                         backend_default_endpoint=backends_defaults.get(item["backend"]),
+                        caller_context=item.get("caller_context", False),
+                        gateway_token=item.get("gateway_token", True),
+                        user_token=item.get("user_token", False),
                     )
                     problem = _validate(binding)
                     if problem:
@@ -203,11 +224,21 @@ class BindingRegistry:
 
 
 def _validate(binding: Binding) -> Optional[str]:
+    for flag in ("caller_context", "gateway_token", "user_token"):
+        if not isinstance(getattr(binding, flag), bool):
+            return f"binding '{binding.capability}' has a non-boolean {flag} {getattr(binding, flag)!r}"
     if binding.auth_mode not in VALID_AUTH_MODES:
         return (
             f"binding '{binding.capability}' has missing or unknown auth_mode "
             f"{binding.auth_mode!r} (expected one of {sorted(VALID_AUTH_MODES)}, ADR-0208) - "
             "an entry without an explicit mode never loads"
+        )
+    if binding.auth_mode in DELEGATED_AUTH_MODES and binding.user_token is not True:
+        # WP-225 lot C review: a delegated binding acts with the user's own
+        # credential, so assertion mode must never replace its token.
+        return (
+            f"binding '{binding.capability}' has auth_mode {binding.auth_mode} but not user_token: true "
+            "(a delegated binding keeps the user's token; WP-225 lot C)"
         )
     if binding.transport not in VALID_TRANSPORTS:
         return (

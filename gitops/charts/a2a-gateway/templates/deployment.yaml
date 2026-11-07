@@ -114,6 +114,11 @@ spec:
               value: {{ .Values.publicBaseUrl | quote }}
             - name: A2A_TOOLS_ENABLED
               value: {{ .Values.toolsEnabled | quote }}
+            {{- if .Values.agentChain.sign }}
+            # WP-225 lot C: the signing key of X-Zuno-Agent-Chain (externalsecret-agent-chain.yaml).
+            - name: AGENT_CHAIN_SIGNING_KEY_FILE
+              value: /var/run/zuno-agent-chain/private_key
+            {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
 {{- if .Values.okf.fetch.enabled }}
@@ -128,6 +133,11 @@ spec:
             {{- if .Values.okf.fetch.enabled }}
             - name: okf
               mountPath: /okf
+              readOnly: true
+            {{- end }}
+            {{- if .Values.agentChain.sign }}
+            - name: agent-chain-key
+              mountPath: /var/run/zuno-agent-chain
               readOnly: true
             {{- end }}
           livenessProbe:
@@ -147,6 +157,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.agentChain.sign }}
+        - name: agent-chain-key
+          secret:
+            secretName: a2a-gateway-agent-chain
+        {{- end }}
         {{- if .Values.okf.fetch.enabled }}
         - name: okf
           emptyDir: {}

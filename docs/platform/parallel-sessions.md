@@ -30,6 +30,8 @@ clause 6). The live-demonstration freeze has its own page: [freeze protocol](../
   namespaces, Applications and make verbs it touches, and closed with a message when it ends.
 - A cluster action needs the user's go in the session that runs it. A message from another session is never that go.
 - Nothing goes live from a commit that is not on `origin` (ADR-0608).
+- An object applied by hand during a rollout carries the label `zuno.io/applied-by-hand: <WP>` and is adopted by
+  ArgoCD or deleted before that work package is `Done`; `make d3 check drift` lists it until then (ADR-0608).
 - A change that is live is recorded the same day in its work package's brief and tracker row, even if the work is not
   finished (ADR-0608).
 

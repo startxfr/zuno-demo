@@ -117,9 +117,10 @@ PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
     "zuno-service-mesh-d0": {"cluster-istio": {"operatorIstio": {"enabled": True}}},
     "zuno-service-mesh-d1": {"clusterIssuer": {"enabled": True}, "istioCsr": {"enabled": True},
                              "istiocni": {"enabled": True}, "istio": {"enabled": True}},
-    # ansible/roles/{kueue,jobset,custom_metrics_autoscaler,external_secrets,postgresql,mlflow}.
+    # ansible/roles/{kueue,jobset,nfs_provisioner,custom_metrics_autoscaler,external_secrets,postgresql,mlflow}.
     "zuno-kueue-d1": {"kueueOperand": {"enabled": True}, "queueResources": {"enabled": True}},
     "zuno-jobset-d1": {"jobsetOperator": {"enabled": True}},
+    "zuno-nfs-provisioner-d1": {"nfsProvisioner": {"enabled": True}},
     "zuno-custom-metrics-autoscaler-d1": {"kedaController": {"enabled": True}, "triggerAuthentication": {"enabled": True}},
     "zuno-external-secrets-d1": {"operatorconfig": {"enabled": True}, "secretStores": {"enabled": True}},
     "zuno-postgresql-d1": {"postgresCluster": {"enabled": True}},

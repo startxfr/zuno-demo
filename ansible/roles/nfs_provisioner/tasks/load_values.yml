@@ -1,0 +1,18 @@
+---
+# The chart's values.yaml is the single source of the names, the pin and the
+# StorageClass name; the role reads it instead of duplicating them (same as
+# ansible/roles/openclaw/tasks/load_values.yml).
+- name: "nfs_provisioner | read the chart values"
+  ansible.builtin.set_fact:
+    _nfsp: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/nfs-provisioner/values.yaml') | from_yaml }}"
+
+- name: "nfs_provisioner | derive the names and the pinned CSV"
+  ansible.builtin.set_fact:
+    _nfsp_namespace: "{{ _nfsp.operator.subscription.namespace }}"
+    _nfsp_subscription: "{{ _nfsp.operator.subscription.name }}"
+    _nfsp_package: "{{ _nfsp.operator.subscription.operator.name }}"
+    # The startx operator chart builds startingCSV as "<csv>.<version>".
+    _nfsp_pinned_csv: "{{ _nfsp.operator.subscription.operator.csv }}.{{ _nfsp.operator.subscription.version }}"
+    _nfsp_cr_name: "{{ _nfsp.nfsProvisioner.name }}"
+    _nfsp_cr_namespace: "{{ _nfsp.nfsProvisioner.namespace }}"
+    _nfsp_storage_class: "{{ _nfsp.nfsProvisioner.spec.scForNFS }}"

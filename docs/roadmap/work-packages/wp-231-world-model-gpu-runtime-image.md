@@ -1,6 +1,6 @@
 # WP-231: World-model GPU runtime image (delivers ADR-0604 D2, D3, D4)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0604
 - **Depends on:** WP-230
 - **Blocks:** WP-232, WP-234
@@ -29,8 +29,8 @@ ADR-0604 D2, D3 (single-GPU contract), D4 (encoder, coalescing), §4.2, §4.3, �
      "SIMULATED") and `WaypointEngine` (`world_engine` at the pinned commit, quantization from config);
    - `ImageGenerator` (`generate` and `edit`) with `MockFlux` (preset images, a visible tint for edits) and
      `Flux2Klein` (pinned diffusers);
-   - `FrameEncoder` with `X264Encoder` (PyAV, ultrafast/zerolatency, no B-frames) and `NvencEncoder` (PyNvVideoCodec),
-     chosen by a startup capability probe whose result is exported;
+   - `FrameEncoder` on PyAV, whose wheels bundle FFmpeg with both `h264_nvenc` and `libx264` (no PyNvVideoCodec
+     needed): `auto` opens NVENC and falls back to x264, and the choice is exported;
    - 4 frames per step paced to the measured step time; last-value control coalescing; one lease; browser key codes mapped
      to `CtrlInput` server-side; `HF_HUB_OFFLINE=1`, model paths from the cache directory.
 2. `Dockerfile`: `python:3.12-slim` from the `zuno-ai-build` mirror, torch CUDA wheels pinned to a version that supports
@@ -44,6 +44,14 @@ ADR-0604 D2, D3 (single-GPU contract), D4 (encoder, coalescing), §4.2, §4.3, �
 5. `ansible/roles/world_model_build/` from `ansible/roles/token_proxy_build/tasks/build.yml` through
    `ansible/tasks/apply_openshift_build.yml` (signed by the existing chain); `.github/workflows/build-publish.yml` matrix
    entry; `components/README.md` row. Record the licence of the bundled encoder library.
+
+## Result (2026-11-07)
+
+`components/world-model-runtime` (app, 13 mock tests passing, two hashed locks, Dockerfile with sha256-checked
+`world_engine`/`taehv`/`gemlite` archives), `app/smoke.py`, `platform/world-model/fetch_models.py` (S3 to the model cache,
+pinned revisions only, run in the mirrored storage-initializer image), `platform/world-model/tests/gpu-smoke-job.yaml`,
+`ansible/roles/world_model_build`, the build matrix entry and the lint.yml test step. The world-model-web image joins
+the build role in WP-234.
 
 ## Operator steps (with the user's go)
 

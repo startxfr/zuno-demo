@@ -1,0 +1,47 @@
+---
+# `make d0 check world-model-gpu` (ADR-0604, WP-229). State detection only,
+# never fails. Reads the Application and the Node, never the Machine API, so it
+# also runs under the AAP check credential (nodes get/list only).
+- name: "world-model-gpu | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "world-model-gpu | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _world_model_gpu_confidential_file
+
+- name: "world-model-gpu | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _world_model_gpu_confidential_file.stat.exists
+
+- name: "world-model-gpu | check the node's Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "{{ world_model_gpu_app_name }}"
+
+- name: "world-model-gpu | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "world-model-gpu | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "world-model-gpu | look up the world-model GPU node"
+  kubernetes.core.k8s_info:
+    kind: Node
+    label_selectors:
+      - "{{ world_model_gpu_node_label }}"
+  register: _world_model_gpu_nodes
+
+- name: "world-model-gpu | report the node against the switch"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_world_model_enabled={{ zuno_world_model_enabled | bool }};
+      world-model GPU nodes: {{ _world_model_gpu_nodes.resources | default([]) | length }}
+      {%- for n in _world_model_gpu_nodes.resources | default([]) %}
+      ({{ n.metadata.name }}, gpu {{ n.status.allocatable['nvidia.com/gpu'] | default('0') }},
+      mig {{ n.metadata.labels['nvidia.com/mig.config.state'] | default('?') }}){% endfor %}.
+      {{ 'MISMATCH: run make d0 install world-model-gpu to converge.'
+         if (zuno_world_model_enabled | bool) != ((_world_model_gpu_nodes.resources | default([]) | length) > 0)
+         else 'Matches the switch.' }}

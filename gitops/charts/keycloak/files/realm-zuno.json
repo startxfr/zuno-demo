@@ -1400,6 +1400,57 @@
                 "email"
             ]
         }, {
+            "clientId": "blender",
+            "name": "Blender 3D generator",
+            "description": "Public client of the Blender add-on (ADR-0610, WP-244): device sign-in on a workstation, no secret, no redirect, no password grant; the user's own token reaches the ai-gateway workstation entry (azp checked), local models only (C3)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "redirectUris": [],
+            "webOrigins": [],
+            "attributes": {
+                "oauth2.device.authorization.grant.enabled": "true",
+                "oauth2.device.code.lifespan": "600",
+                "oauth2.device.polling.interval": "5"
+            },
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
+        }, {
             "clientId": "openclaw-consultant-02",
             "name": "OpenClaw assistant of consultant-02",
             "description": "Confidential client of consultant-02's OpenClaw assistant (ADR-0589, ADR-0590): client credentials for the assistant's model and tool calls (claw-operator proxy), browser flow for its oauth2-proxy front door",

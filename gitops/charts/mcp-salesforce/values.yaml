@@ -35,3 +35,32 @@ credentials:
   # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
   secretStoreName: vault
   refreshInterval: 1h
+
+# ADR-0603 M12 (WP-225 lot B): owner scoping. When enabled, every tool is limited to
+# the Opportunities the caller owns: the caller is the active Salesforce User whose
+# Email is the `email` claim of the caller's token (signed by the mcp-gateway), and
+# only when the token's `email_verified` is true (the realm does not verify emails and
+# users may edit theirs; an immutable identifier is the WP-227 follow-up); a
+# record it creates is owned by it; an update of another owner's record is refused
+# before anything is written. A caller with none, or several, matching Users is
+# refused. Groups in allRecordsGroups are entitled to every record. Off: today's
+# behaviour, every caller sees what the technical identity sees.
+ownerScoping:
+  enabled: false
+  allRecordsGroups: []
+
+# ADR-0602 clause 10 / ADR-0603 M14 (WP-225 lot C): verify the mcp-gateway's
+# per-call assertion (Authorization: Bearer <EdDSA JWT, typ zuno-call+jwt>: aud this
+# server, sub the caller, act the gateway, the tool, exp <= 60 s, jti consumed once).
+# publicKey: the PEM of Vault mcp/gateway-call-assertion public_key. Set, an
+# assertion is verified when one is sent (a forged, expired, misaddressed,
+# other-tool or replayed one is refused) and a request without one is still
+# served. required: true refuses every request without a valid assertion; set it
+# only after the mcp-gateway runs with outboundIdentity.mode assertion. Both off by
+# default (today's behaviour).
+# maxBodyBytes: the largest request body read to check a tools/call (a larger one
+# is refused with 413); 16 MiB leaves room for a git.file.write of a large file.
+callAssertion:
+  publicKey: ""
+  required: false
+  maxBodyBytes: 16777216

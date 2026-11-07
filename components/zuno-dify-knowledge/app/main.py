@@ -108,10 +108,10 @@ def create_app(settings: Settings, transport: Optional[httpx.AsyncBaseTransport]
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": settings.tool_name, "arguments": {"query": query, "top_k": top_k}},
         }
-        response = await client.post(
-            settings.mcp_url, json=message,
-            headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
-        )
+        headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+        if settings.proxy_key:
+            headers["Authorization"] = f"Bearer {settings.proxy_key}"  # WP-225 lot C: the proxy's inbound key
+        response = await client.post(settings.mcp_url, json=message, headers=headers)
         response.raise_for_status()
         if response.headers.get("content-type", "").startswith("text/event-stream"):
             rpc = _sse_json(response.text)

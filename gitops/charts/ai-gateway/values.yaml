@@ -67,6 +67,24 @@ keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/ope
 # or the pod refuses to start).
 jwtAudience: zuno-admin-api
 jwtAudienceRequired: true
+# ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens the
+# gateway accepts, on top of jwtAudience ("*" suffix = prefix). Empty (default)
+# accepts every client the audience admits; a bare "*" is refused. Include the
+# admin client when /admin/* is used.
+jwtAllowedClients: []
+# ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
+# With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
+# the WP-209 classification floor, the routing preferences and the guardrails mode
+# key on the verified agent; a disagreeing X-Zuno-Agent is ignored and logged. A
+# missing or invalid chain keeps today's headers and the per-client floor.
+agentChain:
+  verify: false
+  publicKey: ""
+  # WP-225 lot C review: Keycloak clients (azp, "*" suffix = prefix) that must
+  # present a valid chain when they name an agent. Without one their X-Zuno-Agent
+  # is ignored (logged) and only the client floor applies. Needs verify. Empty
+  # (default) requires it of nobody.
+  requireFor: []
 localModelEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
 localModelName: qwen3.6-27b-instruct
 
@@ -206,12 +224,13 @@ classification:
   # WP-209 brief lists (the UnifAI shared `zuno-gateway` LLM above all) send a
   # header. An older image ignores it and keeps C1.
   defaultWhenAbsent: C1
-  # WP-209 review: the floor of a call that names no known agent (absent or
-  # unknown X-Zuno-Agent), per Keycloak client (`azp`), e.g. {unifai: C2}.
+  # WP-209 review: a floor per Keycloak client (`azp`), e.g. {unifai: C2}.
   # The agent and task headers are caller-set, so without it a UnifAI token
   # escapes every floor by omitting X-Zuno-Agent while the default is C1.
-  # Empty = none (today's behaviour). A caller claiming a low-floor agent is
-  # closed only by a verifiable agent identity (WP-225 lot C).
+  # WP-225 lot C review: it applies to every call whose agent is not verified
+  # by a signed a2a-gateway chain, as the higher of it and the named agent's
+  # floor, so claiming a low-floor agent cannot drop below it either. Empty =
+  # none (today's behaviour).
   clientFloors: {}
 
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
@@ -242,6 +261,15 @@ experienceClients:
   - world-model
   - zuno-evaluations
   - zuno-stresstest
+  # ADR-0610 (WP-244): the Blender add-on, a workstation client (public Keycloak client, device sign-in).
+  - blender
+
+# ADR-0610 (WP-244): admit the Kuadrant gateway that fronts this service for workstation clients
+# (NetworkPolicy peer). The entry itself (Route, HTTPRoute, AuthPolicy) is the connectivity-link chart's
+# workstationEntry; turn both on together. Off by default; a cluster turns it on with
+# zuno_ai_gateway_workstation_entry in ansible/clusters/<cluster>.yml.
+workstationEntry:
+  enabled: false
 
 # ADR-0593/ADR-0601 (WP-202): Keycloak clients whose tokens may carry the
 # hardcoded `persona` claim (an entry ending in `*` is a prefix). The quota and
@@ -301,10 +329,11 @@ guardrails:
   nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
   configId: zuno-observe
   timeoutSeconds: "10"
-  # off | observe | block, per DECLARED data classification
-  # (X-Zuno-Data-Classification). observe = evaluate after the response,
-  # never alter it; block = refuse a flagged prompt/reply with HTTP 400 (a
-  # streamed reply is observed, not blocked). Every class ships observe:
+  # off | observe | block, per EFFECTIVE data classification (the
+  # X-Zuno-Data-Classification header raised by the WP-209 floor and the
+  # ADR-0594 markers). observe = evaluate after the response, never alter it;
+  # block = refuse a flagged prompt, tool result or reply with HTTP 400, and
+  # cut a streamed reply on a detection (WP-225). Every class ships observe:
   # switching one to block is a values change, decided on evidence
   # (ADR-0534). An unlisted class is observe.
   modeByClassification:
@@ -317,6 +346,71 @@ guardrails:
   # minimum and the calling agent's `zuno.guardrails.mode`. Needs an image
   # with app/guardrails.py's AgentModes (ai-gateway after WP-164 lot 3).
   modesGenerated: false
+  # ADR-0602 clause 8 (WP-225 lot A). Each takes effect in `block` mode only;
+  # with every class on observe (above) nothing changes for a caller.
+  # The lowest class whose `block` fails CLOSED when the detector (or the
+  # classifier below) is unreachable or errors: the request is refused with a
+  # typed 503 instead of served unchecked. Below it (C1) a detector outage
+  # still lets the request through. "" = never fail closed.
+  failClosedFrom: C2
+  # Scan the current turn's tool results and retrieved context (OpenAI `tool`
+  # messages, Anthropic tool_result/document/search_result blocks, Responses
+  # *_call_output items) like the user's text, in observe and block. Shipped
+  # false so a merge keeps today's scan (the last user message only); turn it on
+  # per cluster (zuno_ai_gateway_guardrails_scan_tool_results) once the detector
+  # load of whole tool results is measured.
+  scanToolResults: false
+  # A streamed reply in block mode is held back until this many characters
+  # are pending, checked, then released or cut with the protocol's error event.
+  # 0 = buffer the whole reply and check it once at the end.
+  streamHoldBackChars: 400
+  # A model-based classifier next to the regular expressions
+  # (app/guardrails_classifier.py). Off: no model is wired by default.
+  # `detectors-api` calls any detector served through the FMS Guardrails
+  # detector API (TrustyAI's Hugging Face detector runtime): POST
+  # <url>/api/v1/text/contents with header detector-id. Its outage counts as
+  # a detector outage (failClosedFrom above). A type set without url and
+  # detectorId fails the render; the code treats it as unavailable too.
+  classifier:
+    type: ""          # "" (off) | detectors-api
+    url: ""
+    detectorId: ""
+    threshold: "0.5"
+
+# ADR-0602 clause 9 (WP-225 lot A): the ai-gateway serves POST /v1/messages
+# (Anthropic Messages, with /v1/messages/count_tokens) and POST /v1/responses
+# (OpenAI Responses) as a metered pass-through to a local model that speaks
+# the protocol, because MaaS's token limits do not count either path. Usage is
+# counted on zuno_model_tokens and the token-budget ledger like a chat call;
+# guardrails and the WP-209 classification apply. Open by decision: metered,
+# not blocked. A Claude Code key minted on MaaS still goes to MaaS directly and
+# is unaffected. Off = the paths answer 404, as before.
+meteredPaths:
+  enabled: false
+  # The `model` a client sends -> provider-routing.yaml provider names, tried
+  # in order; the first `kind: local` one with an `endpoint`, eligible for the
+  # call's classification and available is used. Example:
+  #   gpt-oss-20b: [local-gpt-oss-maas, local-gpt-oss]
+  models: {}
+  # Optional per-key token ceiling on these two paths (app/key_ceilings.py).
+  # A key is the caller's persona (the person, or an OpenClaw persona); a
+  # tenant a Keycloak group, whose members share one counter. `default: 0` and
+  # no entries = no ceiling (today's behaviour). `exemptPersonas` and
+  # `exemptClients` (Keycloak client ids) are never capped, whatever the
+  # default. A call reserves its estimate (prompt + max output) until it ends,
+  # so parallel calls overrun a ceiling by one call at most.
+  # `maxConcurrentStreams` caps the open streams of one key (0 = no cap). Over a
+  # ceiling the call gets the protocol's 429 (Anthropic rate_limit_error, OpenAI
+  # code rate_limit_exceeded) with Retry-After. Consumed tokens follow
+  # quotaLedger.store; reservations and stream counts are per replica.
+  keyCeilings:
+    window: 1h
+    default: 0
+    keys: {}
+    tenants: {}
+    exemptPersonas: []
+    exemptClients: []
+    maxConcurrentStreams: 0
 
 # ADR-0594 (WP-191): signed classification markers on MCP tool results. The key
 # Secret is generated in zuno-ai-run by the mcp-gateway chart; both gateways read it.

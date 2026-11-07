@@ -1,0 +1,63 @@
+---
+# Refuses first: deleting the NFSProvisioner deletes the NFS server and its
+# backing volume, so every PersistentVolume of the class (UnifAI's shared
+# storage in zuno-unifai, ADR-0608) would lose its data, and the provisioner
+# would no longer be there to clean up the PersistentVolumes. Then the reverse
+# of install.yml, as in ansible/roles/jobset/tasks/uninstall.yml: d1 first,
+# then remove_operator.yml, then d0. The namespace is left in place (the
+# project chart's PreSync hook is never pruned).
+- name: "nfs_provisioner | read the chart values"
+  ansible.builtin.include_tasks: load_values.yml
+
+- name: "nfs_provisioner | list the PersistentVolumeClaims of every namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+  register: _nfsp_all_pvcs
+
+- name: "nfs_provisioner | list the PersistentVolumes"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: PersistentVolume
+  register: _nfsp_all_pvs
+
+- name: "nfs_provisioner | keep the volumes of the {{ _nfsp_storage_class }} StorageClass"
+  ansible.builtin.set_fact:
+    _nfsp_class_pvcs: >-
+      {% set out = [] %}{% for p in _nfsp_all_pvcs.resources | default([])
+         | selectattr('spec.storageClassName', 'defined')
+         | selectattr('spec.storageClassName', 'equalto', _nfsp_storage_class) %}{% set _ = out.append(p.metadata.namespace ~ '/' ~ p.metadata.name) %}{% endfor %}{{ out }}
+    _nfsp_class_pvs: >-
+      {{ _nfsp_all_pvs.resources | default([])
+         | selectattr('spec.storageClassName', 'defined')
+         | selectattr('spec.storageClassName', 'equalto', _nfsp_storage_class)
+         | map(attribute='metadata.name') | list }}
+
+- name: "nfs_provisioner | refuse while a volume uses the {{ _nfsp_storage_class }} StorageClass"
+  ansible.builtin.fail:
+    msg: >-
+      Refusing to uninstall nfs-provisioner: StorageClass '{{ _nfsp_storage_class }}'
+      is still used by {{ _nfsp_class_pvcs | length }} PersistentVolumeClaim(s)
+      [{{ _nfsp_class_pvcs | join(', ') }}]
+      and {{ _nfsp_class_pvs | length }} PersistentVolume(s) [{{ _nfsp_class_pvs | join(', ') }}].
+      Deleting the provisioner deletes the NFS server and its backing volume in
+      {{ _nfsp_namespace }}, and with it the data of every one of those volumes
+      (UnifAI's shared storage in zuno-unifai, ADR-0608). Remove them first,
+      then re-run.
+  when: (_nfsp_class_pvcs | length) > 0 or (_nfsp_class_pvs | length) > 0
+
+- name: "nfs_provisioner | delete the nfs-provisioner GitOps Application (d1: NFSProvisioner instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-nfs-provisioner-d1"
+
+- name: "nfs_provisioner | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ _nfsp_subscription }}"
+    operator_namespace: "{{ _nfsp_namespace }}"
+
+- name: "nfs_provisioner | delete the nfs-provisioner GitOps Application (d0: the Subscription and OperatorGroup)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-nfs-provisioner-d0"

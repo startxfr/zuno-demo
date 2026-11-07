@@ -40,7 +40,7 @@ spec:
     # multiagent (KEYCLOAK_BASE_URL).
     - type: Allow
       to:
-        dnsName: keycloak.{{ .Values.clusterBaseDomain }}
+        dnsName: {{ $s.identity.keycloakHost | default (printf "keycloak.%s" .Values.clusterBaseDomain) }}
       ports:
         - protocol: TCP
           port: 443

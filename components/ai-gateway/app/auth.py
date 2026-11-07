@@ -25,7 +25,7 @@ from jwt import PyJWKClient
 logger = logging.getLogger("ai_gateway.auth")
 
 KEYCLOAK_ISSUER = os.getenv(
-    "KEYCLOAK_ISSUER", "https://keycloak-zuno.apps.mycluster.example.com/realms/zuno"
+    "KEYCLOAK_ISSUER", "https://keycloak.apps.mycluster.example.com/realms/zuno"
 )
 KEYCLOAK_JWKS_URL = os.getenv(
     "KEYCLOAK_JWKS_URL", f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
@@ -51,6 +51,35 @@ def admin_groups() -> List[str]:
     raw = os.getenv("ADMIN_GROUPS", "ocp-paas-ops,ocp-ai-ops")
     return [g.strip() for g in raw.split(",") if g.strip()]
 JWT_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "30"))
+
+
+def allowed_clients() -> List[str]:
+    """ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (`azp`) whose tokens
+    this gateway accepts, from JWT_ALLOWED_CLIENTS (comma-separated, read per call;
+    an entry ending in `*` is a prefix). Empty, the default, accepts every client
+    the audience admits, as before. Set, a token from another client, or without
+    `azp`, is refused with a 401: on top of the `zuno-admin-api` audience
+    (WP-222), each experience is then admitted by name."""
+    raw = os.getenv("JWT_ALLOWED_CLIENTS", "")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+# WP-225 lot C review: a bare "*" would turn the allowlist into "every client" while
+# looking like a control; refuse to start instead.
+if "*" in allowed_clients():
+    raise RuntimeError("JWT_ALLOWED_CLIENTS contains a bare '*'; list the clients (a prefix like 'openclaw-*' is fine).")
+
+
+def client_allowed(azp: str, patterns: List[str]) -> bool:
+    for pattern in patterns:
+        if pattern == "*":
+            continue  # a bare "*" would admit every client: refused at start, never a match
+        if pattern.endswith("*"):
+            if azp.startswith(pattern[:-1]) and len(azp) > len(pattern) - 1:
+                return True
+        elif azp == pattern:
+            return True
+    return False
 
 
 def trusted_platform_clients() -> set:
@@ -172,6 +201,11 @@ def validate_token(authorization: Optional[str] = Header(default=None)) -> Calle
     sub = claims.get("sub")
     if not sub:
         raise HTTPException(status_code=401, detail="Token missing 'sub' claim.")
+
+    patterns = allowed_clients()
+    if patterns and not client_allowed(str(claims.get("azp") or ""), patterns):
+        logger.warning("token of client %r refused (JWT_ALLOWED_CLIENTS)", claims.get("azp"))
+        raise HTTPException(status_code=401, detail="Token issued to a client this gateway does not accept.")
 
     groups = claims.get("groups", []) or []
     return CallerIdentity(sub=sub, groups=[g.lstrip("/") for g in groups], raw_claims=claims, token=token)

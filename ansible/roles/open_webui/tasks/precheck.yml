@@ -56,6 +56,9 @@
           not signed by Zuno (ADR-0586 decision 7), so the digest pin is the only integrity check.
         quiet: true
 
+    - name: "open-webui | resolve the Keycloak endpoint (ADR-0352, WP-211)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
     - name: "open-webui | probe Keycloak, the gateways and the internet from the pod"
       kubernetes.core.k8s_exec:
         namespace: "{{ open_webui_namespace }}"
@@ -64,7 +67,7 @@
         command: >-
           sh -c '
           c() { curl -s -o /dev/null -m 10 -w "%{http_code}" "$@" || true; };
-          echo "keycloak=$(c https://keycloak.{{ cluster_base_domain }}/realms/zuno/.well-known/openid-configuration)";
+          echo "keycloak=$(c {{ zuno_keycloak_issuer_url }}/.well-known/openid-configuration)";
           echo "ai_gateway=$(c http://ai-gateway.zuno-ai-run.svc:8080/v1/models)";
           echo "mcp_gateway=$(c -X POST -H "Content-Type: application/json"
           -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}" http://mcp-gateway.zuno-ai-run.svc:8080/mcp)";

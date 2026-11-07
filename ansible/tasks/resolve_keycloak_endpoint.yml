@@ -1,0 +1,32 @@
+---
+# ADR-0352 / WP-211 (lot A): the one place that says where Keycloak is.
+#
+# Every Ansible task that calls Keycloak or hands its URL to a workload reads these
+# facts instead of building `https://keycloak.<domain>` itself. Today they describe
+# the built-in instance only, and reproduce exactly the strings the callers used to
+# write by hand, so including this file changes nothing. WP-211 lot B adds external
+# mode here (zuno_keycloak_mode, zuno_keycloak_external_*), without touching callers.
+#
+# An include, not group_vars: the AAP Controller inventory has no group_vars
+# directory (see gitops/charts/aap-config/templates/ansibleinventory.yaml), so a
+# variable defined there would be undefined in every AAP-launched job.
+#
+# Needs: cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml).
+# Sets:
+#   zuno_keycloak_url           https://keycloak.<domain> (public base URL, no realm path)
+#   zuno_keycloak_realm         zuno
+#   zuno_keycloak_issuer_url    <url>/realms/<realm>
+#   zuno_keycloak_token_url     <issuer>/protocol/openid-connect/token
+#   zuno_keycloak_auth_url      <issuer>/protocol/openid-connect/auth
+#   zuno_keycloak_internal_url  http://zuno-service.zuno-auth.svc:8080 (in-cluster, built-in only)
+- name: "keycloak-endpoint | resolve the Keycloak endpoint (ADR-0352, built-in instance)"
+  ansible.builtin.set_fact:
+    zuno_keycloak_url: "https://keycloak.{{ cluster_base_domain }}"
+    zuno_keycloak_realm: zuno
+    zuno_keycloak_internal_url: "http://zuno-service.zuno-auth.svc:8080"
+
+- name: "keycloak-endpoint | derive the realm URLs"
+  ansible.builtin.set_fact:
+    zuno_keycloak_issuer_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}"
+    zuno_keycloak_token_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/token"
+    zuno_keycloak_auth_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/auth"

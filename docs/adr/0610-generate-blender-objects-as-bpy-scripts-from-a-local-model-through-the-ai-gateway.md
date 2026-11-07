@@ -173,3 +173,25 @@ The first two rows are expectations to be confirmed by clause 8; the third is me
 
 None opened yet. The work package is opened when the v0.17 band starts, with its number reserved under ADR-0606
 clause 5.
+
+## Update 2026-11-07 (WP-244): implementation choices
+
+Executed ahead of the v0.17 band by user decision (weekend rush before the 2026-11-09 demonstration). What WP-244
+builds, clause by clause, where it differs from the wording above:
+
+- **Clause 2.** No model alias: the add-on names the task with `X-Zuno-Agent: blender` and `X-Zuno-Task: bpy`, the
+  headers every caller uses, so `modelTaskAliases` and the fail-closed list are unchanged. The task is declared in the
+  agents release (`experience-clients/blender/tasks/bpy.md`, `models.preferred: [reasoning, default]`, zuno-demo-agents
+  b8ac031); until that release is promoted, the corp order answers.
+- **Clause 3.** `zuno_ai_gateway_classification_client_floors: {blender: C3}`, keyed on the token's `azp`. `blender` is
+  an experience client, never an agent, so every call of the client is a call that names no known agent and gets this
+  floor; the stack generator writes floors for agents only. The task also forbids every external model role, so the
+  generated routing excludes the SaaS providers as well.
+- **Clause 5.** The entry is `gitops/charts/connectivity-link/templates/workstation-entry.yaml` (the ai-gateway's
+  Application may not write to `openshift-ingress`): reencrypt Route, HTTPRoute on `zuno-agent-gateway` with the two
+  paths and a 300 s timeout, AuthPolicy with issuer, audience, `azp` and an admitted group (demo333: `ocp-ai-dev`,
+  persona ai-dev-01: a public device client lets every realm user mint a token, so the group narrows who may use the
+  entry; an existing group, because group membership is not managed from this repository), and a RateLimitPolicy of
+  60 requests per user per 5 minutes. The ai-gateway's port 8080 already accepts callers outside the mesh
+  (PeerAuthentication `ai-gateway-from-unmeshed-clients`), and its own audience check is live (`JWT_AUDIENCE_REQUIRED`).
+- **Clause 7.** demo333's routes serve the Let's Encrypt wildcard, so the add-on needs no CA file there.

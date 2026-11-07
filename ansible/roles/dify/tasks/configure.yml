@@ -57,6 +57,17 @@
   register: _dify_knowledge_key
   no_log: true
 
+- name: "dify | read the token proxy inbound key from Vault (WP-225 lot C)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _dify_cfg_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -field=inbound_keys zuno/dify/token-proxy"
+  register: _dify_proxy_key
+  when: dify_token_proxy_inbound_auth | bool
+  no_log: true
+
 - name: "dify | clear the example applications directory of the api pod"
   kubernetes.core.k8s_exec:
     namespace: "{{ dify_namespace }}"
@@ -81,7 +92,9 @@
     DIFY_CFG: >-
       {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
           'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'reimport': dify_reimport_apps, 'models': dify_models,
-          'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout})} | to_json }}
+          'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout}),
+          'proxy_key': ((_dify_proxy_key.stdout | default('')).splitlines() | first | default(''))
+            if (dify_token_proxy_inbound_auth | bool) else ''} | to_json }}
   args:
     executable: /bin/bash
   register: _dify_cfg_out

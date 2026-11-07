@@ -29,7 +29,7 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -207,6 +207,21 @@ class PolicyDecision:
     subject_field: Optional[str] = None
 
 
+def agent_entitlement_every_call() -> bool:
+    """WP-225 lot C: whether evaluate() (both front doors) checks the agent
+    entitlement on every tool call. Read per call; off unless set to true."""
+    return os.getenv("AGENT_ENTITLEMENT_EVERY_CALL", "false").strip().lower() == "true"
+
+
+def agent_entitlement_refusal(agent: Any, caller_groups: List[str]) -> Optional[str]:
+    """None when the caller's groups include one of the agent's zuno.access.groups
+    (ADR-0040), else the refusal. An agent that declares no group is refused, never
+    open to everyone."""
+    if not set(getattr(agent, "access_groups", None) or []) & set(caller_groups or []):
+        return f"caller is not entitled to agent '{agent.name}' (ADR-0040)"
+    return None
+
+
 def evaluate(
     store: PolicyStore,
     agents: AgentDeclarationStore,
@@ -263,6 +278,19 @@ def evaluate(
     agent = agents.get(agent_name)
     if agent is None:
         return PolicyDecision(allowed=False, reason=f"unknown calling agent '{agent_name}'")
+
+    # ADR-0040 / ADR-0603 M14 (WP-225 lot C): the caller must be entitled to the
+    # agent it calls as. /mcp checked this before listing; the REST path did not,
+    # so a caller could name an agent it may not use and reach that agent's tools.
+    # Both front doors now get it from here, the one intersection (ADR-0036).
+    # Gated (chart `restAgentEntitlement`, env AGENT_ENTITLEMENT_EVERY_CALL), OFF by
+    # default: kept off until a post-demo golden-path run, belt and braces. UnifAI
+    # calls /mcp, which keeps its own up-front refusal either way (main.py); the
+    # only REST callers are the evaluation scripts.
+    if agent_entitlement_every_call():
+        refusal = agent_entitlement_refusal(agent, caller_groups)
+        if refusal:
+            return PolicyDecision(allowed=False, reason=refusal)
 
     delegated = bool(chain)
     if delegated:

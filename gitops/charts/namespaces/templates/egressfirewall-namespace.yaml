@@ -55,7 +55,7 @@ spec:
     # Keycloak's public issuer and JWKS (the gateways verify tokens against it).
     - type: Allow
       to:
-        dnsName: keycloak.{{ $.Values.clusterBaseDomain }}
+        dnsName: {{ $.Values.keycloakHost | default (printf "keycloak.%s" $.Values.clusterBaseDomain) }}
       ports:
         - protocol: TCP
           port: 443

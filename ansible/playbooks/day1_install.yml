@@ -8,6 +8,8 @@
 # `vault`/`external_secrets` (Day 0). `postgresql`/`keycloak`/`aap`/
 # `aap_config` moved the other way, into Day 0 right after `machines` (see
 # day0_install.yml) - they are this repo's "always-on infra" core.
+# `nfs_provisioner` (ADR-0608/WP-241) needs only OLM; its `nfs` StorageClass
+# serves Day 2's `unifai` (sharedStorageClass).
 # `openshift_ai`/`kueue` back `models`' KServe/RHOAI serving path.
 # `openshift_oauth` runs where `keycloak` used
 # to (right before `connectivity_link`) - it needs Keycloak's Ingress/TLS
@@ -34,6 +36,7 @@
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler
+      - nfs_provisioner
       - redis
       - observability
       - service_mesh

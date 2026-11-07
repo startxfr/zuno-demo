@@ -7,6 +7,11 @@ global:
   zuno:
     clusterBaseDomain: apps.mycluster.example.com
     routeHost: kagent.apps.mycluster.example.com
+    # ADR-0352/WP-211: Keycloak seam. Empty = the built-in instance
+    # (https://keycloak.<clusterBaseDomain>/realms/zuno). Global so that the
+    # subchart's tpl-evaluated env can read it too.
+    keycloakIssuerUrl: ""
+    keycloakHost: ""
 
 namespace: zuno-kagent
 

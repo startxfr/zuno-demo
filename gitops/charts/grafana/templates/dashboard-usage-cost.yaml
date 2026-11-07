@@ -37,6 +37,12 @@
 # (a throwaway probe dashboard, both an expanded and a collapsed row)
 # before being applied here - no known incompatibility with this
 # operator version.
+#
+# WP-225 lot B (ADR-0603 M15): the `user` label was dropped from the ai-gateway
+# counters (personal data on every series, one series set per person). The "by
+# user" panels and the $user variable are now by experience client ($client); the
+# group panels are unchanged. A per-person view reads Tempo (zuno.user_sub,
+# zuno.persona on the model_call span) or the token-budget ledger.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -56,7 +62,7 @@ spec:
     {
       "uid": "zuno-usage-cost",
       "title": "Usage & cost",
-      "description": "ADR-0029/ADR-0413: model calls/tokens/cost and API requests by user and Keycloak group, filterable by user/group/agent/model/provider.",
+      "description": "ADR-0029/ADR-0413: model calls/tokens/cost and API requests by experience client and Keycloak group, filterable by client/group/agent/model/provider. No per-user label since WP-225 lot B (ADR-0603 M15): one person's usage is in the token-budget ledger and in Tempo (zuno.user_sub, zuno.persona).",
       "tags": [
         "zuno",
         "usage",
@@ -91,14 +97,14 @@ spec:
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "definition": "label_values(zuno_model_calls_total, user)",
+            "definition": "label_values(zuno_model_calls_total, client)",
             "hide": 0,
             "includeAll": true,
             "allValue": ".*",
             "multi": true,
-            "name": "user",
+            "name": "client",
             "options": [],
-            "query": "label_values(zuno_model_calls_total, user)",
+            "query": "label_values(zuno_model_calls_total, client)",
             "refresh": 2,
             "regex": "",
             "sort": 1,
@@ -198,7 +204,7 @@ spec:
         {
           "id": 1011,
           "type": "row",
-          "title": "By user",
+          "title": "By client (top 20)",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -210,7 +216,7 @@ spec:
         },
         {
           "id": 1,
-          "title": "Model calls (top 20 users, over range)",
+          "title": "Model calls (top 20 clients, over range)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -228,14 +234,14 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "topk(20, sum by (user) (increase(zuno_model_calls_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
-              "legendFormat": "{{`{{user}}`}}"
+              "expr": "topk(20, sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
+              "legendFormat": "{{`{{client}}`}}"
             }
           ]
         },
         {
           "id": 3,
-          "title": "Estimated cost (top 20 users, over range)",
+          "title": "Estimated cost (top 20 clients, over range)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -258,14 +264,14 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "topk(20, sum by (user) (increase(zuno_model_cost_usd_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
-              "legendFormat": "{{`{{user}}`}}"
+              "expr": "topk(20, sum by (client) (increase(zuno_model_cost_usd_total{client=~\"$client\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
+              "legendFormat": "{{`{{client}}`}}"
             }
           ]
         },
         {
           "id": 5,
-          "title": "API requests (top 20 users, over range)",
+          "title": "API requests (top 20 clients, over range)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -283,14 +289,14 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "topk(20, sum by (user) (increase(zuno_model_calls_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
-              "legendFormat": "{{`{{user}}`}}"
+              "expr": "topk(20, sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", agent=~\"$agent\"}[$__range])))",
+              "legendFormat": "{{`{{client}}`}}"
             }
           ]
         },
         {
           "id": 9,
-          "title": "Top token consumers (over range)",
+          "title": "Top token consumers by client (over range)",
           "type": "table",
           "datasource": {
             "type": "prometheus",
@@ -308,7 +314,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "topk(20, sum by (user) (increase(zuno_model_tokens_total{user=~\"$user\"}[$__range])))",
+              "expr": "topk(20, sum by (client) (increase(zuno_model_tokens_total{client=~\"$client\"}[$__range])))",
               "format": "table",
               "instant": true
             }
@@ -403,7 +409,7 @@ spec:
             },
             {
               "id": 10,
-              "title": "Model cost by user & agent (top 20, over range)",
+              "title": "Model cost by client & agent (top 20, over range)",
               "type": "table",
               "description": "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed.",
               "datasource": {
@@ -427,7 +433,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "topk(20, sum by (user, agent) (increase(zuno_model_cost_usd_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
+                  "expr": "topk(20, sum by (client, agent) (increase(zuno_model_cost_usd_total{client=~\"$client\", agent=~\"$agent\"}[$__range])))",
                   "format": "table",
                   "instant": true
                 }
@@ -567,7 +573,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum by (client) (increase(zuno_model_calls_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
                   "legendFormat": "{{`{{client}}`}}"
                 }
               ]
@@ -593,7 +599,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{client=~\"$client\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
                   "legendFormat": "{{`{{client}}`}} ({{`{{kind}}`}})"
                 }
               ]
@@ -624,7 +630,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum by (client) (increase(zuno_model_cost_usd_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "expr": "sum by (client) (increase(zuno_model_cost_usd_total{client=~\"$client\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
                   "legendFormat": "{{`{{client}}`}}"
                 }
               ]
