@@ -320,6 +320,34 @@ zuno_unifai_values:
       - virtualization
     syncInterval: 168h
     resyncToken: git-2026-11-08-1
+  - name: rhoai-odh-3-3-docs
+    type: git
+    visibility: public
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:openshift-ai
+    git:
+      url: https://github.com/opendatahub-io/opendatahub-documentation
+      ref: main
+      metadata:
+        product: Red Hat OpenShift AI Self-Managed (from the Open Data Hub docs)
+        version: 3.x (main, March 2026)
+        language: en
+      attributes:
+        upstream!: ''
+        self-managed: ''
+      include:
+      - '*.adoc'
+      exclude:
+      - modules/*
+      - assemblies/*
+      - examples/*
+      - scripts/*
+      - _artifacts/*
+      - README.adoc
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
   retrievers:
   - config:
       # WEB too: the sales-demo source (knowledge.sales) is a web source.
