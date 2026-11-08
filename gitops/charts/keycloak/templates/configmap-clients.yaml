@@ -62,6 +62,9 @@ data:
     {{ $g.name }} {{ $sg.name }}
 {{- end }}
 {{- end }}
+{{- range $g := .Values.keycloakExternal.extraGroups }}
+    - {{ $g }}
+{{- end }}
 {{- if .Values.keycloakExternal.seedPersonas }}
 {{- range $u := $realm.users }}
 {{- if not $u.serviceAccountClientId }}
