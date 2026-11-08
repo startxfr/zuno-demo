@@ -38,8 +38,8 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
-| v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237 |
-| v0.17 | 3 | 3 | 10 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-244 |
+| v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-227, WP-229, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237 |
+| v0.17 | 3 | 2 | 11 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1046,7 +1046,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 |---|---|---|---|---|---|
 | WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Done (2026-11-07) | floors live on demo333 (image d849b322), cognos C1->C3 proven; header-less default stays C1 by user decision, so ADR-0565 stays Partially implemented |
 | WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Abandoned (2026-11-07) | user decision: per-source aclGroups is the contract, page-level ACL not needed; ADR-0110 Implemented |
-| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Repo work merged - lot A of three | lot A done (seams, internal unchanged, proven by an identical render); lots B and C open, decisions D1-D5 |
+| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Repo work in review | lots A and B built and tested locally (A pushed, B waits for the end of the demo freeze); lot C is the live there-and-back in a window with the user |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
 | WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal |
@@ -1060,8 +1060,8 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Done | merged to `devel` locally, not pushed; live checks waived by the user; push, gateway builds and sync wait for the user's go |
 | WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Done | demo333 migrated 2026-11-07 (raft + AWS KMS + TLS, root token revoked, recovery 3/2); eso-reader kept until `main` carries WP-223 (zuno-rhtas-d1 tracks main) |
 | WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222, WP-223 | Operator pending | pushed 55ebf41f and rolled out on demo333 2026-11-07 (STRICT x3, zuno-ai-run firewall Argo-owned, three AppProjects); left: zuno-unifai firewall rehearsal, agents scaffold, GitHub settings |
-| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603 | WP-222, WP-209 | Operator pending (lots A, B and C, 2026-11-07) | lot A (guardrails fail closed from C2, tool results scanned, streams cut, classifier hook; metered `/v1/messages` and `/v1/responses` with an optional per-key ceiling) committed locally, not pushed, off by default, review findings fixed; lot B (signed caller context; space, repository and recipient allowlists; Salesforce owner scoping; PromQL namespace matcher; no per-user metric label; JSON-RPC batch bound; AAP launch limit) committed locally on `wp-225-lot-b`, not pushed, scope checks off by default; lot C (signed per-call assertion instead of the forwarded bearer, one entitlement check for REST and `/mcp`, token-proxy inbound keys and a per-client `azp` allowlist, signed a2a agent chain feeding the WP-209 floor) committed locally on `wp-225-lot-c`, not pushed, off by default (the REST entitlement behind `restAgentEntitlement`); live probes need the builds and the user's go; classification itself stays with WP-209 |
-| WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Operator pending | committed locally on `wp-226-supply-chain`, not pushed; rebuilds, warn dry run, enforce, first rendered release and route-cert switch wait for the user's go |
+| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603 | WP-222, WP-209 | Done (2026-11-07) | lot A (guardrails fail closed from C2, tool results scanned, streams cut, classifier hook; metered `/v1/messages` and `/v1/responses` with an optional per-key ceiling) committed locally, not pushed, off by default, review findings fixed; lot B (signed caller context; space, repository and recipient allowlists; Salesforce owner scoping; PromQL namespace matcher; no per-user metric label; JSON-RPC batch bound; AAP launch limit) committed locally on `wp-225-lot-b`, not pushed, scope checks off by default; lot C (signed per-call assertion instead of the forwarded bearer, one entitlement check for REST and `/mcp`, token-proxy inbound keys and a per-client `azp` allowlist, signed a2a agent chain feeding the WP-209 floor) committed locally on `wp-225-lot-c`, not pushed, off by default (the REST entitlement behind `restAgentEntitlement`); live probes need the builds and the user's go; classification itself stays with WP-209 |
+| WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Done (2026-11-07) | on `devel`, image policy enforced for the opt-in namespaces; first rendered release and route-cert switch wait for the user's go (see post-demo-hardening) |
 | WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
 
 ### Phase 51 — interactive world-model demo (added 2026-11-07)
@@ -1072,16 +1072,16 @@ the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a wor
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Repo work in review | committed on `wm-world-model`, not pushed; push waits for the user's go |
-| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Repo work in review | the GPU Operator toleration is a separate commit, pushed and applied in the announced window (Tue 2026-11-10 morning, user's go); first live create/delete cycle in WP-232 |
-| WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Repo work in review | none: copy done and verified 2026-11-07 (25 files, 19.7 GB); lock file not pushed |
-| WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Repo work in review | build-node storage check, then `make d2 build world-model` (planned Mon 2026-11-09 after the demo, user's go) |
-| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Not started | one GPU window of about 3 h: enable, smoke Job, preset images, disable |
-| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Repo work in review | seed Vault (`make d0 install vault`, new key and zuno-auth grant) before the push; the push rolls Keycloak (KC_VAULT item) and the ai-gateway; the group is created by the WP-235 role |
-| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Not started | none (local end-to-end on mocks) |
-| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Not started | none until WP-237 |
-| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Not started | none |
-| WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Not started | one GPU day: full cycle, measurements, recordings, rehearsal, disable |
+| WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Done (2026-11-08) | none: on devel |
+| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Operator pending | node created live (eu-central-1b, `zuno_world_model_gpu_az`), toleration window done 2026-11-07 with zero model impact; the removal path (`make d0 uninstall world-model-gpu`) is proven after the 2026-11-09 demo |
+| WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Done (2026-11-08) | none: 25 files, 19.7 GB, used by the first live install |
+| WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Done (2026-11-08) | none: built and signed in-cluster (build 5, sha256:cb43f925), world_engine imported on the GPU |
+| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Operator pending | smoke passed 2026-11-08 (GO, 80.7 FPS bf16); the preset images and the node removal wait for after the 2026-11-09 demo |
+| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Operator pending | client, Vault seed and group are live; the prompt enhancement with a real user token is checked in the presenter session (WP-237) |
+| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Operator pending | images built; a signed-in browser session as ai-ops-01 in Chrome (WP-237) |
+| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Operator pending | installed on demo333 2026-11-08, `make d2 check world-model` green; `make d2 uninstall world-model` after the 2026-11-09 demo |
+| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Repo work merged | the dashboard rolls out with grafana; the runbook carries the 2026-11-08 measurements and is rehearsed in WP-237 |
+| WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Operator pending | service-level session measured 2026-11-08 and a labelled fallback recorded; the signed-in browser rehearsal, the negative security tests and the teardown remain |
 
 ### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)
 
@@ -1107,7 +1107,8 @@ the 2026-11-09 demonstration); the freeze window still applies.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Operator pending | `make d1 install llm` and `make d1 install connectivity-link` after the push; the agents release with `experience-clients/blender` and its promotion (user) |
+| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07) |
+| WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
 
 ### OKF stream phases
 
@@ -1254,6 +1255,7 @@ moving.
 ## Change log
 
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-07 — WP-245 added (Phase 53): ADR-0610 Implemented (prompt set measured, golden-path moment `blender`); Blender joins the 2026-11-09 demonstration.
 - 2026-11-07 — ADR-0610 and WP-244 added (Phase 53, v0.17): Blender objects from text on a local model, executed ahead of its band by user decision.
 - 2026-11-07 — ADR-0605 to ADR-0609 and WP-238 to WP-243 added (Phase 52), from the project review of 2026-11-07. v0.15 becomes the demo-ready band: ADR-0565 (Implemented) and ADR-0605 (golden-path check and freeze window, WP-238), tagged before the demonstration of 2026-11-09. ADR-0584, ADR-0602 and ADR-0603 move to v0.16 with ADR-0606 (definition of done and WIP limit), ADR-0607 (pre-GA dependencies), ADR-0608 (drift) and ADR-0609 (canary rehearsals). ADR-0352 and ADR-0557 move to the new band v0.17. No decision clause of a moved record changes; each carries a dated amendment.
 - 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.

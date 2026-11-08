@@ -31,12 +31,55 @@
       - publish_ca_configmap_namespace | length > 0
     fail_msg: "publish_keycloak_ca_configmap.yml requires 'publish_ca_configmap_namespace' to be set by the including role"
 
+# ADR-0352 / WP-211, external mode: the CA is the one the operator SUPPLIED (zuno_keycloak_external_ca_bundle), never
+# derived from an Ingress that does not exist. Empty = the external certificate is publicly trusted: no ConfigMap,
+# callers omit the CA reference, exactly the Let's Encrypt case below.
+- name: "keycloak-ca | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "keycloak-ca | resolve the Keycloak endpoint and mode (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
+- name: "keycloak-ca | external mode: is there a supplied CA to publish"
+  ansible.builtin.set_fact:
+    keycloak_ca_configmap_published: "{{ zuno_keycloak_ca_pem | length > 0 }}"
+  when: zuno_keycloak_external_mode | bool
+
+- name: "keycloak-ca | external mode: publish the supplied CA ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ publish_ca_configmap_name | default('rhtas-keycloak-ca') }}"
+        namespace: "{{ publish_ca_configmap_namespace }}"
+        labels:
+          zuno.io/managed-by: ansible
+      data:
+        ca-bundle.crt: "{{ zuno_keycloak_ca_pem }}"
+  when:
+    - zuno_keycloak_external_mode | bool
+    - keycloak_ca_configmap_published | bool
+
+- name: "keycloak-ca | external mode: remove any stale CA ConfigMap (the external certificate is publicly trusted)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: "{{ publish_ca_configmap_name | default('rhtas-keycloak-ca') }}"
+    namespace: "{{ publish_ca_configmap_namespace }}"
+  when:
+    - zuno_keycloak_external_mode | bool
+    - not (keycloak_ca_configmap_published | bool)
+
 - name: "keycloak-ca | look up the Keycloak Ingress to find its live TLS secret name"
   kubernetes.core.k8s_info:
     api_version: networking.k8s.io/v1
     kind: Ingress
     namespace: zuno-auth
   register: _keycloak_ca_ingress
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "keycloak-ca | fail loudly if no Ingress with a TLS secret was found at all"
   ansible.builtin.fail:
@@ -45,7 +88,9 @@
       `oc get ingress -n zuno-auth` before re-running - this is a
       genuinely missing prerequisite, unlike a Secret with no ca.crt
       (tolerated below).
-  when: (_keycloak_ca_ingress.resources | default([]) | length) == 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_keycloak_ca_ingress.resources | default([]) | length) == 0
 
 - name: "keycloak-ca | read the Keycloak serving-cert secret"
   kubernetes.core.k8s_info:
@@ -54,6 +99,7 @@
     namespace: zuno-auth
     name: "{{ _keycloak_ca_ingress.resources[0].spec.tls[0].secretName }}"
   register: _keycloak_ca_tls
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "keycloak-ca | fail loudly if the referenced Secret doesn't exist"
   ansible.builtin.fail:
@@ -62,11 +108,14 @@
       '{{ _keycloak_ca_ingress.resources[0].spec.tls[0].secretName }}',
       which does not exist. Check `oc get secret -n zuno-auth` before
       re-running.
-  when: (_keycloak_ca_tls.resources | default([]) | length) == 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_keycloak_ca_tls.resources | default([]) | length) == 0
 
 - name: "keycloak-ca | determine whether this cert bundles its own ca.crt"
   ansible.builtin.set_fact:
     keycloak_ca_configmap_published: "{{ 'ca.crt' in (_keycloak_ca_tls.resources[0].data | default({})) }}"
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "keycloak-ca | publish the CA ConfigMap (cert bundles a ca.crt - e.g. Vault PKI)"
   kubernetes.core.k8s:
@@ -81,7 +130,9 @@
           zuno.io/managed-by: ansible
       data:
         ca-bundle.crt: "{{ _keycloak_ca_tls.resources[0].data['ca.crt'] | b64decode }}"
-  when: keycloak_ca_configmap_published | bool
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - keycloak_ca_configmap_published | bool
 
 - name: "keycloak-ca | remove any stale CA ConfigMap (cert has no ca.crt - e.g. Let's Encrypt)"
   kubernetes.core.k8s:
@@ -90,4 +141,6 @@
     kind: ConfigMap
     name: "{{ publish_ca_configmap_name | default('rhtas-keycloak-ca') }}"
     namespace: "{{ publish_ca_configmap_namespace }}"
-  when: not (keycloak_ca_configmap_published | bool)
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - not (keycloak_ca_configmap_published | bool)

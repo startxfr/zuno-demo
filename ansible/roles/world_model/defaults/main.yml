@@ -1,0 +1,20 @@
+---
+# ADR-0604 (WP-235). The switch lives in ansible/clusters/<cluster>.yml (committed: AAP reads the SCM) and may be
+# overridden locally from ansible/confidential.yml.
+zuno_world_model_enabled: false
+
+world_model_namespace: zuno-world-model
+world_model_app_name: zuno-world-model-d1
+world_model_gpu_node_label: "zuno.io/gpu-workload=world-model"
+# The curated scenes (WP-236). Absent = the experience offers only free text.
+world_model_presets_file: platform/world-model/config/presets.yaml
+# Keycloak group that may open the demo, with ocp-ai-ops and ocp-paas-ops (realm groups are create-only: made live here).
+world_model_group: zuno-world-model-users
+# Users added to the group when it is created or found, e.g. the presenter. ocp-ai-ops and ocp-paas-ops members
+# (ai-ops-01, paas-ops-01) need no membership.
+world_model_group_members: []
+# The model bucket (the models chart's own bucket; the role keeps its region default in the chart).
+world_model_s3_prefix_suffix: world-model
+# Two models load and compile kernels before the runtime is ready: 25 minutes.
+world_model_wait_retries: 100
+world_model_wait_delay: 15

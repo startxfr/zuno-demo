@@ -84,7 +84,8 @@
         _world_model_gpu_entry: >-
           {{ _world_model_gpu_values_raw['cluster-machine']['machineSet']['list'][0]
              | combine({'az': _world_model_gpu_az_overrides[world_model_gpu_machineset]}
-                       if world_model_gpu_machineset in _world_model_gpu_az_overrides else {}) }}
+                       if world_model_gpu_machineset in _world_model_gpu_az_overrides else {})
+             | combine({'az': zuno_world_model_gpu_az} if (zuno_world_model_gpu_az | string | length) > 0 else {}) }}
 
     - name: "world-model-gpu | fail if the zone has no installer subnet"
       ansible.builtin.fail:
@@ -93,8 +94,8 @@
           '{{ cluster_aws_identity.region }}{{ _world_model_gpu_entry.az }}', but no
           installer MachineSet exists there to read the subnet from (discovered:
           {{ cluster_aws_identity.subnetByAz.keys() | list }}). Set
-          zuno_machines_az_override['{{ world_model_gpu_machineset }}'] to a zone
-          that has one and offers g7e.
+          zuno_world_model_gpu_az (or zuno_machines_az_override['{{ world_model_gpu_machineset }}'])
+          to a zone that has one and offers g7e.
       when: (cluster_aws_identity.region ~ _world_model_gpu_entry.az) not in cluster_aws_identity.subnetByAz
 
     - name: "world-model-gpu | build the values with this cluster's identity"

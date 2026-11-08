@@ -1,0 +1,145 @@
+---
+# `make d2 check world-model`: the preflight of the demo (ADR-0604 D7, §9 gates). State detection first (never fails), then,
+# when installed, the whole chain probed from inside the pods with real requests (TCP probes lie behind NetworkPolicies):
+# the GPU node, the models and the encoder the runtime reports, Keycloak, the ai-gateway, and that nothing else is reachable.
+- name: "world-model | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "world-model | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _world_model_confidential_file
+
+- name: "world-model | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _world_model_confidential_file.stat.exists
+
+- name: "world-model | check the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "{{ world_model_app_name }}"
+
+- name: "world-model | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "world-model | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "world-model | report the application against the switch"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_world_model_enabled={{ zuno_world_model_enabled | bool }}; installed={{ _state_is_installed | bool }}.
+      {{ 'Matches the switch.' if (zuno_world_model_enabled | bool) == (_state_is_installed | bool)
+         else 'MISMATCH: run make d2 install world-model to converge.' }}
+
+- name: "world-model | probe the chain"
+  when: _state_is_installed | bool
+  block:
+    - name: "world-model | look up the GPU node"
+      kubernetes.core.k8s_info:
+        kind: Node
+        label_selectors:
+          - "{{ world_model_gpu_node_label }}"
+      register: _world_model_nodes
+
+    - name: "world-model | find the running pods"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ world_model_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/name={{ item }}"
+        field_selectors:
+          - status.phase=Running
+      register: _world_model_pods
+      loop:
+        - world-model-runtime
+        - world-model-web
+
+    - name: "world-model | fail without a running runtime or web pod"
+      ansible.builtin.fail:
+        msg: "No running {{ item.item }} pod in {{ world_model_namespace }}: the runtime needs the GPU node and about 10 minutes to load its models."
+      when: (item.resources | default([]) | length) == 0
+      loop: "{{ _world_model_pods.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: "world-model | ask the runtime what it runs (engine, models, encoder)"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ world_model_namespace }}"
+        pod: "{{ _world_model_pods.results[0].resources[0].metadata.name }}"
+        container: runtime
+        command: >-
+          python3 -c {{ _world_model_status_script | quote }}
+      vars:
+        _world_model_status_script: |
+          import json, os, urllib.request
+          req = urllib.request.Request("http://127.0.0.1:8080/internal/status",
+              headers={"X-World-Runtime-Token": os.environ.get("WORLD_MODEL_INTERNAL_TOKEN", "")})
+          print(json.dumps(json.load(urllib.request.urlopen(req, timeout=10))))
+      register: _world_model_runtime
+      changed_when: false
+
+    - name: "world-model | probe Keycloak, the ai-gateway, the runtime and the internet from the web pod"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ world_model_namespace }}"
+        pod: "{{ _world_model_pods.results[1].resources[0].metadata.name }}"
+        container: web
+        command: >-
+          python3 -c {{ _world_model_probe_script | quote }}
+      vars:
+        _world_model_probe_script: |
+          import os, urllib.error, urllib.request
+          def code(url):
+              try:
+                  return urllib.request.urlopen(url, timeout=8).status
+              except urllib.error.HTTPError as e:
+                  return e.code
+              except Exception:
+                  return 0
+          print("keycloak=%s" % code(os.environ["KEYCLOAK_ISSUER"] + "/.well-known/openid-configuration"))
+          print("ai_gateway=%s" % code("http://ai-gateway.zuno-ai-run.svc:8080/v1/models"))
+          print("runtime=%s" % code("http://world-model-runtime:8080/readyz"))
+          print("internet=%s" % code("https://huggingface.co"))
+      register: _world_model_probe
+      changed_when: false
+
+    - name: "world-model | parse the answers"
+      ansible.builtin.set_fact:
+        _world_model_status: "{{ _world_model_runtime.stdout | from_json }}"
+        _world_model_codes: "{{ dict(_world_model_probe.stdout_lines | map('split', '=') | list) }}"
+
+    - name: "world-model | probe the Route"
+      ansible.builtin.uri:
+        url: "https://world-model.{{ cluster_base_domain }}/ping"
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+        status_code: 200
+      register: _world_model_route
+      failed_when: false
+
+    - name: "world-model | report the chain"
+      ansible.builtin.debug:
+        msg:
+          node: "{{ _world_model_nodes.resources[0].metadata.name | default('none') }}"
+          runtime: "{{ _world_model_status }}"
+          probes: "{{ _world_model_codes }}"
+          route: "{{ _world_model_route.status | default('unreachable') }}"
+
+    - name: "world-model | fail on a broken chain"
+      ansible.builtin.fail:
+        msg: >-
+          World-model preflight failed. Expected: one GPU node, runtime engine waypoint-1.5-1b with image model
+          flux2-klein-4b and an h264 encoder (nvenc or x264), keycloak=200, ai_gateway=401 (reached, no token), runtime=200,
+          internet=0 (egress denied), Route /ping 200. Got: node={{ _world_model_nodes.resources | default([]) | length }},
+          runtime={{ _world_model_status }}, probes={{ _world_model_codes }}, route={{ _world_model_route.status | default('unreachable') }}.
+      when: >-
+        (_world_model_nodes.resources | default([]) | length) != 1 or
+        _world_model_status.engine | default('') != 'waypoint-1.5-1b' or
+        _world_model_status.image | default('') != 'flux2-klein-4b' or
+        _world_model_status.encoder | default('') not in ['nvenc', 'x264'] or
+        _world_model_codes.keycloak | default('') != '200' or
+        _world_model_codes.ai_gateway | default('') != '401' or
+        _world_model_codes.runtime | default('') != '200' or
+        _world_model_codes.internet | default('') != '0' or
+        (_world_model_route.status | default(0)) != 200

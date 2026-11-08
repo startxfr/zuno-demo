@@ -26,6 +26,7 @@ state are not restated here.
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.3` | 2026-11-07 | patch before the demonstration of 2026-11-09 (user decision, in place of `v0.15.0`): the state that is demonstrated, cut from `devel` 14a34d0f after a passing golden-path run (WP-238); in-cluster ledger run 2026-11-07, 12 components in 38 min; named exception: D11 (ADR-0605, a v0.15 record, is open and is not part of this patch's band) |
+| v0.14 | `v0.14.4` | 2026-11-07 | patch, proven checkpoint before the demonstration of 2026-11-09: WP-225 hardening lots A-C deployed with their new behaviours off, ADR-0608 nfs-provisioner adopted, the WP-226 image policy enforced for the opt-in namespaces, golden path extended, CI quality-gate fix; cut from `devel` 21ddff13 after a passing golden-path run (11/11); in-cluster ledger run 2026-11-07, 12 components in 36 min; the Secret scan run on the tag is red on a documented false positive (`Authorization: Bearer placeholder` in the golden-path probe, fixed in the next tag) |
 | v0.15 | planned | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238); tagged later, once more content joins the band (user decision 2026-11-07) |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
 | v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610) |
@@ -338,7 +339,7 @@ One new experience: Blender 3D objects generated as `bpy` scripts by `gpt-oss-20
 the user's own identity and a C3 floor (ADR-0610), the first of the band's two experience slots (ADR-0606 clause 2);
 its work package is opened when the band starts.
 
-**3 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Accepted`.** Open work packages: WP-211 to
+**3 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Implemented`.** Open work packages: WP-211 to
 WP-215, WP-218.
 
 ## OKF stream

@@ -1,0 +1,108 @@
+---
+# ADR-0604 D1: realm groups are create-only on a live realm (the import never updates them), so the group that may
+# open the demo is created here when missing, and each listed member is added when missing. Nothing is removed.
+#
+# ADR-0352 / WP-211: over the Admin REST API, in both Keycloak modes (the pattern of open_webui's keycloak_admin_group.yml).
+# It used to kubectl-exec `kcadm.sh` inside the built-in pod zuno-0, which an external Keycloak does not have.
+- name: "world-model | resolve where Keycloak is (ADR-0352)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
+- name: "world-model | read the Keycloak automation credentials (ADR-0595)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/read_keycloak_automation_credentials.yml"
+
+- name: "world-model | get a Keycloak admin token"
+  ansible.builtin.uri:
+    url: "{{ zuno_keycloak_admin_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: password
+      client_id: admin-cli
+      username: "{{ _kc_automation_user }}"
+      password: "{{ _kc_automation_password }}"
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  register: _world_model_kc_token
+  no_log: true
+
+- name: "world-model | set the admin API facts"
+  ansible.builtin.set_fact:
+    _kc_api: "{{ zuno_keycloak_url }}/admin/realms/{{ zuno_keycloak_realm }}"
+    _kc_headers:
+      Authorization: "Bearer {{ _world_model_kc_token.json.access_token }}"
+  no_log: true
+
+- name: "world-model | look up the {{ world_model_group }} group"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/groups?search={{ world_model_group }}&exact=true"
+    headers: "{{ _kc_headers }}"
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  register: _world_model_kc_groups
+  no_log: true
+
+- name: "world-model | create the {{ world_model_group }} group when missing"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/groups"
+    method: POST
+    headers: "{{ _kc_headers }}"
+    body_format: json
+    body: {name: "{{ world_model_group }}"}
+    status_code: [201]
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  when: (_world_model_kc_groups.json | selectattr('name', 'equalto', world_model_group) | list | length) == 0
+  register: _world_model_kc_group_created
+  changed_when: true
+  no_log: true
+
+- name: "world-model | read the group id"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/groups?search={{ world_model_group }}&exact=true"
+    headers: "{{ _kc_headers }}"
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  register: _world_model_kc_groups_after
+  no_log: true
+
+- name: "world-model | keep the group id"
+  ansible.builtin.set_fact:
+    _world_model_group_id: "{{ (_world_model_kc_groups_after.json | selectattr('name', 'equalto', world_model_group) | list | first).id }}"
+
+- name: "world-model | look up each listed member"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users?username={{ item }}&exact=true"
+    headers: "{{ _kc_headers }}"
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  loop: "{{ world_model_group_members }}"
+  register: _world_model_kc_users
+  no_log: true
+
+- name: "world-model | read the groups of each existing member"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users/{{ item.json[0].id }}/groups"
+    headers: "{{ _kc_headers }}"
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  loop: "{{ _world_model_kc_users.results | selectattr('json', 'truthy') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: _world_model_kc_memberships
+  no_log: true
+
+- name: "world-model | add the missing members to {{ world_model_group }}"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users/{{ item.item.json[0].id }}/groups/{{ _world_model_group_id }}"
+    method: PUT
+    headers: "{{ _kc_headers }}"
+    status_code: [204]
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  loop: "{{ _world_model_kc_memberships.results }}"
+  loop_control:
+    label: "{{ item.item.item }}"
+  when: (item.json | selectattr('name', 'equalto', world_model_group) | list | length) == 0
+  register: _world_model_kc_added
+  changed_when: true
+  no_log: true
+
+- name: "world-model | report the group"
+  ansible.builtin.debug:
+    msg:
+      - "group {{ world_model_group }}: {{ 'created' if (_world_model_kc_group_created is changed) else 'already present' }}"
+      - "listed users absent from the realm, skipped: {{ _world_model_kc_users.results | rejectattr('json', 'truthy') | map(attribute='item') | list }}"
+      - "members added: {{ _world_model_kc_added.results | default([]) | rejectattr('skipped', 'defined') | map(attribute='item') | map(attribute='item') | map(attribute='item') | list }}"

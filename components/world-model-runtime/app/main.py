@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 
 from app import metrics
 from app.config import Settings
+from app.encoder import build_encoder
 from app.engine import build_engine
 from app.imagegen import build_image_generator
 from app.session import Busy, NotFound, Runtime, encode_png
@@ -89,6 +90,13 @@ def get_app(settings: Optional[Settings] = None) -> FastAPI:
             await runtime._gpu(engine.reset, warm)
             for _ in range(3):
                 await runtime._gpu(runtime._timed_step, runtime_warm_ctrl())
+            # The capability probe of ADR-0604 D4: which H.264 encoder this node really has. Not ready without one,
+            # and the choice is known (status, metric, preflight) before the first visitor.
+            probe = await loop.run_in_executor(None, build_encoder, settings)
+            runtime.encoder_name = probe.name
+            metrics.ENCODER_INFO.clear()
+            metrics.ENCODER_INFO.labels(encoder=probe.name).set(1)
+            probe.close()
             app.state.runtime = runtime
             app.state.ready = True
             logger.info("ready: engine=%s image=%s", engine.name, images.name)

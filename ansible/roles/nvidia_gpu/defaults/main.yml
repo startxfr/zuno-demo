@@ -1,0 +1,13 @@
+---
+# ADR-0604 (WP-229): whether the GPU Operator may upgrade the driver pods on its own. true is the platform default
+# (the CSV's own ClusterPolicy has driver.upgradePolicy.autoUpgrade true, and the driver DaemonSet is OnDelete).
+#
+# Any change to the operand DaemonSets' pod template (the toleration for the on-demand world-model node taint was one)
+# makes the existing driver pods "outdated". With autoUpgrade true the upgrade controller then cordons each MIG node in
+# turn, deletes its GPU pods (the LLM pods) and restarts the driver; the MIG nodes are full, so those pods stay Pending
+# until the node is back. With false, nothing replaces the outdated pods and the operator reports the ClusterPolicy
+# notReady (state-driver) for as long as they stay outdated, which fires GPUOperatorReconciliationFailed after 1 h.
+#
+# So false is only a way to apply a template change now and restart the drivers later: set it to false for the change,
+# then back to true in an announced window. 2026-11-07: applied with false, then restarted with true the same night.
+nvidia_gpu_driver_auto_upgrade: true

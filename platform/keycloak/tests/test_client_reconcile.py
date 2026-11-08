@@ -453,8 +453,10 @@ def test_each_eval_persona_copies_its_source_users_groups() -> None:
         assert p["username"] not in users, (
             f"{p['username']} is also a realm-file user: the Job owns eval personas"
         )
-        # the Job adds evalPersonasGroup (when set) to every group of the source persona
-        expected = users[p["copyOf"]]["groups"] + (
+        # the Job adds evalPersonasGroup (when set) to every group of the source persona, or to the explicit
+        # `groups` list of a probe persona (ADR-0610/WP-245: eval-ai-dev-01 holds /ocp-ai-dev only)
+        base = p["groups"] if p.get("groups") else users[p["copyOf"]]["groups"]
+        expected = list(base) + (
             [values["evalPersonasGroup"]] if values.get("evalPersonasGroup") else []
         )
         assert lines[p["username"]] == expected

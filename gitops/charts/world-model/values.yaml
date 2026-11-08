@@ -1,0 +1,125 @@
+# ADR-0604 (WP-235): the world-model experience in zuno-world-model. The namespace, its experience-client
+# label, the GPU quota and the baseline NetworkPolicy come from gitops/charts/namespaces; the GPU node from the
+# Day-0 component world-model-gpu. The role (ansible/roles/world_model) passes the cluster values through the
+# Application: global.zuno, egress.clusterCIDRs, modelStorage and presets.
+
+global:
+  zuno:
+    clusterBaseDomain: apps.mycluster.example.com
+    routeHost: world-model.apps.mycluster.example.com
+    # ADR-0352/WP-211: Keycloak seam. Empty = the built-in instance (https://keycloak.<clusterBaseDomain>/realms/zuno).
+    keycloakIssuerUrl: ""
+    keycloakHost: ""
+
+namespace: zuno-world-model
+
+externalSecrets:
+  refreshInterval: 1h
+  # ADR-0602/WP-223: this namespace's own SecretStore, which reads only the keys platform/vault/secret-access.yaml grants it.
+  secretStore: vault
+  # The Vault key whose accessKeyId/secretAccessKey read the model bucket (the models chart reads the same one).
+  s3Key: rag/s3
+
+images:
+  # Built in-cluster by ansible/roles/world_model_build (make d2 build world-model), signed by the existing chain.
+  runtime: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/world-model-runtime:latest
+  web: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/world-model-web:latest
+  # The mirrored KServe storage initializer: it ships boto3, which the model-cache init container needs.
+  storageInitializer: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-kserve-storage-initializer-rhel9:rhel9
+  # Third-party, unsigned: pinned by digest (ADR-0586 clause 7), like the kagent and dify front doors.
+  frontDoor: quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+
+# oauth2-proxy admits the groups; world-model-web re-checks the same groups on the validated token.
+frontDoor:
+  clientId: world-model
+  allowedGroups:
+    - /zuno-world-model-users
+    - /ocp-ai-ops
+    - /ocp-paas-ops
+  cookieName: _world_model_front_door
+  # The Keycloak access token lives 15 minutes (realm accessTokenLifespan 900) and world-model-web validates its
+  # expiry on every call: the proxy must refresh the session and forward a fresh token well before that.
+  cookieRefresh: 10m
+
+route:
+  # A streaming session outlasts the router's 30 s default.
+  timeout: 30m
+
+runtime:
+  # ADR-0604 D2/D3: waypoint + flux2 on the GPU node. `mock` runs the CPU stand-ins (a chart lint or a laptop,
+  # never the cluster demo).
+  engine: waypoint
+  image: flux2
+  encoder: auto
+  # world_engine quantization once the smoke test (WP-232) has measured it: "", intw8a8, fp8w8a8 or nvfp4.
+  quant: ""
+  nodeSelector:
+    zuno.io/gpu-workload: world-model
+  toleration:
+    key: zuno.io/gpu-world-model
+  resources:
+    requests: {cpu: "6", memory: 48Gi}
+    limits: {cpu: "14", memory: 100Gi, nvidia.com/gpu: "1"}
+  # Models are copied from S3 into node-local storage on every pod start: the node is ephemeral.
+  cacheSizeLimit: 40Gi
+  # Loading two models and compiling kernels takes minutes: 20 minutes before the pod is called failed.
+  startupFailureThreshold: 120
+
+web:
+  resources:
+    requests: {cpu: 200m, memory: 256Mi}
+    limits: {cpu: "2", memory: 1Gi}
+  # The ai-gateway, for prompt enhancement (ADR-0604 D8): empty turns it off, and the demo degrades to filtered prompts.
+  aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
+  promptModel: auto
+  audience: zuno-admin-api
+  allowedGroups: zuno-world-model-users,ocp-ai-ops,ocp-paas-ops
+  opsGroups: ocp-ai-ops,ocp-paas-ops
+  maxPromptChars: 300
+  idleSeconds: 180
+  detachedSeconds: 60
+  maxSessionSeconds: 1800
+  worldsPerHour: 12
+
+# Where the runtime's init container finds the weights (platform/world-model/models.lock.yaml). The revisions below
+# MUST equal the lock file's: platform/world-model/tests/check_pins.py compares them in CI.
+modelStorage:
+  bucket: zuno-demo-sources
+  prefix: models/world-model
+  # The bucket's own region (not the cluster's), as the models chart's modelsS3.
+  region: eu-west-2
+  revisions:
+    Overworld/Waypoint-1.5-1B: 391f92827075edcf4a8b3c8a2ddae010698f8636
+    Overworld-Models/taehv1_5: a0253886b13b9c4c3bd224bd479be03f5988a3df
+    black-forest-labs/FLUX.2-klein-4B: e7b7dc27f91deacad38e78976d1f2b499d76a294
+
+# The curated scenes (platform/world-model/config/presets.yaml, WP-236), passed by the role.
+presets: []
+
+egress:
+  gatewayNamespace: zuno-ai-run
+  gatewayPort: 8080
+  # Pod and Service networks, excluded from the HTTPS-out rule (read by the role).
+  clusterCIDRs:
+    - 10.128.0.0/14
+  # The address ranges AWS publishes for S3 in the model bucket's region (modelStorage.region), allowed on 443 next to the
+  # name rules (templates/egressfirewall.yaml says why). Refresh: curl -s https://ip-ranges.amazonaws.com/ip-ranges.json |
+  # jq -r '.prefixes[] | select(.service=="S3" and .region=="<region>") | .ip_prefix' | sort -u. A region missing here
+  # keeps the name rules only, which is slow and unreliable for a 20 GB copy.
+  # eu-west-2 from syncToken 1794088025 (2026-11-07).
+  s3CidrsByRegion:
+    eu-west-2:
+      - 1.178.94.0/24
+      - 16.12.15.0/24
+      - 16.12.16.0/23
+      - 18.168.37.160/28
+      - 18.168.37.176/28
+      - 3.2.110.0/24
+      - 3.2.72.0/24
+      - 3.5.244.0/22
+      - 52.219.219.0/24
+      - 52.95.142.0/23
+      - 52.95.144.0/24
+      - 52.95.148.0/23
+      - 52.95.150.0/24
+      - 52.95.191.0/24

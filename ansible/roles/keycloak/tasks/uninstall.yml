@@ -3,18 +3,47 @@
 # (Keycloak CR/RealmImport) first to avoid ArgoCD fighting the CRD
 # deletion, then remove the operator while the Subscription (a d0-managed
 # resource) still exists to read its installedCSV, then delete d0.
+#
+# ADR-0352 clause 4 / WP-211: in external mode the Keycloak is not ours. Uninstall removes only what this
+# installer created on the consumer side (the -d1 Application: client-secret ExternalSecrets, client ConfigMap, the
+# reconcile Job, and the supplied-CA ConfigMap) and never touches the external instance or the realm content.
+- name: "keycloak | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "keycloak | resolve the Keycloak endpoint and mode (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
 - name: "keycloak | delete the keycloak GitOps Application (d1: Keycloak CR/RealmImport/ExternalSecrets)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-keycloak-d1"
 
+- name: "keycloak | leave the external Keycloak untouched (external mode)"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_keycloak_mode is 'external' - the Keycloak at {{ zuno_keycloak_url }} is not owned by this platform and is
+      left untouched, realm included; only the consumer-side -d1 Application was removed. Flipping back to internal is
+      a migration event (ADR-0352 clause 4).
+  when: zuno_keycloak_external_mode | bool
+
+- name: "keycloak | remove the supplied-CA ConfigMap (external mode)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: keycloak-external-ca
+    namespace: zuno-auth
+  when: zuno_keycloak_external_mode | bool
+
 - name: "keycloak | remove the operator (its owned CRDs - cascading the Keycloak/KeycloakRealmImport CRs - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  when: not (zuno_keycloak_external_mode | bool)
   vars:
     operator_subscription_name: rhbk-operator
     operator_namespace: zuno-auth
 
 - name: "keycloak | delete the keycloak GitOps Application (d0: cascades the remaining OperatorGroup)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  when: not (zuno_keycloak_external_mode | bool)
   vars:
     gitops_app_name: "zuno-keycloak-d0"

@@ -36,6 +36,8 @@ Run on 2026-11-03 (`results/ranking-fr-2026-11-03.json`, the 24 English and the 
 so French retrieval is accepted as it is. The one miss is 26 (the internal registry exposed outside the cluster), which lands on the images book instead of the registry book;
 28 ranks 2 (etcd backup lands on the updating book first), and 33 ranks 1 where its English twin ranks 2. The 24-question figures are unchanged by the run (0.71 / 0.86 / 0.77).
 
+**Baseline before the first git ingest (R-530, 2026-11-08).** `results/ranking-baseline-before-git-2026-11-08.json`, run with `ranking_run.py` (top_k 10, persona eval-consultant-01, UnifAI 0.1.64, DBSF): English 21 hit@1 **0.62**, hit@5 0.76, MRR 0.69 (not in the top 10: [1, 2, 9, 11, 12]), so the drift of 2026-11-03 is unchanged (0.62 / 0.76 / 0.69; the target is the 0.71 / 0.86 / 0.77 of 2026-10-31). French 10: 0.80 / 0.90 / 0.85 (missed [26]). All 34: 0.68 / 0.81 / 0.74. The first git ingest (OCP 4.22 pilot, then RHACM 2.17 and RHOAI/ODH) is measured against this file.
+
 **Sparse encoder versions (WP-186, 2026-11-03).** `results/ranking-sparse-v1-v2-v3-2026-11-03.json` compares the three sparse encoders of the UnifAI RAG on the 34-entry set (31 with an
 expected book; operator 0.1.50, DBSF; stack written `[2,3]`, every source re-embedded once, then read 2, read 3 and read 1 again). hit@1 / hit@5 / MRR:
 

@@ -46,7 +46,13 @@ zuno_build_git_ref: "devel"
 # Turning it on starts billing a GPU instance: enable it ~40 minutes before
 # use and back to false (then `make d2 uninstall world-model` and
 # `make d0 uninstall world-model-gpu`) right after. An alert fires after 8 h.
-zuno_world_model_enabled: false
+# TRUE since 2026-11-08 for the 2026-11-09 demo (node and app installed and the preflight
+# green on 2026-11-08): with false, any `make d2 install all` converges the app away.
+# Set it back to false right after the demo, then uninstall as above.
+zuno_world_model_enabled: true
+# g7e.4xlarge had no capacity in eu-central-1a on 2026-11-07 (InsufficientInstanceCapacity, the machine controller retried
+# ~2900 times); eu-central-1b gave the node in minutes. Both zones offer g7e for this account.
+zuno_world_model_gpu_az: "b"
 
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
@@ -252,11 +258,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:25cf3c6d65c8e4e774b60897020bc51da241df93f41a9f4b981b959be1a12650  # v0.1.64
-      identity: quay.io/zuno/unifai-identity@sha256:6b6bf1070d35a7b05378d3f2d301b14d218925fc540a7f9dd2decb6797c80397  # v0.1.64
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:adb05e40c6d7bdba910735655726a51678cf9c37f9f3defbc31b368d3c75439d  # v0.1.64
-      rag: quay.io/zuno/unifai-rag@sha256:81a2539506f02b53924e473bcc4b56efe9d2458568494ac4fcee6568e904b85d  # v0.1.64
-      ui: quay.io/zuno/unifai-ui@sha256:b06a5da46c1c817f47e99c43a2ad9c3031069937b24534212c813f26cfb4e768  # v0.1.64
+      backend: quay.io/zuno/unifai-backend@sha256:ef490e841aef1b51e9e56560be52d1dccb46b96fe3a75e3112f056c38dcd1509  # v0.1.65
+      identity: quay.io/zuno/unifai-identity@sha256:7b0bd69116a5b03ce17dccae6ad7643a11ed3b04e44d0d27af1af3bcfdf36489  # v0.1.65
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:4aeac21097a1223627ea52162bc102c614d6c827f1d0152d64f4a198794f2184  # v0.1.65
+      rag: quay.io/zuno/unifai-rag@sha256:c4b7b2c954ea13f7eb0d7234f77d4ead1b285cbbcf81d9defe939cdc0fc67902  # v0.1.65
+      ui: quay.io/zuno/unifai-ui@sha256:1a53c9e296766266856a0513e6191c939cb2eb3e74e0477f0254861b76e5f683  # v0.1.65
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -392,3 +398,11 @@ zuno_kueue_channel: "stable-v1.5"
 # ADR-0608 clause 6 (WP-241): `make d3 check drift` fails on any finding. Switched on 2026-11-07 after the first
 # clean run (nfs-provisioner adopted, ECK listed in platform/drift/external-operators.yaml until its removal).
 zuno_drift_strict: true
+
+# WP-225 lot C, rollout step 2 (user's go 2026-11-07): the ai-gateway verifies the a2a-gateway's
+# signed agent chain. The public half of Vault a2a/agent-chain; a chain-less call keeps today's behaviour.
+zuno_ai_gateway_agent_chain_verify: true
+zuno_ai_gateway_agent_chain_public_key: |
+  -----BEGIN PUBLIC KEY-----
+  MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+  -----END PUBLIC KEY-----

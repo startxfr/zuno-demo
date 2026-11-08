@@ -1,6 +1,6 @@
 # WP-244: Blender workstation experience client
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
 - **Depends on:** none
 - **Related:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md),
@@ -39,7 +39,7 @@ The Blender add-on of `docs/demo/blender-3d.md` signs in with the device flow, s
    floor is the client floor of step 2. Until the promotion the corp order answers (qwen3.6-27b first, slower).
 5. **Add-on.** `docs/demo/blender-3d.md`: device sign-in, `X-Zuno-Agent: blender`, `X-Zuno-Task: bpy`, verified TLS,
    script shown in a text block, static check, run on click.
-6. **Live, in order.** Push (Keycloak client, ai-gateway label); `make d1 install llm` (floor, NetworkPolicy peer);
+6. **Live, in order.** Push (Keycloak client, ai-gateway label); `make d2 install llm` (floor, NetworkPolicy peer);
    `make d1 install connectivity-link` (entry). Then the checks below.
 
 ## Acceptance checks
@@ -64,7 +64,22 @@ The add-on is a local file.
 
 - 2026-11-07: pushed 5fd22409; Keycloak client `blender` created by the reconcile Job (device endpoint answers, password
   grant refused with 400); ai-gateway rolled with `blender` in EXPERIENCE_CLIENTS. zuno-demo-agents b8ac031 (VERSION
-  0.14.3) pushed, CI green, release and promotion pending. `make d1 install llm` and `make d1 install connectivity-link`
+  0.14.3) pushed, CI green, release and promotion pending. `make d2 install llm` and `make d1 install connectivity-link`
   pending (the entry and the C3 floor are not live yet).
 - 2026-11-07: add-on run in Blender 4.2.3 LTS headless: five operators registered, Run builds six objects with a modifier
   and a material, `import os` refused before execution, Markdown-wrapped answers reduced to code.
+- 2026-11-07 18:30 CET (user's go): `make d2 install llm` (ok=63 failed=0; `llm` is a Day-2 component, the brief said d1)
+  rolled the ai-gateway with CLASSIFICATION_CLIENT_FLOORS=blender=C3 and the NetworkPolicy peer; `make d1 install
+  connectivity-link` (ok=48 failed=0) created the Route, HTTPRoute, AuthPolicy and RateLimitPolicy, all Accepted, the
+  Route admitted. Live: no token and a garbage token answer 401 from Authorino at the edge (`www-authenticate: Bearer
+  realm="keycloak-jwt"`), unrouted paths and methods answer 404. MaaS (AuthPolicy Accepted/Enforced, maas-api 401
+  without token) and the quota-demo routes are unchanged. The AuthPolicy did not publish the identity, so the
+  RateLimitPolicy's `auth.identity.sub` counter could not resolve (WP-54 trap 1): fixed in the template; the 429 is
+  proven only with a real token.
+- 2026-11-07 ~19:30 CET: acceptance run as ai-dev-01 (user signed in through the device flow). `GET /v1/models` 200; three
+  streamed generations floored C1 -> C3 and served by `gpt-oss-20b` via MaaS (agents release v0.14.3 promoted, routing
+  entry live) in 6.6, 9.4 and 7.7 s, all three pass the static check; replayed in Blender 4.2.3: 2 of 3 build their
+  objects, 1 fails on an invented argument and is rolled back. ai-ops-01 (group `ocp-ai-ops`) gets 403 at the edge.
+  The 61st request within 5 min answers 429 (57 GETs after 4 calls). Non-streamed calls are cut at 60 s by the load
+  balancer: the add-on streams. Remaining for ADR-0610 (not this WP): the full prompt set of clause 8 and a golden-path
+  probe for the client (clause 9), which needs a non-interactive token path.

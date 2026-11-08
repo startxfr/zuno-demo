@@ -1,4 +1,4 @@
-{{- if and .Values.keycloak.enabled (not .Values.ingress.operatorManaged) }}
+{{- if and .Values.keycloak.enabled .Values.keycloak.builtIn (not .Values.ingress.operatorManaged) }}
 # Hand-authored so it can carry the cert-manager.io/cluster-issuer
 # annotation (ADR-0316) - the RHBK operator's own ingress.enabled path
 # (templates/keycloak.yaml) has no template we can attach cert-manager

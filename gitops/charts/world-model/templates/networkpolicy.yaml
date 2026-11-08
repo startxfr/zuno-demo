@@ -1,0 +1,40 @@
+# ADR-0604 §8.4: namespace default-deny comes from gitops/charts/namespaces; this opens what the workloads need and
+# nothing else: DNS, the namespace itself, the ai-gateway (prompt enhancement), and HTTPS out to anything but the
+# cluster networks (Keycloak for the front door and the JWKS, S3 for the model cache) which the EgressFirewall then narrows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: world-model-egress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.gatewayNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.gatewayPort }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 443

@@ -1,4 +1,4 @@
-{{- if .Values.keycloak.enabled }}
+{{- if and .Values.keycloak.enabled .Values.keycloak.builtIn }}
 # Imports the `zuno` realm from files/realm-zuno.json, embedded inline since
 # the CRD's spec.realm field has no ConfigMap/file reference option.
 #

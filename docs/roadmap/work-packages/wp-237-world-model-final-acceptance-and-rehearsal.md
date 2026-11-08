@@ -1,6 +1,6 @@
 # WP-237: World-model final acceptance and rehearsal (delivers ADR-0604 §9, §15)
 
-- **State:** Not started
+- **State:** Operator pending
 - **ADRs:** ADR-0604
 - **Depends on:** WP-232, WP-236
 - **Blocks:** none
@@ -40,3 +40,17 @@ of Done checkboxes; ADR status in the body and the index; tracker, briefs and me
 ## Verification
 
 The acceptance file covers every row of ADR-0604 §9.1 and every gate; `check_docs.py` passes.
+
+## Progress (2026-11-08)
+
+A session was played against the real runtime from inside its pod (the persona password is not available to an unattended
+run, so the browser sign-in is the presenter's): FLUX first image 0.87 s, world created in 65 ms, H.264 over the session
+WebSocket decoded without error at 1280x720 (about 43 frames per second received, 4.4 Mbit/s), input to first frame p50 145 ms
+and p95 182 ms measured at the server, an edit applied in 1.2 s with the world continuing from the edited image, the GPU
+released on stop. A 24 s fallback recording, labelled "RECORDED", was made from that run (kept outside git, 7 MB).
+Behaviours worth telling the presenter: walking straight into a wall of snow for 15 s collapses the picture into texture (the
+model's ten-second context), so walk in short bursts and use Reset; the sky edit reads best when the sky is in view.
+Still to do: the signed-in browser rehearsal in Chrome, the negative security tests (outside group 403, no other egress,
+prompts absent from logs and labels), and the teardown. One robustness gap to fix after the demo: a control message the runtime does not expect (a `mouse` that is a list was
+reproduced, a non-numeric `scroll` is read from the code) makes its receive task raise and ends that session silently; the web
+tier validates `mouse` but not `scroll`.

@@ -5,13 +5,10 @@ Audience: the presenter, and the platform team preparing a workstation. Decision
 (Target v0.17), under [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md) and
 [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md).
 
-> **Status: being rolled out on demo333 ([WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)).**
-> The entry, the Keycloak client and the C3 floor come with WP-244; `gpt-oss-20b` answers first once the agents release
-> that declares `experience-clients/blender` is promoted (before that, the corp order answers, qwen3.6-27b first, slower).
-> The add-on was run in Blender 4.2.3 LTS (headless, 2026-11-07): it registers its five operators, **Run** builds a
-> sample table (six objects, a bevel modifier, a material) as one undo step, a script importing `os` is refused before
-> it runs, and a model answer wrapped in Markdown is reduced to its code. The first run against the live entry is
-> WP-244's acceptance check.
+> **Status: live on demo333, in the 2026-11-09 demonstration (moment 4 of
+> [demo-day-2026-11-09.md](demo-day-2026-11-09.md)).** [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)
+> built the chain, [WP-245](../roadmap/work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) measured the
+> prompts (23 of 24 runs build a scene with the add-on's system prompt v2) and added the `blender` golden-path moment.
 
 ## The message
 
@@ -52,7 +49,7 @@ Everything below lands as commits and is synced by ArgoCD (ADR-0608). Nothing is
 |---|---|---|
 | Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
 | `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
-| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for zuno-agent-gateway | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d1 install llm` |
+| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for zuno-agent-gateway | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
 | Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group `ocp-ai-dev`), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
 | Experience client `blender`, task `bpy`, `models.preferred: [reasoning]` (`gpt-oss-20b` first), no tools, C3 | `experience-clients/blender/` in zuno-demo-agents | the agents release and its promotion |
 
@@ -65,390 +62,93 @@ oc get llminferenceservice -n zuno-ai-run                       # gpt-oss-20b an
 oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   # Accepted and Enforced
 ```
 
-## Day 2: install the add-on and run the demo
+## Day 2: the presenter's workstation and the demonstration
 
-1. In Blender, open the **Scripting** workspace, create a new text named `zuno_3d_generator.py`, paste the add-on
-   below and click **Run Script**. To keep it across sessions instead, save it as a file and install it from
-   **Edit > Preferences > Add-ons > Install from Disk**.
-2. In the 3D Viewport press **N**, open the **Zuno 3D** tab and fill in **Gateway**
-   (`https://ai-gateway.apps.<cluster-domain>`), **Issuer** (`https://keycloak.apps.<cluster-domain>/realms/zuno`) and,
-   only for a private CA, **CA file**.
-3. Click **Sign in**, then **Open sign-in page**: the browser shows Keycloak with the code displayed in the panel. Sign
-   in as ai-dev-01. The panel turns to **Signed in**. No password and no key is ever typed into Blender.
-4. Enter a prompt, for example "A wooden table with 4 cylindrical legs and a small desk lamp on top", and click
-   **Generate script**. Blender stays responsive; the answer takes about 15 to 40 seconds.
-5. The script appears in the Text Editor as `zuno_3d_script.py`, with the result of the static check in the panel.
-   Show the code: this is the point of the demonstration, the artist sees what will run.
-6. Click **Run script**. The objects appear as one undo step; select one and show its modifiers and dimensions in the
-   properties: they are editable, not a frozen mesh.
-7. Show the platform side: Grafana, dashboard **Zuno Platform / Five experiences** filtered on `client="blender"`
-   (tokens counted against ai-dev-01), and in Tempo the `model_call` span with the C3 floor and the local
-   provider.
+### Who prepares what, and when
 
-Named limits to say out loud:
+- **The presenter prepares their own workstation** (the laptop on stage, with a screen): Blender and the add-on,
+  once, before the Sunday 20:00 freeze or at the latest at the 08:30 preflight. Nothing is installed on the cluster
+  for this step.
+- **The platform is ready** when `make demo golden-path` passes, its `blender` moment included (device sign-in of
+  `eval-ai-dev-01`, one generation, C3 floor and `gpt-oss-20b` in the ai-gateway log).
+
+### Install (once, about 10 minutes)
+
+1. Install **Blender 4.2 LTS or newer** (measured headless on 4.2.3; run by the presenter on 5.2.0 LTS on
+   2026-11-07, where the add-on shows as a Legacy (User) add-on, version 0.2.0).
+2. Download the add-on [evaluations/blender/zuno_3d_generator.py](../../evaluations/blender/zuno_3d_generator.py)
+   (on GitHub, branch `devel`: open the file, **Raw**, save it).
+3. Blender: **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, pick the file, tick
+   **Zuno 3D generator (demo)**.
+4. In the 3D Viewport press **N**, tab **Zuno 3D**. **Cluster domain** is already `apps.demo333.startx.fr`.
+
+Details, tests and the measurement: [evaluations/blender/README.md](../../evaluations/blender/README.md).
+
+### Preflight (08:30, about 3 minutes)
+
+1. In the browser, sign out of any Keycloak session
+   (`https://keycloak.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout`): the device sign-in reuses
+   an open session, and a session of a user outside `ocp-ai-dev` gets 403.
+2. Blender, tab **Zuno 3D**: **Sign in**, **Open sign-in page**, sign in as **ai-dev-01**, accept the grant page. The
+   panel shows **Signed in**. The session holds for the morning (the access token is refreshed by the add-on).
+3. Generate the first stage prompt once (it warms the model), **Run script**, then **Ctrl+Z** and clear the text: the
+   scene is empty again, the add-on stays signed in.
+4. Set the 3D Viewport's shading to **Material Preview** (Z, then Material Preview): the generated materials show
+   their colours there. Do not render (F12): the scripts add no light, so a render comes out dark.
+5. Leave Blender open on the 3D Viewport with the **Zuno 3D** tab and the **Scripting** workspace one click away.
+
+### On stage (about 3 minutes)
+
+Stage prompts, measured 2/2 on `gpt-oss-20b` with the add-on's system prompt v2 (2026-11-07, ADR-0610 clause 8):
+
+| Order | Prompt | Measured | What the audience sees |
+|---|---|---|---|
+| 1 | A wooden table with 4 cylindrical legs and a small desk lamp on top | 2/2, about 13 s | a wooden table, four legs, a lamp on top, 8 objects |
+| 2 | A coffee mug with a handle on a saucer | 2/2, about 7 s | a mug with a torus handle on a saucer |
+| Backup | A cartoon rocket with three fins on a launch pad | 2/2, about 10 s | a rocket with a cone tip and fins |
+| Backup | A low-poly pine tree on a small grassy hill | 2/2, about 8 s | a stacked-cone tree on green ground |
+
+Do not use prompts outside this table on stage. The full results are in `evaluations/blender/results/`.
+
+#### Scenario (about 3 minutes)
+
+The starting state: Blender full screen, Layout workspace, empty scene, Material Preview shading, tab **Zuno 3D** open
+and **Signed in**, prompt 1 already typed in the prompt field.
+
+| Time | The presenter does | The presenter says | The audience sees |
+|---|---|---|---|
+| 0:00 | Points at the Zuno 3D panel. | "A 3D artist wants help from AI without sending a design brief to a public cloud. This is Blender on my laptop, with a small add-on. I am signed in with my company account, nothing else: no API key in Blender." | The panel: cluster domain, "Status: Signed in". |
+| 0:20 | Clicks **Generate script**. | "My sentence leaves Blender with my own identity. The platform classifies the call C3, so only the models on our own GPUs may answer: here gpt-oss-20b. No public model can see it." | "Working..." for about 13 seconds. |
+| 0:40 | Waits for "Check passed", switches to **Scripting**. | "The model does not draw a mesh. It writes a Blender Python script. The add-on checks it before anything runs: only Blender's own modules, no file or system calls, no network imports. And I can read it." | The script `zuno_3d_script.py`, about 50 lines, object names such as `Leg_1`, `LampStand`, `LampShade`. |
+| 1:10 | Back to **Layout**, clicks **Run script**. | "Nothing runs until I click. Now it runs, in one undo step." | The table, its four legs and the lamp appear. |
+| 1:30 | Selects the table top, changes **Scale X** in the properties, then **Ctrl+Z**. | "These are real Blender objects, with names, dimensions and materials. The artist keeps working on them; it is not a frozen mesh." | The table top stretches, then comes back. |
+| 2:00 | Clears the scene (A, X), types prompt 2, **Generate script**, then **Run script**. | "A second one, a coffee mug: about seven seconds." | The mug on its saucer. |
+| 2:40 | Optional: Grafana, **Zuno Platform / Five experiences**, `client="blender"`. | "On the platform side, Blender is one more experience: same quotas, same telemetry, same rules as the chat and the agents." | The `client="blender"` series. |
+
+The sentences to keep if time is short: the call leaves with the user's identity, it stays on the company's own GPUs,
+the script is shown and checked, and nothing runs before the click.
+
+### Fallbacks on stage
+
+| What happens | What to do |
+|---|---|
+| The answer is slow (more than 30 s) or the panel shows an error from the gateway | Say that the request is queued on the platform's GPUs; retry once; then switch to a backup prompt. If `gpt-oss-20b` is down, `qwen3.5-9b` answers, slower. |
+| The panel says "session expired" or "Signed out" | **Sign in** again (the code shows in the panel, about 20 s in the browser), then retry. |
+| A script fails when it runs ("Script failed, nothing kept") | Nothing is left in the scene. Say it: the model wrote an API call that does not exist, the add-on refused to keep half an object. Switch to the mug. |
+| The panel says "Refused: ..." | The static check stopped the script before it ran. Show that line, it is the safety the demonstration is about, then switch to a backup prompt. |
+
+### Rollback
+
+Switching Blender off on the platform side is described in [docs/demo/rollback.md](rollback.md) and in
+[WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md) (workstation entry off, Keycloak
+client removed). On the workstation: **Sign out**, untick the add-on.
+
+### Named limits to say out loud
 
 - The static check catches a confused model; it is not a sandbox. The code runs with the artist's rights, after the
   artist has read it and clicked.
-- Only prompts from the measured set (ADR-0610 clause 8) are used live.
-- If `gpt-oss-20b` is not Ready, `qwen3.5-9b` answers, slower and less accurate.
-
-### The add-on
-
-```python
-bl_info = {
-    "name": "Zuno 3D generator (demo)",
-    "author": "Zuno Demo",
-    "version": (0, 1, 0),
-    "blender": (4, 0, 0),
-    "location": "View3D > Sidebar > Zuno 3D",
-    "description": "Generates editable objects from a prompt with a local model through the Zuno ai-gateway (ADR-0610)",
-    "category": "Object",
-}
-
-import ast
-import json
-import math
-import random
-import re
-import ssl
-import threading
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
-import webbrowser
-
-import bmesh
-import bpy
-import mathutils
-
-# ADR-0610: the ai-gateway routes on (agent, task); the model name is not a routing input.
-MODEL = "auto"
-AGENT = "blender"
-TASK = "bpy"
-CLIENT_ID = "blender"
-TEXT_NAME = "zuno_3d_script.py"
-SYSTEM_PROMPT = (
-    "You are an expert Blender 4 Python (bpy) developer. Return ONLY executable Python code for Blender, "
-    "with no Markdown fences and no explanation. Use only the modules bpy, bmesh, mathutils, math and random. "
-    "Create new objects in the current scene; never delete existing objects, save files, or quit Blender."
-)
-ALLOWED_IMPORTS = {"bpy", "bmesh", "mathutils", "math", "random"}
-FORBIDDEN_CALLS = {"exec", "eval", "compile", "open", "__import__", "getattr", "setattr", "delattr",
-                   "globals", "locals", "vars", "input", "breakpoint"}
-FORBIDDEN_PREFIXES = ("bpy.ops.wm", "bpy.ops.script", "bpy.ops.preferences", "bpy.utils", "bpy.app.handlers")
-
-# Tokens and job results live in process memory only (ADR-0610 clause 4).
-_state = {"access": None, "refresh": None, "expires_at": 0.0, "user_code": "", "verify_url": "",
-          "status": "Signed out", "busy": False, "result": None, "error": None, "check": ""}
-
-
-# ---------- pure helpers ----------
-
-def extract_code(text):
-    """Return the first fenced block if the model added fences, else the text."""
-    match = re.search(r"```(?:python|py)?\s*\n(.*?)```", text, re.DOTALL)
-    return (match.group(1) if match else text).strip()
-
-
-def _dotted(node):
-    parts = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if isinstance(node, ast.Name):
-        parts.append(node.id)
-        return ".".join(reversed(parts))
-    return None
-
-
-def check_script(code):
-    """Static guard against a confused model. Not a sandbox. Returns a list of problems."""
-    try:
-        tree = ast.parse(code)
-    except SyntaxError as exc:
-        return [f"syntax error line {exc.lineno}: {exc.msg}"]
-    problems = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name.split(".")[0] not in ALLOWED_IMPORTS:
-                    problems.append(f"line {node.lineno}: import {alias.name}")
-        elif isinstance(node, ast.ImportFrom):
-            if (node.module or "").split(".")[0] not in ALLOWED_IMPORTS or node.level:
-                problems.append(f"line {node.lineno}: from {node.module} import ...")
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
-            problems.append(f"line {node.lineno}: call to {node.func.id}()")
-        elif isinstance(node, ast.Name) and node.id.startswith("__"):
-            problems.append(f"line {node.lineno}: name {node.id}")
-        elif isinstance(node, ast.Attribute):
-            if node.attr.startswith("__"):
-                problems.append(f"line {node.lineno}: attribute {node.attr}")
-            dotted = _dotted(node)
-            if dotted and dotted.startswith(FORBIDDEN_PREFIXES):
-                problems.append(f"line {node.lineno}: {dotted}")
-    return sorted(set(problems))
-
-
-def _ssl_context(ca_file):
-    ctx = ssl.create_default_context()  # verification stays on (ADR-0610 clause 7)
-    try:
-        import certifi
-        ctx.load_verify_locations(certifi.where())
-    except ImportError:
-        pass
-    if ca_file:
-        ctx.load_verify_locations(bpy.path.abspath(ca_file))
-    return ctx
-
-
-def _post(url, data, ctx, headers=None, form=True, timeout=30):
-    body = urllib.parse.urlencode(data).encode() if form else json.dumps(data).encode()
-    hdrs = {"Content-Type": "application/x-www-form-urlencoded" if form else "application/json"}
-    hdrs.update(headers or {})
-    req = urllib.request.Request(url, data=body, headers=hdrs, method="POST")
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read().decode())
-    except urllib.error.HTTPError as err:
-        try:
-            return err.code, json.loads(err.read().decode())
-        except ValueError:
-            return err.code, {"error": f"HTTP {err.code}"}
-
-
-def _store_tokens(tok):
-    _state["access"] = tok["access_token"]
-    _state["refresh"] = tok.get("refresh_token")
-    _state["expires_at"] = time.time() + int(tok.get("expires_in", 300)) - 30
-
-
-# ---------- background jobs (no bpy calls in threads) ----------
-
-def _sign_in_job(issuer, ctx):
-    status, dev = _post(f"{issuer}/protocol/openid-connect/auth/device",
-                        {"client_id": CLIENT_ID, "scope": "openid"}, ctx)
-    if status != 200:
-        _state.update(busy=False, error=f"device sign-in refused: {dev.get('error', status)}")
-        return
-    _state.update(user_code=dev["user_code"],
-                  verify_url=dev.get("verification_uri_complete") or dev["verification_uri"],
-                  status="Waiting for browser sign-in")
-    interval = int(dev.get("interval", 5))
-    deadline = time.time() + int(dev.get("expires_in", 600))
-    while time.time() < deadline:
-        time.sleep(interval)
-        status, tok = _post(f"{issuer}/protocol/openid-connect/token",
-                            {"grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                             "device_code": dev["device_code"], "client_id": CLIENT_ID}, ctx)
-        if status == 200:
-            _store_tokens(tok)
-            _state.update(busy=False, user_code="", verify_url="", status="Signed in")
-            return
-        err = tok.get("error")
-        if err == "slow_down":
-            interval += 5
-        elif err != "authorization_pending":
-            _state.update(busy=False, user_code="", error=f"sign-in failed: {err}")
-            return
-    _state.update(busy=False, user_code="", error="sign-in timed out")
-
-
-def _token(issuer, ctx):
-    if _state["access"] and time.time() < _state["expires_at"]:
-        return _state["access"]
-    if _state["refresh"]:
-        status, tok = _post(f"{issuer}/protocol/openid-connect/token",
-                            {"grant_type": "refresh_token", "refresh_token": _state["refresh"],
-                             "client_id": CLIENT_ID}, ctx)
-        if status == 200:
-            _store_tokens(tok)
-            return _state["access"]
-    _state.update(access=None, refresh=None, status="Signed out")
-    return None
-
-
-def _generate_job(gateway, issuer, ctx, prompt):
-    token = _token(issuer, ctx)
-    if not token:
-        _state.update(busy=False, error="session expired: sign in again")
-        return
-    payload = {"model": MODEL, "temperature": 0.2,
-               "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": f"Create this 3D object or scene: {prompt}"}]}
-    try:
-        status, res = _post(f"{gateway.rstrip('/')}/v1/chat/completions", payload, ctx,
-                            headers={"Authorization": f"Bearer {token}", "X-Zuno-Agent": AGENT, "X-Zuno-Task": TASK},
-                            form=False, timeout=240)
-    except Exception as exc:  # network, TLS
-        _state.update(busy=False, error=f"gateway unreachable: {exc}")
-        return
-    if status != 200:
-        _state.update(busy=False, error=f"gateway answered {status}: {res.get('error', res)}")
-        return
-    _state.update(busy=False, result=res["choices"][0]["message"]["content"] or "")
-
-
-def _poll():
-    """Main-thread timer: hands results back to Blender."""
-    if _state["result"] is not None:
-        code = extract_code(_state["result"])
-        _state["result"] = None
-        text = bpy.data.texts.get(TEXT_NAME) or bpy.data.texts.new(TEXT_NAME)
-        text.clear()
-        text.write(code)
-        problems = check_script(code)
-        _state["check"] = "Check passed: review the script, then Run" if not problems else \
-            "Refused: " + "; ".join(problems[:3])
-    for window in bpy.context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type in {"VIEW_3D", "TEXT_EDITOR"}:
-                area.tag_redraw()
-    return 0.5 if (_state["busy"] or _state["user_code"]) else None
-
-
-def _start(job, *args):
-    _state.update(busy=True, error=None)
-    threading.Thread(target=job, args=args, daemon=True).start()
-    if not bpy.app.timers.is_registered(_poll):
-        bpy.app.timers.register(_poll, first_interval=0.5)
-
-
-# ---------- Blender UI ----------
-
-class ZUNO3D_Settings(bpy.types.PropertyGroup):
-    gateway_url: bpy.props.StringProperty(name="Gateway", default="https://ai-gateway.apps.example.com")
-    issuer_url: bpy.props.StringProperty(name="Issuer", default="https://keycloak.apps.example.com/realms/zuno")
-    ca_file: bpy.props.StringProperty(name="CA file", subtype="FILE_PATH",
-                                      description="Only for a cluster whose routes use a private CA")
-    prompt: bpy.props.StringProperty(name="Prompt", default="A wooden table with four cylindrical legs")
-
-
-class ZUNO3D_OT_sign_in(bpy.types.Operator):
-    bl_idname = "zuno3d.sign_in"
-    bl_label = "Sign in"
-
-    def execute(self, context):
-        s = context.scene.zuno3d
-        _start(_sign_in_job, s.issuer_url.rstrip("/"), _ssl_context(s.ca_file))
-        return {"FINISHED"}
-
-
-class ZUNO3D_OT_open_browser(bpy.types.Operator):
-    bl_idname = "zuno3d.open_browser"
-    bl_label = "Open sign-in page"
-
-    def execute(self, context):
-        webbrowser.open(_state["verify_url"])
-        return {"FINISHED"}
-
-
-class ZUNO3D_OT_sign_out(bpy.types.Operator):
-    bl_idname = "zuno3d.sign_out"
-    bl_label = "Sign out"
-
-    def execute(self, context):
-        _state.update(access=None, refresh=None, expires_at=0.0, status="Signed out")
-        return {"FINISHED"}
-
-
-class ZUNO3D_OT_generate(bpy.types.Operator):
-    bl_idname = "zuno3d.generate"
-    bl_label = "Generate script"
-
-    def execute(self, context):
-        s = context.scene.zuno3d
-        if not s.prompt.strip():
-            self.report({"WARNING"}, "The prompt is empty")
-            return {"CANCELLED"}
-        _state["check"] = ""
-        _start(_generate_job, s.gateway_url, s.issuer_url.rstrip("/"), _ssl_context(s.ca_file), s.prompt)
-        self.report({"INFO"}, "Asking the platform's local model...")
-        return {"FINISHED"}
-
-
-class ZUNO3D_OT_run(bpy.types.Operator):
-    bl_idname = "zuno3d.run"
-    bl_label = "Run script"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        text = bpy.data.texts.get(TEXT_NAME)
-        if text is None:
-            self.report({"WARNING"}, "Generate a script first")
-            return {"CANCELLED"}
-        code = text.as_string()  # the user's edits count
-        problems = check_script(code)
-        if problems:
-            self.report({"ERROR"}, "Refused: " + "; ".join(problems[:3]))
-            return {"CANCELLED"}
-        scope = {"__name__": "__zuno3d__", "bpy": bpy, "bmesh": bmesh, "mathutils": mathutils,
-                 "math": math, "random": random}
-        try:
-            exec(compile(code, TEXT_NAME, "exec"), scope)  # after the check and the user's click only
-        except Exception as exc:
-            self.report({"ERROR"}, f"Script failed: {exc}")
-            return {"CANCELLED"}
-        self.report({"INFO"}, "Objects created")
-        return {"FINISHED"}
-
-
-class ZUNO3D_PT_panel(bpy.types.Panel):
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "Zuno 3D"
-    bl_label = "Zuno 3D (local model)"
-
-    def draw(self, context):
-        s = context.scene.zuno3d
-        col = self.layout.column()
-        box = col.box()
-        box.prop(s, "gateway_url")
-        box.prop(s, "issuer_url")
-        box.prop(s, "ca_file")
-        col.label(text=f"Task: {AGENT}/{TASK}   Status: {_state['status']}")
-        if _state["user_code"]:
-            col.label(text=f"Code: {_state['user_code']}")
-            col.operator("zuno3d.open_browser", icon="URL")
-        row = col.row()
-        row.enabled = not _state["busy"]
-        row.operator("zuno3d.sign_in", icon="USER")
-        row.operator("zuno3d.sign_out")
-        col.prop(s, "prompt", text="")
-        row = col.row()
-        row.enabled = bool(_state["access"]) and not _state["busy"]
-        row.operator("zuno3d.generate", icon="TEXT")
-        if _state["busy"]:
-            col.label(text="Working...", icon="TIME")
-        if _state["check"]:
-            col.label(text=_state["check"])
-        col.operator("zuno3d.run", icon="PLAY")
-        if _state["error"]:
-            col.label(text=_state["error"], icon="ERROR")
-
-
-CLASSES = (ZUNO3D_Settings, ZUNO3D_OT_sign_in, ZUNO3D_OT_open_browser, ZUNO3D_OT_sign_out,
-           ZUNO3D_OT_generate, ZUNO3D_OT_run, ZUNO3D_PT_panel)
-
-
-def register():
-    for cls in CLASSES:
-        bpy.utils.register_class(cls)
-    bpy.types.Scene.zuno3d = bpy.props.PointerProperty(type=ZUNO3D_Settings)
-
-
-def unregister():
-    if bpy.app.timers.is_registered(_poll):
-        bpy.app.timers.unregister(_poll)
-    del bpy.types.Scene.zuno3d
-    for cls in reversed(CLASSES):
-        bpy.utils.unregister_class(cls)
-    _state.update(access=None, refresh=None)
-
-
-if __name__ == "__main__":
-    register()
-```
+- The model sometimes invents a Blender API call: one in 24 measured runs still fails with the v2 prompt, and Run keeps
+  nothing when it does.
 
 ## Day 3: monitoring and decommissioning
 

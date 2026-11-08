@@ -1,6 +1,6 @@
 # WP-225: AI and agent surface: guardrails, metering, delegated scope (delivers ADR-0602, ADR-0603)
 
-- **State:** Operator pending (lots A, B and C, 2026-11-07)
+- **State:** Done (2026-11-07, user decision). Lots A, B and C are on `devel` and live on demo333 with the scope checks that the demo allows; the switches that stay off are listed in [post-demo-hardening.md](../post-demo-hardening.md)
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** WP-222, WP-209 (classification floor; do not duplicate its work)
 - **Blocks:** WP-227
@@ -617,3 +617,22 @@ Back-out: each value back to its default, then sync; the order does not matter f
      which registers them with the key.
 6. **Client allowlist.** After step 5, a token of the `aap` client gets 401 on both gateways, and every listed client
    keeps answering (`zuno_model_tokens_total` keeps growing per client).
+
+## Live activation on demo333 (2026-11-07, user's go)
+
+| Step | What is on | Proof |
+|---|---|---|
+| Keys | Two Ed25519 pairs in Vault (`zuno/mcp/gateway-call-assertion`, `zuno/a2a/agent-chain`), granted to zuno-ai-run; seeded by `ansible/playbooks/wp225_seed_signing_keys.yml` (idempotent, prints nothing) | ExternalSecrets Ready |
+| 1 | a2a-gateway signs the agent chain (`agentChain.sign`) | golden path PASS, delegation included |
+| 2 | mcp-gateway and ai-gateway verify the chain (`agentChain.verify`, public key in `gitops/apps/mcp` and `zuno_ai_gateway_agent_chain_*` in `ansible/clusters/demo333.yml`); mcp-gateway signs a per-call assertion (`outboundIdentity.mode: assertion`) | golden path PASS; logs of the three gateways clean (34 `POST /agents/tekos` all 200) |
+| 3 | confluence-mcp, git-forge-mcp and aap-mcp hold the assertion public key (`callAssertion.publicKey`), `required` still off; salesforce is not deployed | a forged assertion of the right type gets 401 "Signature verification failed" and is logged; golden path PASS with the `tools` moment (6 pages through confluence-mcp) |
+| Lot B | `spaceAllowlist` (SXSI) and `repositoryAllowlist` (`github:startxfr/zuno-demo`) for `ocp-ai-dev`, `ocp-ai-ops`, `ocp-paas-dev`, `ocp-paas-ops`, `aap_ops`; every demo group (consultant, board, cdp, lightspeed_readonly, sales, finance, adv, recrut) keeps all spaces and repositories | golden path PASS, 13 moments; the onboarding pages are in SXSI |
+
+Still off, by decision: `callAssertion.required`, `jwtAllowedClients`, `restAgentEntitlement`, `agentChain.requireFor`, token-proxy inbound auth
+(it needs Dify's stored credentials re-registered), Salesforce owner scoping (no Salesforce org), the namespace matcher and the Confluence/git
+allowlists for groups other than the five above. Lot A is exercised by an isolated clone of the ai-gateway
+(`ai-gateway-wp225probe`, C2/C3 in `block`, unreachable detector): the script is `lota-live-test.py`. **Result (2026-11-07, run by the user):** C1 served (200); C2 and C3 refused with
+503 `guardrails_unavailable` (stage `prompt`). The clone was deleted afterwards; the live ai-gateway was never touched.
+
+Known residual: the two signing keys are readable by `ocp-ai-dev` and `ocp-ai-ops` (they can create ExternalSecrets in zuno-ai-run), like the
+workload token that signs the lot B context. Closing it needs the keys in a namespace those groups cannot reach.

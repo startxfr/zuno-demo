@@ -1,6 +1,6 @@
 # WP-236: World-model observability and demo kit (delivers ADR-0604 D7, §10)
 
-- **State:** Not started
+- **State:** Repo work merged
 - **ADRs:** ADR-0604
 - **Depends on:** WP-235
 - **Blocks:** WP-237
@@ -28,6 +28,13 @@ ADR-0604 D7, §9.2, §10.
    with resets (the model's context is about 10 seconds); what it does not show; if something goes wrong (the labelled
    recording); disable sequence and the cost alert.
 4. `docs/architecture/world-model.md`: one page, the §4 diagram and the switch.
+
+## Result (2026-11-07)
+
+`platform/world-model/config/presets.yaml` (three scenes, validated by `components/world-model-web/tests/test_presets.py` against the visitor
+rules; no image shipped: the pre-generated first images come with the GPU smoke test), `gitops/charts/grafana/templates/
+dashboard-world-model.yaml` (20 panels over the zuno_world_* series, DCGM and the machine age; rendered and its JSON parsed),
+`docs/demo/world-model.md` (written without the GPU and marked not-to-be-shown until WP-237) and `docs/architecture/world-model.md`.
 
 ## Verification
 

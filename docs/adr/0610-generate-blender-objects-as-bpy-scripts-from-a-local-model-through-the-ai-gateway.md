@@ -1,6 +1,6 @@
 # ADR-0610: Generate Blender objects as bpy scripts from a local model through the ai-gateway
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.17
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team, with the DevOps / infrastructure and 3D content creation teams
@@ -195,3 +195,40 @@ builds, clause by clause, where it differs from the wording above:
   60 requests per user per 5 minutes. The ai-gateway's port 8080 already accepts callers outside the mesh
   (PeerAuthentication `ai-gateway-from-unmeshed-clients`), and its own audience check is live (`JWT_AUDIENCE_REQUIRED`).
 - **Clause 7.** demo333's routes serve the Let's Encrypt wildcard, so the add-on needs no CA file there.
+
+## Update 2026-11-07 (WP-244): live on demo333, first measurements
+
+- **Clauses 2 to 5 live.** Signed in as ai-dev-01 (device flow, client `blender`, group `ocp-ai-dev`), three prompts
+  went through `https://ai-gateway.apps.demo333.startx.fr`. The ai-gateway logged `classification raised by floor: C1 ->
+  C3 agent=blender task=bpy client=blender` for each and sent them to `gpt-oss-20b` through MaaS (agents release
+  v0.14.3, routing `prefer` gpt-oss-20b then qwen3.5-9b, six SaaS providers excluded). Without a token, or with a token
+  of a user outside the admitted group (ai-ops-01), the edge answers 401 and 403 before the model is reached; unrouted
+  paths answer 404; the 61st request of a user within five minutes answers 429.
+- **Transport.** A non-streamed generation is cut after 60 s by the load balancer in front of the router (no bytes
+  flow while the model works). The add-on streams (`stream: true`); answers then arrive in 6.6 to 9.4 s.
+- **Clause 6.** **Run** is all or nothing: a script that fails half-way removes the objects it created.
+- **Clause 8, first sample (3 prompts, gpt-oss-20b).** Table with lamp: 8 objects. Office chair: failed on an invented
+  argument (`primitive_cone_add(diameter1=...)`), rolled back. Pine tree on a hill: 3 objects and a modifier. 2 of 3
+  run; the full prompt set and the golden-path probe of clause 9 remain, hence `Partially implemented`.
+
+## Update 2026-11-07 (WP-245): prompt set measured, golden-path moment live; Implemented
+
+- **Clause 8.** 12 prompts, twice each, through the real entry as the evaluation persona `eval-ai-dev-01`, every
+  script replayed in Blender 4.2.3 (headless) through the add-on's Run
+  (`evaluations/blender/measure_prompts.py`, results in `evaluations/blender/results/`). With the first system prompt:
+  16 of 24 runs build a scene, 5 prompts stage-ready; the failures were invented API calls (`primitive_cone_add(
+  diameter1=...)`, bmesh operators that do not exist, objects unlinked from a collection they were not in). System
+  prompt v2 keeps the model on documented primitives (no bmesh, no collection moves, materials, objects resting on the
+  ground): 23 of 24 runs build, 11 of 12 prompts stage-ready, 5 to 13 s per answer. The stage uses only measured
+  prompts (`docs/demo/blender-3d.md`).
+- **Clause 9.** Golden-path moment `blender` (`evaluations/golden_path_probe.py`): edge 401 and 404, a device sign-in
+  of the public client `blender` as `eval-ai-dev-01` with no human (`evaluations/blender/device_login.py`, the login
+  form and the grant page scripted, the session revoked afterwards), `/v1/models`, one streamed generation that passes
+  the static check, the C3 floor line and a `gpt-oss-20b` call in the ai-gateway log. Passes on demo333; required once
+  the workstation entry exists. The persona holds `/ocp-ai-dev` and the evaluation group only (explicit `groups` in
+  `evalPersonas`), so neither the entry nor the AuthPolicy widened (zuno-demo-3c review).
+- **ADR-0606 definition of done.** Work packages WP-244 and WP-245; the golden-path moment; rollback in
+  `docs/demo/rollback.md` and WP-244; the demonstration step (moment 4 of `docs/demo/demo-day-2026-11-09.md`,
+  `docs/demo/blender-3d.md`); `blender` in the ai-gateway's `experienceClients`. Blender joined the 2026-11-09
+  demonstration by user decision.
+- **Add-on.** Shipped as `evaluations/blender/zuno_3d_generator.py`, installed from disk; one **Cluster domain** field.

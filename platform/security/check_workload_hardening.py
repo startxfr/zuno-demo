@@ -46,6 +46,8 @@ DEPLOYMENT_CHARTS = [
     "mcp-git-forge",
     # ADR-0355/WP-074 - same.
     "mcp-aap",
+    # ADR-0604/WP-235: the world-model experience (the GPU runtime, the web tier, the front door).
+    "world-model",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;
@@ -357,7 +359,7 @@ def main() -> int:
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "models"]:
+    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "models", "world-model"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

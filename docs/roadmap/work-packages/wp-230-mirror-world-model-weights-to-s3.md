@@ -1,6 +1,6 @@
 # WP-230: Mirror the world-model weights to S3 (delivers ADR-0604 D2, D3)
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-08)
 - **ADRs:** ADR-0604
 - **Depends on:** WP-228
 - **Blocks:** WP-231

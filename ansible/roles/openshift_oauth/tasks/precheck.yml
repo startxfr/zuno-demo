@@ -1,5 +1,11 @@
 ---
 # State detection (never fails).
+# ADR-0352 / WP-211: external mode builds keycloak-serving-ca from the supplied CA, not from a built-in Ingress.
+- name: "openshift_oauth | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "openshift_oauth | resolve the Keycloak endpoint and mode (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
 - name: "openshift_oauth | check the openshift-oauth Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
@@ -122,6 +128,7 @@
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ingress_check
   ignore_errors: true
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "openshift_oauth | look up the Secret the Keycloak Ingress actually serves"
   kubernetes.core.k8s_info:
@@ -131,14 +138,16 @@
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ca_check
   ignore_errors: true
-  when: (_openshift_oauth_keycloak_ingress_check.resources | default([]) | length) > 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_openshift_oauth_keycloak_ingress_check.resources | default([]) | length) > 0
 
 - name: "openshift_oauth | note whether the serving-CA snapshot can be evaluated at all"
   ansible.builtin.set_fact:
     _openshift_oauth_serving_ca_checkable: >-
       {{ (_openshift_oauth_ca_lookup.resources | default([]) | length) > 0
          and (_openshift_oauth_router_ca_check.resources | default([]) | length) > 0
-         and ((_openshift_oauth_keycloak_ca_check.resources | default([])) | length) > 0 }}
+         and (((_openshift_oauth_keycloak_ca_check.resources | default([])) | length) > 0 or (zuno_keycloak_external_mode | bool)) }}
 
 # Byte-for-byte the expression install.yml uses to build the ConfigMap - same
 # concatenation order, same conditional "\n". Any cosmetic divergence here
@@ -150,9 +159,13 @@
   ansible.builtin.set_fact:
     _openshift_oauth_serving_ca_expected: >-
       {{ (
-           (_openshift_oauth_keycloak_ca_check.resources[0].data['ca.crt'] | b64decode) + "\n"
-           if 'ca.crt' in (_openshift_oauth_keycloak_ca_check.resources[0].data | default({}))
-           else ''
+           (zuno_keycloak_ca_pem + "\n" if (zuno_keycloak_ca_pem | length > 0) else '')
+           if (zuno_keycloak_external_mode | bool)
+           else (
+             (_openshift_oauth_keycloak_ca_check.resources[0].data['ca.crt'] | b64decode) + "\n"
+             if 'ca.crt' in (_openshift_oauth_keycloak_ca_check.resources[0].data | default({}))
+             else ''
+           )
          )
          + (_openshift_oauth_router_ca_check.resources[0].data['ca-bundle.crt']) }}
   when: _openshift_oauth_serving_ca_checkable | bool

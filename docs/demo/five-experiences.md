@@ -60,8 +60,11 @@ flowchart LR
    applications are not affected).
 2. **The same question in UnifAI and Open WebUI.** Same persona, same documents, same entitlement: the three answers draw
    on the same sources. Say what differs: the interface.
-   In OpenClaw (sale-01's assistant) name Confluence in the question: *"Cherche dans Confluence les pages d'onboarding"*. A
-   bare question about "workshops d'onboarding" matches OpenClaw's own documents and it answers from those (WP-208 D5).
+   In OpenClaw use **consultant-02's assistant** (`https://assistant-zuno-claw-consultant-02.apps.<domain>`) and name
+   Confluence in the question: *"Cherche dans Confluence les pages d'onboarding"*. A bare question about "workshops
+   d'onboarding" matches OpenClaw's own documents and it answers from those (WP-208 D5). Not sale-01's assistant: the
+   `sales` group gets no Confluence tool (tool policy; checked 2026-11-07, its assistant is offered Drive, Gmail and
+   diagram only), while consultant-02's is offered `confluence.page.search` and finds the SXSI onboarding pages.
 3. **Same backend, five clients.** Dashboard row *Same backend, five experiences*: one series per client (`unifai`,
    `open-webui`, `openclaw-*`, `dify`, `kagent`) for calls, tokens, cost and guardrail evaluations. One gateway counted them all.
 4. **Same models and routing.** Row *Same models, same routing*: the provider follows the request's data classification,

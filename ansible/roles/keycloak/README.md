@@ -312,3 +312,34 @@ Operator/Keycloak behavior but not exercised end to end:
 
 Run `make d0 check keycloak` → `make d0 install keycloak` against the real
 cluster and adjust any of the above that turns out to be wrong.
+
+## External mode (ADR-0352, WP-211)
+
+`zuno_keycloak_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that the Keycloak is not
+owned by this platform. Payload and meaning of each key: `ansible/confidential.example.yml`. Only the realm `zuno`
+is supported.
+
+| Verb | internal (default) | external |
+|---|---|---|
+| `install` | RHBK operator (`-d0`), then `-d1`: Keycloak CR, realm import, ExternalSecrets, reconcile Job | no operator, no Keycloak CR, no import. Asserts the endpoint over TLS against the supplied CA and the admin sign-in, seeds `zuno/keycloak/admin` in Vault, publishes `zuno-auth/keycloak-external-ca`, then applies `-d1` with `keycloak.builtIn: false`: the client-secret ExternalSecrets, the client ConfigMap and `job-client-reconcile-external.yaml` |
+| `check` | Applications, Keycloak CR Ready, realm import Done | `-d1` Synced and Healthy, endpoint reachable, admin sign-in good, realm present (record only) |
+| `uninstall` | `-d1`, the operator, `-d0` | `-d1` and the CA ConfigMap only; the external Keycloak and its realm are never touched |
+
+What the external reconcile Job does, create-if-missing and never deleting: the realm (only if its credential may),
+every client with its real secret (the Job substitutes `${vault.<key>}` itself from the same projected Secrets the
+built-in pod mounts, because an external Keycloak has no file-vault SPI; the secrets therefore also live in that
+Keycloak's own store), the service-account role mappings, the 24 groups and their subgroups, and with
+`zuno_keycloak_external_seed_personas` the demo personas. It merges only the keys of `realm-settings.json` into the realm.
+
+**What the external owner provides.** A realm `zuno` (empty is fine) and a user in it with the
+`realm-management/realm-admin` role, with a first name, a last name and an email. With a master-realm admin and
+`zuno_keycloak_external_admin_realm: master` the Job creates the realm itself. The credential signs in through the
+`admin-cli` client of its realm.
+
+**Consumers.** Every consumer reads the endpoint from `ansible/tasks/resolve_keycloak_endpoint.yml`; in external mode
+`apply_gitops_app.yml` merges the Keycloak seams of each consumer chart (`ansible/tasks/keycloak_seam_values.yml`).
+No component reads `zuno_keycloak_mode` itself, except through that one task.
+
+**Flipping the mode** is a migration event (ADR-0352 clause 4): the data is not moved by this installer. Runbook:
+`docs/roadmap/work-packages/wp-211-keycloak-internal-external-mode.md`, "Migration runbook".
+

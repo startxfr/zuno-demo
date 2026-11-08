@@ -18,6 +18,30 @@ zuno_keycloak_google_oauth_enabled: false
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
+# --- Keycloak internal/external mode (ADR-0352, WP-211) ---------------------
+# internal (default, key absent): the platform deploys Keycloak (RHBK operator, the Keycloak CR, the realm
+# import). external: a Keycloak this platform does not own is used. Then the role deploys nothing, asserts the
+# endpoint and the admin credential, seeds the credential into Vault (zuno/keycloak/admin), publishes the supplied
+# CA, and the reconcile Job creates, when missing, the realm's clients, groups and service accounts (and the demo
+# personas only if asked). Not provisioned, by decision: the Google identity provider (the external owner's), the
+# master realm, any other realm. Only the realm `zuno` is supported. Switching mode is a migration event, not a
+# reconcile (WP-211 runbook). Needs this file: AAP-launched jobs do not carry it, so run the roles locally.
+zuno_keycloak_mode: internal
+# https URL of the external Keycloak, no realm path, TLS-verifiable (there is no skip-verify option).
+zuno_keycloak_external_url: "xxxxxx"
+zuno_keycloak_external_realm: "zuno"
+# PEM bundle that signs its certificate ("" = publicly trusted). May hold several certificates.
+zuno_keycloak_external_ca_bundle: ""
+# The credential the platform signs in with, in the realm below. A user with the realm-management/realm-admin role
+# on the realm zuno is enough (it needs a first name, a last name and an email). The default `zuno` expects the
+# owner to have created the empty realm; `master` with a master-realm admin lets the Job create it.
+zuno_keycloak_external_admin_realm: "zuno"
+zuno_keycloak_external_admin_username: "xxxxxx"
+zuno_keycloak_external_admin_password: "xxxxxx"
+# true = also create the demo personas (same shared password as internal, ADR-0595) when missing. Off by default: a
+# customer's Keycloak should not get demo accounts. The acceptance gate and the probes need them.
+zuno_keycloak_external_seed_personas: false
+
 # --- SMTP technical mail identity ------------------------------------------
 # Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false

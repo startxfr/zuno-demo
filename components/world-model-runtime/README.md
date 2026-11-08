@@ -34,5 +34,5 @@ WORLD_MODEL_ENGINE=mock WORLD_MODEL_IMAGE=mock uvicorn app.main:get_app --factor
 
 `Dockerfile` installs two hash-checked locks (`requirements.txt`, `gpu/requirements.txt`, ADR-0603 M20), then the pinned
 `world_engine`, `taehv` and `gemlite` archives after a sha256 check. Weights are never baked in: an init container runs
-`platform/world-model/fetch_models.py` to copy the revisions of `platform/world-model/models.lock.yaml` from S3.
+`gitops/charts/world-model/files/fetch_models.py` to copy the revisions of `platform/world-model/models.lock.yaml` from S3.
 `app/smoke.py` is the GPU smoke test (`platform/world-model/tests/gpu-smoke-job.yaml`, WP-232).

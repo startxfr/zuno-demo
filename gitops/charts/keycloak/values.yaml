@@ -3,6 +3,22 @@
 # Both default false so templates render nothing by default.
 keycloak:
   enabled: false
+  # ADR-0352/WP-211: true = this chart deploys the Keycloak (CR, Ingress, realm import, database
+  # secret). false = EXTERNAL mode: a Keycloak this platform does not own is used instead; only the
+  # consumer-side objects stay (client-secret ExternalSecrets, the client ConfigMap) and the
+  # reconcile Job targets keycloakExternal.url (templates/job-client-reconcile-external.yaml).
+  builtIn: true
+
+# ADR-0352/WP-211: used only when keycloak.builtIn is false (the role sets them from confidential.yml).
+keycloakExternal:
+  url: ""              # https://sso.corp.example.com, no realm path
+  realm: zuno          # the realm must be called zuno (the consumers' URLs write it)
+  adminRealm: zuno     # realm the admin credential signs in to; `master` for a master-realm admin
+  caConfigMap: ""      # ConfigMap (key ca-bundle.crt) in this namespace holding the external CA; "" = system trust
+  seedPersonas: false  # create the demo personas (and, with them, nothing else) when missing
+  # Groups the live realm carries that the realm file does not (found by the WP-211 lot C export): the group of the
+  # evaluation personas (evalPersonasGroup) and the Tekos preview agent group. Created when missing, like the others.
+  extraGroups: [zuno-evaluation, agent_tekos_preview]
 
 # Namespace for the Keycloak CR, KeycloakRealmImport and ExternalSecrets.
 # No Namespace template here - zuno-auth is created by gitops/charts/namespaces.
@@ -150,7 +166,7 @@ operator:
     operator:
       channel: ""
       name: rhbk-operator
-      installPlanApproval: Automatic
+      installPlanApproval: Manual  # demo freeze (2026-11-08): no unattended operator upgrade until after the 2026-11-09 demo; back to Automatic after it
       source:
         name: ""
         namespace: openshift-marketplace
@@ -191,6 +207,13 @@ evalPersonas:
     copyOf: finance-01
   - username: eval-board-01
     copyOf: board-01
+  # ADR-0610/WP-245: the Blender golden-path probe and prompt-set measurement sign in as this persona through the
+  # device flow of the public client `blender`; the workstation entry admits /ocp-ai-dev only. Explicit groups
+  # (not copyOf ai-dev-01, which would add /agent_tekos): /ocp-ai-dev plus evalPersonasGroup, nothing else
+  # (zuno-demo-3c review 2026-11-07). Its 429 counter and budget are its own.
+  - username: eval-ai-dev-01
+    groups:
+      - /ocp-ai-dev
   # Stresstest twins: the day-3 stresstest Jobs sign in as these
   # (EVAL_TWIN_PREFIX=stress-), so one stresstest run - about 160 model
   # calls, close to a whole 3M-token daily user budget since the Red Hat

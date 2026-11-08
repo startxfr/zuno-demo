@@ -1,0 +1,80 @@
+# ADR-0604 §4: the browser API and UI. One replica and Recreate: the GPU lease lives in memory.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world-model-web
+  labels:
+    app.kubernetes.io/name: world-model-web
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: world-model-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: world-model-web
+    spec:
+      serviceAccountName: world-model-web
+      automountServiceAccountToken: false
+      {{- include "world-model.podSecurity" . | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ .Values.images.web }}
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - {name: WORLD_MODEL_RUNTIME_URL, value: "http://world-model-runtime:8080"}
+            - name: WORLD_MODEL_INTERNAL_TOKEN
+              valueFrom: {secretKeyRef: {name: world-model-internal, key: token}}
+            # The public https issuer: the token's `iss` must match it, so never the in-cluster http Service.
+            - {name: KEYCLOAK_ISSUER, value: {{ include "world-model.keycloakIssuer" . | quote }}}
+            - {name: JWT_AUDIENCE, value: {{ .Values.web.audience | quote }}}
+            - {name: ALLOWED_GROUPS, value: {{ .Values.web.allowedGroups | quote }}}
+            - {name: OPS_GROUPS, value: {{ .Values.web.opsGroups | quote }}}
+            - {name: ALLOWED_ORIGINS, value: "https://{{ .Values.global.zuno.routeHost }}"}
+            - {name: AI_GATEWAY_URL, value: {{ .Values.web.aiGatewayUrl | quote }}}
+            - {name: PROMPT_MODEL, value: {{ .Values.web.promptModel | quote }}}
+            - {name: MAX_PROMPT_CHARS, value: {{ .Values.web.maxPromptChars | quote }}}
+            - {name: SESSION_IDLE_SECONDS, value: {{ .Values.web.idleSeconds | quote }}}
+            - {name: SESSION_DETACHED_SECONDS, value: {{ .Values.web.detachedSeconds | quote }}}
+            - {name: SESSION_MAX_SECONDS, value: {{ .Values.web.maxSessionSeconds | quote }}}
+            - {name: WORLDS_PER_HOUR, value: {{ .Values.web.worldsPerHour | quote }}}
+            - {name: PRESETS_FILE, value: /app/config/presets.yaml}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          {{- include "world-model.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: presets, mountPath: /app/config, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: presets
+          configMap:
+            name: world-model-presets
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-model-web
+  labels:
+    app.kubernetes.io/name: world-model-web
+    zuno.io/managed-by: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: world-model-web
+  ports:
+    - {name: http, port: 8080, targetPort: http}

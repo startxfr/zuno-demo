@@ -1,0 +1,72 @@
+---
+# ADR-0352 / WP-211: in EXTERNAL mode, point each Keycloak consumer chart at the external endpoint.
+# Included by apply_gitops_app.yml when zuno_keycloak_mode is external; internal mode never gets here, so no
+# manifest or rendering changes for it. Every key below is a chart value added empty by lot A of WP-211, whose
+# default is today's built-in literal: this file only fills it in.
+#
+# It merges into the Application's own values (never replaces them), so the roles' values and the manifest's
+# stay as they are. Components not listed are not Keycloak consumers (or are handled by their own role: the
+# keycloak chart by the keycloak role, rhtas-config's issuer by the rhtas_config role).
+#
+# Needs: _gitops_app_definition and gitops_component_name (set by apply_gitops_app.yml).
+# `.get('values', ...)`, never ['values'] or .values: on a manifest with no values key (models), Jinja falls back
+# from the item to the dict METHOD of that name and combine() then fails ("expected dicts but got a 'method'").
+- name: "keycloak-seams | resolve the Keycloak endpoint (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
+- name: "keycloak-seams | the chart values per consumer component"
+  ansible.builtin.set_fact:
+    _keycloak_seams:
+      ai-gateway:
+        keycloakIssuer: "{{ zuno_keycloak_issuer_url }}"
+        keycloakJwksUrl: "{{ zuno_keycloak_jwks_url }}"
+      mcp:
+        keycloakIssuer: "{{ zuno_keycloak_issuer_url }}"
+        keycloakJwksUrl: "{{ zuno_keycloak_jwks_url }}"
+      a2a-gateway:
+        keycloakIssuer: "{{ zuno_keycloak_issuer_url }}"
+        keycloakJwksUrl: "{{ zuno_keycloak_jwks_url }}"
+      token-proxy-dify:
+        tokenUrl: "{{ zuno_keycloak_token_url }}"
+      token-proxy-kagent:
+        tokenUrl: "{{ zuno_keycloak_token_url }}"
+      dify:
+        global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      kagent:
+        global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      open-webui:
+        global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      world-model:
+        global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      openclaw:
+        keycloak: {host: "{{ zuno_keycloak_host }}"}
+      unifai:
+        stack: {identity: {keycloakUrl: "{{ zuno_keycloak_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      models:
+        keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"
+      openshift-oauth:
+        oauth: {keycloakUrl: "{{ zuno_keycloak_url }}"}
+      namespaces:
+        keycloakHost: "{{ zuno_keycloak_host }}"
+      connectivity-link:
+        quotaEnforcement: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
+        workstationEntry: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
+      rhtas:
+        fulcio: {oidc: {issuerUrl: "{{ zuno_keycloak_issuer_url }}"}}
+      trustyai-config:
+        ragasEval: {keycloakTokenUrl: "{{ zuno_keycloak_token_url }}"}
+      mlops:
+        acceptanceGate: {keycloakUrl: "{{ zuno_keycloak_url }}"}
+
+- name: "keycloak-seams | merge them into the Application values of {{ gitops_component_name }}"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        _gitops_app_definition
+        | combine({'spec': {'source': {'helm': {'values':
+            ((_gitops_app_definition.spec.source.helm.get('values', '{}') | from_yaml)
+             | combine(_keycloak_seams[gitops_component_name], recursive=True)) | to_nice_yaml}}}}, recursive=True)
+      }}
+  when:
+    - gitops_component_name in _keycloak_seams
+    - _gitops_app_definition.spec.source.helm is defined

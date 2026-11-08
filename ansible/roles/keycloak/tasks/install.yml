@@ -1,4 +1,14 @@
 ---
+# ADR-0352 / WP-211: `zuno_keycloak_mode: external` (ansible/confidential.yml) means the Keycloak is not ours: the
+# RHBK operator (-d0) and the built-in instance are not deployed, install_external.yml asserts the endpoint instead,
+# and the -d1 Application only carries the consumer side (client-secret ExternalSecrets, the client ConfigMap and the
+# reconcile Job that creates the realm content in the external Keycloak). Absent means internal, exactly as before.
+- name: "keycloak | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "keycloak | resolve the Keycloak endpoint and mode (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
 # RHBK's CSV only supports OwnNamespace/SingleNamespace install modes, not
 # AllNamespaces, so it's subscribed directly into zuno-auth rather than the
 # shared openshift-operators namespace other operators use.
@@ -7,6 +17,7 @@
     # match if one ever exists, else fall back to defaultChannel.
 - name: "keycloak | resolve the operator package"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  when: not (zuno_keycloak_external_mode | bool)
   vars:
     operator_package_name: "rhbk-operator"
     operator_subscription_namespace: "zuno-auth"
@@ -14,7 +25,9 @@
 
 - name: "keycloak | apply the keycloak GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  when: not (operator_package_skip_d0 | bool)
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "keycloak"
     gitops_app_phase: "d0"
@@ -57,6 +70,29 @@
   vars:
     assert_security_profile_check_personas: true
 
+# ADR-0352 / WP-211, external mode: assert the endpoint and the credential, seed Vault, publish the CA.
+- name: "keycloak | install against the external Keycloak (ADR-0352 clause 4)"
+  ansible.builtin.include_tasks: install_external.yml
+  when: zuno_keycloak_external_mode | bool
+
+# The chart values that switch the d1 Application to external mode ({} in internal mode, so its
+# rendering is untouched). keycloak.enabled stays true (it gates the consumer-side objects).
+- name: "keycloak | compute the mode-specific chart values"
+  ansible.builtin.set_fact:
+    _keycloak_mode_values: >-
+      {{
+        {
+          'keycloak': {'builtIn': false},
+          'keycloakExternal': {
+            'url': zuno_keycloak_url,
+            'realm': zuno_keycloak_realm,
+            'adminRealm': zuno_keycloak_admin_realm,
+            'caConfigMap': ('keycloak-external-ca' if (zuno_keycloak_ca_pem | length > 0) else ''),
+            'seedPersonas': (zuno_keycloak_external_seed_personas | default(false) | bool)
+          }
+        } if (zuno_keycloak_external_mode | bool) else {}
+      }}
+
 # gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
 # rather than merging: values is a YAML *string* key, so combine(recursive=True)
 # cannot descend into it. Re-supplying only the keys this role knew about
@@ -92,12 +128,14 @@
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'googleOAuth': {'enabled': (zuno_keycloak_google_oauth_enabled | default(true) | bool)}}, recursive=True)
         | combine({'securityProfile': (zuno_security_profile | default('demo'))})
+        | combine(_keycloak_mode_values, recursive=True)
         | combine({'agentGroups': ((lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml')
                                     | from_yaml)['keycloak']['groups'] | default([], true))})
       }}
     gitops_app_wait_retries: 60
 
 - name: "keycloak | wait for the Keycloak CR to report Ready"
+  when: not (zuno_keycloak_external_mode | bool)
   kubernetes.core.k8s_info:
     api_version: k8s.keycloak.org/v2alpha1
     kind: Keycloak
@@ -111,6 +149,7 @@
   delay: 10
 
 - name: "keycloak | wait for the zuno realm import to report Done"
+  when: not (zuno_keycloak_external_mode | bool)
   kubernetes.core.k8s_info:
     api_version: k8s.keycloak.org/v2alpha1
     kind: KeycloakRealmImport
@@ -136,4 +175,6 @@
       then let the google-oauth-client ExternalSecret resync (or delete the
       Keycloak pod to pick up the refreshed KC_VAULT_GOOGLE_CLIENT_* env
       vars) - no keycloak role step depends on this to complete.
-  when: zuno_keycloak_google_oauth_enabled | default(true) | bool
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - zuno_keycloak_google_oauth_enabled | default(true) | bool

@@ -1,0 +1,44 @@
+---
+# WP-225 lot C, rollout step 0 (ADR-0602 clause 10, ADR-0603 M14): seed the two Ed25519
+# signing key pairs in Vault.
+#
+#   zuno/mcp/gateway-call-assertion   private_key, public_key   mcp-gateway signs the per-call assertion
+#   zuno/a2a/agent-chain              private_key, public_key   a2a-gateway signs the delegation chain
+#
+# Idempotent and quiet: a pair that already exists is NEVER overwritten (rotating a key
+# means the verifiers' public keys change in the same window, see the brief), and no key
+# material is printed or logged. Writes as the short-lived ansible-seeder token
+# (zuno/data/* only), the same way the other seed tasks do (WP-223).
+#
+#   ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/wp225_seed_signing_keys.yml
+- name: "WP-225 lot C: seed the signing key pairs in Vault"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    zuno_repo_root: "{{ playbook_dir }}/../.."
+    wp225_key_paths:
+      - mcp/gateway-call-assertion
+      - a2a/agent-chain
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: "find the Vault server pod"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-vault
+        label_selectors:
+          - "app.kubernetes.io/name=vault"
+          - "component=server"
+      register: _wp225_vault_pod
+
+    - name: "log in to Vault as ansible-seeder"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+    - name: "seed one key pair if absent"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/wp225_seed_one_key.yml"
+      loop: "{{ wp225_key_paths }}"
+      loop_control:
+        loop_var: wp225_path
+        label: "zuno/{{ wp225_path }}"

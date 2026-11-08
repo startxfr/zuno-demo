@@ -1,0 +1,319 @@
+{
+  "run": "2026-11-08",
+  "set": "ranking.yaml (24 English + 10 French), top_k 10, persona eval-consultant-01, UnifAI query.bearer, before the first git ingest (baseline of 2026-11-08, UnifAI 0.1.64)",
+  "en21": {
+    "entries": 21,
+    "hit@1": 0.6190476190476191,
+    "hit@5": 0.7619047619047619,
+    "mrr": 0.6904761904761905,
+    "missed": [
+      1,
+      2,
+      9,
+      11,
+      12
+    ]
+  },
+  "french_subset": {
+    "entries": 10,
+    "hit@1": 0.8,
+    "hit@5": 0.9,
+    "mrr": 0.85,
+    "missed": [
+      26
+    ]
+  },
+  "all_34": {
+    "entries": 31,
+    "hit@1": 0.6774193548387096,
+    "hit@5": 0.8064516129032258,
+    "mrr": 0.7419354838709677,
+    "missed": [
+      1,
+      2,
+      9,
+      11,
+      12,
+      26
+    ],
+    "expect_none_top_scores": [
+      1.1372055,
+      1.471401,
+      0.95726556
+    ]
+  },
+  "rows": [
+    {
+      "id": 1,
+      "rank": null,
+      "lang": "en",
+      "top_score": 0.9726978,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index",
+      "query": "What is a namespace in OpenShift?"
+    },
+    {
+      "id": 2,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.2054534,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/server_administration_guide/",
+      "query": "How do I connect OpenShift to Keycloak so users log in with their company account?"
+    },
+    {
+      "id": 3,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.3346288,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/authentication_and_authorization/index",
+      "query": "How can I give a colleague admin rights on just one project?"
+    },
+    {
+      "id": 4,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.4979134,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index",
+      "query": "How do I ask for persistent storage for my pod?"
+    },
+    {
+      "id": 5,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.7653873,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index",
+      "query": "How do I expose the internal image registry outside the cluster?"
+    },
+    {
+      "id": 6,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.6554397,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index",
+      "query": "What is an update channel and which one should I pick to upgrade my cluster?"
+    },
+    {
+      "id": 7,
+      "rank": 2,
+      "lang": "en",
+      "top_score": 1.807473,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/etcd/index",
+      "query": "How do I back up etcd before a risky change?"
+    },
+    {
+      "id": 8,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.2699263,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index",
+      "query": "How do I block traffic between two namespaces?"
+    },
+    {
+      "id": 9,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.553342,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index",
+      "query": "How do I add more worker nodes automatically when the cluster is full?"
+    },
+    {
+      "id": 10,
+      "rank": 2,
+      "lang": "en",
+      "top_score": 0.9873806,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/index",
+      "query": "How do I keep normal pods off a node reserved for databases?"
+    },
+    {
+      "id": 11,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.1310431,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index",
+      "query": "How do I forward application logs to an external Splunk?"
+    },
+    {
+      "id": 12,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.6849015,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/index",
+      "query": "How do I create an alert on my own application's metrics?"
+    },
+    {
+      "id": 13,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.6388237,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index",
+      "query": "How do I mirror the release images to install a cluster with no internet access?"
+    },
+    {
+      "id": 14,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.5941372,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index",
+      "query": "How do I create a Windows virtual machine on OpenShift?"
+    },
+    {
+      "id": 15,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 2.0426388,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5",
+      "query": "How do I serve a large language model with OpenShift AI?"
+    },
+    {
+      "id": 16,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 2.3144655,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index",
+      "query": "What is an ApplicationSet in Argo CD?"
+    },
+    {
+      "id": 17,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.7514472,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17",
+      "query": "How do I register a RHEL server to Satellite?"
+    },
+    {
+      "id": 18,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 2.2189512,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite",
+      "query": "What does the internal procedure S0R42 'Schedule Satellite' describe?"
+    },
+    {
+      "id": 19,
+      "rank": 2,
+      "lang": "en",
+      "top_score": 1.8633351,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675665332/O0B81-BDTBO+Construction+des+tests+de+backup+restore+OADP",
+      "query": "How do we restore a deleted project with OADP?"
+    },
+    {
+      "id": 20,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 2.0510104,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster",
+      "query": "What is our process for preparing a cluster upgrade?"
+    },
+    {
+      "id": 21,
+      "rank": 1,
+      "lang": "en",
+      "top_score": 1.5091636,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675796818/O0R62-EXONS+Correction+d+un+namespace+instable",
+      "query": "A namespace is stuck and unstable, what is the fix procedure?"
+    },
+    {
+      "id": 22,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.1372055,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index",
+      "query": "What was the revenue of our Brazilian subsidiary last quarter?"
+    },
+    {
+      "id": 23,
+      "rank": null,
+      "lang": "en",
+      "top_score": 1.471401,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_google_cloud/index",
+      "query": "Give me a recipe for a chocolate cake."
+    },
+    {
+      "id": 24,
+      "rank": null,
+      "lang": "en",
+      "top_score": 0.95726556,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675795851/O0B45-SUCNE+Support+de+la+configuration+du+r+seau+du+cluster",
+      "query": "How do I configure a Cisco Catalyst switch VLAN trunk?"
+    },
+    {
+      "id": 25,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.2002219,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index",
+      "query": "Comment demander un stockage persistant pour mon pod ?"
+    },
+    {
+      "id": 26,
+      "rank": null,
+      "lang": "fr",
+      "top_score": 1.0917931,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/index",
+      "query": "Comment exposer le registre d'images interne en dehors du cluster ?"
+    },
+    {
+      "id": 27,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.3522515,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index",
+      "query": "Qu'est-ce qu'un canal de mise \u00e0 jour et lequel choisir pour mettre \u00e0 niveau mon cluster ?"
+    },
+    {
+      "id": 28,
+      "rank": 2,
+      "lang": "fr",
+      "top_score": 1.2210114,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index",
+      "query": "Comment sauvegarder etcd avant un changement risqu\u00e9 ?"
+    },
+    {
+      "id": 29,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.1603448,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index",
+      "query": "Comment bloquer le trafic entre deux namespaces ?"
+    },
+    {
+      "id": 30,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.7278854,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index",
+      "query": "Comment copier les images de release pour installer un cluster sans acc\u00e8s \u00e0 internet ?"
+    },
+    {
+      "id": 31,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.659029,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17",
+      "query": "Comment enregistrer un serveur RHEL aupr\u00e8s de Satellite ?"
+    },
+    {
+      "id": 32,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 2.1550484,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite",
+      "query": "Que d\u00e9crit la proc\u00e9dure interne S0R42 \u00ab Schedule Satellite \u00bb ?"
+    },
+    {
+      "id": 33,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 2.1027281,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765491/O0R62-RSNSO+Restauration+d+un+projet+via+OADP",
+      "query": "Comment restaurer un projet supprim\u00e9 avec OADP ?"
+    },
+    {
+      "id": 34,
+      "rank": 1,
+      "lang": "fr",
+      "top_score": 1.4700317,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster",
+      "query": "Quel est notre processus pour pr\u00e9parer une mise \u00e0 niveau de cluster ?"
+    }
+  ]
+}

@@ -39,6 +39,8 @@
       # ADR-0599/ADR-0600 (WP-202): Dify and kagent, stubs until WP-204/WP-207.
       - dify
       - kagent
+      # ADR-0604 (WP-235): the world-model chain (GPU node, models, auth, gateway), skipped while the demo is off.
+      - world_model
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

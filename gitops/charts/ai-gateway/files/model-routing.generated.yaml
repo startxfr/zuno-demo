@@ -251,14 +251,48 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+- agent: blender
+  task: bpy
+  prefer:
+  - local-gpt-oss-maas
+  - local-gpt-oss
+  - local-qwen35-maas
+  - local-qwen35
+  exclude:
+  - openai
+  - gemini
+  - anthropic
+  - mistral
+  - mistral-codestral
+  - ovhcloud-gpt-oss-120b
+- agent: dify
+  task: chat
+  prefer:
+  - local-gpt-oss-maas
+  - local-gpt-oss
 - agent: dify
   task: code
   prefer:
   - mistral-codestral
+- agent: kagent
+  task: diagnose
+  prefer:
+  - local-gpt-oss-maas
+  - local-gpt-oss
+- agent: open-webui
+  task: chat
+  prefer:
+  - local-gpt-oss-maas
+  - local-gpt-oss
 - agent: open-webui
   task: code
   prefer:
   - mistral-codestral
+- agent: openclaw
+  task: chat
+  prefer:
+  - local-gpt-oss-maas
+  - local-gpt-oss
 - agent: openclaw
   task: code
   prefer:

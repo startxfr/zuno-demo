@@ -1,0 +1,19 @@
+# monitoring.coreos.com/v1: the platform Prometheus scrapes zuno-world-model (the namespace carries
+# openshift.io/cluster-monitoring=true). A monitoring.rhobs/v1 object would be rendered and never scraped.
+{{- range list "world-model-runtime" "world-model-web" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ . }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ . }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+{{- end }}

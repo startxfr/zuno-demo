@@ -15,6 +15,7 @@ The architecture documentation is intentionally split into complementary views.
 - `identity-architecture.md` - Keycloak, Google federation, delegated OAuth, and identity propagation.
 - `network-architecture.md` - routes, service paths, NetworkPolicies, and controlled egress.
 - `sequence-flows.md` - representative runtime sequences.
+- `world-model.md` - the on-demand interactive generative world-model experience (ADR-0604).
 
 ## Baseline logical flow
 

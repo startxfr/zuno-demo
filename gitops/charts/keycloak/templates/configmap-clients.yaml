@@ -52,6 +52,28 @@ data:
     {{ $g }}
 {{- end }}
 {{- end }}
+{{- if not .Values.keycloak.builtIn }}
+  # ADR-0352/WP-211 (external mode only: the internal realm import creates these): every group of the realm
+  # file, one "<parent> <name>" per line ("-" = top level), created when missing by the external Job.
+  realm-groups.txt: |
+{{- range $g := $realm.groups }}
+    - {{ $g.name }}
+{{- range $sg := ($g.subGroups | default list) }}
+    {{ $g.name }} {{ $sg.name }}
+{{- end }}
+{{- end }}
+{{- range $g := .Values.keycloakExternal.extraGroups }}
+    - {{ $g }}
+{{- end }}
+{{- if .Values.keycloakExternal.seedPersonas }}
+{{- range $u := $realm.users }}
+{{- if not $u.serviceAccountClientId }}
+  persona-{{ $u.username }}.json: |
+{{ $u | toPrettyJson | indent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- range $u := $realm.users }}
 {{- if $u.serviceAccountClientId }}
   # One "<role-container-client> <role-name>" per line, consumed by the Job's

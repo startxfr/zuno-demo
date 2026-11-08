@@ -1,0 +1,95 @@
+---
+# ADR-0352 clause 4 (WP-211): assert the external Keycloak. Shared by install (hard fail) and
+# precheck (record only). It proves, in order, that the endpoint answers over TLS against the
+# supplied CA, and that the admin credential signs in to its realm.
+#
+# Needs: ansible/tasks/resolve_keycloak_endpoint.yml (external mode), keycloak_assert_hard_fail (bool).
+# Sets:  keycloak_external_ok (bool), keycloak_external_realm_exists (bool).
+- name: "keycloak | write the supplied CA bundle to a temporary file (external mode)"
+  ansible.builtin.tempfile:
+    state: file
+    suffix: keycloak-ca.pem
+  register: _keycloak_ca_tmp
+  when: zuno_keycloak_ca_pem | length > 0
+
+- name: "keycloak | store the supplied CA bundle (external mode)"
+  ansible.builtin.copy:
+    content: "{{ zuno_keycloak_ca_pem }}\n"
+    dest: "{{ _keycloak_ca_tmp.path }}"
+    mode: "0600"
+  when: zuno_keycloak_ca_pem | length > 0
+
+- name: "keycloak | probe the external endpoint over TLS ({{ zuno_keycloak_url }})"
+  ansible.builtin.uri:
+    url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_admin_realm }}/.well-known/openid-configuration"
+    method: GET
+    status_code: [200, 404]
+    validate_certs: true
+    ca_path: "{{ _keycloak_ca_tmp.path | default(omit) }}"
+    timeout: 20
+  register: _keycloak_ext_probe
+  failed_when: false
+
+- name: "keycloak | sign in to the external Keycloak with the admin credential"
+  ansible.builtin.uri:
+    url: "{{ zuno_keycloak_admin_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: password
+      client_id: admin-cli
+      username: "{{ zuno_keycloak_external_admin_username }}"
+      password: "{{ zuno_keycloak_external_admin_password }}"
+    status_code: [200, 400, 401, 404]
+    validate_certs: true
+    ca_path: "{{ _keycloak_ca_tmp.path | default(omit) }}"
+    timeout: 20
+  register: _keycloak_ext_login
+  failed_when: false
+  no_log: true
+  when: (_keycloak_ext_probe.status | default(-1)) in [200, 404]
+
+- name: "keycloak | evaluate the external endpoint"
+  ansible.builtin.set_fact:
+    keycloak_external_reachable: "{{ (_keycloak_ext_probe.status | default(-1)) in [200, 404] }}"
+    keycloak_external_realm_exists: "{{ (_keycloak_ext_probe.status | default(-1)) == 200 }}"
+    keycloak_external_ok: "{{ (_keycloak_ext_login.status | default(-1)) == 200 }}"
+
+- name: "keycloak | remove the temporary CA file"
+  ansible.builtin.file:
+    path: "{{ _keycloak_ca_tmp.path }}"
+    state: absent
+  when: zuno_keycloak_ca_pem | length > 0
+
+- name: "keycloak | fail: the external Keycloak is not reachable over TLS"
+  ansible.builtin.fail:
+    msg: >-
+      {{ zuno_keycloak_url }} did not answer over TLS ({{ _keycloak_ext_probe.msg | default('no response') }}).
+      Check zuno_keycloak_external_url, and that zuno_keycloak_external_ca_bundle holds the CA chain that signs its
+      certificate (ADR-0352 clause 6: trust is supplied, never derived; there is no skip-verify option).
+  when:
+    - keycloak_assert_hard_fail | bool
+    - not (keycloak_external_reachable | bool)
+
+- name: "keycloak | fail: the sign-in realm does not exist"
+  ansible.builtin.fail:
+    msg: >-
+      The realm '{{ zuno_keycloak_admin_realm }}' does not exist on {{ zuno_keycloak_url }}. A credential scoped to the
+      realm zuno needs the owner to create an empty realm 'zuno' first; with a master-realm admin set
+      zuno_keycloak_external_admin_realm: master and the reconcile Job creates it.
+  when:
+    - keycloak_assert_hard_fail | bool
+    - keycloak_external_reachable | bool
+    - not (keycloak_external_realm_exists | bool)
+
+- name: "keycloak | fail: the admin credential was refused"
+  ansible.builtin.fail:
+    msg: >-
+      {{ zuno_keycloak_url }} refused the credential of '{{ zuno_keycloak_external_admin_username }}' in the realm
+      '{{ zuno_keycloak_admin_realm }}' (HTTP {{ _keycloak_ext_login.status | default('n/a') }}). Check
+      zuno_keycloak_external_admin_username, _password and _admin_realm; a user needs a first name, a last name and an
+      email to sign in on Keycloak 26.
+  when:
+    - keycloak_assert_hard_fail | bool
+    - keycloak_external_realm_exists | bool
+    - not (keycloak_external_ok | bool)

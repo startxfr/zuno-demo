@@ -1,0 +1,20 @@
+# The model-cache copy script (one source: files/fetch_models.py, also used by the smoke Job) and the curated scenes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: world-model-fetch
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  fetch_models.py: |
+{{ .Files.Get "files/fetch_models.py" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: world-model-presets
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  presets.yaml: |
+{{ dict "presets" .Values.presets | toYaml | indent 4 }}

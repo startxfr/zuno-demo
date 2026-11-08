@@ -75,12 +75,15 @@
 # Backups to the cluster's backups bucket (ADR-0112, ADR-0546) reuse the S3
 # settings PostgreSQL already has in ansible/confidential.yml: same bucket and
 # identity, under the unifai/<namespace> prefix. Off when they are not set.
+# No `endpoint` is passed (WP-224 rehearsal, 2026-11-08): with an explicit endpoint the aws cli uses
+# path-style requests to the regional apex host, whose rotating front IPs the EgressFirewall dnsName rule
+# could not follow (0/20 requests got through). Without it the cli uses the bucket's virtual-hosted name,
+# which the firewall rule follows well enough for the cli's own retries (16/20 per attempt).
 - name: "unifai | derive the backup settings from the PostgreSQL S3 settings"
   ansible.builtin.set_fact:
     _unifai_backup_values: >-
       {{ {'stack': {'backup': {'enabled': true,
                                'bucket': zuno_postgresql_backup_s3_bucket,
-                               'endpoint': 'https://' ~ zuno_postgresql_backup_s3_endpoint,
                                'region': zuno_postgresql_backup_s3_region}}}
          if ((zuno_postgresql_backup_s3_bucket | default('xxxxxx')) != 'xxxxxx'
              and (zuno_postgresql_backup_s3_endpoint | default('xxxxxx')) != 'xxxxxx'

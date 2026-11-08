@@ -1,0 +1,92 @@
+---
+# Stale OLM bookkeeping on the Kuadrant CRDs after RHCL 1.5 (found live on
+# demo333, 2026-11-07).
+#
+# Before RHCL 1.5, OLM installed authorino-operator, dns-operator and
+# limitador-operator alongside rhcl-operator, and their CRDs carried both the
+# `olm.managed=true` label and an `operatorframework.io/installed-alongside-*`
+# annotation. RHCL 1.5 moves those three off OLM (KuadrantControlPlane owns
+# them, the three CSVs are gone) and the label is gone from their CRDs, but
+# the installed-alongside annotations stay.
+#
+# olm-operator treats every CRD with that annotation as its own. At start-up
+# it finds five such CRDs without `olm.managed`, so it cannot filter its
+# informers, labels what it can (Deployments, ClusterRoles,
+# ClusterRoleBindings), logs "detected that every object is labelled, exiting
+# to re-start the process" and exits. CRDs are not among the kinds it labels,
+# so it exits again after every restart: CrashLoopBackOff, CSV statuses frozen
+# and no OLM install or upgrade can finish. The defect stays hidden until
+# olm-operator restarts. On demo333 the restart came from a master reboot,
+# two days after the RHCL 1.5 upgrade.
+#
+# The fix removes the stale annotation. It runs only when none of the three
+# dependency CSVs exists any more, so a cluster still on RHCL < 1.5 (where OLM
+# really owns those CRDs) is never touched. Mode `check` reports the stale
+# CRDs and fails; mode `fix` removes the annotations.
+- name: "connectivity_link | OLM CRD annotations: list the RHCL dependency CSVs still installed"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: _connectivity_link_olm_csvs
+
+- name: "connectivity_link | OLM CRD annotations: list the Kuadrant CRDs"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+  register: _connectivity_link_olm_crds
+
+- name: "connectivity_link | OLM CRD annotations: compute the stale ones"
+  ansible.builtin.set_fact:
+    _connectivity_link_dep_csvs: >-
+      {{ _connectivity_link_olm_csvs.resources | default([])
+         | map(attribute='metadata.name')
+         | select('match', '^(authorino-operator|dns-operator|limitador-operator)\.')
+         | list }}
+    _connectivity_link_stale_crds: >-
+      {%- set out = [] -%}
+      {%- for crd in _connectivity_link_olm_crds.resources | default([]) -%}
+      {%-   if crd.spec.group is match('^(.+\.)?kuadrant\.io$')
+              and (crd.metadata.labels | default({}, true)).get('olm.managed') != 'true' -%}
+      {%-     set keys = (crd.metadata.annotations | default({}, true)).keys()
+                         | select('match', '^operatorframework\.io/installed-alongside-') | list -%}
+      {%-     if keys | length > 0 -%}
+      {%-       set _ = out.append({'name': crd.metadata.name, 'keys': keys}) -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: "connectivity_link | OLM CRD annotations: report"
+  ansible.builtin.debug:
+    msg: >-
+      dependency CSVs still installed: {{ _connectivity_link_dep_csvs | length }};
+      Kuadrant CRDs with a stale installed-alongside annotation:
+      {{ _connectivity_link_stale_crds | map(attribute='name') | list }}
+
+- name: "connectivity_link | OLM CRD annotations: fail the check while stale annotations remain"
+  ansible.builtin.assert:
+    that:
+      - _connectivity_link_stale_crds | length == 0
+    fail_msg: >-
+      {{ _connectivity_link_stale_crds | length }} Kuadrant CRD(s) keep an OLM installed-alongside annotation without
+      the olm.managed label, and no dependency CSV owns them: olm-operator restarts in a loop on its next start.
+      Fix: make d1 install connectivity-link (removes the stale annotations).
+  when:
+    - connectivity_link_olm_crd_mode == 'check'
+    - _connectivity_link_dep_csvs | length == 0
+
+- name: "connectivity_link | OLM CRD annotations: remove the stale annotations"
+  kubernetes.core.k8s_json_patch:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: "{{ item.0.name }}"
+    patch:
+      - op: remove
+        path: "/metadata/annotations/{{ item.1 | replace('~', '~0') | replace('/', '~1') }}"
+  loop: "{{ _connectivity_link_stale_crds | subelements('keys') }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1 }}"
+  when:
+    - connectivity_link_olm_crd_mode == 'fix'
+    - _connectivity_link_dep_csvs | length == 0
