@@ -197,3 +197,11 @@ def test_world_from_an_uploaded_image_and_bad_input(client):
     assert client.post("/internal/worlds", json={"image_png_b64": "!!notbase64"}).status_code == 422
     assert client.post("/internal/worlds", json={"prompt": "x" * 700}).status_code == 422
     assert client.delete("/internal/worlds/nope").status_code == 404
+
+
+def test_the_image_can_serve_a_websocket():
+    """uvicorn answers a WebSocket upgrade 404 unless `websockets` or `wsproto` is installed, and the starlette test
+    client does not need either: this is what the first live session hit (2026-11-08)."""
+    import importlib.util
+
+    assert any(importlib.util.find_spec(name) for name in ("websockets", "wsproto"))
