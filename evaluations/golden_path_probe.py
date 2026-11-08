@@ -127,7 +127,7 @@ class Context:
         self.gateway_persona = os.getenv("GOLDEN_GATEWAY_PERSONA", "consultant-01")
         self.password = secret_value("zuno-ai-run", "acceptance-gate-credentials", "demo-persona-password")
         self._eval_secret = secret_value("zuno-ai-run", "acceptance-gate-credentials", "eval-client-secret")
-        self.keycloak = f"https://keycloak.{self.domain}"
+        self.keycloak = os.getenv("GOLDEN_KEYCLOAK_URL") or f"https://keycloak.{self.domain}"
         self.unifai = f"https://unifai-ui-zuno-unifai.{self.domain}"
         self.open_webui = f"https://open-webui.{self.domain}"
         self.tekos_run_id = ""  # set by unifai-tekos, read by trace
@@ -765,7 +765,8 @@ def probe_blender(ctx: Context) -> Result:
     from device_login import DeviceLoginError, PersonaRefused, device_token, revoke
 
     addon = load_addon()
-    gateway, issuer = addon.endpoints(ctx.domain)
+    gateway, issuer = addon.endpoints(
+        ctx.domain, issuer_override=f"{ctx.keycloak}/realms/zuno" if os.getenv("GOLDEN_KEYCLOAK_URL") else "")
     persona = os.getenv("GOLDEN_BLENDER_PERSONA", "eval-ai-dev-01")
     s: Dict = {"persona": persona}
     s["no_token"] = httpx.post(f"{gateway}/v1/chat/completions", json={}, timeout=30, verify=VERIFY_TLS).status_code

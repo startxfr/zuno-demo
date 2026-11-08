@@ -50,6 +50,7 @@
         keycloakHost: "{{ zuno_keycloak_host }}"
       connectivity-link:
         quotaEnforcement: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
+        workstationEntry: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
       rhtas:
         fulcio: {oidc: {issuerUrl: "{{ zuno_keycloak_issuer_url }}"}}
       trustyai-config:
