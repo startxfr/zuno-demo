@@ -279,6 +279,47 @@ zuno_unifai_values:
       - ai_applications
     syncInterval: 168h
     resyncToken: git-2026-11-08-1
+  - name: rhacm-2-17-docs
+    type: git
+    visibility: public
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:rhacm
+    git:
+      url: https://github.com/stolostron/rhacm-docs
+      ref: 2.17_prod
+      metadata:
+        product: Red Hat Advanced Cluster Management
+        version: '2.17'
+        language: en
+      attributeFiles:
+      - modules/common-attributes.adoc
+      paths:
+      - about
+      - add-ons
+      - applications
+      - business_continuity
+      - clusters
+      - console
+      - get_started
+      - gitops
+      - global_hub
+      - governance
+      - health_metrics
+      - mce_acm_integration
+      - mce_release_notes
+      - mce_troubleshooting
+      - mcp
+      - networking
+      - observability
+      - release_notes
+      - search
+      - secure_clusters
+      - troubleshooting
+      - virtualization
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
   retrievers:
   - config:
       # WEB too: the sales-demo source (knowledge.sales) is a web source.
