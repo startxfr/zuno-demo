@@ -40,7 +40,13 @@ stack:
   # Extra environment by component (operator >= 0.1.22): multiagent,
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
-  extraEnv: {}
+  extraEnv:
+    # UnifAI 0.1.65 starts the rag-celery worker without `git_queue`, so a `type: git` source stays in Syncing/pipeline
+    # forever (R-530; fork defect fixed in the operator default of a later release). An entry with the same name replaces
+    # the operator's value. Remove it once the pinned operator lists git_queue itself.
+    ragCelery:
+      - name: CELERY_QUEUES
+        value: slack_queue,document_queue,slack_events_queue,confluence_queue,web_queue,git_queue
   # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
   # embedding model of `rag` below.
   memory:
