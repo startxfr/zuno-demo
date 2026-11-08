@@ -80,6 +80,15 @@ spec:
           port: {{ . }}
         {{- end }}
     {{- end }}
+    {{- range .cidrs }}
+    # {{ required (printf "platformNamespaces[%s].egressFirewall.cidrs[%s].reason is required" $entry.name .cidr) .reason }}
+    - type: Allow
+      to:
+        cidrSelector: {{ required (printf "platformNamespaces[%s].egressFirewall.cidrs[].cidr is required" $entry.name) .cidr }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
     {{- with .salesforce }}
     {{- if .enabled }}
     # mcp-salesforce (gitops/charts/mcp-salesforce): the org's instance host,

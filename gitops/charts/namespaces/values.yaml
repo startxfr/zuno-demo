@@ -526,6 +526,39 @@ platformNamespaces:
       routeHosts:
         - name: unifai-ui-zuno-unifai
           reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).
+      # S3 answers each name lookup with other addresses out of a pool of hundreds; a name rule holds only the few it
+      # resolved, so the storage-initializer of a recreated model pod stalled on blocked connections (embeddings-predictor
+      # down 2026-11-08 02:30 to 14:30, found by the RAG pilot). The published eu-west-2 S3 ranges (syncToken 1794088025,
+      # 2026-11-07) are allowed on 443 next to the name rules, as the world-model chart does (1f049258).
+      cidrs:
+        - cidr: 1.178.94.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 16.12.15.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 16.12.16.0/23
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 18.168.37.160/28
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 18.168.37.176/28
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 3.2.110.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 3.2.72.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 3.5.244.0/22
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.219.219.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.95.142.0/23
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.95.144.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.95.148.0/23
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.95.150.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
+        - cidr: 52.95.191.0/24
+          reason: AWS S3 eu-west-2 published range (KServe storage-initializer, model bucket zuno-demo-sources).
       hosts:
         - dnsName: api.openai.com
           reason: ai-gateway provider openai (provider-routing.yaml, langchain_openai default).
