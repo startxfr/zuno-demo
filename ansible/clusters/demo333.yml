@@ -281,7 +281,8 @@ zuno_unifai_values:
     resyncToken: git-2026-11-08-1
   - name: rhacm-2-17-docs
     type: git
-    visibility: public
+    # stolostron/rhacm-docs has no LICENSE file: not shared until that is clarified (user decision 2026-11-09).
+    visibility: private
     classification: C1
     tags:
     - knowledge.tech
