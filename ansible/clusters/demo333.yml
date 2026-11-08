@@ -212,6 +212,73 @@ zuno_unifai_values:
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/processus-renouvellement.html
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/qualification-opportunite.html
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/reponses-objections.html
+  # R-530 (2026-11-08): public git documentation sources, tag knowledge.tech, read from the repository archive.
+  - name: ocp-4-22-docs
+    type: git
+    visibility: public
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:openshift
+    git:
+      url: https://github.com/openshift/openshift-docs
+      ref: enterprise-4.22
+      maxFiles: 3000
+      metadata:
+        product: OpenShift Container Platform
+        version: '4.22'
+        language: en
+      attributeFiles:
+      - _attributes/common-attributes.adoc
+      attributes:
+        openshift-enterprise: ''
+        product-title: OpenShift Container Platform
+        product-version: '4.22'
+      paths:
+      - welcome
+      - release_notes
+      - tutorials
+      - architecture
+      - disconnected
+      - installing
+      - post_installation_configuration
+      - updating
+      - support
+      - web_console
+      - cli_reference
+      - security
+      - authentication
+      - networking
+      - storage
+      - registry
+      - operators
+      - extensions
+      - cicd
+      - openshift_images
+      - applications
+      - serverless
+      - machine_configuration
+      - machine_management
+      - etcd
+      - hosted_control_planes
+      - vcp
+      - nodes
+      - windows_containers
+      - sandboxed_containers
+      - observability
+      - scalability_and_performance
+      - ai_workloads
+      - edge_computing
+      - hardware_enablement
+      - hardware_accelerators
+      - backup_and_restore
+      - migrating_from_ocp_3_to_4
+      - lightspeed
+      - service_mesh
+      - virt
+      - ai_applications
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
   retrievers:
   - config:
       # WEB too: the sales-demo source (knowledge.sales) is a web source.
