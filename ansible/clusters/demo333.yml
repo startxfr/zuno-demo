@@ -361,8 +361,10 @@ zuno_unifai_values:
     teamRef: agent-comage
   - config:
       forward_user_token: true
+      # GIT too (R-530, 2026-11-08): the OpenShift, RHACM and RHOAI/ODH documentation read from git (tag knowledge.tech).
       extra_source_types:
       - WEB
+      - GIT
       source_type: CONFLUENCE
       threshold: 0.3
       # 10, not 5 (2026-10-25): the Red Hat corpus repeats each page across
