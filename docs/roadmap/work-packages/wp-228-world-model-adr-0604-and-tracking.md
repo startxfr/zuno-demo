@@ -1,6 +1,6 @@
 # WP-228: World-model ADR-0604 and tracking (delivers ADR-0604 bookkeeping)
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-08)
 - **ADRs:** ADR-0604
 - **Depends on:** none
 - **Blocks:** WP-229, WP-230, WP-233

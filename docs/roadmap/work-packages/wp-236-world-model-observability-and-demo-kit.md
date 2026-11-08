@@ -1,6 +1,6 @@
 # WP-236: World-model observability and demo kit (delivers ADR-0604 D7, §10)
 
-- **State:** Repo work in review
+- **State:** Repo work merged
 - **ADRs:** ADR-0604
 - **Depends on:** WP-235
 - **Blocks:** WP-237

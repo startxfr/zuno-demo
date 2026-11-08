@@ -1,6 +1,6 @@
 # WP-231: World-model GPU runtime image (delivers ADR-0604 D2, D3, D4)
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-08)
 - **ADRs:** ADR-0604
 - **Depends on:** WP-230
 - **Blocks:** WP-232, WP-234
@@ -75,3 +75,9 @@ Tests pass locally; the smoke Job manifest passes `oc apply --dry-run=client`. T
 diffusers (with `Flux2KleinPipeline`) and av import and that `world_engine`, `taehv` and `gemlite` are installed. It cannot
 import `world_engine`: `gemlite` queries the CUDA device at import time and a build pod has no NVIDIA driver (the first
 in-cluster build, 2026-11-07, failed on exactly that). The smoke Job (WP-232) is where `world_engine` is first imported.
+
+## Result (2026-11-08)
+
+The runtime image is built again from devel cde3ad58 (build 5, `sha256:cb43f925…`, signed keyless): `gcc` and `libc6-dev` for
+Triton's launcher (build 4) and `websockets` for uvicorn (build 5). The smoke Job imported `world_engine` on the GPU and the
+runtime served a full session, see [the smoke report](../../testing/world-model-gpu-smoke-2026-11-08.md) and WP-235.

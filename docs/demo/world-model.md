@@ -6,10 +6,11 @@ freeze) and [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-do
 Work packages: [WP-236](../roadmap/work-packages/wp-236-world-model-observability-and-demo-kit.md) (this script),
 [WP-237](../roadmap/work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) (its rehearsal on the GPU).
 
-> **Status (2026-11-07):** written and tested without the GPU. Nothing in it has been rehearsed on the RTX PRO 6000 yet, and
-> the timings and the model's behaviour below come from the vendor and from the mock, not from this platform. WP-237 replaces them
-> with measurements. **Do not show this to an audience before WP-237 has passed**: ADR-0606 requires the golden-path probe, a
-> tested rollback and this script before any experience is shown.
+> **Status (2026-11-08):** installed on demo333 and rehearsed at service level on the RTX PRO 6000: the timings below that
+> say "measured" come from this GPU (smoke test and a played session, see
+> [the smoke report](../testing/world-model-gpu-smoke-2026-11-08.md)). The signed-in browser rehearsal (Chrome, persona
+> **ai-ops-01**) is the presenter's and is not done yet: ADR-0606 wants it before any audience. Do not promise the model's
+> behaviour beyond what "What it does not show" says.
 
 ## The message
 
@@ -69,6 +70,32 @@ The model's context is about ten seconds, so the script resets often. Say so.
 9. **The dashboard (1 min).** GPU utilization and VRAM, the engine step, frames generated against frames displayed, the
    input-to-display latency the browser measured, how prompts were treated, and the **GPU node up for** gauge.
 
+## The short version (2 to 3 minutes), for a slot inside a longer demo
+
+Have the page open and signed in, with one dry-run world already ended, so the first image is not a cold start.
+
+1. **Say what it is (20 s).** Read the notice: generative AI, not a 3D simulation. One GPU, one world, a node that exists
+   only for the demo.
+2. **Enter a world (30 s).** Pick **Snowy village, then a volcano**. The first image takes about a second (measured: 0.9 s,
+   FLUX.2 klein), then the world runs.
+3. **Walk in short bursts (40 s).** Click the picture, W for a few seconds, a turn, stop. Open **Technical view**: engine
+   Waypoint-1.5-1B in bf16, encoder NVENC, about 40 displayed frames per second, input to display well under 200 ms (measured
+   at the server: p50 145 ms). Never walk straight for more than about 10 seconds: into a wall of snow the picture collapses
+   into texture, which is the model's ten-second memory. Press **Reset to the first image** when it drifts.
+4. **Change the world (30 s).** Stop walking with the sky in view, press **The sky turns red**. About 1.2 seconds later the
+   sky is red-pink and the village is still there: FLUX edited the frame and the world continued from it (measured). Say why:
+   Waypoint takes no text, a prompt is an image edit.
+5. **A refusal (20 s).** Type something outside the rules: refused with a reason before it reaches the GPU.
+6. **End session (10 s).**
+
+**Fallback**: if the node or the page is down, do not present it as live. Play the labelled recording
+`world-model-recorded-2026-11-08.mp4` (24 s, 1280x720, a real run of this runtime with the red-sky edit, the label "RECORDED"
+burnt in). It is not in git (7 MB): it is kept at `/home/cl/demo-fallback/` on the operator's workstation, copy it to the
+presenting laptop beforehand.
+
+**Measured on this GPU (2026-11-08):** Waypoint 80.7 FPS bf16 and 98.6 FPS fp8 at 720p (engine), about 43 frames per second
+reaching the client, 4.4 Mbit/s of H.264, step 52 ms for 4 frames, FLUX first image 0.9 s and edit 1.2 s, VRAM 23.5 GB of 96.
+
 ## What it does not show
 
 - **A persistent or accurate world.** No geometry, no physics, no memory beyond about ten seconds; two visitors never share one.
@@ -80,8 +107,11 @@ The model's context is about ten seconds, so the script resets often. Say so.
 
 ## If something goes wrong
 
-- **"The GPU runtime is not ready (models loading)"**: normal for about 10 minutes after `make d2 install world-model`. Watch
-  `oc get pods -n zuno-world-model`; the runtime pod is Ready only when both models are loaded and warmed.
+- **"The GPU runtime is not ready (models loading)"**: normal for about 10 minutes after `make d2 install world-model`
+  (weights copied in about 2.5 minutes, then both models load and kernels compile; measured). Watch
+  `oc get pods -n zuno-world-model`; the runtime pod is Ready only when both models are loaded and warmed. If the init
+  container `fetch-models` is still copying after 5 minutes, the EgressFirewall's S3 address ranges are stale
+  (`egress.s3CidrsByRegion` in the chart): refresh them from AWS's published ranges.
 - **Nothing is installed / no GPU node**: the switch is off, or `make d0 install world-model-gpu` has not run. The role says
   which. There is no recorded fallback video yet (WP-237 records them, each labelled "recorded"): without the node, do not
   present this demo as live.

@@ -110,6 +110,10 @@
         gitops_component_name: "world-model"
         gitops_app_phase: "d1"
         gitops_app_name: "{{ world_model_app_name }}"
+        # Healthy needs the runtime Available, which loads two models and compiles kernels (about 8 minutes cold):
+        # the default 5 minutes failed the first live install although everything was on its way up.
+        gitops_app_wait_retries: "{{ world_model_wait_retries }}"
+        gitops_app_wait_delay: "{{ world_model_wait_delay }}"
         gitops_app_extra_helm_values:
           global:
             zuno:
