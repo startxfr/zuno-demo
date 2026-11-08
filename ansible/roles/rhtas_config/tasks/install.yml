@@ -216,8 +216,8 @@
                 'trustRoot': {'rootJsonBase64': _rhtas_config_tuf_root.stdout | trim},
                 'clusterImagePolicy': {
                   'certIdentityIssuer': zuno_keycloak_issuer_url,
-                  'certIdentityExtraIssuers': (['https://keycloak.' ~ cluster_base_domain ~ '/realms/zuno']
-                                               if (zuno_keycloak_mode | default('internal')) == 'external' else [])
+                  'certIdentityExtraIssuers': ([] if zuno_keycloak_issuer_url == 'https://keycloak.' ~ cluster_base_domain ~ '/realms/zuno'
+                                               else ['https://keycloak.' ~ cluster_base_domain ~ '/realms/zuno'])
                 },
                 'unifai': _rhtas_config_unifai_admission
               }
