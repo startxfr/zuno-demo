@@ -81,13 +81,14 @@ oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   
 3. Blender: **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, pick the file, tick
    **Zuno 3D generator (demo)**.
 4. In the 3D Viewport press **N**, tab **Zuno 3D**. **Cluster domain** is already `apps.demo333.startx.fr`.
+5. While Keycloak runs in external mode (until after the 2026-11-09 demo): **Edit > Preferences > Add-ons > Zuno 3D generator**, field **Issuer override** = `https://keycloak-ext.apps.demo333.startx.fr/realms/zuno`. Leave Cluster domain and Gateway override as they are.
 
 Details, tests and the measurement: [evaluations/blender/README.md](../../evaluations/blender/README.md).
 
 ### Preflight (08:30, about 3 minutes)
 
 1. In the browser, sign out of any Keycloak session
-   (`https://keycloak.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout`): the device sign-in reuses
+   (`https://keycloak-ext.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout`): the device sign-in reuses
    an open session, and a session of a user outside `ocp-ai-dev` gets 403.
 2. Blender, tab **Zuno 3D**: **Sign in**, **Open sign-in page**, sign in as **ai-dev-01**, accept the grant page. The
    panel shows **Signed in**. The session holds for the morning (the access token is refreshed by the add-on).
