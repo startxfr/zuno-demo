@@ -8,7 +8,7 @@ image:
   tag: latest
   # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
   # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
-  digest: "sha256:dabd17023066f1c3784d3580005fdf4caf47f3cc5ddbdd4507afe1e812ae54f3"
+  digest: ""
   pullPolicy: Always
 
 replicas: 1
@@ -84,7 +84,7 @@ okf:
       tag: latest
       # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
       # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
-      digest: "sha256:91045f7ed0ea935d0bb2ebd38b91975fdc1b0b3985c17d3ad7402237074a5573"
+      digest: ""
       pullPolicy: Always
     resources:
       requests: {cpu: 50m, memory: 64Mi}

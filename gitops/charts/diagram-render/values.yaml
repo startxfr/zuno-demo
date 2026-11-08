@@ -12,7 +12,7 @@ image:
   tag: latest
   # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
   # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
-  digest: "sha256:007099dbdb724a21a0706d23eb7c601f2a161f7121ea1888bc9191e50f920727"
+  digest: ""
   # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
   # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always

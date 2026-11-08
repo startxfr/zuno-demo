@@ -24,7 +24,7 @@ image:
   tag: latest
   # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
   # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
-  digest: "sha256:e7192204334f05a4a9ecb3d7c2afc3e227550ffd27c310db668b3dc0e3f9d93a"
+  digest: ""
   # Always, not IfNotPresent - with a mutable tag, IfNotPresent serves
   # whatever stale image the node cached, silently ignoring rebuilds.
   pullPolicy: Always
