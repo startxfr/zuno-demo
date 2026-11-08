@@ -8,7 +8,7 @@ image:
   tag: latest
   # ADR-0603 M16: written by platform/supply-chain/render_release_digests.py from the release
   # ledger, never by hand. Set, it wins over tag (repository@digest, IfNotPresent, no :latest trigger).
-  digest: ""
+  digest: "sha256:200c65c5df5dbe71be28e9e83a5bde0eec1897b02c56336e25f8f4eed6d62053"
   pullPolicy: Always
 
 replicas: 1

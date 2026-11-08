@@ -103,6 +103,7 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
 | `v0.14.2` | v0.14 (patch) | 2026-11-07 | `2b396a58` | yes (2026-11-07) |
 | `v0.14.3` | v0.14 (patch) | 2026-11-07 | `f9bb7a87` | yes (2026-11-07) |
 | `v0.14.4` | v0.14 (patch) | 2026-11-07 | `82c39e37` | yes (2026-11-07) |
+| `v0.14.5` | v0.14 (patch) | 2026-11-08 | `355a0e43` | yes (2026-11-08) |
 
 **The rule.**
 - **When.** A band is tagged when its ADRs are all closed and its work packages are Done or deferred by name, as of
@@ -126,7 +127,7 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
 
 **Bands not tagged.** v0.4 to v0.12 were never tagged: work moved from `v0.3.0` straight to the demo333 pilot and the
 UnifAI adoption, and the bands were closed in the roadmap without a tag. They are not tagged retroactively, so `v0.13.0`
-contains all of their content. `v0.14.3` (2026-11-07) was a patch cut before the demonstration of 2026-11-09, by user decision; `v0.14.4` (2026-11-07) was the proven checkpoint after it; the next tag is `v0.14.5` (the Sunday 2026-11-08 stabilisation);
+contains all of their content. `v0.14.3` (2026-11-07) was a patch cut before the demonstration of 2026-11-09, by user decision; `v0.14.4` (2026-11-07) was the proven checkpoint after it; `v0.14.5` (2026-11-08) was the Sunday stabilisation cut before the freeze, with the first-party digests rendered into the charts (`RENDER_DIGESTS=1`); the next tag is `v0.14.6`;
 `v0.15.0` follows once the v0.15 band closes and more content has joined it.
 
 ## Path 2's process, once a maintainer is ready to cut `v0.1.0` via Quay
