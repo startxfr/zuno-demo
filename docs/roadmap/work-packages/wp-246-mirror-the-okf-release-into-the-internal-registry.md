@@ -26,7 +26,9 @@ verification.
    printed), run by `make d3 admit agents`.
 3. **Chart.** `okf.fetch.mirrorReference` derived from the locked reference; the init container tries the mirror, then
    `quay.io`, each with the existing timeout and retry; a non-digest reference still fails the render.
-4. **NetworkPolicy.** Egress from both gateways to the internal registry only; EgressFirewall untouched.
+4. **The mirror registry as a chart** (`okf-mirror`: zot pinned by digest, PVC, service-CA TLS, ingress NetworkPolicy
+   admitting the two gateways only). The gateways' policies are ingress-only, so they need no egress rule; the
+   EgressFirewall is untouched.
 5. **Promotion check.** The promotion pull request runs the `mirror` step and cannot merge if it fails.
 6. **Live on demo333** with the owner's go and a golden path before and after: roll one gateway from the mirror.
 7. **Drill.** In the canary, block `quay.io` and show a gateway pod starting from the mirror; set a forged digest and
@@ -83,6 +85,16 @@ passes (122). Run live against zot in the canary through a port-forward: 9 artif
 
 Still to do: wiring the step into `make d3 admit agents` behind `zuno_okf_registry_mirror` (step 2 tail), then steps 3
 to 7.
+
+## Result of step 3 (2026-11-09)
+
+`okf.fetch.mirror.{prefix,plainHttp}` in the mcp-gateway and a2a-gateway charts: set, the init container reads the
+mirror first (2 attempts of 60 s), clears `/okf` and falls back to the source registry (4 attempts of 150 s); the
+pod-template gains the annotation `zuno.startx.fr/okf-mirror`. Default empty: the script block gains an inert `if`, which
+changes the pod template, so merging rolls both gateways once. Run in the canary with the rendered script and the
+new `admit_okf_bundle.py`: from the mirror with `quay.io` blocked, exit 0 (VERIFIED, release 0.14.3, 8 agents); with a
+digest the mirror does not hold, the mirror is refused, the fallback tries `quay.io` (blocked) and the pod never
+succeeds (fail closed). The signer image must be rebuilt for the real pods to know `--mirror` (step 6).
 
 ## Acceptance
 
