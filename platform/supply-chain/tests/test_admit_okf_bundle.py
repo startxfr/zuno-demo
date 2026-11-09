@@ -306,5 +306,94 @@ class ConformanceLayerExtractTest(unittest.TestCase):
             self._extract([{"cases/a": b"1"}, {"cases/b": b"2"}])
 
 
+class MirrorTest(unittest.TestCase):
+    """ADR-0611 / WP-246: the mirror copies by digest and is read back by digest."""
+
+    CORP = "quay.io/zuno/okf-corp@sha256:" + "a" * 64
+    AGENT = "quay.io/zuno/okf-tekos@sha256:" + "b" * 64
+    MIRROR = "zot.example.svc:5000/okf"
+
+    def test_reference_keeps_name_and_digest_and_changes_the_registry(self) -> None:
+        self.assertEqual(admit.mirror_reference(self.AGENT, self.MIRROR + "/"),
+                         "zot.example.svc:5000/okf/okf-tekos@sha256:" + "b" * 64)
+
+    def test_reference_refuses_a_tag_and_a_bad_prefix(self) -> None:
+        with self.assertRaises(admit.AdmissionError):
+            admit.mirror_reference("quay.io/zuno/okf-corp:latest", self.MIRROR)
+        for bad in ("", "/okf", "host@sha256:x", "host:"):
+            with self.assertRaises(admit.AdmissionError):
+                admit.mirror_reference(self.CORP, bad)
+
+    def test_plain_http_is_only_for_the_mirror_host(self) -> None:
+        admit.set_plain_http(self.MIRROR)
+        try:
+            self.assertEqual(admit._oras_http(self.MIRROR + "/okf-corp"), ["--plain-http"])
+            self.assertEqual(admit._oras_http(self.CORP), [])
+            self.assertEqual(admit._cosign_http(self.CORP), [])
+            self.assertIn("--allow-http-registry", admit._cosign_http(self.MIRROR + "/x@sha256:1"))
+        finally:
+            admit.set_plain_http(None)
+
+    def _run_mirror(self, fake_run, resolve_digest: str):
+        calls = []
+        saved = (admit.run, admit.require, admit.verify)
+        verified = []
+        admit.require = lambda b: b
+        admit.run = lambda args, **k: fake_run(calls, args, resolve_digest)
+        admit.verify = lambda ref, dev=False, mirror=None: (
+            verified.append((ref, mirror)) or {"release": "0.0.1", "channel": "release",
+                                               "agents": [{"name": "tekos", "version": "1", "reference": self.AGENT}]})
+        try:
+            return admit.mirror_release(self.CORP, self.MIRROR), calls, verified
+        finally:
+            admit.run, admit.require, admit.verify = saved
+
+    @staticmethod
+    def _resolve(args, resolve_digest):
+        """What the mirror holds under the release tag: the pushed digest, unless the test says otherwise."""
+        if resolve_digest != "same":
+            return resolve_digest
+        return "sha256:" + args[-1].rsplit("release-", 1)[1][:1] * 64
+
+    def _ok(self, calls, args, resolve_digest):
+        calls.append(args)
+        return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+    def test_copies_every_artifact_with_its_sig_and_att_tags_and_verifies_from_the_mirror(self) -> None:
+        index, calls, verified = self._run_mirror(self._ok, "same")
+        copies = [c for c in calls if c[1] == "cp"]
+        self.assertEqual(len(copies), 6)  # corp + agent, each: artifact, .sig, .att
+        tags = [c[-1].rsplit(":", 1)[1] for c in copies]
+        self.assertIn("sha256-" + "a" * 64 + ".sig", tags)
+        self.assertIn("sha256-" + "b" * 64 + ".att", tags)
+        self.assertTrue(all("-r" in c for c in copies))
+        self.assertEqual(verified[0], (self.CORP, None))
+        self.assertEqual(verified[1], ("zot.example.svc:5000/okf/okf-corp@sha256:" + "a" * 64, self.MIRROR))
+
+    def test_a_digest_that_changed_on_the_way_is_refused(self) -> None:
+        with self.assertRaises(admit.AdmissionError) as ctx:
+            self._run_mirror(self._ok, "sha256:" + "c" * 64)
+        self.assertIn("digest mismatch", str(ctx.exception))
+
+    def test_a_missing_att_tag_is_skipped_but_other_failures_are_not(self) -> None:
+        def missing(calls, args, resolve_digest):
+            calls.append(args)
+            if args[1] == "cp" and args[-1].endswith(".att"):
+                raise admit.AdmissionError("oras cp failed: sha256-x.att: not found")
+            return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+        index, calls, _ = self._run_mirror(missing, "same")
+        self.assertEqual(index["release"], "0.0.1")
+
+        def broken(calls, args, resolve_digest):
+            calls.append(args)
+            if args[1] == "cp" and args[-1].endswith(".sig"):
+                raise admit.AdmissionError("oras cp failed: connection refused")
+            return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+        with self.assertRaises(admit.AdmissionError):
+            self._run_mirror(broken, "same")
+
+
 if __name__ == "__main__":
     unittest.main()

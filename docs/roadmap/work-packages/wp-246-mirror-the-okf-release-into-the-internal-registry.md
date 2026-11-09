@@ -72,6 +72,18 @@ the forged-digest case. The canary (namespace, zot, ImageStream `signer`) stays 
 tried to add in `zuno-ai-build` to let the canary pull the signer image was refused by the auto-mode classifier and
 not created; the image was copied into the canary's own ImageStream instead.
 
+## Result of step 2 (2026-11-09)
+
+`admit_okf_bundle.py` gains `mirror` (verify at the source, `oras cp -r` of the corp artifact and the eight agent
+artifacts plus their `.sig` and `.att` tags, digest checked after the copy, verify again from the mirror) and
+`--mirror` / `--plain-http` on `verify` and `extract` (the agent references of the index are read from the mirror;
+plain HTTP applies to the mirror host only, the source stays on TLS). Four new unit tests; the supply-chain suite
+passes (122). Run live against zot in the canary through a port-forward: 9 artifacts mirrored in 95 s, then
+`extract` from the mirror alone returned VERIFIED, release 0.14.3, 8 agents.
+
+Still to do: wiring the step into `make d3 admit agents` behind `zuno_okf_registry_mirror` (step 2 tail), then steps 3
+to 7.
+
 ## Acceptance
 
 With `quay.io` blocked, a new mcp-gateway and a2a-gateway pod reach Ready from the mirror; a forged digest is refused;
