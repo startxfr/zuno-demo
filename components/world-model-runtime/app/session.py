@@ -297,7 +297,7 @@ class Runtime:
         return self.images.edit(current, prompt, seed)
 
     async def _reanchor(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
-        """Redraw the current frame from the scene prompt and splice it back: the world keeps its scene.
+        """Redraw the current frame from the scene prompt and restart the world from it: the world keeps its scene.
 
         Waypoint-1.5 only invents what it has never seen, so after some seconds of walking it has drifted into
         close-up texture; it never recovers on its own. The UI shows the same banner as a world edit.
@@ -308,7 +308,10 @@ class Runtime:
         world.moving_seconds = 0.0  # also on failure: no retry storm
         try:
             fixed = await self._gpu(self._anchor_edit, current, self._anchor_text(world), world.seed + 1000 + world.anchors)
-            await self._gpu(self.engine.splice, fixed)
+            # reset, not splice: Waypoint keeps ~8 s of history in its KV cache, so after a splice the weapons and
+            # collapsed textures of earlier frames pull the next frames back (measured: a rifle on 9 of 11 frames of
+            # a 60 s walk with splice, none on 22 frames with reset). The cleaned frame is the new first image.
+            await self._gpu(self.engine.reset, fixed)
             world.anchors += 1
             encoder.request_keyframe()
             metrics.IMAGE_SECONDS.labels(kind="anchor").observe(time.perf_counter() - started)

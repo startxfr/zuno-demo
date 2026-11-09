@@ -300,3 +300,38 @@ def test_raw_mode_upscales_on_the_gpu_path_to_the_display_size():
     out = torch.randint(0, 255, (4, 128, 256, 3), dtype=torch.uint8)
     frames = engine._to_display(out)
     assert frames.shape == (4, 180, 320, 3) and frames.dtype == np.uint8
+
+
+def test_an_anchor_restarts_the_engine_from_the_cleaned_frame_instead_of_splicing_it():
+    """Splicing keeps the old frames (and their weapons or collapsed textures) in the model's cache."""
+    import asyncio
+    import dataclasses
+
+    from app.session import Runtime, State, World
+
+    calls = []
+
+    class SpyEngine(MockEngine):
+        def reset(self, image):
+            calls.append("reset")
+            super().reset(image)
+
+        def splice(self, image):
+            calls.append("splice")
+            super().splice(image)
+
+    settings = dataclasses.replace(SMALL, anchor_seconds=1.0)
+    rt = Runtime(settings, SpyEngine(settings), MockFlux())
+    image = np.zeros((176, 320, 3), np.uint8)
+    rt.engine.reset(image)
+    calls.clear()
+    world = World(world_id="w", seed=1, image=image, scene_prompt="a quiet harbour", moving_seconds=2.0)
+    events = []
+
+    async def send_event(e):
+        events.append(e)
+
+    asyncio.run(rt._reanchor(world, build_encoder(settings), image, send_event))
+    assert calls == ["reset"], calls
+    assert world.anchors == 1 and world.moving_seconds == 0.0 and world.state == State.STREAMING
+    assert [e for e in events if e.get("type") == "anchor"][0]["status"] == "applied"
