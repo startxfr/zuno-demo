@@ -1398,7 +1398,10 @@
                 "profile",
                 "roles",
                 "email"
-            ]
+            ],
+            "attributes": {
+                "post.logout.redirect.uris": "https://world-model.apps.mycluster.example.com/*"
+            }
         }, {
             "clientId": "blender",
             "name": "Blender 3D generator",
