@@ -84,7 +84,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
-  me: () => call<{ user: string; groups: string[]; ops: boolean }>("GET", "/api/me"),
+  me: () => call<{ user: string; groups: string[]; ops: boolean; logout_url: string | null }>("GET", "/api/me"),
   presets: () => call<{ presets: Preset[] }>("GET", "/api/presets").then((r) => r.presets),
   status: () => call<Status>("GET", "/api/status"),
   createWorld: (body: { preset_id: string } | { prompt: string }) => call<SessionInfo>("POST", "/api/worlds", body),

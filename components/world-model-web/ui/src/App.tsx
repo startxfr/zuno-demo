@@ -49,7 +49,7 @@ export default function App() {
   const intentionalClose = useRef(false);
   const sessionRef = useRef<SessionInfo | null>(null);
 
-  const [me, setMe] = useState<{ user: string; ops: boolean } | null>(null);
+  const [me, setMe] = useState<{ user: string; ops: boolean; logout_url: string | null } | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
@@ -237,6 +237,18 @@ export default function App() {
     if (sid) await api.release(sid).catch(() => undefined);
   };
 
+  // Free the GPU, then leave: the oauth2-proxy cookie and the Keycloak SSO session both end, so the next visit asks for
+  // a login again (a different person can sign in on this browser).
+  const signOut = async () => {
+    if (!me?.logout_url) return;
+    const sid = session?.session_id;
+    closeStream();
+    if (sid) {
+      await Promise.race([api.release(sid).catch(() => undefined), new Promise((r) => setTimeout(r, 3000))]);
+    }
+    window.location.assign(me.logout_url);
+  };
+
   const releaseOthers = async () => {
     if (status?.holder_session_id) await api.release(status.holder_session_id).catch(() => undefined);
     setStatus(await api.status());
@@ -262,6 +274,9 @@ export default function App() {
             <Flex>
               <FlexItem><Label color={label.color}>{label.text}</Label></FlexItem>
               {me && <FlexItem>{me.user}</FlexItem>}
+              {me?.logout_url && (
+                <FlexItem><Button variant="secondary" size="sm" onClick={signOut}>Sign out</Button></FlexItem>
+              )}
             </Flex>
           </MastheadContent>
         </Masthead>

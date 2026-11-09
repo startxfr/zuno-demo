@@ -24,6 +24,7 @@ import random
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
@@ -73,6 +74,16 @@ def load_presets(path: Path) -> list:
         image = item.get("image")
         out.append({**item, "_image_path": (path.parent / image) if image else None})
     return out
+
+
+def logout_url(settings: Settings) -> Optional[str]:
+    """Where the browser goes to sign out: the oauth2-proxy drops its cookie, then Keycloak ends the SSO session
+    and sends the browser back to the site. Without the second hop the next visit would sign straight back in."""
+    if not settings.public_url:
+        return None
+    keycloak = (f"{settings.issuer}/protocol/openid-connect/logout?client_id={quote(settings.logout_client_id, safe='')}"
+                f"&post_logout_redirect_uri={quote(settings.public_url + '/', safe='')}")
+    return "/oauth2/sign_out?rd=" + quote(keycloak, safe="")
 
 
 def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authenticator] = None,
@@ -142,7 +153,8 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
     @app.get("/api/me")
     async def me(request: Request):
         caller = caller_of(request)
-        return {"user": caller.username, "groups": caller.groups, "ops": caller.in_any(settings.ops_groups)}
+        return {"user": caller.username, "groups": caller.groups, "ops": caller.in_any(settings.ops_groups),
+                "logout_url": logout_url(settings)}
 
     @app.get("/api/presets")
     async def list_presets(request: Request):

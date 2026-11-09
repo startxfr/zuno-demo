@@ -128,6 +128,12 @@ reaching the client, 4.4 Mbit/s of H.264, step 52 ms for 4 frames, FLUX first im
 
 ## After the session
 
+0. In the page, **Sign out** (top right, next to your name) frees the GPU if you hold it, ends the oauth2-proxy cookie, then
+   ends your Keycloak single sign-on session and brings you back to the site: the next visit asks for a login, so another
+   person can sign in on the same browser. Keycloak may show one "Do you want to log out?" confirmation first (no ID token is
+   passed to it by design). The client `world-model` must list `https://world-model.<domain>/*` in its post-logout redirect URIs
+   (set in the realm file, applied to a live realm by the client reconcile Job).
+
 1. `make d2 uninstall world-model` removes the application.
 2. `make d0 uninstall world-model-gpu` terminates the GPU node (it refuses while the application exists).
 3. Set `zuno_world_model_enabled: false` in `ansible/clusters/demo333.yml`, commit and push: otherwise the next
