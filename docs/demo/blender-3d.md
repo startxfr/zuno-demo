@@ -81,7 +81,7 @@ oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   
 3. Blender: **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, pick the file, tick
    **Zuno 3D generator (demo)**.
 4. In the 3D Viewport press **N**, tab **Zuno 3D**. **Cluster domain** is already `apps.demo333.startx.fr`.
-5. While Keycloak runs in external mode (until after the 2026-11-09 demo): **Edit > Preferences > Add-ons > Zuno 3D generator**, field **Issuer override** = `https://keycloak-ext.apps.demo333.startx.fr/realms/zuno`. Leave Cluster domain and Gateway override as they are.
+5. Keep the add-on current: `bash evaluations/blender/install_addon.sh` (fetches `origin/devel`, copies the add-on into the Blender user folder, prints its version and checksum; `--dry-run` copies nothing), then close Blender completely and reopen it. The settings sit in the scene, in the **Zuno 3D** panel under **Show advanced** (Gateway override, **Issuer override**), not in the preferences: leave them empty on the built-in Keycloak. Only while Keycloak runs in external mode, set **Issuer override** to that Keycloak's `https://<host>/realms/zuno`.
 
 Details, tests and the measurement: [evaluations/blender/README.md](../../evaluations/blender/README.md).
 

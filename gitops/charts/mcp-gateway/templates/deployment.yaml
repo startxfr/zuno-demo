@@ -73,14 +73,23 @@ spec:
         - name: okf-fetch
           image: {{ include "mcp-gateway.imageRef" .Values.okf.fetch.image | quote }}
           imagePullPolicy: {{ include "mcp-gateway.imagePullPolicy" .Values.okf.fetch.image }}
+          # Each attempt is cut after 150 s and retried (4 attempts, new connection each time): the
+          # egress firewall's dnsName rule for quay.io lets only some of its addresses through, and an
+          # `oras` call on a blocked one never returns (seen on demo333, 2026-11-09). Verification is
+          # unchanged: any failure of the last attempt still keeps the pod in Init (fail closed).
           command:
-            - python3
-            - /app/platform/supply-chain/admit_okf_bundle.py
-            - extract
-            - {{ .Values.okf.fetch.corpReference | quote }}
-            - --out
-            - /okf
+            - sh
+            - -c
+            - |
+              for i in 1 2 3 4; do
+                timeout 150 python3 /app/platform/supply-chain/admit_okf_bundle.py extract "$OKF_REFERENCE" --out /okf && exit 0
+                echo "okf-fetch attempt $i failed or timed out" >&2
+                sleep 5
+              done
+              exit 1
           env:
+            - name: OKF_REFERENCE
+              value: {{ .Values.okf.fetch.corpReference | quote }}
             - name: HOME
               value: /tmp
           securityContext:
