@@ -50,6 +50,28 @@ So the internal registry is not a usable mirror for signed OKF artifacts. Next: 
 registry in `zuno-ai-build` (clause 1 of ADR-0611 names it); it needs the owner's go and an image source that the
 cluster can pull. The canary namespace stays until that is measured, then it is removed.
 
+## Result of step 1, repeated with zot (2026-11-09)
+
+Same canary: zot v2.1.22 (`ghcr.io/project-zot/zot-linux-amd64`, pinned by digest `sha256:46f688dc…`), one replica,
+`emptyDir`, no authentication, reachable only inside the namespace. **The gate passes.**
+
+- `oras cp -r` of the corp artifact keeps the digest (`sha256:2918e463…`) and lists the Sigstore bundle as a referrer.
+- That is **not enough**: `cosign verify` still said "no signatures found" until the legacy tags
+  `sha256-<digest>.sig` and `sha256-<digest>.att` were copied too (`oras cp -r` does not copy tags that merely name a
+  digest). With them, `verify` and `verify-attestation --offline` pass, from the workstation and from a pod in the
+  canary reading `zot.zuno-canary-wp-246.svc:5000` (cosign needs `--allow-http-registry --allow-insecure-registry` on
+  plain HTTP). `oras pull` from the service returned the four layers; `quay.io` was unreachable from that pod.
+- **The index names `quay.io` itself.** `okf-index.json` lists each agent as `quay.io/zuno/okf-<agent>@sha256:…`.
+  A pull of the corp artifact from the mirror would still fetch the eight agent artifacts from `quay.io`. The consumer
+  must replace the registry prefix of those references with the mirror's (the digest, which the signature covers,
+  does not change), and the `mirror` step must copy every agent artifact with its `.sig` and `.att` tags.
+- The registry used here is plain HTTP; the real one serves TLS from the service CA (to do in step 3).
+
+Not yet measured: mirroring the eight agent artifacts, extraction end to end through `okf-fetch` from the mirror, and
+the forged-digest case. The canary (namespace, zot, ImageStream `signer`) stays for steps 2 to 7. One RoleBinding I
+tried to add in `zuno-ai-build` to let the canary pull the signer image was refused by the auto-mode classifier and
+not created; the image was copied into the canary's own ImageStream instead.
+
 ## Acceptance
 
 With `quay.io` blocked, a new mcp-gateway and a2a-gateway pod reach Ready from the mirror; a forged digest is refused;

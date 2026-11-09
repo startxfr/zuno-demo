@@ -32,16 +32,18 @@ first. `quay.io` stays only as a second source, and no CDN address range is open
    mirror stores these artifacts with their signatures and that `cosign` and `oras` read them back.
    **Measured 2026-11-09: the OpenShift internal registry fails** (no Referrers API, the tag-schema fallback is refused,
    `cosign verify` finds no signature; see WP-246). The mirror is therefore a small OCI registry in `zuno-ai-build`
-   (or `zuno-ai-run`), measured the same way; the rest of the decision does not change. Every `image-registry...:5000`
+   (or `zuno-ai-run`). **Measured the same day on zot v2.1.22: it passes**, provided the legacy `.sig` and `.att` tags
+   are copied with the artifact; the rest of the decision does not change. Every `image-registry...:5000`
    address in clauses 2 and 6 reads as that registry.
 2. **Mirror at admission.** `admit_okf_bundle.py` gets a `mirror` step run by `make d3 admit agents`: `oras copy -r` of
    the corp artifact, every agent artifact it lists, and their signatures and attestations, to
-   the mirror registry. The digest is identical to `quay.io`'s; the
-   step fails if it is not.
+   the mirror registry. The `.sig` and `.att` tags that `cosign verify` reads are copied
+   too. The digest is identical to `quay.io`'s; the step fails if it is not.
 3. **Pull from the mirror, verify as before.** `okf-fetch` tries the mirror reference, then `quay.io`, with the retry
    and timeout of commit a10c10b3 on each. Verification is unchanged: offline, by the Sigstore identity of ADR-0578,
    pinned by the digest in `platform/okf/agents.lock`. The mirror is an untrusted transport; it cannot widen what a pod
-   accepts.
+   accepts. `okf-index.json` names each agent artifact on `quay.io`, so the consumer replaces that registry prefix with
+   the mirror's; the digest, covered by the signature, is unchanged.
 4. **The lock stays the only pin.** The chart derives the mirror reference from the locked reference; no second digest is
    recorded anywhere.
 5. **Mirror before merge.** A promotion pull request cannot roll the gateways before the mirror holds its digest. The
