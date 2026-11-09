@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
-| v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-227, WP-229, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237 |
+| v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-227, WP-237 |
 | v0.17 | 3 | 2 | 11 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1073,14 +1073,14 @@ the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a wor
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Done (2026-11-08) | none: on devel |
-| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Operator pending | node created live (eu-central-1b, `zuno_world_model_gpu_az`), toleration window done 2026-11-07 with zero model impact; the removal path (`make d0 uninstall world-model-gpu`) is proven after the 2026-11-09 demo |
+| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Done (2026-11-09) | node created live (eu-central-1b, `zuno_world_model_gpu_az`), toleration window done 2026-11-07 with zero model impact; the removal path (`make d0 uninstall world-model-gpu`) is proven after the 2026-11-09 demo |
 | WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Done (2026-11-08) | none: 25 files, 19.7 GB, used by the first live install |
 | WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Done (2026-11-08) | none: built and signed in-cluster (build 5, sha256:cb43f925), world_engine imported on the GPU |
-| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Operator pending | smoke passed 2026-11-08 (GO, 80.7 FPS bf16); the preset images and the node removal wait for after the 2026-11-09 demo |
-| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Operator pending | client, Vault seed and group are live; the prompt enhancement with a real user token is checked in the presenter session (WP-237) |
-| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Operator pending | images built; a signed-in browser session as ai-ops-01 in Chrome (WP-237) |
-| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Operator pending | installed on demo333 2026-11-08, `make d2 check world-model` green; `make d2 uninstall world-model` after the 2026-11-09 demo |
-| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Repo work merged | the dashboard rolls out with grafana; the runbook carries the 2026-11-08 measurements and is rehearsed in WP-237 |
+| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Done (2026-11-09) | smoke passed 2026-11-08 (GO, 80.7 FPS bf16); the preset images and the node removal wait for after the 2026-11-09 demo |
+| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Done (2026-11-09) | client, Vault seed and group are live; the prompt enhancement with a real user token is checked in the presenter session (WP-237) |
+| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Done (2026-11-09) | images built; a signed-in browser session as ai-ops-01 in Chrome (WP-237) |
+| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Done (2026-11-09) | installed on demo333 2026-11-08, `make d2 check world-model` green; `make d2 uninstall world-model` after the 2026-11-09 demo |
+| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Done (2026-11-09) | the dashboard rolls out with grafana; the runbook carries the 2026-11-08 measurements and is rehearsed in WP-237 |
 | WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Operator pending | service-level session measured 2026-11-08 and a labelled fallback recorded; the signed-in browser rehearsal, the negative security tests and the teardown remain |
 
 ### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)

@@ -1,6 +1,6 @@
 # WP-233: World-model experience client and prompt enhancement (delivers ADR-0604 D1, D8)
 
-- **State:** Operator pending
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-228
 - **Blocks:** WP-234

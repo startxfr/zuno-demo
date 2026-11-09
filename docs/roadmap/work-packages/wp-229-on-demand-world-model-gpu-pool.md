@@ -1,6 +1,6 @@
 # WP-229: On-demand world-model GPU pool (delivers ADR-0604 D5)
 
-- **State:** Operator pending
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-228
 - **Blocks:** WP-232, WP-235

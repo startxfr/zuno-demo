@@ -1,6 +1,6 @@
 # WP-235: World-model GitOps integration (delivers ADR-0604 D5, D6, §7, §8)
 
-- **State:** Operator pending
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-229, WP-234
 - **Blocks:** WP-236
