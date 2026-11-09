@@ -1,0 +1,75 @@
+{
+  "label": "after",
+  "rows": [
+    {
+      "id": "ocp-logging",
+      "question": "How do I forward application logs to an external Splunk?",
+      "status": 200,
+      "seconds": 9.8,
+      "reply": "To forward application logs to an external Splunk instance you need to create a **ClusterLogForwarder** resource that points to a Splunk HTTP Event Collector (HEC) endpoint.  \nThe steps are:\n\n1. **Prerequisites**  \n   * Red Hat OpenShift Logging Operator 5.6 or later.  \n   * A `ClusterLogging` instance that uses the **Vector** collector.  \n   * A Base64‑encoded Splunk HEC token.\n\n2. **Create a secret that holds the HEC token**  \n   ```bash\n   oc -n openshift-logging create secret generic vector-splunk-secret \\\n     --from-literal hecToken=<Base64‑encoded‑HEC‑token>\n   ```\n\n3. **Create or edit a `ClusterLogForwarder` Custom Resource**  \n   ```yaml\n   apiVersion: logging.openshift.io/v1\n   kind: ClusterLogForwarder\n   metadata:\n     name: <log_forwarder_name>          # legacy: instance; multi‑forwarder: any name\n     namespace: <log_forwarder_namespace>  # legacy: openshift-logging; multi‑forwarder: any\n   spec:\n     serviceAccountName: <service_account_name>   # required only if not in openshift-logging\n     outputs:\n       - name: splunk-receiver\n         secret:\n           name: vector-splunk-secret\n         type: splunk\n         url: http://your.splunk.hec.url:8088\n     pipelines:\n       - inputRefs:\n           - application\n           - infrastructure\n         name: <pipeline_name>          # optional\n         outputRefs:\n           - splunk-receiver\n   ```\n\n   * `name` under `outputs` is a unique identifier for the Splunk endpoint.  \n   * `secret.name` must match the secret created in step 2.  \n   * `type: splunk` tells Vector to use the Splunk HEC protocol.  \n   * `url` is the full Splunk HEC URL (including port).  \n   * The pipeline selects the `application` (and optionally `infrastructure`) logs and forwards them to the Splunk output.\n\n4. **Apply the CR**  \n   ```bash\n   oc apply -f clusterlogforwarder.yaml\n   ```\n\nOnce the `ClusterLogForwarder` is applied, Vector will start sending application logs to the specified Splunk HEC endpoint.  \n\nSources:  \n- OpenShift Logging documentation – “Configuring log forwarding” (sections on Splunk output and ClusterLogForwarder CR).  \n- Example CR snippet from the provided context.  \n\n— Tekos",
+      "raw_keys": [
+        "messages",
+        "output",
+        "routing",
+        "tool_calls",
+        "user_prompt"
+      ]
+    },
+    {
+      "id": "ocp-alerts",
+      "question": "How do I create an alert on my own application's metrics?",
+      "status": 200,
+      "seconds": 9.3,
+      "reply": "To create an alert for your own application’s metrics you need to:\n\n1. **Enable user‑workload monitoring** (if not already done).  \n   ```yaml\n   apiVersion: v1\n   kind: ConfigMap\n   metadata:\n     name: cluster-monitoring-config\n     namespace: openshift-monitoring\n   data:\n     config.yaml: |\n       enableUserWorkload: true\n   ```\n   Apply it with  \n   ```bash\n   oc apply -f <file>\n   ```\n\n2. **Expose a metrics endpoint** in your application (e.g., `/metrics` on port `8080`).  \n   Ensure the endpoint is reachable by Prometheus.\n\n3. **Create a `ServiceMonitor`** that tells Prometheus how to scrape that endpoint.  \n   ```yaml\n   apiVersion: monitoring.coreos.com/v1\n   kind: ServiceMonitor\n   metadata:\n     name: myapp-monitor\n     namespace: <your‑app‑namespace>\n   spec:\n     selector:\n       matchLabels:\n         app: myapp\n     endpoints:\n     - port: http\n       path: /metrics\n       interval: 30s\n   ```\n   Apply it with  \n   ```bash\n   oc apply -f <file>\n   ```\n\n4. **Define an alert rule** in a `PrometheusRule` resource.  \n   Example – alert when the number of 500 responses exceeds 10 in the last 5 minutes:\n   ```yaml\n   apiVersion: monitoring.coreos.com/v1\n   kind: PrometheusRule\n   metadata:\n     name: myapp-alert\n     namespace: <your‑app‑namespace>\n   spec:\n     groups:\n     - name: myapp.rules\n       rules:\n       - alert: InternalServerErrorHigh\n         expr: |\n           sum(rate(http_requests_total{status=\"500\", app=\"myapp\"}[5m])) > 10\n         for: 5m\n         labels:\n           severity: warning\n         annotations:\n           summary: \"High 500 error rate in myapp\"\n           description: \"The rate of 500 responses has exceeded 10 per minute for 5 minutes.\"\n   ```\n   Apply it with  \n   ```bash\n   oc apply -f <file>\n   ```\n\n5. **Verify the alert**.  \n   * In the **Developer** perspective, go to **Observe → Alerts** after selecting your project.  \n   * In the **Administrator** perspective, view the alert in the **Monitoring** tab.\n\nThese steps create a Prometheus rule that watches your application’s metrics and fires an alert when the condition is met.  \n\nSources:  \n- OpenShift documentation on creating a `PrometheusRule` and `ServiceMonitor` (see the examples above).  \n- The “Post‑installation configuration” guide for enabling user workload monitoring.  \n\n— Tekos",
+      "raw_keys": [
+        "messages",
+        "output",
+        "routing",
+        "tool_calls",
+        "user_prompt"
+      ]
+    },
+    {
+      "id": "ocp-oidc",
+      "question": "How do I connect OpenShift to Keycloak so users log in with their company accounts?",
+      "status": 200,
+      "seconds": 11.4,
+      "reply": "To let OpenShift users log in with their company accounts via Keycloak, configure Keycloak as an **identity broker** for OpenShift.  \nThe official OpenShift documentation shows the exact steps:\n\n1. **Get the OpenShift API URL**  \n   ```bash\n   $ curl -s -k -H \"Authorization: Bearer $(oc whoami -t)\" \\\n     https://<openshift-user-facing-api-url>/apis/config.openshift.io/v1/infrastructures/cluster | \\\n     jq \".status.apiServerURL\"\n   ```\n   (The `jq` tool is required; see the prerequisites in the docs.)  \n   This URL will be used as the *Base URL* for the identity provider in Keycloak.\n\n2. **Create an OAuth client in OpenShift**  \n   ```bash\n   $ oc create -f <(echo '\n   kind: OAuthClient\n   apiVersion: oauth.openshift.io/v1\n   metadata:\n     name: keycloak-broker\n   secret: \"<client‑secret>\"\n   redirectURIs:\n     - \"https://<keycloak-host>/auth/realms/<realm>/broker/openshift-v4/endpoint\"\n   grantMethod: prompt\n   ')\n   ```\n   Replace `<client‑secret>`, `<keycloak-host>`, and `<realm>` with your values.\n\n3. **Add the OpenShift identity provider in Keycloak**  \n   * In the Keycloak admin console, go to **Identity Providers** → **Add provider** → **OpenShift v4**.  \n   * Set:\n     * **Base URL** – the API URL obtained in step 1.  \n     * **Client ID** – `keycloak-broker`.  \n     * **Client Secret** – the secret you created in step 2.  \n\n4. **Enable the provider on the login page**  \n   In the provider settings, ensure **Enabled** is ON and **Hide on Login Page** is OFF (unless you want to force the broker).  \n\n5. **Test the login**  \n   * Open the OpenShift console or any OpenShift‑protected resource.  \n   * Click **Login with OpenShift** (or **Login via Keycloak** if you use the Keycloak login page).  \n   * You should be redirected to Keycloak, authenticate with your company credentials, and be returned to OpenShift with a valid session.\n\nThese steps are taken from the OpenShift documentation on “Keycloak Identity Brokering with OpenShift Container Platform” (see the procedure section).  \n\n— Tekos",
+      "raw_keys": [
+        "messages",
+        "output",
+        "routing",
+        "tool_calls",
+        "user_prompt"
+      ]
+    },
+    {
+      "id": "confluence-s0r42",
+      "question": "What does the internal procedure S0R42 'Schedule Satellite' describe?",
+      "status": 200,
+      "seconds": 5.5,
+      "reply": "The internal procedure **S0R42 – “Schedule Satellite”** is a planning step for the Run phase of the Satellite platform.  \nIt documents how to schedule and plan future evolutions (updates, changes, or improvements) on the Satellite platform that is under supervision. The procedure is stored in Confluence and linked to a GitLab repository that contains the related artifacts and scripts.  \n\nKey points from the procedure:\n\n| Item | Detail |\n|------|--------|\n| **Purpose** | Planning of evolutions on the supervised Satellite platform. |\n| **Phase** | Run – Improve – Schedule (S0R42). |\n| **Location** | Confluence page: <https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite> |\n| **GitLab repository** | <https://gitlab.com/startx-customers/SXS/-/tree/main//SATELLITE/S0-SATELLITE/S0R-Run/S0R4-Improve/S0R42-Schedule> |\n\nThe procedure does not contain detailed actions in the provided excerpt; it mainly sets the context for scheduling future changes on the Satellite platform. If you need the specific tasks or steps, refer to the Confluence page or the GitLab tree linked above.  \n\n— Tekos",
+      "raw_keys": [
+        "messages",
+        "output",
+        "routing",
+        "tool_calls",
+        "user_prompt"
+      ]
+    },
+    {
+      "id": "confluence-upgrade",
+      "question": "What is our process for preparing a cluster upgrade?",
+      "status": 200,
+      "seconds": 4.9,
+      "reply": "Our process for preparing a cluster upgrade is defined in the **O0R41‑RDUPG** procedure.  \nKey steps are:\n\n1. **Pre‑requisites** – Identify and document all prerequisites for the upgrade (e.g., cluster version, required operator versions, backup strategy).  \n2. **Pre‑actions** – Perform preparatory actions such as validating cluster health, ensuring all operators are in a healthy state, and verifying that the cluster is in a ready state for upgrade.  \n3. **Actions** – Execute the upgrade steps:  \n   * Update the cluster‑operator and other critical operators.  \n   * Apply the new OpenShift version using the web console or `oc adm upgrade`.  \n   * Monitor the upgrade progress and resolve any issues that arise.  \n4. **Post‑actions** – After the upgrade, run post‑upgrade checks:  \n   * Verify that all workloads are running correctly.  \n   * Confirm that the cluster‑operator and other components are functioning as expected.  \n   * Document any changes or issues encountered during the upgrade.  \n\nThe full structure and detailed actions are documented in the Confluence page:  \n[O0R41‑RDUPG : Rédaction du process d'upgrade de cluster](https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster) — Tekos",
+      "raw_keys": [
+        "messages",
+        "output",
+        "routing",
+        "tool_calls",
+        "user_prompt"
+      ]
+    }
+  ]
+}
