@@ -335,3 +335,23 @@ def test_an_anchor_restarts_the_engine_from_the_cleaned_frame_instead_of_splicin
     assert calls == ["reset"], calls
     assert world.anchors == 1 and world.moving_seconds == 0.0 and world.state == State.STREAMING
     assert [e for e in events if e.get("type") == "anchor"][0]["status"] == "applied"
+
+
+def test_malformed_control_messages_do_not_end_the_stream(client):
+    world = client.post("/internal/worlds", json={"prompt": "a snowy medieval village at dusk", "seed": 7}).json()
+    bad = ["[1, 2]", "42", "not json", '"text"', json.dumps({"type": "control", "seq": 1, "keys": 5}),
+           json.dumps({"type": "control", "seq": 2, "keys": ["KeyW"], "mouse": [1, 2]}),
+           json.dumps({"type": "control", "seq": 3, "keys": ["KeyW"], "scroll": "up"}),
+           json.dumps({"type": "control", "seq": 4, "keys": [["KeyW"]], "mouse": {"dx": "x"}})]
+    with client.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+        json.loads(ws.receive_text())
+        for text in bad:
+            ws.send_text(text)
+        ws.send_text(json.dumps({"type": "control", "seq": 10, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+        seen, deadline = set(), time.time() + 5
+        while 10 not in seen and time.time() < deadline:
+            msg = ws.receive()
+            if msg.get("bytes"):
+                seen.add(_video(msg["bytes"])[2])
+        assert 10 in seen, "a valid control sent after the malformed ones must still be applied"
+        ws.send_text(json.dumps({"type": "stop"}))
