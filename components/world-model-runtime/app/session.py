@@ -12,6 +12,7 @@ import asyncio
 import base64
 import io
 import logging
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -64,24 +65,36 @@ def video_message(payload: bytes, keyframe: bool, pts_us: int, seq: int = -1) ->
     return VIDEO_TAG + bytes([1 if keyframe else 0]) + pts_us.to_bytes(8, "big") + seq32.to_bytes(4, "big") + payload
 
 
-# What the anchor needs from the prompt: "first-person view". Measured 2026-11-09 on the GPU node: with it FLUX
-# REDRAWS the frame as the described scene and the walk resumes in a village; without it (a "wide street view",
-# "same lighting as the input image", any negation) FLUX makes a minimal, faithful edit of the already-collapsed
-# texture and keeps it. Negations ("no hands") are ignored and name the thing; the redraw shows first-person arms,
-# which fits the view.
-POV_CUE = "cinematic first-person view"
+# The anchor prompt, measured 2026-11-09 on the GPU node (closed loop with Waypoint, 42 s walks, several seeds).
+# - "first-person view" made FLUX redraw the frame but also draw first-person arms and HUD (Waypoint itself
+#   hallucinates hands and weapons while walking: it is trained on game footage; FLUX then keeps them).
+# - A camera cue that names no character ("a camera at eye level moving through the scene, only the environment")
+#   redraws the frame without the arms in most runs; a few runs keep a Waypoint-made hand as a snow-covered lump.
+# - An explicit instruction at the end removes the rest ("Remove any hands, arms, weapons and interface elements."),
+#   while a negation ("no hands") is ignored or only partial.
+# The scene text must not say "first-person": it is stripped.
+ANCHOR_CUE = ", cinematic view from a camera at eye level moving through the scene, only the environment"
+ANCHOR_CLEAN = ". Remove any hands, arms, weapons and interface elements."
+_POV = re.compile(r",?\s*\b(?:cinematic\s+)?first[- ]person(?:\s+(?:camera\s+)?view)?\b", re.IGNORECASE)
 FRAME_RATE = 60
 
 
 def anchor_prompt(scene: str, last_edit: str, limit: int) -> str:
     """The scene (plus the newest world edit) as a FLUX prompt; "" when the world has no text to anchor on."""
-    parts = [p.strip(" ,.") for p in (scene, last_edit) if p and p.strip()]
+    parts = [_POV.sub("", p).strip(" ,.") for p in (scene, last_edit) if p and p.strip()]
+    parts = [p for p in parts if p]
     if not parts:
         return ""
-    text = ", ".join(parts)
-    if "first-person" not in text.lower():
-        text = text[: max(0, limit - len(POV_CUE) - 2)].rstrip(" ,") + ", " + POV_CUE
-    return text[:limit]
+    tail = ANCHOR_CUE + ANCHOR_CLEAN
+    return ", ".join(parts)[: max(0, limit - len(tail))].rstrip(" ,") + tail
+
+
+def edit_size(spec: str):
+    """"1024x512" -> (1024, 512); "" -> None (edit at the display size)."""
+    if not spec:
+        return None
+    w, h = spec.lower().split("x")
+    return int(w), int(h)
 
 
 @dataclass
@@ -273,6 +286,16 @@ class Runtime:
     def _anchor_text(self, world: World) -> str:
         return anchor_prompt(world.scene_prompt, world.last_edit, self.settings.max_prompt_chars)
 
+    def _anchor_edit(self, current: np.ndarray, prompt: str, seed: int) -> np.ndarray:
+        """FLUX edit, at the autoencoder's native size when configured: about 0.66 s instead of 1.17 s at 720p, and
+        the engine takes the result at that size anyway (raw mode)."""
+        size = edit_size(self.settings.anchor_edit_size)
+        if size and current.shape[1::-1] != size:
+            from PIL import Image
+
+            current = np.asarray(Image.fromarray(current).resize(size, Image.LANCZOS))
+        return self.images.edit(current, prompt, seed)
+
     async def _reanchor(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
         """Redraw the current frame from the scene prompt and splice it back: the world keeps its scene.
 
@@ -284,7 +307,7 @@ class Runtime:
         started = time.perf_counter()
         world.moving_seconds = 0.0  # also on failure: no retry storm
         try:
-            fixed = await self._gpu(self.images.edit, current, self._anchor_text(world), world.seed + 1000 + world.anchors)
+            fixed = await self._gpu(self._anchor_edit, current, self._anchor_text(world), world.seed + 1000 + world.anchors)
             await self._gpu(self.engine.splice, fixed)
             world.anchors += 1
             encoder.request_keyframe()

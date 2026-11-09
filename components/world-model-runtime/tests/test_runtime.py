@@ -20,7 +20,7 @@ from app.encoder import build_encoder
 from app.engine import MockEngine
 from app.imagegen import MockFlux
 from app.main import get_app
-from app.session import POV_CUE, VIDEO_TAG, anchor_prompt
+from app.session import ANCHOR_CLEAN, ANCHOR_CUE, VIDEO_TAG, anchor_prompt, edit_size
 
 SMALL = Settings(width=320, height=176, mock_step_seconds=0.01, encoder="x264", gop_frames=8)
 
@@ -208,15 +208,26 @@ def test_the_image_can_serve_a_websocket():
 
 
 # ---------------------------------------------------------------- drift anchoring
-def test_anchor_prompt_keeps_the_scene_and_the_latest_edit_and_always_asks_for_a_first_person_view():
+def test_anchor_prompt_keeps_the_scene_and_the_latest_edit_without_the_first_person_cue():
     scene = "a snowy medieval village at dusk, wooden houses with lit windows, cinematic first-person view"
-    text = anchor_prompt(scene, "the sky turns red", 600)
-    assert text == scene + ", the sky turns red"
-    typed = anchor_prompt("a quiet harbour at dawn", "", 600)
-    assert typed == "a quiet harbour at dawn, " + POV_CUE, "FLUX only redraws the frame with the first-person cue"
+    text = anchor_prompt(scene, "the sky turns red, first-person view", 600)
+    assert text == ("a snowy medieval village at dusk, wooden houses with lit windows, the sky turns red"
+                    + ANCHOR_CUE + ANCHOR_CLEAN)
+    assert "first-person" not in text.lower(), "that cue makes FLUX draw first-person arms"
     assert anchor_prompt("", "", 600) == "", "an image-only world has nothing to anchor on"
+    assert anchor_prompt("cinematic first-person view", "", 600) == ""
     long = anchor_prompt("x" * 900, "", 600)
-    assert len(long) <= 600 and long.endswith(POV_CUE)
+    assert len(long) <= 600 and long.endswith(ANCHOR_CLEAN)
+
+
+def test_edit_size_parsing_and_validation():
+    import dataclasses
+
+    assert edit_size("") is None and edit_size("1024x512") == (1024, 512)
+    dataclasses.replace(SMALL, anchor_edit_size="1024x512").validate()
+    for bad in ("1024", "axb", "1000x512", "128x128"):
+        with pytest.raises(ValueError):
+            dataclasses.replace(SMALL, anchor_edit_size=bad).validate()
 
 
 def test_anchor_settings_are_validated():
