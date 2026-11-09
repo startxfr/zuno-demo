@@ -28,6 +28,9 @@ spec:
         {{- if .Values.okf.fetch.enabled }}
         # ADR-0580: a promoted release changes this, which rolls the pods.
         zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+        {{- with .Values.okf.fetch.mirror.prefix }}
+        zuno.startx.fr/okf-mirror: {{ . | quote }}
+        {{- end }}
         {{- end }}
         {{- with $digestAnnotations }}
         {{- . | nindent 8 }}
@@ -68,6 +71,15 @@ spec:
             - sh
             - -c
             - |
+              if [ -n "$OKF_MIRROR_REFERENCE" ]; then
+                for i in 1 2; do
+                  timeout 60 python3 /app/platform/supply-chain/admit_okf_bundle.py extract "$OKF_MIRROR_REFERENCE" --mirror "$OKF_MIRROR_PREFIX" $OKF_MIRROR_FLAGS --out /okf && exit 0
+                  echo "okf-fetch: mirror attempt $i failed or timed out" >&2
+                  sleep 2
+                done
+                echo "okf-fetch: falling back to the source registry" >&2
+                find /okf -mindepth 1 -delete
+              fi
               for i in 1 2 3 4; do
                 timeout 150 python3 /app/platform/supply-chain/admit_okf_bundle.py extract "$OKF_REFERENCE" --out /okf && exit 0
                 echo "okf-fetch attempt $i failed or timed out" >&2
@@ -77,6 +89,15 @@ spec:
           env:
             - name: OKF_REFERENCE
               value: {{ .Values.okf.fetch.corpReference | quote }}
+            {{- with .Values.okf.fetch.mirror.prefix }}
+            {{- $corp := $.Values.okf.fetch.corpReference }}
+            - name: OKF_MIRROR_PREFIX
+              value: {{ . | quote }}
+            - name: OKF_MIRROR_REFERENCE
+              value: {{ printf "%s/%s@%s" (trimSuffix "/" .) (base (first (splitList "@" $corp))) (last (splitList "@" $corp)) | quote }}
+            - name: OKF_MIRROR_FLAGS
+              value: {{ ternary "--plain-http" "" $.Values.okf.fetch.mirror.plainHttp | quote }}
+            {{- end }}
             - name: HOME
               value: /tmp
           securityContext:
