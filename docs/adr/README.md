@@ -394,6 +394,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 | [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
+| [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) | Proposed | Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io |
 
 ## OKF v0.1
 

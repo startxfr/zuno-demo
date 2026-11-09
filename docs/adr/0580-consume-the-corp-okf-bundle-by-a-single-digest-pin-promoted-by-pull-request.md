@@ -163,7 +163,7 @@ NetworkPolicy or egress policy forbids it, admission copies the admitted
 artifacts (`oras copy`, by digest, signatures included) into a mirror
 registry set by `zuno_okf_registry_mirror`, and `okf-fetch` pulls from it;
 whether the OpenShift internal registry serves OCI artifacts with referrers
-is verified by WP-161 before relying on it.
+is verified by WP-161 before relying on it. ADR-0611 (2026-11-09) takes up this mirror.
 
 `make d3 admit agents` is safe to run any time; it changes nothing on the
 cluster unless the mirror is configured.
