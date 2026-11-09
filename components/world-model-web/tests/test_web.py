@@ -90,6 +90,17 @@ def test_enhancement_is_data_not_instructions_and_uses_the_users_token(make_clie
     assert response.json()["prompt"]["enhancement"] == "applied"
 
 
+def test_the_scene_prompt_reaches_the_runtime_on_create_and_reset(make_client, keys, gateway, fake_runtime):
+    """The runtime re-anchors the scene against drift on this text (it only gets an image otherwise)."""
+    gateway.status = 503  # the filtered prompt is used as typed
+    client = make_client()
+    h = bearer(keys.token())
+    made = client.post("/api/worlds", json={"prompt": "a snowy village"}, headers=h).json()
+    assert fake_runtime.world_requests[0]["prompt"] == "a snowy village"
+    assert client.post(f"/api/sessions/{made['session_id']}/reset", headers=h).status_code == 200
+    assert fake_runtime.world_requests[1]["prompt"] == "a snowy village"
+
+
 def test_gateway_down_degrades_to_the_filtered_prompt(make_client, keys, gateway, fake_runtime):
     gateway.status = 503
     client = make_client()

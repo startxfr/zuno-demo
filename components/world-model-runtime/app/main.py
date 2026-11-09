@@ -90,6 +90,8 @@ def get_app(settings: Optional[Settings] = None) -> FastAPI:
             await runtime._gpu(engine.reset, warm)
             for _ in range(3):
                 await runtime._gpu(runtime._timed_step, runtime_warm_ctrl())
+            # A first image edit costs ~10 s cold (measured): pay it here, not at the first anchor mid-walk.
+            await runtime._gpu(images.edit, warm, "warm-up", 0)
             # The capability probe of ADR-0604 D4: which H.264 encoder this node really has. Not ready without one,
             # and the choice is known (status, metric, preflight) before the first visitor.
             probe = await loop.run_in_executor(None, build_encoder, settings)

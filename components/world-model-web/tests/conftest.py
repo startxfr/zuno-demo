@@ -71,6 +71,7 @@ class FakeRuntime:
         self.world = None
         self.streaming = False
         self.created: List[str] = []
+        self.world_requests: List[dict] = []
         self.deleted: List[str] = []
         self.controls: List[dict] = []
         self.edits: List[dict] = []
@@ -111,6 +112,7 @@ class FakeRuntime:
                 return Response(status_code=409)
             state.world = f"w{len(state.created) + 1}"
             state.created.append(state.world)
+            state.world_requests.append(body)
             return {"world_id": state.world, "state": "READY",
                     "preview_png_b64": base64.b64encode(tiny_png()).decode()}
 

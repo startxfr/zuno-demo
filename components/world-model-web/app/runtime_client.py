@@ -56,9 +56,12 @@ class RuntimeClient:
         """A new image from the prompt, as base64 PNG."""
         return (await self._call("POST", "/internal/image", json={"prompt": prompt, "seed": seed})).json()["image_png_b64"]
 
-    async def create_world(self, image_png_b64: str, seed: int) -> dict:
-        return (await self._call("POST", "/internal/worlds",
-                                 json={"image_png_b64": image_png_b64, "seed": seed})).json()
+    async def create_world(self, image_png_b64: str, seed: int, prompt: str = "") -> dict:
+        """`prompt` is the text the image came from: the runtime re-anchors the scene on it (drift control)."""
+        body = {"image_png_b64": image_png_b64, "seed": seed}
+        if prompt:
+            body["prompt"] = prompt[:500]
+        return (await self._call("POST", "/internal/worlds", json=body)).json()
 
     async def delete_world(self, world_id: str) -> None:
         try:

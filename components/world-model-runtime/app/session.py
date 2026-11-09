@@ -64,6 +64,26 @@ def video_message(payload: bytes, keyframe: bool, pts_us: int, seq: int = -1) ->
     return VIDEO_TAG + bytes([1 if keyframe else 0]) + pts_us.to_bytes(8, "big") + seq32.to_bytes(4, "big") + payload
 
 
+# What the anchor needs from the prompt: "first-person view". Measured 2026-11-09 on the GPU node: with it FLUX
+# REDRAWS the frame as the described scene and the walk resumes in a village; without it (a "wide street view",
+# "same lighting as the input image", any negation) FLUX makes a minimal, faithful edit of the already-collapsed
+# texture and keeps it. Negations ("no hands") are ignored and name the thing; the redraw shows first-person arms,
+# which fits the view.
+POV_CUE = "cinematic first-person view"
+FRAME_RATE = 60
+
+
+def anchor_prompt(scene: str, last_edit: str, limit: int) -> str:
+    """The scene (plus the newest world edit) as a FLUX prompt; "" when the world has no text to anchor on."""
+    parts = [p.strip(" ,.") for p in (scene, last_edit) if p and p.strip()]
+    if not parts:
+        return ""
+    text = ", ".join(parts)
+    if "first-person" not in text.lower():
+        text = text[: max(0, limit - len(POV_CUE) - 2)].rstrip(" ,") + ", " + POV_CUE
+    return text[:limit]
+
+
 @dataclass
 class World:
     world_id: str
@@ -73,6 +93,10 @@ class World:
     prompt_version: int = 0
     controls: ControlState = field(default_factory=ControlState)
     created: float = field(default_factory=time.monotonic)
+    scene_prompt: str = ""  # the text the first image came from, for drift anchoring
+    last_edit: str = ""  # the newest applied world edit: it becomes part of the scene
+    moving_seconds: float = 0.0  # generated video time since the last anchor, counted only while moving
+    anchors: int = 0
 
 
 SendBytes = Callable[[bytes], Awaitable[None]]
@@ -115,7 +139,7 @@ class Runtime:
             raise ValueError("a prompt or an image is required")
         await self._gpu(self.engine.reset, image)
         metrics.RESETS.labels(reason="new_world").inc()
-        self.world = World(world_id=uuid.uuid4().hex, seed=seed, image=image)
+        self.world = World(world_id=uuid.uuid4().hex, seed=seed, image=image, scene_prompt=prompt or "")
         return self.world
 
     async def close_world(self, world_id: str) -> None:
@@ -211,10 +235,14 @@ class Runtime:
     async def _loop(self, world: World, encoder: FrameEncoder, out, send_event: SendEvent, pts: int) -> str:
         step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
         while not self._stop.is_set():
-            frames, step_seconds, seq = await step
+            frames, step_seconds, seq, moving = await step
             metrics.FRAMES_GENERATED.labels(model=self.engine.name, precision=self.precision).inc(len(frames))
+            if moving:
+                world.moving_seconds += len(frames) / FRAME_RATE
             if not self._edits.empty():
                 await self._apply_edit(world, encoder, frames[-1], send_event)
+            elif self._anchor_due(world):
+                await self._reanchor(world, encoder, frames[-1], send_event)
             # Generate the next batch while this one plays (upstream pacing).
             step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
             interval = max(step_seconds, 1e-3) / len(frames)
@@ -235,7 +263,41 @@ class Runtime:
         spent = time.perf_counter() - started
         self.last_step_seconds = spent
         metrics.ENGINE_STEP.labels(model=self.engine.name).observe(spent)
-        return frames, spent, ctrl.seq
+        moving = bool(ctrl.button) or abs(ctrl.mouse[0]) + abs(ctrl.mouse[1]) > 0.02
+        return frames, spent, ctrl.seq, moving
+
+    def _anchor_due(self, world: World) -> bool:
+        every = self.settings.anchor_seconds
+        return every > 0 and world.moving_seconds >= every and bool(self._anchor_text(world))
+
+    def _anchor_text(self, world: World) -> str:
+        return anchor_prompt(world.scene_prompt, world.last_edit, self.settings.max_prompt_chars)
+
+    async def _reanchor(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
+        """Redraw the current frame from the scene prompt and splice it back: the world keeps its scene.
+
+        Waypoint-1.5 only invents what it has never seen, so after some seconds of walking it has drifted into
+        close-up texture; it never recovers on its own. The UI shows the same banner as a world edit.
+        """
+        world.state = State.RECONDITIONING
+        await send_event({"type": "state", "state": world.state.value, "reason": "stabilize"})
+        started = time.perf_counter()
+        world.moving_seconds = 0.0  # also on failure: no retry storm
+        try:
+            fixed = await self._gpu(self.images.edit, current, self._anchor_text(world), world.seed + 1000 + world.anchors)
+            await self._gpu(self.engine.splice, fixed)
+            world.anchors += 1
+            encoder.request_keyframe()
+            metrics.IMAGE_SECONDS.labels(kind="anchor").observe(time.perf_counter() - started)
+            metrics.ANCHORS.labels(result="applied").inc()
+            await send_event({"type": "anchor", "status": "applied", "count": world.anchors,
+                              "ms": round((time.perf_counter() - started) * 1000)})
+        except Exception as exc:  # noqa: BLE001 - a failed anchor keeps the world running, drifting
+            logger.exception("world anchor failed")
+            metrics.ANCHORS.labels(result="failed").inc()
+            await send_event({"type": "anchor", "status": "failed", "message": str(exc)[:200]})
+        world.state = State.STREAMING
+        await send_event({"type": "state", "state": world.state.value})
 
     async def _apply_edit(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
         version, prompt = self._edits.get_nowait()
@@ -249,6 +311,8 @@ class Runtime:
             metrics.IMAGE_SECONDS.labels(kind="edit").observe(time.perf_counter() - started)
             await self._gpu(self.engine.splice, edited)
             world.prompt_version = version
+            world.last_edit = prompt
+            world.moving_seconds = 0.0
             encoder.request_keyframe()
             elapsed = time.perf_counter() - started
             metrics.PROMPT_APPLY.labels(result="applied").observe(elapsed)

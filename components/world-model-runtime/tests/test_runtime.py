@@ -20,7 +20,7 @@ from app.encoder import build_encoder
 from app.engine import MockEngine
 from app.imagegen import MockFlux
 from app.main import get_app
-from app.session import VIDEO_TAG
+from app.session import POV_CUE, VIDEO_TAG, anchor_prompt
 
 SMALL = Settings(width=320, height=176, mock_step_seconds=0.01, encoder="x264", gop_frames=8)
 
@@ -205,3 +205,87 @@ def test_the_image_can_serve_a_websocket():
     import importlib.util
 
     assert any(importlib.util.find_spec(name) for name in ("websockets", "wsproto"))
+
+
+# ---------------------------------------------------------------- drift anchoring
+def test_anchor_prompt_keeps_the_scene_and_the_latest_edit_and_always_asks_for_a_first_person_view():
+    scene = "a snowy medieval village at dusk, wooden houses with lit windows, cinematic first-person view"
+    text = anchor_prompt(scene, "the sky turns red", 600)
+    assert text == scene + ", the sky turns red"
+    typed = anchor_prompt("a quiet harbour at dawn", "", 600)
+    assert typed == "a quiet harbour at dawn, " + POV_CUE, "FLUX only redraws the frame with the first-person cue"
+    assert anchor_prompt("", "", 600) == "", "an image-only world has nothing to anchor on"
+    long = anchor_prompt("x" * 900, "", 600)
+    assert len(long) <= 600 and long.endswith(POV_CUE)
+
+
+def test_anchor_settings_are_validated():
+    import dataclasses
+
+    with pytest.raises(ValueError):
+        dataclasses.replace(SMALL, anchor_seconds=0.5).validate()
+    dataclasses.replace(SMALL, anchor_seconds=5).validate()
+    dataclasses.replace(SMALL, anchor_seconds=0).validate()
+
+
+def _events_until(ws, predicate, seconds):
+    events, deadline = [], time.time() + seconds
+    while time.time() < deadline and not predicate(events):
+        msg = ws.receive()
+        if msg.get("text"):
+            events.append(json.loads(msg["text"]))
+    return events
+
+
+def test_walking_re_anchors_the_scene_and_standing_still_does_not():
+    import dataclasses
+
+    with TestClient(get_app(dataclasses.replace(SMALL, anchor_seconds=1.0))) as c:
+        deadline = time.time() + 20
+        while c.get("/readyz").status_code != 200:
+            assert time.time() < deadline
+            time.sleep(0.05)
+        world = c.post("/internal/worlds", json={"prompt": "a quiet city street at night", "seed": 3}).json()
+        with c.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+            ws.receive_text()
+            # Idle for 1.5 s of wall time (far more than 1 s of video): no anchor.
+            idle = _events_until(ws, lambda ev: False, 1.5)
+            assert not any(e.get("type") == "anchor" for e in idle)
+            ws.send_text(json.dumps({"type": "control", "seq": 1, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+            events = _events_until(ws, lambda ev: any(e.get("type") == "anchor" for e in ev), 8)
+            anchors = [e for e in events if e.get("type") == "anchor"]
+            assert anchors and anchors[0]["status"] == "applied" and anchors[0]["count"] == 1
+            stab = [e for e in events if e.get("state") == "RECONDITIONING"]
+            assert stab and stab[0].get("reason") == "stabilize"
+            ws.send_text(json.dumps({"type": "stop"}))
+
+
+def test_a_world_from_an_image_alone_is_never_anchored():
+    import dataclasses
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (320, 176), (20, 80, 160)).save(buf, format="PNG")
+    with TestClient(get_app(dataclasses.replace(SMALL, anchor_seconds=1.0))) as c:
+        deadline = time.time() + 20
+        while c.get("/readyz").status_code != 200:
+            assert time.time() < deadline
+            time.sleep(0.05)
+        world = c.post("/internal/worlds", json={"image_png_b64": base64.b64encode(buf.getvalue()).decode()}).json()
+        with c.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+            ws.receive_text()
+            ws.send_text(json.dumps({"type": "control", "seq": 1, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+            events = _events_until(ws, lambda ev: any(e.get("type") == "anchor" for e in ev), 2)
+            assert not any(e.get("type") == "anchor" for e in events)
+            ws.send_text(json.dumps({"type": "stop"}))
+
+
+def test_raw_mode_upscales_on_the_gpu_path_to_the_display_size():
+    torch = pytest.importorskip("torch")
+    from app.engine import WaypointEngine
+
+    engine = WaypointEngine.__new__(WaypointEngine)
+    engine._torch, engine.raw, engine.width, engine.height = torch, True, 320, 180
+    out = torch.randint(0, 255, (4, 128, 256, 3), dtype=torch.uint8)
+    frames = engine._to_display(out)
+    assert frames.shape == (4, 180, 320, 3) and frames.dtype == np.uint8

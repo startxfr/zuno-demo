@@ -211,7 +211,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
             else:
                 effective = screened.prompt if screened else preset.get("prompt", "")
                 base = await rt.image(effective, seed)
-            world = await rt.create_world(base, seed)
+            world = await rt.create_world(base, seed, effective)
         except (RuntimeBusy, RuntimeUnavailable) as exc:
             lease.release(session, "create_failed")
             metrics.WORLDS.labels(source=kind, result="runtime_error").inc()
@@ -221,6 +221,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
             lease.release(session, "create_failed")
             raise
         session.world_id, session.base_png_b64, session.state = world["world_id"], base, "READY"
+        session.scene_prompt = effective
         session.touch()
         metrics.WORLDS.labels(source=kind, result="created").inc()
         return {
@@ -273,7 +274,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
         last = "busy"
         for _ in range(20):  # the runtime clears its streaming flag a moment after the socket closes
             try:
-                world = await rt.create_world(session.base_png_b64, session.seed)
+                world = await rt.create_world(session.base_png_b64, session.seed, session.scene_prompt)
                 break
             except RuntimeBusy:
                 await asyncio.sleep(0.25)

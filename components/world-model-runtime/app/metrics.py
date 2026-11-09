@@ -21,6 +21,8 @@ SESSION_DURATION = Histogram("zuno_world_session_duration_seconds", "Streaming s
 STREAM_DISCONNECT = Counter("zuno_world_stream_disconnect_total", "Stream ends", ["reason"], registry=REGISTRY)
 BUSY_REJECTED = Counter("zuno_world_busy_rejected_total", "Requests refused because the GPU is busy",
                         registry=REGISTRY)
+ANCHORS = Counter("zuno_world_anchor_total", "Drift re-anchors (FLUX redraw of the current frame from the scene prompt)",
+                  ["result"], registry=REGISTRY)
 RESETS = Counter("zuno_world_reset_total", "World resets", ["reason"], registry=REGISTRY)
 ENCODER_INFO = Gauge("zuno_world_encoder_info", "The H.264 encoder in use (1)", ["encoder"], registry=REGISTRY)
 ENGINE_INFO = Gauge("zuno_world_engine_info", "The world engine and image model in use (1)",

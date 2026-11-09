@@ -17,6 +17,7 @@ from app.config import Settings
 from app.controls import Ctrl
 
 FRAMES_PER_STEP = 4  # Waypoint-1.5 temporal compression
+RAW_WIDTH, RAW_HEIGHT = 1024, 512  # the TAEHV autoencoder's native size (2:1)
 
 
 class WorldEngineAdapter(Protocol):
@@ -137,18 +138,32 @@ class WaypointEngine:
 
         self._torch, self._ctrl_cls = torch, CtrlInput
         self.width, self.height = settings.width, settings.height
+        self.raw = settings.ae_raw
+        # world_engine's autoencoder works at 512x1024 (2:1) and, with auto_aspect_ratio, resizes 720p to that
+        # and back with a bilinear filter. Raw mode feeds it 512x1024 directly and upscales on the GPU (bicubic).
+        self.native = (RAW_WIDTH, RAW_HEIGHT) if self.raw else (self.width, self.height)
+        overrides = {"ae_uri": str(settings.taehv_path)}  # local: snapshot_download fails offline
+        if self.raw:
+            overrides["auto_aspect_ratio"] = False
         self.engine = WorldEngine(
             str(settings.waypoint_dir),
             quant=settings.quant,
-            # Local autoencoder: snapshot_download fails offline and world_engine
-            # falls back to the path it was given.
-            model_config_overrides={"ae_uri": str(settings.taehv_path)},
+            model_config_overrides=overrides,
             device="cuda",
         )
 
     def _batch(self, image: np.ndarray):
-        frame = _fit(image, self.width, self.height)
+        frame = _fit(image, *self.native)
         return self._torch.from_numpy(np.repeat(frame[None], self.frames_per_step, axis=0))
+
+    def _to_display(self, out):
+        """(4, H, W, 3) uint8 CUDA tensor at the engine's size -> numpy at the display size."""
+        if not self.raw:
+            return out.cpu().numpy()
+        torch = self._torch
+        x = out.permute(0, 3, 1, 2).float()
+        x = torch.nn.functional.interpolate(x, size=(self.height, self.width), mode="bicubic", align_corners=False)
+        return x.clamp_(0, 255).round_().to(torch.uint8).permute(0, 2, 3, 1).contiguous().cpu().numpy()
 
     def reset(self, image: np.ndarray) -> None:
         self.engine.reset()
@@ -160,7 +175,7 @@ class WaypointEngine:
     def step(self, ctrl: Ctrl) -> np.ndarray:
         out = self.engine.gen_frame(ctrl=self._ctrl_cls(
             button=set(ctrl.button), mouse=ctrl.mouse, scroll_wheel=ctrl.scroll_wheel))
-        return out.cpu().numpy()
+        return self._to_display(out)
 
     def close(self) -> None:
         self.engine = None

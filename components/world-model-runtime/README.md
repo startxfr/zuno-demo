@@ -11,6 +11,9 @@ quotas and prompt screening.
 | `WORLD_MODEL_IMAGE` | `flux2` (diffusers `Flux2KleinPipeline`, 4 steps) | `mock`: a gradient seeded by the prompt |
 | `WORLD_MODEL_ENCODER` | `auto`: `h264_nvenc` (PyAV's FFmpeg, needs `NVIDIA_DRIVER_CAPABILITIES=...,video`), else `libx264` | `x264` |
 
+| `WORLD_MODEL_ANCHOR_SECONDS` | `3` in the chart: every 3 s of walking FLUX redraws the frame from the scene prompt and it is spliced back (ADR-0604 D9); `0` = off | unused by the mock tests unless set |
+| `WORLD_MODEL_AE_RAW` | `true` in the chart: no bilinear 720p/512x1024 round trip, GPU bicubic upscale | n/a |
+
 Waypoint-1.5 takes no text (`prompt_conditioning: null`). A mid-session prompt is a **world edit**: FLUX edits the current
 frame and `append_frame` splices it, while the session reports `RECONDITIONING`.
 
