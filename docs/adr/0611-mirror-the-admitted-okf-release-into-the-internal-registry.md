@@ -29,12 +29,14 @@ On 2026-11-09 that stopped being true.
 first. `quay.io` stays only as a second source, and no CDN address range is opened.**
 
 1. **Gate on a measurement.** Before anything is built, WP-246 proves in a canary namespace (ADR-0609) that the
-   OpenShift internal registry stores these artifacts with their signatures and that `cosign` and `oras` read them back.
-   If it does not, the mirror is a small registry in `zuno-ai-build` instead, and this record is amended; the rest of
-   the decision does not change.
+   mirror stores these artifacts with their signatures and that `cosign` and `oras` read them back.
+   **Measured 2026-11-09: the OpenShift internal registry fails** (no Referrers API, the tag-schema fallback is refused,
+   `cosign verify` finds no signature; see WP-246). The mirror is therefore a small OCI registry in `zuno-ai-build`
+   (or `zuno-ai-run`), measured the same way; the rest of the decision does not change. Every `image-registry...:5000`
+   address in clauses 2 and 6 reads as that registry.
 2. **Mirror at admission.** `admit_okf_bundle.py` gets a `mirror` step run by `make d3 admit agents`: `oras copy -r` of
    the corp artifact, every agent artifact it lists, and their signatures and attestations, to
-   `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/okf/...`. The digest is identical to `quay.io`'s; the
+   the mirror registry. The digest is identical to `quay.io`'s; the
    step fails if it is not.
 3. **Pull from the mirror, verify as before.** `okf-fetch` tries the mirror reference, then `quay.io`, with the retry
    and timeout of commit a10c10b3 on each. Verification is unchanged: offline, by the Sigstore identity of ADR-0578,
@@ -45,7 +47,7 @@ first. `quay.io` stays only as a second source, and no CDN address range is open
 5. **Mirror before merge.** A promotion pull request cannot roll the gateways before the mirror holds its digest. The
    promotion check runs the `mirror` step, and the merge is blocked if it fails. The `quay.io` fallback covers the
    window if a pod restarts earlier anyway.
-6. **Egress.** The two gateways get a NetworkPolicy rule to the internal registry. The EgressFirewall is left as it is:
+6. **Egress.** The two gateways get a NetworkPolicy rule to the mirror registry. The EgressFirewall is left as it is:
    no Akamai or other CDN range is added.
 7. **Scope.** Only the OKF release fetched by `okf-fetch`. The bundles `unifai-operator` pulls (ADR-0564) and the
    `quay.io/zuno` runtime images (ADR-0353) are not covered; they are named here so nobody assumes otherwise.

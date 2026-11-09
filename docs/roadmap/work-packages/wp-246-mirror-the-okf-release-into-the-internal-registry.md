@@ -32,6 +32,24 @@ verification.
 7. **Drill.** In the canary, block `quay.io` and show a gateway pod starting from the mirror; set a forged digest and
    show the pod stays in `Init`.
 
+## Result of step 1 (2026-11-09)
+
+Canary `zuno-canary-wp-246` (egress to the registry on 5000 only), OpenShift 4.22.20, corp artifact of release 0.14.3
+copied from `quay.io` through the registry's external route. The internal registry **fails the gate**:
+
+- It cannot store an artifact by digest alone: the push returns 201, but the image is not linked to the ImageStream and
+  every read answers `manifest unknown`. The ImageStream must exist first, and the artifact must be pushed **with a
+  tag**; then it reads back by digest.
+- It does not hold the signature. The Sigstore bundle is an OCI 1.1 referrer of the corp artifact. The registry has no
+  Referrers API, and the tag-schema fallback (an index tagged `sha256-<digest>`) is refused with a 500 at
+  `CreateImageStreamMapping`. `cosign verify --offline` through `admit_okf_bundle.py verify` then answers "no signatures
+  found" on the mirror, while the same command passes on `quay.io`.
+- Pulling the blobs works; what fails is trust.
+
+So the internal registry is not a usable mirror for signed OKF artifacts. Next: step 1 again against a small OCI
+registry in `zuno-ai-build` (clause 1 of ADR-0611 names it); it needs the owner's go and an image source that the
+cluster can pull. The canary namespace stays until that is measured, then it is removed.
+
 ## Acceptance
 
 With `quay.io` blocked, a new mcp-gateway and a2a-gateway pod reach Ready from the mirror; a forged digest is refused;
