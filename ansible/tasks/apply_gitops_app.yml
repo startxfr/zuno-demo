@@ -101,6 +101,11 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/keycloak_seam_values.yml"
   when: (zuno_keycloak_mode | default('internal')) == 'external'
 
+# Global OLM approval switch (zuno_operator_install_plan_approval): one variable for every operator Subscription.
+- name: "gitops | apply the global OLM approval mode to the chart's Subscriptions"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/install_plan_approval.yml"
+  when: gitops_component_name not in (zuno_operator_install_plan_approval_exempt | default([]))
+
 - name: "gitops | apply ArgoCD Application: zuno-{{ gitops_app_name }}"
   kubernetes.core.k8s:
     state: present

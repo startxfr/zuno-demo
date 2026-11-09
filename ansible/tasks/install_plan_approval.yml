@@ -1,0 +1,30 @@
+---
+# Global OLM approval switch. `zuno_operator_install_plan_approval` (Automatic or Manual, group_vars/all/main.yml) is
+# written into every `installPlanApproval` key of the chart's default values, through the Application's own Helm values,
+# so one variable flips all operator Subscriptions at the next apply. Components listed in
+# `zuno_operator_install_plan_approval_exempt` keep what their chart says (pre-GA operators that stay Manual).
+#
+# Included by apply_gitops_app.yml. Needs: _gitops_app_definition and gitops_component_name.
+# `.get('values', ...)`, never ['values'] or .values (see keycloak_seam_values.yml).
+- name: "install-plan-approval | read the chart default values of {{ gitops_component_name }}"
+  ansible.builtin.set_fact:
+    _ipa_chart_values: >-
+      {{ lookup('ansible.builtin.file', zuno_repo_root ~ '/' ~ _gitops_app_definition.spec.source.path ~ '/values.yaml',
+                errors='ignore') | from_yaml | default({}, true) }}
+
+- name: "install-plan-approval | the overrides for {{ gitops_component_name }}"
+  ansible.builtin.set_fact:
+    _ipa_overrides: "{{ _ipa_chart_values | install_plan_approval_overrides(zuno_operator_install_plan_approval | default('Automatic')) }}"
+
+- name: "install-plan-approval | merge them into the Application values of {{ gitops_component_name }}"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        _gitops_app_definition
+        | combine({'spec': {'source': {'helm': {'values':
+            ((_gitops_app_definition.spec.source.helm.get('values', '{}') | from_yaml)
+             | combine(_ipa_overrides, recursive=True)) | to_nice_yaml}}}}, recursive=True)
+      }}
+  when:
+    - _ipa_overrides | length > 0
+    - _gitops_app_definition.spec.source.helm is defined
