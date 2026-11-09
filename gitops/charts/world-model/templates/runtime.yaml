@@ -60,6 +60,8 @@ spec:
             - {name: WORLD_MODEL_IMAGE, value: {{ .Values.runtime.image | quote }}}
             - {name: WORLD_MODEL_ENCODER, value: {{ .Values.runtime.encoder | quote }}}
             - {name: WORLD_MODEL_QUANT, value: {{ .Values.runtime.quant | quote }}}
+            - {name: WORLD_MODEL_ANCHOR_SECONDS, value: {{ .Values.runtime.anchorSeconds | quote }}}
+            - {name: WORLD_MODEL_AE_RAW, value: {{ .Values.runtime.aeRaw | quote }}}
             - {name: WORLD_MODEL_DIR, value: /models}
             # `video` lets the container toolkit mount libnvidia-encode, which PyAV's h264_nvenc needs.
             - {name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility,video"}
