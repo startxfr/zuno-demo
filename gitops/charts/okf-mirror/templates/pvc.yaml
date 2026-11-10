@@ -6,8 +6,9 @@ metadata:
   labels:
     app.kubernetes.io/name: okf-mirror
     zuno.io/managed-by: argocd
+  # Same wave as the Deployment on purpose: gp3-csi is WaitForFirstConsumer, a PVC alone in an earlier wave never turns healthy.
   annotations:
-    argocd.argoproj.io/sync-wave: "25"
+    argocd.argoproj.io/sync-wave: "30"
 spec:
   accessModes: ["ReadWriteOnce"]
   {{- with .Values.storage.storageClassName }}
