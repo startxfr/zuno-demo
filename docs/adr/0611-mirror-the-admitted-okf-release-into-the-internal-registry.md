@@ -1,6 +1,6 @@
 # ADR-0611: Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.17
 - **Date:** 2026-11-09
 - **Decision owners:** Zuno Demo architecture team

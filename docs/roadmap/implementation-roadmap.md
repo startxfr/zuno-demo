@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
 | v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-227, WP-237 |
-| v0.17 | 4 | 3 | 12 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-246 |
+| v0.17 | 4 | 2 | 12 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1109,7 +1109,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 |---|---|---|---|---|---|
 | WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07) |
 | WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
-| WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0611 | WP-242 | Not started | the owner's go per cluster step; none started |
+| WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0611 | WP-242 | Done | live on demo333 2026-11-10: gateways read the mirror, quay.io blocked drill passed |
 
 ### OKF stream phases
 

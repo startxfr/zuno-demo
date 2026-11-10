@@ -1,6 +1,6 @@
 # WP-246: Mirror the OKF release into the internal registry
 
-- **State:** Not started (needs the owner's go for each cluster step)
+- **State:** Done
 - **ADRs:** [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md)
 - **Depends on:** [WP-242](wp-242-canary-namespace-pattern.md)
 - **Related:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md),
@@ -133,7 +133,19 @@ workflow nodes are in place; check_docs passes.
 - Both new gateway pods logged `VERIFIED okf-mirror.zuno-ai-run.svc:5000/okf/okf-corp@sha256:2918e463…` : they read
   the release from the mirror, not from `quay.io`.
 
-Still open: step 7 (drill with `quay.io` blocked and a forged digest), removal of the canary namespace.
+
+## Result of step 7 (2026-11-10, demo333)
+
+Drill with `quay.io` blocked: four temporary `Deny` rules (`quay.io`, `cdn01`, `cdn02`, `cdn03`) at the head of the
+`zuno-ai-run` EgressFirewall, ArgoCD self-heal of `zuno-namespaces-d1` paused for the window (about 4 minutes), both
+restored afterwards (34 rules, Synced/Healthy, self-heal back on).
+
+- A probe pod could not reach `https://quay.io/v2/` nor `https://cdn02.quay.io/`.
+- `rollout restart` of mcp-gateway and a2a-gateway: both new pods reached Ready, and both okf-fetch logs read
+  `VERIFIED okf-mirror.zuno-ai-run.svc:5000/okf/okf-corp@sha256:2918e463…`, with no quay.io dependency.
+- Forged digest (last hex digit changed) through the mirror: `no signatures found`, exit 1. A pod without the
+  reader label got 503 from the mirror (NetworkPolicy).
+- Canary namespace `zuno-canary-wp-246` removed.
 
 ## Acceptance
 
