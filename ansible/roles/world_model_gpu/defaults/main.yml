@@ -10,7 +10,9 @@ zuno_world_model_enabled: false
 zuno_world_model_gpu_az: ""
 
 world_model_gpu_app_name: zuno-machines-world-model-d0
-world_model_gpu_machineset: zuno-gpu-world-model-a
+# One MachineSet per zone; the zones scaled to 1 are zuno_world_model_gpu_azs (["a","b"] searches both zones; c has no g7e.4xlarge).
+zuno_world_model_gpu_azs: []
+world_model_gpu_machinesets: [zuno-gpu-world-model-a, zuno-gpu-world-model-b]
 world_model_gpu_node_label: "zuno.io/gpu-workload=world-model"
 # The Day-2 application whose presence blocks removing the node.
 world_model_gpu_dependent_app: zuno-world-model-d1
