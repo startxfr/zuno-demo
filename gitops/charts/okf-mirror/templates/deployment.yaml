@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: okf-mirror
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: okf-mirror
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  replicas: {{ .Values.replicas }}
+  # One ReadWriteOnce volume: the old pod must release it before the new one mounts it.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: okf-mirror
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: okf-mirror
+    spec:
+      serviceAccountName: okf-mirror
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: zot
+          {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .Values.image.digest) }}
+          {{- fail "okf-mirror image.digest must be sha256:<64 hex>" }}
+          {{- end }}
+          image: {{ printf "%s@%s" .Values.image.repository .Values.image.digest | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["serve", "/etc/zot/config.json"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 5000
+          readinessProbe:
+            httpGet: {path: /v2/, port: http}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /v2/, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - {name: config, mountPath: /etc/zot, readOnly: true}
+            - {name: data, mountPath: /data}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: okf-mirror-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: okf-mirror

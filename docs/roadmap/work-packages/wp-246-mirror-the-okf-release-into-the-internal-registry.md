@@ -96,6 +96,17 @@ new `admit_okf_bundle.py`: from the mirror with `quay.io` blocked, exit 0 (VERIF
 digest the mirror does not hold, the mirror is refused, the fallback tries `quay.io` (blocked) and the pod never
 succeeds (fail closed). The signer image must be rebuilt for the real pods to know `--mirror` (step 6).
 
+## Result of step 4 (2026-11-10)
+
+Chart `gitops/charts/okf-mirror` (zot v2.1.22 pinned by digest, Recreate, one 1 Gi volume, read-only root filesystem,
+ingress NetworkPolicy for `mcp-gateway` and `a2a-gateway` pods, plain HTTP inside the mesh), added to the hardening
+check (9 checks pass). Rendered into the canary: Ready, volume bound, and `admit_okf_bundle.py mirror` filled it
+(9 artifacts, verified again from the mirror). No Application and no role installs it yet, so nothing is deployed.
+
+Not proven here: that the NetworkPolicy excludes other pods. The canary's own namespace-wide policy already admits
+every pod of the namespace (policies add up), so an unlabelled pod read the mirror too. Measure it in `zuno-ai-run`,
+which has pod-level policies only, at step 6. Also open: the mesh in strict mTLS with a port-forward write.
+
 ## Acceptance
 
 With `quay.io` blocked, a new mcp-gateway and a2a-gateway pod reach Ready from the mirror; a forged digest is refused;

@@ -1,0 +1,28 @@
+# The mirror accepts traffic only from the pods that read the release. Admission writes through
+# `oc port-forward`, which reaches the pod from the node and is not an ingress peer. The gateways'
+# own policies are ingress-only, so they need no egress rule to reach this service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: okf-mirror
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: okf-mirror
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range .Values.readers }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 5000

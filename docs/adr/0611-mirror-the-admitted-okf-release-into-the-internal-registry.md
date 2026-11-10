@@ -50,8 +50,9 @@ first. `quay.io` stays only as a second source, and no CDN address range is open
    promotion check runs the `mirror` step, and the merge is blocked if it fails. The `quay.io` fallback covers the
    window if a pod restarts earlier anyway.
 6. **Network.** The gateways' namespace policies are ingress-only, so the gateways need no egress rule. The mirror
-   registry gets an ingress NetworkPolicy that admits only the two gateways, serves TLS from the service CA, and takes
-   writes from admission through a port-forward, not through a route. The EgressFirewall is left as it is: no Akamai
+   registry gets an ingress NetworkPolicy that admits only the two gateways. It runs in the meshed `zuno-ai-run` namespace, so the mesh carries the traffic
+   over mTLS and the registry itself speaks plain HTTP (a service-CA certificate would need that CA in the init
+   container, for no gain inside the mesh). Admission writes through a port-forward, not through a route. The EgressFirewall is left as it is: no Akamai
    or other CDN range is added.
 7. **Scope.** Only the OKF release fetched by `okf-fetch`. The bundles `unifai-operator` pulls (ADR-0564) and the
    `quay.io/zuno` runtime images (ADR-0353) are not covered; they are named here so nobody assumes otherwise.
