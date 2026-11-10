@@ -28,6 +28,9 @@
 # as the gateways verify it (offline cosign + oras, by digest), through a port-forward.
 # Empty (default) = no mirror, nothing to check. Feed the mirror with
 # `OKF_MIRROR_TO=localhost:15001/okf OKF_MIRROR_PLAIN_HTTP=1 make d3 admit agents` (port-forward first).
+- name: "agents | load the committed per-cluster variables (zuno_okf_registry_mirror)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "agents | verify that the internal mirror holds the locked release (ADR-0611)"
   ansible.builtin.shell: |
     set -u

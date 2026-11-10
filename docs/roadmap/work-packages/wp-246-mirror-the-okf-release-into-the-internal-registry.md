@@ -117,6 +117,24 @@ is not there, so a promotion cannot be rolled onto gateways that would only fall
 Component `okf-mirror` (role `okf_mirror`, Application `zuno-okf-mirror-d1`, Day 2, before `mcp`) and its two AAP
 workflow nodes are in place; check_docs passes.
 
+## Result of step 6 (2026-11-10, demo333)
+
+- Chart bug found on the first install: the PVC sat in an earlier sync wave than the Deployment, and `gp3-csi` is
+  `WaitForFirstConsumer`, so the Application never turned healthy. Same wave now (db1793a0).
+- `make d2 install okf-mirror`: zot Ready 2/2 (with the mesh sidecar) on a bound 1Gi volume.
+- `OKF_MIRROR_TO=localhost:15001/okf OKF_MIRROR_PLAIN_HTTP=1 make d3 admit agents` through `oc port-forward`: 9
+  artifacts mirrored and verified again from the mirror. The port-forward write works with the mesh in strict mTLS.
+- NetworkPolicy exclusivity, measured in `zuno-ai-run`: a pod labelled `app.kubernetes.io/name=mcp-gateway` got
+  HTTP 200 from the mirror, an unlabelled pod timed out.
+- Signer image rebuilt (it carries `admit_okf_bundle.py`, so the init containers know `--mirror`). The prefix
+  `okf-mirror.zuno-ai-run.svc:5000/okf` is `zuno_okf_registry_mirror` in `ansible/clusters/demo333.yml`; `make d2
+  install mcp` passes it to both gateways.
+- Golden path before and after the switch: PASS (13 live moments, world model shown as roadmap).
+- Both new gateway pods logged `VERIFIED okf-mirror.zuno-ai-run.svc:5000/okf/okf-corp@sha256:2918e463…` : they read
+  the release from the mirror, not from `quay.io`.
+
+Still open: step 7 (drill with `quay.io` blocked and a forged digest), removal of the canary namespace.
+
 ## Acceptance
 
 With `quay.io` blocked, a new mcp-gateway and a2a-gateway pod reach Ready from the mirror; a forged digest is refused;
