@@ -55,6 +55,8 @@ zuno_world_model_enabled: true
 # 2026-11-10: no g7e.4xlarge capacity in a or b for hours, so both zones are searched (one MachineSet each; zone c does not offer the type);
 # keep only the zone that got the node: `oc scale machineset zuno-gpu-world-model-<z> -n openshift-machine-api --replicas=0`.
 zuno_world_model_gpu_azs: ["a", "b"]
+# Same GPU, other host sizes (another capacity pool): g7e.4xlarge, g7e.2xlarge and g7e.8xlarge in zones a and b, searched together.
+zuno_world_model_gpu_sets: [zuno-gpu-world-model-a, zuno-gpu-world-model-b, zuno-gpu-world-model-2xl-a, zuno-gpu-world-model-2xl-b, zuno-gpu-world-model-8xl-a, zuno-gpu-world-model-8xl-b]
 
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the

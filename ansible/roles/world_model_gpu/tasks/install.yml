@@ -92,8 +92,9 @@
             'ami': cluster_aws_identity.ami,
             'securityGroupName': cluster_aws_identity.securityGroupName,
             'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ e.az],
-            'replicas': 1 if e.az in (zuno_world_model_gpu_azs if (zuno_world_model_gpu_azs | length) > 0
-                                      else ([zuno_world_model_gpu_az] if (zuno_world_model_gpu_az | string | length) > 0 else ['a'])) else 0
+            'replicas': (1 if e.name in zuno_world_model_gpu_sets else 0) if (zuno_world_model_gpu_sets | length) > 0
+                        else (1 if (e.instanceType == 'g7e.4xlarge' and e.az in (zuno_world_model_gpu_azs if (zuno_world_model_gpu_azs | length) > 0
+                                      else ([zuno_world_model_gpu_az] if (zuno_world_model_gpu_az | string | length) > 0 else ['a']))) else 0)
           })) %}{% endfor %}{{ out }}
 
     - name: "world-model-gpu | fail if a requested zone has no installer subnet"
@@ -123,7 +124,7 @@
           - _world_model_gpu_values['cluster-machine']['machineSet']['enabled'] | bool
           - not (_world_model_gpu_values['cluster-machine']['machineAutoscaler']['enabled'] | bool)
           - not (_world_model_gpu_values['cluster-machine']['cluster']['autoscaler']['enabled'] | bool)
-          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | length) in [1, 2, 3]
+          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | length) >= 1
           - _world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='name') | difference(world_model_gpu_machinesets) | length == 0
           - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | selectattr('replicas', 'equalto', 1) | list | length) >= 1
           - "'placeholder' not in (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='ami') | join(','))"

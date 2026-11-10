@@ -98,6 +98,122 @@ spec:
                   - key: zuno.io/gpu-world-model
                     value: "true"
                     effect: NoSchedule
+              - name: zuno-gpu-world-model-2xl-a
+                az: a
+                type: worker
+                group: gpu-world-model
+                ami: ami-mycluster-placeholder
+                # One full RTX PRO 6000 Blackwell (96 GB), 16 vCPU, 128 GiB:
+                # Waypoint + FLUX + the encoder in one pod (ADR-0604 D5).
+                instanceType: g7e.2xlarge
+                securityGroupName: mycluster-infraid-node
+                subnet_name: mycluster-infraid-subnet-private-a
+                blockDevices: |-
+                  - ebs:
+                      encrypted: true
+                      iops: 0
+                      volumeSize: 250
+                      volumeType: gp3
+                replicas: 0
+                additionnalsLabels: |-
+                  nvidia.com/mig.config: all-disabled
+                  zuno.io/gpu-workload: world-model
+                # Only the world-model runtime tolerates this taint. The GPU
+                # Operator DaemonSets get a toleration for it in
+                # ansible/roles/nvidia_gpu (an announced window: it may restart
+                # the driver on the MIG fleet), or the node never advertises
+                # its GPU.
+                additionnalsTaints: |-
+                  - key: zuno.io/gpu-world-model
+                    value: "true"
+                    effect: NoSchedule
+              - name: zuno-gpu-world-model-2xl-b
+                az: b
+                type: worker
+                group: gpu-world-model
+                ami: ami-mycluster-placeholder
+                # One full RTX PRO 6000 Blackwell (96 GB), 16 vCPU, 128 GiB:
+                # Waypoint + FLUX + the encoder in one pod (ADR-0604 D5).
+                instanceType: g7e.2xlarge
+                securityGroupName: mycluster-infraid-node
+                subnet_name: mycluster-infraid-subnet-private-b
+                blockDevices: |-
+                  - ebs:
+                      encrypted: true
+                      iops: 0
+                      volumeSize: 250
+                      volumeType: gp3
+                replicas: 0
+                additionnalsLabels: |-
+                  nvidia.com/mig.config: all-disabled
+                  zuno.io/gpu-workload: world-model
+                # Only the world-model runtime tolerates this taint. The GPU
+                # Operator DaemonSets get a toleration for it in
+                # ansible/roles/nvidia_gpu (an announced window: it may restart
+                # the driver on the MIG fleet), or the node never advertises
+                # its GPU.
+                additionnalsTaints: |-
+                  - key: zuno.io/gpu-world-model
+                    value: "true"
+                    effect: NoSchedule
+              - name: zuno-gpu-world-model-8xl-a
+                az: a
+                type: worker
+                group: gpu-world-model
+                ami: ami-mycluster-placeholder
+                # One full RTX PRO 6000 Blackwell (96 GB), 16 vCPU, 128 GiB:
+                # Waypoint + FLUX + the encoder in one pod (ADR-0604 D5).
+                instanceType: g7e.8xlarge
+                securityGroupName: mycluster-infraid-node
+                subnet_name: mycluster-infraid-subnet-private-a
+                blockDevices: |-
+                  - ebs:
+                      encrypted: true
+                      iops: 0
+                      volumeSize: 250
+                      volumeType: gp3
+                replicas: 0
+                additionnalsLabels: |-
+                  nvidia.com/mig.config: all-disabled
+                  zuno.io/gpu-workload: world-model
+                # Only the world-model runtime tolerates this taint. The GPU
+                # Operator DaemonSets get a toleration for it in
+                # ansible/roles/nvidia_gpu (an announced window: it may restart
+                # the driver on the MIG fleet), or the node never advertises
+                # its GPU.
+                additionnalsTaints: |-
+                  - key: zuno.io/gpu-world-model
+                    value: "true"
+                    effect: NoSchedule
+              - name: zuno-gpu-world-model-8xl-b
+                az: b
+                type: worker
+                group: gpu-world-model
+                ami: ami-mycluster-placeholder
+                # One full RTX PRO 6000 Blackwell (96 GB), 16 vCPU, 128 GiB:
+                # Waypoint + FLUX + the encoder in one pod (ADR-0604 D5).
+                instanceType: g7e.8xlarge
+                securityGroupName: mycluster-infraid-node
+                subnet_name: mycluster-infraid-subnet-private-b
+                blockDevices: |-
+                  - ebs:
+                      encrypted: true
+                      iops: 0
+                      volumeSize: 250
+                      volumeType: gp3
+                replicas: 0
+                additionnalsLabels: |-
+                  nvidia.com/mig.config: all-disabled
+                  zuno.io/gpu-workload: world-model
+                # Only the world-model runtime tolerates this taint. The GPU
+                # Operator DaemonSets get a toleration for it in
+                # ansible/roles/nvidia_gpu (an announced window: it may restart
+                # the driver on the MIG fleet), or the node never advertises
+                # its GPU.
+                additionnalsTaints: |-
+                  - key: zuno.io/gpu-world-model
+                    value: "true"
+                    effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api
