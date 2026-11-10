@@ -76,7 +76,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
+DAY2_RUN_COMPONENTS := namespaces llm models okf-mirror mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
 DAY2_VERBS := check install build uninstall reconcile all reinstall
@@ -749,7 +749,12 @@ case "$$verb" in \
     admit_args=(); \
     if [[ -n "$${RELEASE:-}" ]]; then admit_args+=(--release "$$RELEASE"); fi; \
     case "$${UPDATE_LOCK:-0}" in 1|true|yes) admit_args+=(--update-lock) ;; esac; \
-    python3 platform/supply-chain/admit_okf_bundle.py admit "$${admit_args[@]}" ;; \
+    python3 platform/supply-chain/admit_okf_bundle.py admit "$${admit_args[@]}" || exit $$?; \
+    if [[ -n "$${OKF_MIRROR_TO:-}" ]]; then \
+      mirror_args=(--to "$$OKF_MIRROR_TO"); \
+      case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) mirror_args+=(--plain-http) ;; esac; \
+      python3 platform/supply-chain/admit_okf_bundle.py mirror "$${mirror_args[@]}"; \
+    fi ;; \
   release) \
     case " $(DAY3_RELEASE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 release component: '$$component' (expected one of: $(DAY3_RELEASE_COMPONENTS) or all)" >&2; exit 2;; esac; \
     if [[ -z "$${TAG:-}" ]]; then echo "day3 release requires TAG=<release_tag>, e.g. TAG=v0.2.0 (must already be a real, pushed git tag)" >&2; exit 2; fi; \

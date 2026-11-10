@@ -83,8 +83,7 @@ plain HTTP applies to the mirror host only, the source stays on TLS). Four new u
 passes (122). Run live against zot in the canary through a port-forward: 9 artifacts mirrored in 95 s, then
 `extract` from the mirror alone returned VERIFIED, release 0.14.3, 8 agents.
 
-Still to do: wiring the step into `make d3 admit agents` behind `zuno_okf_registry_mirror` (step 2 tail), then steps 3
-to 7.
+The step is wired into `make d3 admit agents` (see step 5).
 
 ## Result of step 3 (2026-11-09)
 
@@ -106,6 +105,17 @@ check (9 checks pass). Rendered into the canary: Ready, volume bound, and `admit
 Not proven here: that the NetworkPolicy excludes other pods. The canary's own namespace-wide policy already admits
 every pod of the namespace (policies add up), so an unlabelled pod read the mirror too. Measure it in `zuno-ai-run`,
 which has pod-level policies only, at step 6. Also open: the mesh in strict mTLS with a port-forward write.
+
+## Result of step 5 (2026-11-10)
+
+The GitHub runner that opens the promotion pull request cannot reach a registry inside the cluster, so the check
+lives where the cluster is reachable. `make d3 admit agents` runs `mirror` after `admit` when `OKF_MIRROR_TO` is set
+(`OKF_MIRROR_PLAIN_HTTP=1` for the in-mesh HTTP listener). `make d3 check agents` with `zuno_okf_registry_mirror`
+set verifies the locked digest from the mirror itself (offline cosign + oras, through a port-forward) and fails if it
+is not there, so a promotion cannot be rolled onto gateways that would only fall back to `quay.io`.
+
+Component `okf-mirror` (role `okf_mirror`, Application `zuno-okf-mirror-d1`, Day 2, before `mcp`) and its two AAP
+workflow nodes are in place; check_docs passes.
 
 ## Acceptance
 

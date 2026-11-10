@@ -27,6 +27,7 @@
       - mlops
       - agents
       - mcp
+      - okf_mirror
       - models
       - llm
       - namespaces
