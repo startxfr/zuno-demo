@@ -52,7 +52,7 @@ zuno_build_git_ref: "devel"
 zuno_world_model_enabled: true
 # g7e.4xlarge had no capacity in eu-central-1a on 2026-11-07 (InsufficientInstanceCapacity, the machine controller retried
 # ~2900 times); eu-central-1b gave the node in minutes. Both zones offer g7e for this account.
-zuno_world_model_gpu_az: "a"
+zuno_world_model_gpu_az: "b"
 
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
