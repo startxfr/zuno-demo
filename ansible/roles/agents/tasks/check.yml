@@ -81,13 +81,15 @@
     loop_var: _agents_gateway
   register: _agents_gateway_deploys
 
+# The digest reaches the init container as the OKF_REFERENCE env var (the extract command reads "$OKF_REFERENCE",
+# retried with a timeout, a10c10b3; ADR-0611 adds the mirror vars), so compare that variable with the lock.
 - name: "agents | fail when a gateway runs another release than the lock"
   ansible.builtin.assert:
     that:
       - _agents_gateway_run | length > 0
-      - _agents_expected_reference in _agents_gateway_run[0].command
+      - _agents_gateway_ref == _agents_expected_reference
     fail_msg: >-
-      {{ item._agents_gateway }} fetches {{ (_agents_gateway_run[0].command | default([]) | select('search', '@sha256:') | list + ['no digest']) | first }} instead of
+      {{ item._agents_gateway }} fetches {{ _agents_gateway_ref | default('no digest', true) }} instead of
       {{ _agents_expected_reference }}: the promotion was not rolled (D9). Re-run `make d2 install mcp` or the
       a2a-gateway role, then check again.
     quiet: true
@@ -95,6 +97,9 @@
     _agents_gateway_run: >-
       {{ (item.resources[0].spec.template.spec.initContainers | default([]) | selectattr('name', 'equalto', 'okf-fetch') | list)
          if item.resources else [] }}
+    _agents_gateway_ref: >-
+      {{ ((_agents_gateway_run[0].env | default([]) | selectattr('name', 'equalto', 'OKF_REFERENCE') | map(attribute='value') | list)
+          + [''])[0] if _agents_gateway_run | length > 0 else '' }}
   loop: "{{ _agents_gateway_deploys.results }}"
   loop_control:
     label: "{{ item._agents_gateway }}"
