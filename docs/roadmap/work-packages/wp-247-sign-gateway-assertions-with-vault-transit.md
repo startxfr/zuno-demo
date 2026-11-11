@@ -148,6 +148,12 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   verifiers need no rebuild); one window that switches a2a-gateway to `transit` and puts the new public key in
   `gitops/apps/mcp/application-d1.yaml` and `ansible/clusters/demo333.yml` (ai-gateway); golden path `delegation`;
   then retire `a2a/agent-chain` from `secret-access.yaml`.
+- **2026-11-11 13:24Z-13:35Z, lot 2 steps 1-2 applied on demo333 (user's go; behaviour on a Vault failure: option A, no
+  chain sent).** `make d0 install vault` created the Transit key `agent-chain` (ed25519, non-exportable), the policy
+  `agent-chain-signer` and the role `a2a-gateway`; no pod touched. Build `a2a-gateway-20` (devel `f6d0a94`) signed by RHTAS
+  (`sha256:991e56ca`); the a2a-gateway rolled once with `signer=file`, key mount unchanged. Left: the switch window (a2a-gateway
+  `transit` + the Transit public key in the mcp-gateway and ai-gateway values), the `delegation` proof, then retire
+  `a2a/agent-chain` from `secret-access.yaml`.
 
 ## Steps
 
