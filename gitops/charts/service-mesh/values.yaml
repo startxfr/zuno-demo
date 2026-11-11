@@ -31,7 +31,7 @@ istioVersion: v1.30.3
 meshNamespace: zuno-mesh
 
 # Thin wrapper around the startx `cluster-istio` chart (vendored as a Helm
-# dependency, resolved via the "alias:startx" Helm repo) - but only for its
+# dependency, from the startx Helm repo over HTTPS) - but only for its
 # generic operator subchart (operatorIstio), which renders nothing more than
 # a Subscription driven entirely by these values. cluster-istio's own
 # top-level templates (serviceMeshControlPlane.yaml/serviceMeshMember.yaml)
@@ -71,7 +71,7 @@ cluster-istio:
         csv: servicemeshoperator3
         # Deviates from the startx chart's own default (Manual): this repo
         # has no ansible InstallPlan-approval step, so every other
-        # alias:startx-wrapped operator here (see cert-manager/values.yaml)
+        # startx-wrapped operator here (see cert-manager/values.yaml)
         # uses Automatic instead.
         installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
         # Overrides the vendored chart's own default (config.infra: true,

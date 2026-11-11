@@ -70,9 +70,11 @@ The order is by risk reduction per effort.
   tasks call verifies, and the default is `true` in `ansible/inventories/demo/group_vars/all/main.yml` (ADR-0603 M3).
 - WP-227 (hardened profile) not started. It now carries the removal of ArgoCD's `cluster-admin` (user decision
   2026-11-11, ADR-0602 amendment).
-- The plain-HTTP startx chart repository: **decided 2026-11-11**, fixed at its source. The helm-repository project
-  publishes HTTPS URLs, then zuno moves its repository Secret, AppProjects and `Chart.lock` files to HTTPS (ADR-0602
-  amendment).
+- The plain-HTTP startx chart repository: **decided 2026-11-11**, fixed at its source.
+  - The helm-repository project publishes HTTPS URLs: done on 2026-11-11.
+  - zuno then moves to HTTPS: `Chart.yaml` names the URL instead of `alias:startx`, and the `Chart.lock` files,
+    repository Secret, AppProjects, CI and console repository follow. This is in git and waits for its live window:
+    two runs of the argocd role around the chart push (ADR-0602 amendment).
 
 ## Accepted by the user
 

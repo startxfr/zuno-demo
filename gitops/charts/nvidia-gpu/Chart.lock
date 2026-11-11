@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-gpu
-  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   version: 21.3.277
-digest: sha256:5d6d8858cd96bedd00f5ba8e3fd37d22125a53665da61eaa59015842947d8abb
-generated: "2026-08-09T01:12:13.536711987+02:00"
+digest: sha256:03efc41157f6ff4cb1e09182e03480884acd829d10b6b31800a50ecce04cd929
+generated: "2026-11-11T23:46:23.327288227+01:00"

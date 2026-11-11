@@ -1,12 +1,12 @@
 ---
-# Registers the startx Helm repo with the repo-server so `helm dependency
-# build` can resolve vendored subchart deps; being in AppProject sourceRepos
-# is not enough for that.
+# Registers the startx Helm repo with the repo-server.
 #
-# `name: startx` is load-bearing: Chart.yaml files must reference this repo
-# as `repository: "alias:startx"`, not the literal http:// URL - ArgoCD only
-# auto-registers https:// or oci:// or alias: references, and this repo (S3
-# static hosting) has no TLS.
+# Since 2026-11-11 (ADR-0602 amendment, C4) the charts name the repository by
+# its HTTPS URL (the S3 REST endpoint) in Chart.yaml, which ArgoCD registers
+# on its own; they no longer use `alias:startx` and the plain-http S3 website
+# endpoint. Each Chart.lock digest encodes the URL an alias resolves to, so an
+# alias would tie every lock to this Secret's URL. This Secret stays as the
+# named, global entry for that URL.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -25,4 +25,4 @@ stringData:
   # merge patch, which would keep the old `zuno` value of a removed key.
   project: ""
   enableOCI: "false"
-  url: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  url: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable

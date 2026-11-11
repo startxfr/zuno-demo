@@ -171,6 +171,19 @@ The user decided the two points that clause 5 left open.
   2. zuno then moves to HTTPS everywhere the repository appears: the `startx-helm-repo` repository Secret, the
      `sourceRepos` of the `zuno-platform` and `zuno-apps` AppProjects, and every `Chart.lock`. Each chart is checked
      with `helm dependency build`, and every Application is hard-refreshed.
+
+  Step 1 was done on 2026-11-11: the index of stable, noschema and release-21 is HTTPS only (helm-repository commit
+  d883b367f3). The archive releases 14 to 20 keep http URLs; zuno does not use them.
+
+  Step 2 is prepared in three moves. A `Chart.lock` digest encodes the URL that `alias:startx` resolves to. With the
+  alias, a lock and the ArgoCD repository Secret would have to change at the same instant, because each half-switched
+  state fails with "Chart.lock is out of sync". So the 25 charts now name the HTTPS URL directly in `Chart.yaml`, which
+  ArgoCD registers on its own.
+  - (a) Both AppProjects admit the HTTPS URL next to the http one, through the argocd role.
+  - (b) The charts and locks switch in git, together with the CI, the console `HelmChartRepository`, the repository
+    Secret, and AppProjects without http.
+  - (c) The argocd role runs again.
+  The startx archives carry their own subcharts, so nothing is fetched over http afterwards.
 - **The ArgoCD controller's `cluster-admin`: moved to the `hardened` profile (WP-227).** That profile replaces the
   binding with a ClusterRole built from the cluster-scoped kinds that `zuno-platform` allows, plus `admin` in the
   managed namespaces. The `demo` profile keeps `cluster-admin`, as a risk the user accepts. Shrinking it on demo333

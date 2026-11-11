@@ -136,7 +136,7 @@ jobs:
       - name: keycloak realm and reconcile Job tests (ADR-0530, WP-169)
         run: |
           # Chart.yaml names its operator dependency by the alias "startx".
-          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
           helm dependency build gitops/charts/keycloak
           pip install pytest
           python3 -m pytest -q platform/keycloak/tests
@@ -151,7 +151,7 @@ jobs:
         working-directory: platform/supply-chain
         run: python3 tests/test_render_release_digests.py
       # The check renders the keycloak and postgresql charts, which both depend
-      # on the startx "operator" chart (alias:startx); keycloak's was built
+      # on the startx "operator" chart (HTTPS URL); keycloak's was built
       # above, postgresql's was not and `helm template` refused to render it.
       - name: Workload hardening baseline (ADR-0052)
         run: |
@@ -182,7 +182,7 @@ jobs:
       # dependency is built first; --strict-dependencies fails on a gap.
       - name: ArgoCD AppProject split (ADR-0602)
         run: |
-          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
           for repo in https://borispolonsky.github.io/dify-helm https://charts.bitnami.com/bitnami https://charts.jetstack.io https://helm.openwebui.com https://helm.releases.hashicorp.com; do helm repo add "$(echo "$repo" | tr -c 'a-z0-9\n' '-')" "$repo"; done
           for chart in gitops/charts/*/; do if grep -q '^dependencies:' "$chart/Chart.yaml"; then helm dependency build "$chart"; fi; done
           python3 platform/gitops/check_app_projects.py --strict-dependencies
