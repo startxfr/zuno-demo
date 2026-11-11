@@ -175,8 +175,10 @@ async def _invoke_streamable_http(
     # keeps the bearer (app/call_assertion.py). The default (bearer) forwards it, as
     # before. An unusable key fails the call: never a fallback to the bearer.
     try:
-        authorization = call_assertion.authorization_for(
-            binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or "", arguments=arguments
+        # In a thread: with the Vault Transit signer (WP-247) this is a network call.
+        authorization = await asyncio.to_thread(
+            call_assertion.authorization_for,
+            binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or "", arguments=arguments,
         )
     except call_assertion.AssertionUnavailable as exc:
         logger.error("no call assertion for %s: %s", binding.backend, exc)
@@ -282,7 +284,7 @@ async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True, bac
     headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN} if gateway_token else {}
     # WP-225 lot C: in assertion mode a Zuno server may require an assertion on every
     # request; a schema read carries one for the gateway itself, with no tool.
-    authorization = call_assertion.schema_authorization_for(backend, gateway_token)
+    authorization = await asyncio.to_thread(call_assertion.schema_authorization_for, backend, gateway_token)
     if authorization:
         headers["Authorization"] = authorization
     http_client = httpx2.AsyncClient(timeout=SCHEMA_TIMEOUT_SECONDS, headers=headers)

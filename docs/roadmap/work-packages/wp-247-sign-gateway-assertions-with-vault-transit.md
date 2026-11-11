@@ -1,6 +1,6 @@
 # WP-247: Sign the gateway assertions with Vault Transit
 
-- **State:** Not started (design settled with the user on 2026-11-11; no code and no cluster change yet)
+- **State:** Not started (design settled 2026-11-11; lot 1 step 2 coded and tested locally, not deployed: nothing runs it until the Vault side, the chart and the image exist)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-223](wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) (Vault on KMS auto-unseal, raft,
@@ -48,7 +48,7 @@ longer reach the key.
 | Point | Decision | Not adopted (why) |
 |---|---|---|
 | Approach | Vault Transit (ADR-0602 option A) | Moving the Secrets plus an admission rule (option B): cheaper, but the key stays a Secret |
-| Vault unreachable at signing time | **Fail closed**: no signature, the call is refused with a clear error (503, `signing unavailable`), never a silent fallback | Fallback to the local key (defeats the purpose); a signature cache (weakens the binding to the call's `args_hash`) |
+| Vault unreachable at signing time | **Fail closed**: no signature, the call is refused with the existing 502 ("the gateway cannot sign the call assertion", the same path as an unreadable key), never a silent fallback | Fallback to the local key (defeats the purpose); a signature cache (weakens the binding to the call's `args_hash`) |
 | Public-key switch | **All at once in a short window**: gateway and verifiers change together, tool calls fail for a few minutes during the roll, golden path mandatory | A dual-key transition (zero downtime, but a verification code change in four components) |
 | Scope | **Two lots**: lot 1 the MCP call assertion, lot 2 the agent chain | Both keys in one lot (longer window, wider risk) |
 | Final proof | An existing test persona of `ocp-ai-dev`, with the user's go, used only to try the ExternalSecret and observe the refusal, then cleaned up | `oc --as` impersonation (less realistic); the user running it |
@@ -72,6 +72,20 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
 - The signing code paths are small and isolated: `call_assertion.mint()` takes an optional `key`, and
   `signed_chain.sign()` takes a `private_key` argument, so a Transit signer plugs in at those two seams.
 
+## Progress log
+
+- **2026-11-11, lot 1 step 2 (signer), code and tests.** `call_assertion.py` gains `MCP_CALL_ASSERTION_SIGNER`
+  (`file` default, `transit`): in `transit` mode `mint()` builds the compact JWS with the same header PyJWT writes and
+  asks Vault for the ed25519 signature (`auth/kubernetes/login` with the pod's ServiceAccount token, then
+  `transit/sign/<key>`; standard library only, 2 s timeout, token cached until 30 s before its lease ends and replaced
+  once on a 403). Environment: `VAULT_ADDR`, `VAULT_AUTH_ROLE`, `VAULT_TRANSIT_KEY`, optional `VAULT_TRANSIT_MOUNT`,
+  `VAULT_AUTH_MOUNT`, `VAULT_CACERT`, `VAULT_SA_TOKEN_FILE`. Any Vault failure, a refused login, a missing setting, or an
+  answer that is not a 64-byte ed25519 signature raises `AssertionUnavailable` (no fallback to a local key or to the
+  bearer). `downstream.py` now runs the two signing calls in a thread so a slow Vault cannot stall the event loop.
+  Tests: `components/mcp-gateway/tests/test_wp247_transit_signer.py` (15, against a fake Vault holding a real Ed25519
+  key) pass; `test_wp225_lot_c`, `test_downstream_streamable_http`, `test_mcp_frontdoor`, `test_auth` and
+  `test_agent_chain` still pass. The default is unchanged, so the code is dormant until the chart switch.
+
 ## Steps
 
 ### Lot 1: the MCP call assertion
@@ -84,7 +98,7 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
    input through `POST /v1/transit/sign/mcp-call-assertion` (`marshaling_algorithm=jws` is not available for
    ed25519: sign the raw `header.payload` bytes and base64url the result), authenticating with the pod's
    ServiceAccount token over Vault's TLS (use the CA the other roles already mount). Tests against a fake Vault: valid
-   signature verifies with the exported public key, Vault down gives `AssertionUnavailable` (503, no fallback),
+   signature verifies with the exported public key, Vault down gives `AssertionUnavailable` (502 on the call, no fallback),
    response with a bad status or a malformed signature is refused, the token is renewed before expiry. Behind a
    switch (`outboundIdentity.signer: file|transit`, default `file`) so the image can ship before the cluster flips.
 3. **Chart.** `mcp-gateway`: env for the Vault address, role and key; no `mcp-gateway-call-assertion` ExternalSecret
@@ -100,7 +114,7 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
    scripts used on 2026-11-11 live in `evaluations/golden_path_probe.py`). (b) A direct call without assertion is 401.
    (c) The gateway pod no longer mounts the key: `oc -n zuno-ai-run exec deploy/mcp-gateway -- ls` of the old path
    fails and the Secret `mcp-gateway-call-assertion` is gone. (d) Stop Vault's active pod (or deny the role) and
-   confirm the gateway answers 503 `signing unavailable`, not a stale success; restore and confirm recovery.
+   confirm the gateway answers 502 "cannot sign the call assertion", not a stale success; restore and confirm recovery.
    (e) The golden path passes (`tools` moment included).
 7. **Retire the old key.** Delete `zuno/mcp/gateway-call-assertion` private half from Vault (keep a note of the date),
    remove the ExternalSecret template and the value from `ansible/clusters/demo333.yml`.
@@ -128,7 +142,7 @@ servers, then `make d2 install mcp`. That is why the old key is retired only at 
 ## Risks
 
 - A Vault outage stops all tool calls (and, after lot 2, all delegations). Mitigation: Vault on raft with KMS
-  auto-unseal, the 503 is explicit, and the runbook names the recovery.
+  auto-unseal, the 502 names the cause in the log, and the runbook names the recovery.
 - One Vault call per tool call (a few milliseconds on the in-cluster TLS path). Measure `duration_ms` before and
   after on the same tool; refuse the lot if the median grows by more than a small, stated margin.
 - The window is a real outage of tool calls for a few minutes: announce it, run it with the golden path ready.
