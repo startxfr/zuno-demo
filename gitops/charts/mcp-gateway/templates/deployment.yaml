@@ -52,7 +52,8 @@ spec:
       # Reste false par defaut : hors front-door, ce service n'appelle
       # effectivement jamais l'API Kubernetes, et c'est la posture d'origine
       # qu'il faut conserver.
-      automountServiceAccountToken: {{ .Values.lightspeed.enabled }}
+      # WP-247: the Transit signer authenticates to Vault with this token too.
+      automountServiceAccountToken: {{ or .Values.lightspeed.enabled (and (eq .Values.outboundIdentity.mode "assertion") (eq .Values.outboundIdentity.signer "transit")) }}
       {{- if .Values.topologySpreadConstraints.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
@@ -190,8 +191,21 @@ spec:
             {{- if eq .Values.outboundIdentity.mode "assertion" }}
             - name: MCP_OUTBOUND_IDENTITY
               value: assertion
+            {{- if eq .Values.outboundIdentity.signer "transit" }}
+            - name: MCP_CALL_ASSERTION_SIGNER
+              value: transit
+            - name: VAULT_ADDR
+              value: {{ .Values.outboundIdentity.vault.addr | quote }}
+            - name: VAULT_AUTH_ROLE
+              value: {{ .Values.outboundIdentity.vault.authRole | quote }}
+            - name: VAULT_TRANSIT_KEY
+              value: {{ .Values.outboundIdentity.vault.transitKey | quote }}
+            - name: VAULT_CACERT
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            {{- else }}
             - name: MCP_CALL_ASSERTION_KEY_FILE
               value: /var/run/zuno-call-assertion/private_key
+            {{- end }}
             - name: MCP_CALL_ASSERTION_TTL_SECONDS
               value: {{ .Values.outboundIdentity.assertionTtlSeconds | quote }}
             {{- end }}
@@ -234,7 +248,7 @@ spec:
               mountPath: /okf
               readOnly: true
             {{- end }}
-            {{- if eq .Values.outboundIdentity.mode "assertion" }}
+            {{- if and (eq .Values.outboundIdentity.mode "assertion") (eq .Values.outboundIdentity.signer "file") }}
             - name: call-assertion-key
               mountPath: /var/run/zuno-call-assertion
               readOnly: true
@@ -256,7 +270,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if eq .Values.outboundIdentity.mode "assertion" }}
+        {{- if and (eq .Values.outboundIdentity.mode "assertion") (eq .Values.outboundIdentity.signer "file") }}
         - name: call-assertion-key
           secret:
             secretName: mcp-gateway-call-assertion

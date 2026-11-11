@@ -92,6 +92,15 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   token). The configurator policy already allows `transit/keys/*`, so it needs no change. Nothing runs until the configure
   Job is re-run (`make d0 install vault`, needs the user's go). Finding for step 3: the gateway Deployment sets
   `automountServiceAccountToken` from `lightspeed.enabled`, so the chart must mount the token when `signer: transit`.
+- **2026-11-11, lot 1 step 3 (chart), repo only, not applied.** `gitops/charts/mcp-gateway` gains
+  `outboundIdentity.signer` (`file` default, `transit`) and `outboundIdentity.vault` (`addr`, `authRole`, `transitKey`).
+  With `signer: transit` the Deployment sets `MCP_CALL_ASSERTION_SIGNER` and the `VAULT_*` variables (CA = the
+  service-ca bundle next to the ServiceAccount token), mounts the ServiceAccount token, and renders neither the
+  `mcp-gateway-call-assertion` ExternalSecret nor the key volume. `helm template` checked in the three cases: `file`
+  renders as before, `transit` as described, the default (`bearer`) renders no assertion object at all. Network:
+  the gateway pod has an Ingress-only policy (no egress limit) and `zuno-ai-run` is already in the `zuno-vault`
+  `allowedFromNamespaces`, so no NetworkPolicy change is needed. To prove live: the Istio sidecar passing the
+  gateway's own TLS to the non-meshed Vault (the first signature after the switch is the test).
 
 ## Steps
 
