@@ -375,7 +375,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Partially implemented | Define agent lifecycle states, roles and incident revocation |
 | [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Accepted | Harden the platform's trust boundaries before a customer runs it |
 | [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Accepted | Close the medium-severity security gaps found in the 2026-11-06 review |
 | [ADR-0604](0604-introduce-an-interactive-generative-world-model-experience.md) | Accepted | Introduce an interactive generative world-model experience on OpenShift AI and NVIDIA Blackwell |

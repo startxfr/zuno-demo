@@ -1,6 +1,6 @@
 # WP-221: Agent lifecycle states, revocation list and audit events
 
-- **State:** Operator pending (2026-11-11: the operator part is released in UnifAI v0.1.60, demo333 runs v0.1.68; left: the canary rehearsal on demo333, see Status below)
+- **State:** Done (2026-11-11)
 - **ADRs:** [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-167](wp-167-per-agent-entry-and-sheet.md) (done: the sheet already shows the state)
 - **Related:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
@@ -70,3 +70,19 @@ The operator cannot know who approved a state change, so the GitOps flow writes 
 ## Session pilot (2026-11-05)
 
 Done: the owner keeps and can open the session of a deleted workflow and cannot resume it, so clause 4 needs nothing from the fork. [Evidence](../evidence/wp-221-session-pilot-2026-11-05.md). Remaining limit: a pilot on a real agent chat would also show whether the agent's answers stay readable.
+
+## Closure (2026-11-11)
+
+The revocation was rehearsed on demo333 on `comage` ([evidence](../evidence/wp-221-revocation-rehearsal-2026-11-11.md)):
+revoked within one reconcile (about five minutes from the install to the end of the sync, inside the one-hour target the
+user confirmed), event `Revoked` with the reason and the actor, emitted objects pruned; then admitted again. The
+[runbook](../../platform/agent-revocation-runbook.md) is final.
+
+Named exceptions, by user decision:
+
+- `deprecated` and `retired` were not set on a live agent; they rest on the R-536 operator tests and the session pilot.
+- **Fork defect found by the rehearsal:** revocation also deletes the agent's team, which wedges while the chart's
+  `knowledge-<agent>` retriever references it and would delete the team's workspace once nothing does (against clause 4).
+  The runbook gives the way back (remove the finalizer, the bundle adopts the team by name, done live). The fix is the
+  fork session's (do not prune the agent team on revocation or retirement); ADR-0584 stays `Partially implemented` until
+  it ships.
