@@ -23,6 +23,8 @@ The order is by risk reduction per effort.
 
 ## 2. `callAssertion.required: true`
 
+- **Status 2026-11-11 (switched).** `callAssertion.required: true` is set on the three servers in git and live; the
+  golden path passed after the Transit switch (WP-247). The text below is the original plan.
 - **State.** The mcp-gateway sends the assertion and confluence-mcp, git-forge-mcp and aap-mcp verify it, but still
   accept a call without one.
 - **Switch.** `callAssertion.required: true` on the three servers (in `gitops/apps/mcp-*/application-d1.yaml`).
@@ -33,6 +35,11 @@ The order is by risk reduction per effort.
 
 ## 3. `jwtAllowedClients` (per-client `azp` allowlist)
 
+- **Status 2026-11-11 (switched on both gateways).** Ten clients (unifai, open-webui, dify, kagent, world-model,
+  blender, `openclaw-*`, zuno-evaluations, zuno-stresstest, zuno-admin-api), read from the live realm: the clients that
+  carry the `zuno-admin-api` audience. No client refused in the 24 h after. The gateways log `azp` only on a refusal,
+  so the "one week of logs" method below does not work; the list came from the realm. Open: check whether world-model,
+  blender and `/admin/*` really call the gateways, to tighten the list. The text below is the original plan.
 - **State.** Both gateways support it; empty means any client of the realm.
 - **Switch.** Fill the list from the `azp` values seen in the gateway logs over a full week (UI clients, Dify,
   Open WebUI, Lightspeed, the evaluation client, the persona clients), then set it on ai-gateway and mcp-gateway.
