@@ -228,3 +228,33 @@ Day 3 schedule.
   PGO backup of `quay-db` in the Day 3 schedule, the `quay-operator` known-good entry (version known after the first
   install), and whether the canary uses a separate namespace (the Applications and the egress rules name `zuno-registry`)
   or `zuno-registry` itself, which nothing else uses yet.
+
+## Canary plan (decided 2026-11-11: rehearse in `zuno-registry` itself)
+
+**Choice.** The canary is `zuno-registry`, the namespace the registry will really use. It is new, nothing depends on it, and the
+Applications and egress rules already name it; a separate canary namespace would need the namespace made a parameter of both
+Applications and of the firewall for one rehearsal. The rollback is `make d2 uninstall quay-registry` (the bucket stays).
+Because nothing else lives there, this rehearsal is also the first install: if it passes, it stays.
+
+**Before** (the owner's go for the window, and no other rehearsal window open): golden path 14/14 as the baseline; backup
+point recorded; `git status` clean on the branch the Applications track; the namespaces Application synced so that
+`zuno-registry` and its EgressFirewall exist (`make d2 install namespaces`, which also needs the go).
+
+**Run**
+1. `make d2 install quay-registry`: operator, `quay-db`, `QuayRegistry`, config bundle, bootstrap. Record the time to Available.
+2. Check the open points of the prepared-in-repository section, in this order: pod label `quay-component: quay-app`;
+   `clair-config.yaml` honoured (Clair indexes, no updater other than `rhel-vex` in its log); proxy storage (a pull returns blobs
+   from Quay, never a 307 to S3); S3 objects appear under `registry/` in the bucket.
+3. Seed: `OKF_MIRROR_TO=<route host>/zuno make d3 admit agents`, then `cosign` and `oras` re-verify by digest (as in step 1).
+4. Pull as a pod: a throw-away pod in `zuno-ai-run` pulls with the `zuno+pull` robot; a `zuno-ai-build` push with `zuno+push`.
+5. Retention: feed two more releases (or tags that mimic them), then `OKF_MIRROR_QUAY=1 make d3 admit agents` dry run, review,
+   `OKF_MIRROR_PRUNE=1`; confirm the garbage collector removes the untagged manifests and that the kept releases still verify.
+6. Restart test: delete the Quay application pod; the blobs and the pull must survive (the failure of the LocalStorage canary).
+7. Clair: scan one Red Hat based image and one third-party image; record what each reports.
+8. Public images: copy one entry of the future `mirrored-images.yaml` from where `quay.io` is reachable, digest unchanged.
+
+**Pass** when steps 2 to 6 hold and the golden path is 14/14 after. **Record** the measured resources, the time to Available and
+every deviation in this WP, add the `quay-operator` known-good entry from the installed CSV, then decide whether to keep the
+registry running or `uninstall` it until step 5 of the WP starts.
+
+**Not in this canary**: moving any consumer (gateways, builds, UnifAI) to the registry; the zot mirror stays untouched.
