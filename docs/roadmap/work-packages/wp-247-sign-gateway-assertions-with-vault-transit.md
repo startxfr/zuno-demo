@@ -53,9 +53,17 @@ longer reach the key.
 | Scope | **Two lots**: lot 1 the MCP call assertion, lot 2 the agent chain | Both keys in one lot (longer window, wider risk) |
 | Final proof | An existing test persona of `ocp-ai-dev`, with the user's go, used only to try the ExternalSecret and observe the refusal, then cleaned up | `oc --as` impersonation (less realistic); the user running it |
 
-Open item to confirm before lot 2: the post-demo list also names "the workload token that signs the lot B caller
-context". Find which mechanism that is (a shared secret, not an Ed25519 key) and decide whether it belongs here or in
-its own WP. Nothing in this brief covers it yet.
+Open item resolved 2026-11-11: the "workload token that signs the lot B caller context" is
+`MCP_GATEWAY_WORKLOAD_TOKEN`, the Vault secret `zuno/mcp/gateway-workload-token` (random, WP-223). It is a **symmetric
+secret held by the gateway and by every MCP server** (aap, git-forge, confluence, salesforce): the servers compare it in
+constant time as the `X-Zuno-Gateway-Token` and derive from it, per backend, the HMAC key of `X-Zuno-Caller-Signature`
+(`app/caller_context.py`). Transit cannot replace it by swapping a signer: the servers verify with the same secret, so
+moving it to Vault means either a Vault call per verification on four servers or folding the caller context into the
+assertion claims (the assertion is already signed per call and bound to the tool and the arguments). It is therefore **not
+part of this WP**: it needs its own design (candidate: carry `groups`, `email`, `email_verified` and `username` in the
+assertion, then retire both the shared token and the HMAC signature). Mitigation already in place: with
+`callAssertion.required: true` on the servers, holding the workload token alone no longer opens a tool call; forging a
+caller context also needs a valid assertion, that is the Transit key.
 
 ## What is already done (2026-11-11)
 
