@@ -143,7 +143,7 @@ only); Authorino and the RAGAS token still use the public HTTPS endpoint.
   ([evidence](../evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md)). Its finding: backups must use the
   virtual-hosted S3 style, or they hang behind the firewall.
 - **Left, the real switch, in a window with the user's go:**
-  1. `make d1 install unifai`, so the backups use the virtual-hosted S3 style.
+  1. `make d2 install unifai`, so the backups use the virtual-hosted S3 style.
   2. `make d3 backup unifai`, then a golden-path run.
   3. In one commit: `egress.enabled: true` in `gitops/charts/unifai/values.yaml`, and `EGRESS_DEFERRABLE` removed from
      `platform/security/check_mesh_mtls.py`.
