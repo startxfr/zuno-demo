@@ -59,6 +59,10 @@ spec:
           - zuno-evaluations
           - zuno-stresstest
           - zuno-admin-api
+        # WP-225 lot C, post-demo item 4 (user's go 2026-11-11): the per-call agent entitlement also applies to REST
+        # tool calls (env AGENT_ENTITLEMENT_EVERY_CALL); /mcp already enforced it. Back out: remove this key and re-run
+        # `make d2 install mcp`.
+        restAgentEntitlement: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
