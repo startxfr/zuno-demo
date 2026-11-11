@@ -1,0 +1,116 @@
+---
+# External mode (ADR-0352 clause 4, WP-214): a Redis this platform does not own
+# is used. Nothing is deployed - neither zuno-redis Application is applied.
+# Instead: (1) validate the confidential.yml payload fail-fast, before any
+# write; (2) seed the password into the SAME Vault path the consumer
+# ExternalSecret already reads (zuno/redis/session-store), overwriting the
+# internally generated one - the `vault kv put` precedent of the mariadb role:
+# real external credentials re-apply idempotently, they are not
+# create-if-missing; (3) assert reachability, AUTH and the connection budget
+# with an in-cluster redis-cli Job (external_assert.yml, shared with precheck).
+#
+# Who owns what: the vault role still seeds the INTERNAL password
+# (create-if-missing, ADR-0345), so it never overwrites the external value on a
+# re-run; this role owns the external seed. The endpoint itself reaches the
+# consumer side as Helm values through ansible/tasks/redis_seam_values.yml
+# (`make d2 install llm` for ai-gateway, `make d2 install namespaces` for the
+# zuno-ai-run EgressFirewall), never as the mode (clause 11).
+- name: "redis | resolve the Redis endpoint (ADR-0352, WP-214)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_redis_endpoint.yml"
+
+- name: "redis | validate the external-mode payload (fail-fast on the sentinel)"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_redis_mode is 'external' but zuno_redis_external_host is missing or
+      still the 'xxxxxx' sentinel in ansible/confidential.yml. External mode
+      needs at least the endpoint (ADR-0352 clause 2) - see
+      ansible/confidential.example.yml.
+  when: redis_endpoint_host in ['xxxxxx', '']
+
+- name: "redis | validate the external port"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_redis_external_port is '{{ redis_endpoint_port }}' - expected a TCP
+      port number (1-65535; Redis listens on 6379 by default).
+  when: >-
+    not (redis_endpoint_port is match('^[0-9]+$'))
+    or (redis_endpoint_port | int) < 1
+    or (redis_endpoint_port | int) > 65535
+
+- name: "redis | validate the CA bundle shape"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_redis_external_ca_bundle is set but holds no PEM certificate
+      (no '-----BEGIN CERTIFICATE-----' line). Leave it "" for a plaintext
+      endpoint.
+  when:
+    - redis_endpoint_tls | bool
+    - "'-----BEGIN CERTIFICATE-----' not in redis_endpoint_ca_bundle"
+
+# WP-214 limit, checked before anything is written: ai-gateway builds its
+# clients with redis.Redis(host, port, password) and no TLS option
+# (components/ai-gateway/app/{semantic_cache,quota,routing_decisions}.py).
+# Against a TLS-only endpoint every Redis call would fail and fall back
+# silently (cache miss, local quota counters, no routing decision), so the
+# install refuses it rather than report a working external mode. The check
+# (precheck) still asserts a TLS endpoint, so its result is known.
+- name: "redis | refuse a TLS endpoint the consumer cannot use (WP-214 limit)"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_redis_external_ca_bundle declares a TLS endpoint, but ai-gateway,
+      the only Redis consumer, has no Redis TLS option: its code opens plain
+      TCP to REDIS_ADDR. Supporting TLS needs an ai-gateway code change and an
+      image rebuild (WP-214, "Limits"). Use a plaintext endpoint (empty
+      bundle) reachable only from the cluster network, or keep the built-in
+      Redis (zuno_redis_mode: internal).
+  when: redis_endpoint_tls | bool
+
+# Vault access (ADR-0602 clause 1 / WP-223): a short-lived ansible-seeder
+# token from ansible/tasks/vault_login.yml (create/read/update on zuno/data/*).
+# Vault is Day 0, so it exists before this Day-1 role.
+- name: "redis | find the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _redis_vault_pod
+
+- name: "redis | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+# Overwrites the internally generated password (a new KV version: the old one
+# stays in the history, `vault kv rollback` restores it on the way back). The
+# sentinel or "" stores an empty password: ai-gateway then sends no AUTH
+# (REDIS_PASSWORD optional, `or None`). The ExternalSecret
+# ai-gateway-redis-credentials (zuno-ai-run) re-materializes it on its next
+# refresh (refreshInterval 1h; force it during a mode flip), and the pods read
+# REDIS_PASSWORD at start only, so a flip restarts ai-gateway (WP-214 runbook).
+- name: "redis | seed the external password into Vault (zuno/redis/session-store)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _redis_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put
+      zuno/redis/session-store password={{ _redis_external_password | quote }}"
+  vars:
+    _redis_external_password: >-
+      {{ '' if (zuno_redis_external_password | default('xxxxxx') | string) in ['xxxxxx', '']
+         else zuno_redis_external_password | string }}
+  no_log: true
+
+- name: "redis | assert endpoint reachability, AUTH and the connection budget"
+  ansible.builtin.include_tasks: external_assert.yml
+  vars:
+    redis_assert_hard_fail: true
+
+- name: "redis | external-mode summary"
+  ansible.builtin.debug:
+    msg: >-
+      External Redis at {{ redis_endpoint_addr }} verified
+      ({{ _redis_assert_log }}). Nothing was deployed; Vault zuno/redis/session-store now carries the external
+      password. Next: `make d2 install namespaces` (EgressFirewall rule) and
+      `make d2 install llm` (ai-gateway REDIS_ADDR), then restart ai-gateway
+      once its ExternalSecret has refreshed.

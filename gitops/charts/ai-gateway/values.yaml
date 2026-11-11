@@ -291,6 +291,12 @@ semanticCache:
   enabled: false
   ttlSeconds: "3600"
   embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
+  # REDIS_ADDR, also read by the quota ledger (quotaLedger.store: redis) and
+  # the routing-decision side-channel. ADR-0352/WP-214: the default is the
+  # built-in instance; with an external Redis (zuno_redis_mode: external)
+  # ansible/tasks/redis_seam_values.yml sets addr to its host:port, and the
+  # password still comes from Vault redis/session-store (the redis role seeds
+  # it). No TLS option: the code opens plain TCP (WP-214 limit).
   redis:
     addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
     secretName: ai-gateway-redis-credentials

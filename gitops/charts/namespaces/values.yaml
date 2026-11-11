@@ -16,6 +16,15 @@ clusterBaseDomain: ""
 # ADR-0352/WP-211: Keycloak host the EgressFirewalls allow. Empty = the built-in
 # instance, keycloak.<clusterBaseDomain>.
 keycloakHost: ""
+# ADR-0352/WP-214: an EXTERNAL Redis endpoint, allowed by the EgressFirewall of
+# every entry with egressFirewall.redis (zuno-ai-run: ai-gateway's REDIS_ADDR).
+# ansible/tasks/redis_seam_values.yml fills it in external mode only. Empty
+# host = the built-in instance (in-cluster, no rule needed); a *.svc name gets
+# no rule either (in-cluster traffic is not filtered); an IPv4 address gets a
+# /32 cidrSelector, any other name a dnsName rule.
+redisExternal:
+  host: ""
+  port: 6379
 
 # ADR-0329 (supersedes ADR-0023): agent workloads no longer get a
 # dedicated zuno-agent-<name> namespace. Every active agent's FE/BFF
@@ -523,6 +532,9 @@ platformNamespaces:
       # Gateways' JWKS and issuer (public Route since WP-224), acceptance-gate
       # Jobs' token requests (KEYCLOAK_URL).
       keycloak: true
+      # ADR-0352/WP-214: ai-gateway's Redis when it is external (redisExternal
+      # above; renders nothing for the built-in instance).
+      redis: true
       routeHosts:
         - name: unifai-ui-zuno-unifai
           reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).

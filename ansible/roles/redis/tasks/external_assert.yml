@@ -1,0 +1,230 @@
+---
+# Shared by install_external.yml (redis_assert_hard_fail: true) and
+# precheck.yml's external personality (false - prechecks record state, never
+# fail, ADR-0352 clause 4). Asserts what clause 7 requires of an external
+# Redis: the endpoint is reachable (over TLS against the supplied CA when one
+# is given), AUTH succeeds when a password is supplied (PING answers PONG),
+# and the connection budget (maxclients) is at least the floor - via a
+# short-lived in-cluster redis-cli Job, because the external endpoint is not
+# necessarily reachable from the Ansible controller (workstation or AAP
+# execution environment). The mariadb role's external_assert.yml is the model.
+#
+# Where it runs: zuno-auth, the built-in instance's namespace. Not zuno-ai-run,
+# where the consumer lives: every Job there is enrolled into Kueue
+# (kueue.openshift.io/managed, gitops/charts/namespaces) and would queue behind
+# model pulls. zuno-auth has no EgressFirewall, so this proves the endpoint
+# from the cluster network; the consumer's own path through the zuno-ai-run
+# EgressFirewall is opened by the redis seam (redisExternal) and proven by the
+# live rehearsal (WP-214).
+#
+# The connection budget: ai-gateway opens a client per semantic-cache and
+# routing-decision call, so concurrent requests, not pods, set the count. The
+# floor (zuno_redis_external_min_clients, default 100) is a sanity bound, not
+# a sizing; the built-in bitnami/redis allows 10000. A managed tier that
+# refuses CONFIG GET is recorded ("not readable"), not failed.
+#
+# The credentials reach the Job through a short-lived Secret (deleted below),
+# never through the pod spec, and the script never prints them (REDISCLI_AUTH,
+# not -a). The pod opts out of istio injection: a sidecar would keep a
+# completed Job's pod Running forever.
+#
+# Needs: redis_assert_hard_fail (bool). Sets: _redis_external_ok (bool),
+# _redis_assert_auth (bool), _redis_assert_log (the Job's output, when read).
+- name: "redis | resolve the Redis endpoint (ADR-0352, WP-214)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_redis_endpoint.yml"
+
+- name: "redis | record whether AUTH is sent"
+  ansible.builtin.set_fact:
+    _redis_assert_auth: "{{ (zuno_redis_external_password | default('xxxxxx') | string) not in ['xxxxxx', ''] }}"
+    _redis_assert_log: ""
+
+# An unset endpoint is "not installed" for the check; install_external.yml has
+# already failed on it before getting here.
+- name: "redis | assert the external endpoint with a client Job"
+  when: redis_endpoint_host not in ['xxxxxx', '']
+  block:
+    - name: "redis | create the short-lived external-assert credentials Secret"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: redis-external-assert
+            namespace: zuno-auth
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          stringData:
+            REDIS_HOST: "{{ redis_endpoint_host }}"
+            REDIS_PORT: "{{ redis_endpoint_port }}"
+            REDIS_PASSWORD: "{{ (zuno_redis_external_password | string) if _redis_assert_auth | bool else '' }}"
+            REDIS_CA_PEM: "{{ redis_endpoint_ca_bundle }}"
+            MIN_CLIENTS: "{{ zuno_redis_external_min_clients | default(100) | string }}"
+      no_log: true
+
+    - name: "redis | delete any previous external-assert Job"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-auth
+        name: redis-external-assert
+        wait: true
+        wait_timeout: 60
+
+    - name: "redis | run the external-assert client Job"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: redis-external-assert
+            namespace: zuno-auth
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 3600
+            template:
+              metadata:
+                annotations:
+                  sidecar.istio.io/inject: "false"
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: assert
+                    # rhel9/redis-7 ships redis-cli (built with TLS) and is
+                    # pulled with the cluster's registry.redhat.io entitlement,
+                    # like the mariadb role's client image; override with
+                    # -e zuno_redis_client_image=... where a mirror is needed.
+                    image: "{{ zuno_redis_client_image | default('registry.redhat.io/rhel9/redis-7:latest') }}"
+                    envFrom:
+                      - secretRef:
+                          name: redis-external-assert
+                    command:
+                      - /bin/sh
+                      - -c
+                      - |
+                        set -u
+                        tls=""
+                        if [ -n "$REDIS_CA_PEM" ]; then
+                          printf '%s\n' "$REDIS_CA_PEM" > /tmp/redis-ca.pem
+                          tls="--tls --cacert /tmp/redis-ca.pem --sni $REDIS_HOST"
+                        fi
+                        auth="no AUTH"
+                        if [ -n "$REDIS_PASSWORD" ]; then
+                          export REDISCLI_AUTH="$REDIS_PASSWORD"
+                          auth="AUTH"
+                        fi
+                        unset REDIS_PASSWORD
+                        cli() { timeout 20 redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" $tls "$@" 2>&1; }
+                        pong=$(cli PING)
+                        if [ "$pong" != "PONG" ]; then
+                          echo "FAIL: PING with $auth to $REDIS_HOST:$REDIS_PORT ${tls:+(TLS) }answered: $pong"
+                          exit 1
+                        fi
+                        echo "OK: PING with $auth to $REDIS_HOST:$REDIS_PORT ${tls:+(TLS)}"
+                        max=$(cli CONFIG GET maxclients | sed -n 2p | tr -d '\r')
+                        case "$max" in
+                          ''|*[!0-9]*)
+                            echo "INFO: maxclients not readable (CONFIG GET refused or renamed) - recorded, not failed" ;;
+                          *)
+                            if [ "$max" -lt "$MIN_CLIENTS" ]; then
+                              echo "FAIL: maxclients $max is below the floor $MIN_CLIENTS"
+                              exit 1
+                            fi
+                            echo "OK: maxclients $max (floor $MIN_CLIENTS)" ;;
+                        esac
+                        echo "INFO: $(cli INFO clients | tr -d '\r' | grep '^connected_clients:' || echo 'connected_clients: not readable')"
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 32Mi
+                      limits:
+                        cpu: 200m
+                        memory: 128Mi
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      capabilities:
+                        drop: ["ALL"]
+                      seccompProfile:
+                        type: RuntimeDefault
+
+    - name: "redis | wait for the external-assert Job to finish"
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-auth
+        name: redis-external-assert
+      register: _redis_assert_job
+      until: >-
+        (_redis_assert_job.resources | default([]) | length) > 0 and
+        ((_redis_assert_job.resources[0].status.succeeded | default(0) | int) > 0
+         or (_redis_assert_job.resources[0].status.failed | default(0) | int) > 0)
+      retries: 30
+      delay: 10
+      failed_when: false
+
+    - name: "redis | read the external-assert Job output"
+      kubernetes.core.k8s_log:
+        namespace: zuno-auth
+        label_selectors:
+          - "job-name=redis-external-assert"
+      register: _redis_assert_pod_log
+      failed_when: false
+
+    - name: "redis | record the external-assert outcome"
+      ansible.builtin.set_fact:
+        _redis_external_ok: >-
+          {{ (_redis_assert_job.resources | default([]) | length) > 0
+             and (_redis_assert_job.resources[0].status.succeeded | default(0) | int) > 0 }}
+        _redis_assert_log: "{{ _redis_assert_pod_log.log_lines | default([]) | join(' | ') }}"
+
+  always:
+    # The credentials Secret never outlives the assert; a FAILED Job is kept
+    # (ttl-reaped after an hour) so its pod log stays readable, a successful
+    # one is removed right away.
+    - name: "redis | delete the short-lived external-assert credentials Secret"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Secret
+        namespace: zuno-auth
+        name: redis-external-assert
+
+- name: "redis | an unset endpoint is not installed"
+  ansible.builtin.set_fact:
+    _redis_external_ok: false
+  when: redis_endpoint_host in ['xxxxxx', '']
+
+- name: "redis | delete the external-assert Job (success only)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-auth
+    name: redis-external-assert
+    wait: true
+    wait_timeout: 60
+  when: _redis_external_ok | bool
+
+- name: "redis | external-assert result"
+  ansible.builtin.debug:
+    msg: >-
+      External Redis {{ redis_endpoint_addr }}:
+      {{ 'OK' if _redis_external_ok | bool else 'NOT OK' }} -
+      {{ _redis_assert_log if _redis_assert_log | length > 0 else 'no Job output (endpoint unset, or the pod never ran)' }}
+
+- name: "redis | fail on an unreachable, unauthenticated or undersized external endpoint"
+  ansible.builtin.fail:
+    msg: >-
+      The external Redis at {{ redis_endpoint_addr }} failed the assertion
+      ({{ _redis_assert_log | default('no Job output', true) }}). Inspect the
+      redis-external-assert Job in zuno-auth (kept for an hour). The
+      prerequisites are listed in ADR-0352 clause 7 and
+      ansible/confidential.example.yml.
+  when:
+    - redis_assert_hard_fail | default(false) | bool
+    - not (_redis_external_ok | bool)
