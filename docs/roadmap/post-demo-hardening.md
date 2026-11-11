@@ -55,7 +55,7 @@ The order is by risk reduction per effort.
 | Salesforce owner scoping | on with the connector | a Salesforce org (none today) |
 | Namespace matcher on `metrics.query` | set the allowed namespaces per group | the list of groups that may query which namespaces |
 | Space and repository allowlists for the other groups | extend beyond the five groups | a decision on what consultants and board may read |
-| Guardrails `scanToolResults`, `/v1/messages` ceilings | on, with a ceiling per key | traffic numbers from a real week |
+| Guardrails `scanToolResults`, `/v1/messages` ceilings | on, with a ceiling per key | traffic numbers from a real week: **the measurement week started 2026-11-11 20:40 UTC** (user's go); read the per-key token and tool-result volumes from the ai-gateway metrics on 2026-11-18, then set the ceilings |
 
 ## 5. Other open items from the wave
 
