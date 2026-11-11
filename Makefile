@@ -757,6 +757,7 @@ case "$$verb" in \
       prune_args=(--mirror "$$OKF_MIRROR_TO" --keep "$${OKF_MIRROR_KEEP:-3}"); \
       case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) prune_args+=(--plain-http) ;; esac; \
       case "$${OKF_MIRROR_PRUNE:-0}" in 1|true|yes) prune_args+=(--apply) ;; esac; \
+      case "$${OKF_MIRROR_QUAY:-0}" in 1|true|yes) prune_args+=(--quay) ;; esac; \
       python3 platform/supply-chain/admit_okf_bundle.py prune "$${prune_args[@]}"; \
     fi ;; \
   release) \

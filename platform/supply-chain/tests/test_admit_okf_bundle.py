@@ -500,5 +500,87 @@ class PruneTests(unittest.TestCase):
         self.assertEqual(admit.lock_history(5, git), self._history(4, 3, 2, 1))
 
 
+class QuayPruneTests(unittest.TestCase):
+    """ADR-0612: the same retention on Red Hat Quay, by tag deletion through its API."""
+
+    MIRROR = "quay.example.svc/zuno"
+    CORP = {1: "a" * 64, 2: "b" * 64, 3: "c" * 64, 4: "d" * 64}
+    TEKOS = {1: "1" * 64, 2: "2" * 64, 3: "3" * 64, 4: "4" * 64}
+
+    def _src(self, n: int) -> str:
+        return "quay.io/zuno/okf-corp@sha256:" + self.CORP[n]
+
+    def _world(self, releases, page_size=100):
+        calls = []
+        repos = {"okf-corp": self.CORP, "okf-tekos": self.TEKOS}
+
+        def tags_of(name):
+            out = []
+            for n in releases:
+                d = repos[name][n]
+                out += [{"name": f"release-{d[:12]}", "manifest_digest": "sha256:" + d},
+                        {"name": f"sha256-{d}.sig", "manifest_digest": "sha256:" + "9" * 64},
+                        {"name": f"sha256-{d}.att", "manifest_digest": "sha256:" + "8" * 64}]
+            return out
+
+        def http(method, url, token):
+            calls.append((method, url, token))
+            if method == "DELETE":
+                return None
+            if "/repository?namespace=zuno" in url:
+                return {"repositories": [{"name": "okf-corp"}, {"name": "okf-tekos"}]}
+            name = url.split("/zuno/")[1].split("/")[0]
+            page = int(url.rsplit("page=", 1)[1])
+            tags = tags_of(name)
+            chunk = tags[(page - 1) * page_size: page * page_size]
+            return {"tags": chunk, "has_additional": page * page_size < len(tags)}
+
+        def fake_layer(reference, media_type):
+            digest = reference.split("@sha256:")[1]
+            n = next(k for k, v in self.CORP.items() if v == digest)
+            if n not in releases:
+                raise admit.AdmissionError("not found")
+            return ('{"release": "0.0.%d", "agents": [{"name": "tekos", "reference": '
+                    '"quay.io/zuno/okf-tekos@sha256:%s"}]}' % (n, self.TEKOS[n])).encode()
+
+        saved = admit._layer
+        admit._layer = fake_layer
+        self.addCleanup(lambda: setattr(admit, "_layer", saved))
+        return calls, http
+
+    def _history(self, *ns):
+        return [self._src(n) for n in ns]
+
+    def test_a_dry_run_lists_the_oldest_release_tags_and_deletes_nothing(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        d1, t1 = self.CORP[1], self.TEKOS[1]
+        self.assertEqual(sorted(ref for _k, ref in result["candidates"]), sorted([
+            f"zuno/okf-corp:release-{d1[:12]}", f"zuno/okf-corp:sha256-{d1}.sig", f"zuno/okf-corp:sha256-{d1}.att",
+            f"zuno/okf-tekos:release-{t1[:12]}", f"zuno/okf-tekos:sha256-{t1}.sig", f"zuno/okf-tekos:sha256-{t1}.att"]))
+        self.assertFalse([c for c in calls if c[0] == "DELETE"])
+
+    def test_apply_deletes_exactly_the_listed_tags_with_the_token(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        planned = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)["candidates"]
+        calls.clear()
+        admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
+        deletes = [c for c in calls if c[0] == "DELETE"]
+        self.assertEqual(len(deletes), len(planned))
+        self.assertTrue(all(c[2] == "tok" and c[1].startswith("https://quay.example.svc/api/v1/repository/zuno/") for c in deletes))
+        self.assertIn(f"https://quay.example.svc/api/v1/repository/zuno/okf-corp/tag/release-{self.CORP[1][:12]}",
+                      [c[1] for c in deletes])
+
+    def test_every_page_of_tags_is_read(self) -> None:
+        _calls, http = self._world([1, 2, 3, 4], page_size=4)
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        self.assertEqual(len(result["candidates"]), 6)
+
+    def test_it_refuses_when_the_locked_release_is_not_on_quay(self) -> None:
+        _calls, http = self._world([1, 2, 3])
+        with self.assertRaises(admit.AdmissionError):
+            admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
+
+
 if __name__ == "__main__":
     unittest.main()

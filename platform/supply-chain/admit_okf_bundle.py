@@ -50,6 +50,9 @@ import sys
 import tarfile
 import tempfile
 import textwrap
+import urllib.error
+import urllib.parse
+import urllib.request
 from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple
 
 import yaml
@@ -324,6 +327,71 @@ def prune_mirror(mirror: str, keep_releases: int = KEEP_RELEASES, apply: bool = 
         registry = mirror.partition("/")[0]
         for _kind, reference in unique:
             run([require("oras"), "manifest", "delete", "--force", *_oras_http(registry + "/"), reference])
+    return {"kept": history, "absent": absent, "candidates": unique, "applied": apply}
+
+
+# --- retention on Red Hat Quay (ADR-0612) -------------------------------------------
+# Quay refuses `oras manifest delete` (its registry token has no delete scope, WP-248 step 1). Tags are listed and
+# deleted through its API with an OAuth token; Quay's garbage collector then removes the untagged manifests. The kept
+# set is computed exactly as for zot (keep_digests reads the corp index through the registry protocol).
+
+QuayHttp = Callable[[str, str, str], Optional[dict]]
+
+
+def _quay_http(method: str, url: str, token: str) -> Optional[dict]:
+    request = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # trust: SSL_CERT_FILE / system store
+            body = response.read()
+    except urllib.error.HTTPError as exc:
+        raise AdmissionError(f"Quay API {method} {url}: HTTP {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise AdmissionError(f"Quay API {method} {url}: {exc.reason}") from exc
+    return json.loads(body) if body.strip() else None
+
+
+def plan_prune_quay(mirror: str, keep: Dict[str, Set[str]], token: str,
+                    http: QuayHttp = _quay_http) -> List[Tuple[str, str]]:
+    """[(`tag`, `<org>/<repo>:<tag>`)] for the `release-*` tags whose manifest no kept release names and the legacy
+    `.sig` / `.att` tags of dropped artifacts, read from the Quay API. `mirror` is `<quay host>/<organisation>`."""
+    host, _, org = mirror.partition("/")
+    org = org.strip("/")
+    base = f"https://{host}/api/v1"
+    candidates: List[Tuple[str, str]] = []
+    repos = (http("GET", f"{base}/repository?namespace={urllib.parse.quote(org)}", token) or {}).get("repositories", [])
+    for repo in repos:
+        name = repo["name"]
+        wanted = keep.get(name, set())
+        page = 1
+        while True:
+            tags = http("GET", f"{base}/repository/{org}/{name}/tag/?onlyActiveTags=true&limit=100&page={page}", token) or {}
+            for tag in tags.get("tags", []):
+                tag_name = tag["name"]
+                legacy = _LEGACY_TAG_RE.match(tag_name)
+                if tag_name.startswith("release-"):
+                    if _hex(f"x@{tag.get('manifest_digest', '')}") not in wanted:
+                        candidates.append(("tag", f"{org}/{name}:{tag_name}"))
+                elif legacy and legacy.group(1) not in wanted:
+                    candidates.append(("tag", f"{org}/{name}:{tag_name}"))
+            if not tags.get("has_additional"):
+                break
+            page += 1
+    return candidates
+
+
+def prune_quay(mirror: str, token: str, keep_releases: int = KEEP_RELEASES, apply: bool = False,
+               history: Optional[List[str]] = None, http: QuayHttp = _quay_http) -> dict:
+    """The Quay counterpart of prune_mirror: dry run unless `apply`; deletes tags, never a repository."""
+    history = history if history is not None else lock_history(keep_releases)
+    if not history:
+        raise AdmissionError("the lock history is empty: nothing says which releases to keep")
+    keep, absent = keep_digests(history, mirror)
+    unique = list(dict.fromkeys(plan_prune_quay(mirror, keep, token, http)))
+    if apply:
+        host = mirror.partition("/")[0]
+        for _kind, reference in unique:
+            repo_path, _, tag = reference.rpartition(":")
+            http("DELETE", f"https://{host}/api/v1/repository/{repo_path}/tag/{urllib.parse.quote(tag)}", token)
     return {"kept": history, "absent": absent, "candidates": unique, "applied": apply}
 
 
@@ -710,6 +778,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--keep", type=int, default=KEEP_RELEASES, help="releases of the lock history to keep (default 3)")
     p.add_argument("--plain-http", action="store_true", help="the mirror speaks plain HTTP (canary only)")
     p.add_argument("--apply", action="store_true", help="delete (default: dry run, list only)")
+    p.add_argument("--quay", action="store_true",
+                   help="the mirror is Red Hat Quay (<host>/<organisation>): delete tags through its API, token in QUAY_API_TOKEN")
     p = sub.add_parser("validate")
     p.add_argument("release_dir", type=pathlib.Path)
     p = sub.add_parser("diff")
@@ -733,7 +803,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"MIRRORED {reference} to {mirror_reference(reference, args.to)}: release {index['release']}, "
                   f"{1 + len(index['agents'])} artifact(s), verified again from the mirror")
         elif args.command == "prune":
-            result = prune_mirror(args.mirror, args.keep, args.apply)
+            if args.quay:
+                token = os.environ.get("QUAY_API_TOKEN", "")
+                if not token:
+                    raise AdmissionError("--quay needs an OAuth token with repository administration in QUAY_API_TOKEN")
+                result = prune_quay(args.mirror, token, args.keep, args.apply)
+            else:
+                result = prune_mirror(args.mirror, args.keep, args.apply)
             for ref in result["kept"]:
                 note = " (not on the mirror, skipped)" if ref in result["absent"] else ""
                 print(f"KEEP {ref}{note}")
