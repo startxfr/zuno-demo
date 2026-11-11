@@ -1,6 +1,6 @@
 # ADR-0612: Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-11, the owner: Clair limited to the Red Hat sources)
 - **Target:** v0.17
 - **Date:** 2026-11-11
 - **Decision owners:** Zuno Demo architecture team

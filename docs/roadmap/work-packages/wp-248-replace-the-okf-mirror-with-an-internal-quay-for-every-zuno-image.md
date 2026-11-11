@@ -1,7 +1,7 @@
 # WP-248: Replace the OKF mirror with an internal Red Hat Quay that holds every zuno image
 
 - **State:** Not started (the owner's decisions of 2026-11-11 are recorded below; step 1 can start with his go)
-- **ADRs:** [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (the decision, Proposed), [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
+- **ADRs:** [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (the decision, Accepted 2026-11-11), [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
   replaced by the ADR this WP writes), [ADR-0353](../../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md)
   (images sourced by family), [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (per-cluster S3 buckets)
@@ -172,3 +172,16 @@ With `quay.io` blocked, a gateway pod, the UnifAI operator pod and a first-party
 Quay; a forged digest is refused; every image the charts reference is on the internal registry or on the declared exception
 list; the bucket was created by Ansible, scoped to its own IAM user; the zot mirror is removed; the golden path passes 14
 of 14; no CDN or S3 range wider than the measured need was added to an EgressFirewall.
+
+## Result of step 3 (2026-11-11, the owner's go for the AWS write)
+
+`ansible-playbook ansible/playbooks/registry_bucket.yml -e registry_bucket_apply=true` (role `registry_bucket`, workstation
+only; without the flag it prints the plan and writes nothing). It created, in `eu-central-1` of the account's default
+profile: the bucket `zuno-demo333-registry` (all four public-access blocks on, default encryption AES256, no versioning),
+the IAM user `zuno-demo333-registry` with one inline policy limited to that bucket (list, get, put, delete, multipart),
+and one access key. A second run changes nothing. Deviations from the step text: the role calls the `aws` CLI instead of
+`amazon.aws` (the module needs `boto3` on the controller, absent here; four idempotent calls did not justify a new Python
+dependency), and the key is written once to `~/.config/zuno/zuno-demo333-registry-key.json` (0600, outside the
+repository) because AWS never shows the secret again; the `quay_registry` role (step 4) moves it to Vault. The firewall
+CIDRs for S3 and the canary S3 test come with that role. The step-1 canary was deleted on the owner's order; the S3 test
+will run in a later canary together with other changes.
