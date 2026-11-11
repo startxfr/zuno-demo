@@ -1,6 +1,6 @@
 # WP-247: Sign the gateway assertions with Vault Transit
 
-- **State:** Operator pending (2026-11-11): both lots live on demo333 and proven by the golden path, both old keys retired from every reader. Left: the final proof as an `ocp-ai-dev` persona (needs the user's go), the deletion of the two old Vault values (own go), and the workload token (out of scope, own WP)
+- **State:** Done (2026-11-11): both lots live on demo333 and proven by the golden path, both old keys retired from every reader, proven with the namespace store's own Vault role (user's decision 2026-11-11: no separate `ocp-ai-dev` persona proof). Follow-ups outside this WP: delete the two old Vault values (own go) and the workload token (own WP)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-223](wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) (Vault on KMS auto-unseal, raft,
@@ -169,6 +169,11 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   `a2a/agent-chain` left `platform/vault/secret-access.yaml`; the now dead seed and export playbooks
   (`wp225_seed_signing_keys.yml`, `wp225_export_public_keys.yml`, `wp225_seed_one_key.yml`) were removed, so nothing can
   recreate or print a signing key. Vault data of both old keys is not deleted (separate step, separate go).
+- **2026-11-11, closed (user's decision: option B).** The planned final proof as an `ocp-ai-dev` persona was replaced by
+  the proof with the Vault role the namespace store itself uses (`ns-zuno-ai-run`): both old key paths are permission
+  denied there, which is the only door an ExternalSecret has. Not done and not claimed: the persona-level ExternalSecret
+  attempt, deleting the two old Vault values (the paths are unreadable by any namespace; only `ansible-seeder` and root
+  still can), and the workload token.
 
 ## Steps
 
