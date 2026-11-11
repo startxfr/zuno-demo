@@ -126,6 +126,12 @@ zuno_unifai_bundle_settings:
 zuno_unifai_released_bundles: true
 zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
+  # WP-221 rehearsal (2026-11-11, user's go): the incident revocation path of ADR-0584 clause 5 on comage, which
+  # neither the golden path nor the demonstration uses. Removed again by the next commit.
+  agentRevocations:
+  - bundle: comage
+    reason: "WP-221 rehearsal of the incident revocation path (ADR-0584 clause 5)"
+    actor: "Christophe LARUE"
   gatewayLLM:
     timeoutSeconds: 200
     # ADR-0597 (UnifAI >= 0.1.58): public built-ins, seen by every user and
