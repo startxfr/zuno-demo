@@ -559,9 +559,10 @@ zuno_drift_strict: true
 # WP-225 lot C, rollout step 2 (user's go 2026-11-07): the ai-gateway verifies the a2a-gateway's
 # signed agent chain. The public half of Vault a2a/agent-chain; a chain-less call keeps today's behaviour.
 zuno_ai_gateway_agent_chain_verify: true
+# WP-247 lot 2: the public half of the Vault Transit key agent-chain (the private half never leaves Vault).
 zuno_ai_gateway_agent_chain_public_key: |
   -----BEGIN PUBLIC KEY-----
-  MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+  MCowBQYDK2VwAyEAT/I4wgI087mkIC5Pl4R2a5wOVQN9VlrJQ+E/B6fWYz8=
   -----END PUBLIC KEY-----
 # ADR-0611/WP-246: the gateways' okf-fetch reads the admitted OKF release from the in-cluster mirror
 # (roles/okf_mirror) first and falls back to the source registry. Plain HTTP inside the mesh (mTLS).
