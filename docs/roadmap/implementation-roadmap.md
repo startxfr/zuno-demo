@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 5 | 26 | WP-224, WP-227, WP-237 |
-| v0.17 | 4 | 2 | 13 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-248 |
+| v0.17 | 4 | 2 | 13 | WP-212, WP-213, WP-214, WP-215, WP-218, WP-248 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1046,7 +1046,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 |---|---|---|---|---|---|
 | WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Done (2026-11-07) | floors live on demo333 (image d849b322), cognos C1->C3 proven; header-less default stays C1 by user decision, so ADR-0565 stays Partially implemented |
 | WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Abandoned (2026-11-07) | user decision: per-source aclGroups is the contract, page-level ACL not needed; ADR-0110 Implemented |
-| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Operator pending | lots A and B on devel; lot C there-and-back done live (2026-11-08 external, 2026-11-09 back, golden path 14/14 both ways); three role fixes done 2026-11-11; left: keycloak-admin rollback, `zuno-auth-ext` removed after a release signed through the built-in issuer, checks in both modes |
+| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-11) | external mode run live both ways (golden path 14/14 each way); role fixes, bootstrap credential restored, 8 images re-signed through the built-in issuer (supply-chain 12/12), image policy back to one issuer; external-mode make checks waived by the user |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
 | WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal |

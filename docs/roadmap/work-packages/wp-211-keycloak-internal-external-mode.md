@@ -1,6 +1,6 @@
 # WP-211: Keycloak internal/external mode
 
-- **State:** Operator pending (2026-11-11: lots A and B on `devel`; lot C, the live there-and-back, done on 2026-11-08 and 2026-11-09; the three role fixes done; left: the live clean-up and the evidence in both modes, see Status below)
+- **State:** Done (2026-11-11)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (the reconcile mechanics reused)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-216](wp-216-external-secrets-internal-external-mode.md) and [WP-217](wp-217-cert-manager-internal-external-mode.md) (mode-key mechanics: `mode.yml`, symmetric gating), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) (persona passwords)
@@ -352,9 +352,13 @@ Left before Done:
 2. **Live clean-up, each with the user's go:**
    - roll `zuno/keycloak/admin` back to the built-in credential and force-sync the `keycloak-admin` ExternalSecret
      (5151869f): done on 2026-11-11 (version 1, user `admin`, restored as version 3; the Secret carries `admin`);
-   - empty the Blender add-on's issuer override on the presenter's laptop.
-3. **`zuno-auth-ext` and `certIdentityExtraIssuers` stay** until a release is signed through the built-in issuer. The
-   v0.14.5 images were signed through `keycloak-ext`. Delete both after the next tag's ledger run.
+   - empty the Blender add-on's issuer override on the presenter's laptop (the user's own step).
+3. **`zuno-auth-ext` and `certIdentityExtraIssuers`: done on 2026-11-11.** The 8 images still signed through
+   `keycloak-ext` were rebuilt (`make d2 build mcp`, `mlops`, `token-proxy`, `dify-knowledge`), so the supply-chain check
+   passes 12/12 through the built-in issuer; `make d1 install rhtas-config` in internal mode then set
+   `certIdentityExtraIssuers: []` (the ClusterImagePolicy keeps one identity, Ready). The `zuno-auth-ext` namespace was
+   already gone (removed by another session, not recorded in git); no Application spec, Securesign, OAuth or ConfigMap
+   names `keycloak-ext` any more. Golden path 13/13 after (17:07Z).
 4. **Evidence in both modes (user decision 2026-11-11):** the external mode is evidenced by its golden-path runs (14/14
    on 2026-11-08), not by a second flip. The three checks ran in internal mode on 2026-11-11 (`-e
    zuno_keycloak_mode=internal`):
@@ -369,3 +373,12 @@ Left before Done:
 
 Then: the brief to Done, an ADR-0352 clause-9 note, and clauses 5 and 6 amended to the consumer list of lot A.
 
+
+## Closure (2026-11-11)
+
+Done. Keycloak runs in internal or external mode with one key (`zuno_keycloak_mode`); both directions were run live on
+demo333 (external from 2026-11-08, back on 2026-11-09, golden path 14/14 each way); the three role traps of the way back
+are fixed; the bootstrap credential is restored; every running first-party image is signed through the built-in issuer and
+the image policy accepts that issuer only. Named exception, by user decision: the external mode is evidenced by its
+golden-path runs, not by the three `make` checks (run in internal mode only). ADR-0352 stays `Partially implemented`
+(Vault, PostgreSQL, Redis, AAP and ArgoCD remain, and the clause-10 gate).

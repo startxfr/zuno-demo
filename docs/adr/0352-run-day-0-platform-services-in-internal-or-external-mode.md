@@ -633,3 +633,20 @@ chart. Clauses 5 and 6 above still name agent-runtime, the six agent charts and 
 ADR-0561: the consumer list of the WP-211 brief replaces it. The live there-and-back (lot C) is not done, so the ADR
 stays `Partially implemented`.
 
+
+## Amendment (2026-11-11): Keycloak done; the consumer list of clauses 5 and 6
+
+**Clause 9 note.** Keycloak, the first hard component, is done
+([WP-211](../roadmap/work-packages/wp-211-keycloak-internal-external-mode.md), 2026-11-11): the external mode ran live
+on demo333 from 2026-11-08 and the way back on 2026-11-09, golden path 14/14 in each mode, with the built-in instance
+and its database kept for the return (same users and ids). The way back found three role defects, fixed on 2026-11-11:
+the Application apply never removed a seam value it no longer set; `rhtas_config` waited for a renamed operator
+Deployment; `openshift_oauth` joined two PEMs with a literal backslash-n. Remaining under this record: Vault, PostgreSQL,
+Redis and AAP (WP-212 to WP-215), ArgoCD (WP-218, ADR-0557) and the clause-10 vital gate, so it stays
+`Partially implemented`.
+
+**Clauses 5 and 6.** Their consumer lists name agent-runtime, the six agent charts and the aiagent-operator, retired with
+ADR-0561. For Keycloak they are replaced by the consumer inventory of the WP-211 brief (ai-gateway, mcp-gateway,
+a2a-gateway, the token proxies, dify, kagent, open-webui, openclaw, unifai, world-model, models, openshift-oauth,
+namespaces, connectivity-link, rhtas, rhtas-config, trustyai-config, mlops, the image-signing scripts); the other
+components' work packages list their own consumers the same way. The decision itself is unchanged.
