@@ -1,0 +1,35 @@
+---
+# ADR-0611/WP-246: when the gateways read the release from the internal mirror (zuno_okf_registry_mirror = registry
+# prefix, e.g. okf-mirror.zuno-ai-run.svc:5000/okf), the locked digest must be on it, signatures included, before a
+# promotion is rolled. The mirror is verified as the gateways verify it (offline cosign + oras, by digest), through a
+# port-forward. Empty (default) = no mirror, nothing to check.
+# Included by `make d2 check agents` (agents role) and BEFORE `make d2 install mcp` applies the gateways (mcp role,
+# which also installs a2a-gateway): the promotion workflow runs on GitHub and cannot reach the mirror, so the roll is
+# the one point where "mirror before roll" can be enforced. Feed the mirror with
+# `OKF_MIRROR_TO=localhost:15001/okf OKF_MIRROR_PLAIN_HTTP=1 make d3 admit agents` (port-forward first).
+# Needs zuno_okf_registry_mirror: the caller loads ansible/tasks/load_cluster_vars.yml first.
+- name: "okf mirror | verify that the internal mirror holds the locked release (ADR-0611)"
+  ansible.builtin.shell: |
+    set -u
+    oc -n zuno-ai-run port-forward svc/okf-mirror 15002:5000 >/dev/null 2>&1 &
+    pf=$!
+    trap 'kill $pf 2>/dev/null' EXIT
+    for i in 1 2 3 4 5 6 7 8 9 10; do (exec 3<>/dev/tcp/127.0.0.1/15002) 2>/dev/null && break; sleep 1; done
+    prefix="localhost:15002/{{ zuno_okf_registry_mirror.split('/', 1)[1] }}"
+    lock="$(grep -v '^#' platform/okf/agents.lock | grep .)"
+    ref="$(python3 -c 'import sys; sys.path.insert(0, "platform/supply-chain"); import admit_okf_bundle as a; print(a.mirror_reference(sys.argv[1], sys.argv[2]))' "$lock" "$prefix")"
+    python3 platform/supply-chain/admit_okf_bundle.py verify "$ref" --mirror "$prefix" --plain-http
+  args:
+    executable: /bin/bash
+    chdir: "{{ zuno_repo_root }}"
+  register: _okf_mirror_holds_lock
+  changed_when: false
+  failed_when: false
+  when: (zuno_okf_registry_mirror | default('')) | length > 0
+
+- name: "okf mirror | fail when the mirror does not hold the locked release"
+  ansible.builtin.fail:
+    msg: "{{ ['The mirror ' ~ zuno_okf_registry_mirror ~ ' does not hold the locked release; run OKF_MIRROR_TO=... make d3 admit agents (ADR-0611).'] + _okf_mirror_holds_lock.stdout_lines + _okf_mirror_holds_lock.stderr_lines }}"
+  when:
+    - (zuno_okf_registry_mirror | default('')) | length > 0
+    - _okf_mirror_holds_lock.rc != 0
