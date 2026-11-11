@@ -1,6 +1,6 @@
 # WP-214: Redis internal/external mode
 
-- **State:** Repo work in review (2026-11-11: repository part built, local commit, not pushed; the live rehearsal in `zuno-canary-wp-214` needs the owner's go)
+- **State:** Done (2026-11-11)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md) (where the rehearsal runs)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-211](wp-211-keycloak-internal-external-mode.md) (the seam mechanism and the Vault way-back lesson), [WP-177](wp-177-finish-the-maas-quota-delegation.md) (the quota ledger in Redis), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)
@@ -145,6 +145,25 @@ in Vault, then in the ExternalSecret).
   is external (WP-143 finding c).
 - **Connection budget.** ai-gateway builds a new async client per semantic-cache and routing-decision call, so the
   connection count follows concurrency; the floor of 100 is a sanity bound, not a sizing.
+
+## Live rehearsal result (2026-11-11)
+
+Run on demo333 with the user's go ([evidence](../evidence/wp-214-redis-there-and-back-2026-11-11.md)). The external
+mode asserted the canary Redis and seeded Vault; ai-gateway ran on it through the seam (golden path 13/13, keys written
+there, no ledger error). The way back restored the built-in password from the Vault history and the consumers' values
+(golden path 13/13, the built-in's 40 quota keys kept). `make d1 check` at the internal end state: 22 of 23 installed,
+with `openshift-ai` not installed for the RHOAI 3.6 EA reasons that predate this WP.
+
+Two role defects found and fixed during the rehearsal:
+- the endpoint is now asserted BEFORE the external password is written to Vault, so a wrong password never reaches
+  ai-gateway;
+- the assertion Job deletes cascade to their pods, and its log is read from the current run's pod.
+
+Named exceptions, by the user's choice of variant (the session's safety check refused `make d1 uninstall redis`):
+- the built-in Redis kept running during the window, so a platform without the built-in was not exercised;
+- the external-mode uninstall was not run live (read in the code: it removes only the assertion Job and Secret);
+- the EgressFirewall rule for a host outside the cluster is proven by render only;
+- TLS is refused by design (Limits).
 
 ## Verification (repository part, 2026-11-11)
 

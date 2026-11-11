@@ -341,7 +341,7 @@ the user's own identity and a C3 floor (ADR-0610), the first of the band's two e
 its work package is opened when the band starts.
 
 **4 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Implemented`, ADR-0611 `Implemented`.** Open work
-packages: WP-212 to WP-215, WP-218 and WP-248 (WP-211, Keycloak, Done 2026-11-11).
+packages: WP-212, WP-213, WP-215, WP-218 and WP-248 (WP-211, Keycloak, and WP-214, Redis, Done 2026-11-11).
 
 ## OKF stream
 

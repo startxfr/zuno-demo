@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 5 | 28 | WP-224, WP-227, WP-237, WP-249, WP-250 |
-| v0.17 | 5 | 3 | 13 | WP-212, WP-213, WP-214, WP-215, WP-218, WP-248 |
+| v0.17 | 5 | 3 | 13 | WP-212, WP-213, WP-215, WP-218, WP-248 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1049,7 +1049,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-11) | external mode run live both ways (golden path 14/14 each way); role fixes, bootstrap credential restored, 8 images re-signed through the built-in issuer (supply-chain 12/12), image policy back to one issuer; external-mode make checks waived by the user |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
-| WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Repo work in review | repository part built (local commit, not pushed: mode key, symmetric install/check/uninstall, assert Job, ai-gateway and EgressFirewall seams; internal render byte-identical); live there-and-back in zuno-canary-wp-214 needs the owner's go |
+| WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-11) | external mode there and back on demo333 (canary Redis, ai-gateway through the seam, golden path 13/13 both ways); two role fixes from the rehearsal; built-in kept running and external uninstall not run live (user's variant); TLS refused by design |
 | WP-215 | [wp-215](work-packages/wp-215-aap-internal-external-mode.md) | 0352 | WP-143, WP-213 | Not started | cluster rehearsal; keep the Fernet key persistent |
 | WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-07) | external mode built, rehearsed live both ways on demo333; no live uninstall, clause-10 gate not built |
 | WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Done (2026-11-07) | external mode built, rehearsed live both ways on demo333; no live uninstall, clause-10 gate not built |

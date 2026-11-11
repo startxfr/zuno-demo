@@ -663,3 +663,11 @@ functional (about 80 s), and refused with a non-functional component in the list
 `ansible/tasks/record_state.yml` set no `<role>_state_installed` fact on ansible-core 2.19 (a templated-dict `set_fact`);
 fixed. The external-mode work packages of the remaining components (WP-212 to WP-215, WP-218) inherit the gate through
 their prechecks.
+
+## Update (2026-11-11) - Redis done (WP-214)
+
+[WP-214](../roadmap/work-packages/wp-214-redis-internal-external-mode.md) is Done: `zuno_redis_mode` with the
+`zuno_redis_external_*` payload, a mode-agnostic endpoint (`ansible/tasks/resolve_redis_endpoint.yml`), the clause-7
+assertion as an in-cluster Job, and the one consumer left (ai-gateway) reached through a seam. It ran there and back on
+demo333 the same day, with golden path 13/13 in each mode. TLS to an external Redis is refused until ai-gateway's Redis
+clients support it. Remaining under this record: Vault, PostgreSQL and AAP (WP-212, WP-213, WP-215) and ArgoCD (WP-218).
