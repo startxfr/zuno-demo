@@ -8,3 +8,8 @@ zuno_quay_s3_key_file: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno
 # ADR-0612 clause 4: Clair updater sets that run. Red Hat only = one egress host. Whether the operator merges a
 # clair-config.yaml from the config bundle is verified in the first canary (WP-248).
 zuno_quay_clair_updater_sets: [rhel-vex]
+# Bootstrap (tasks/bootstrap.yml): organisation, first admin and robots. validate_certs is true: the route carries the
+# cluster wildcard certificate (ACME, ADR-0211); set false only for a canary on the internal CA.
+zuno_quay_organization: zuno
+zuno_quay_admin_email: quayadmin@zuno.invalid  # Quay only needs a well-formed address
+zuno_quay_validate_certs: true

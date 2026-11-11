@@ -212,3 +212,19 @@ bundle (if it requires a complete file, the Clair restriction moves to the egres
 second half, not written yet); the known-good entry for `quay-operator` (the version is only known after the first install).
 Also still to do: the Quay variant of `prune`, the Vault copy of the bucket key, and the PGO backup of `quay-db` into the
 Day 3 schedule.
+
+### Added the same day, for the canary
+
+- **Quay variant of `prune`** (`admit_okf_bundle.py prune --quay`, `OKF_MIRROR_QUAY=1 make d3 admit agents`): same kept set
+  (last three locked releases, read through the registry protocol), but tags are listed and deleted through the Quay API
+  with the OAuth token in `QUAY_API_TOKEN`; Quay's garbage collector removes the untagged manifests. Dry run by default;
+  4 new tests (42 pass). Not rehearsed: whether the untagged referrer manifests of a deleted `.sig` / `.att` tag are
+  collected, and that the API's `manifest_digest` equals the digest the kept set holds (to be measured against the canary).
+- **Bootstrap** (`roles/quay_registry/tasks/bootstrap.yml`, run at the end of install): `POST /api/v1/user/initialize` once
+  (first admin `quayadmin`, a generated password, an OAuth token), the organisation `zuno`, the robots `zuno+pull` and
+  `zuno+push`, and default permissions (read and write) so the robots reach every repository created later. The admin
+  record goes to Vault `zuno/registry/quay-admin` and the robot tokens to `zuno/registry/quay-robots`, written only when missing.
+- Still open before the canary: the Vault copy of the bucket key (the config bundle reads the 0600 key file for now), the
+  PGO backup of `quay-db` in the Day 3 schedule, the `quay-operator` known-good entry (version known after the first
+  install), and whether the canary uses a separate namespace (the Applications and the egress rules name `zuno-registry`)
+  or `zuno-registry` itself, which nothing else uses yet.

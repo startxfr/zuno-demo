@@ -122,3 +122,6 @@
       | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list) == ['True'])
   retries: 90
   delay: 10
+
+- name: "quay_registry | bootstrap the organisation, the first admin and the robot accounts"
+  ansible.builtin.include_tasks: bootstrap.yml
