@@ -126,6 +126,14 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   gateway log. Not done: (d) stopping Vault to see the 502 live (the fail-closed path is covered by the unit tests; a live
   outage of the one secret store was judged not worth the risk) and (e) the full golden path (zuno-demo runs it). The old key
   `zuno/mcp/gateway-call-assertion` stays in Vault until (e) passes.
+- **2026-11-11, old key retired from every reader (user's go, option A).** Golden path 14/14 by zuno-demo after the
+  switch (and again after UnifAI 0.1.68). `zuno/mcp/gateway-call-assertion` was removed from `zuno-ai-run` in
+  `platform/vault/secret-access.yaml`, from the seed and export playbooks (`wp225_*`), and `make d0 install vault` rewrote
+  the namespace policy. Proof: logged in to Vault with the `ns-zuno-ai-run` role (the role the store of that namespace
+  uses), the read of `mcp/gateway-call-assertion` is **permission denied** while `mcp/gateway-workload-token` and
+  `a2a/agent-chain` remain readable; a gateway tool call still returns 200. The Vault data itself is **not deleted yet**
+  (only `ansible-seeder` and root can still read it, and nothing reads it): deleting it is a separate step with its own go.
+  The chart's `file` signer and its ExternalSecret stay as the documented rollback path.
 
 ## Steps
 
