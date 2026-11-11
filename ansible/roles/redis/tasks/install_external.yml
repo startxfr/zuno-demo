@@ -65,6 +65,14 @@
       Redis (zuno_redis_mode: internal).
   when: redis_endpoint_tls | bool
 
+# Assert BEFORE seeding Vault (WP-214 rehearsal, 2026-11-11): the check reads the password from the payload through a
+# short-lived Secret, not from Vault, so a wrong password fails here and never reaches zuno/redis/session-store, which
+# ai-gateway's ExternalSecret would otherwise pick up at its next refresh.
+- name: "redis | assert endpoint reachability, AUTH and the connection budget"
+  ansible.builtin.include_tasks: external_assert.yml
+  vars:
+    redis_assert_hard_fail: true
+
 # Vault access (ADR-0602 clause 1 / WP-223): a short-lived ansible-seeder
 # token from ansible/tasks/vault_login.yml (create/read/update on zuno/data/*).
 # Vault is Day 0, so it exists before this Day-1 role.
@@ -100,11 +108,6 @@
       {{ '' if (zuno_redis_external_password | default('xxxxxx') | string) in ['xxxxxx', '']
          else zuno_redis_external_password | string }}
   no_log: true
-
-- name: "redis | assert endpoint reachability, AUTH and the connection budget"
-  ansible.builtin.include_tasks: external_assert.yml
-  vars:
-    redis_assert_hard_fail: true
 
 - name: "redis | external-mode summary"
   ansible.builtin.debug:

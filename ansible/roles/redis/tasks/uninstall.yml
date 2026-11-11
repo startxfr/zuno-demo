@@ -27,6 +27,9 @@
         kind: "{{ item.kind }}"
         namespace: zuno-auth
         name: redis-external-assert
+        # Background propagation: the Job's pods go with it (see external_assert.yml).
+        delete_options:
+          propagationPolicy: Background
       loop:
         - { api_version: batch/v1, kind: Job }
         - { api_version: v1, kind: Secret }
