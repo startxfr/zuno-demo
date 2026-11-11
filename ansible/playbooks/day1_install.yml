@@ -65,6 +65,10 @@
           {{ day1_components if target_component | default('all') == 'all'
              else [target_component | replace('-', '_')] }}
 
+    # ADR-0352 clause 10: Day 1 does not start until the vital Day-0 components are functional, whatever their mode.
+    - name: Refuse to start Day 1 while a vital Day-0 component is not functional (ADR-0352 clause 10)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_day1_vital_gate.yml"
+
     - name: Install Day 1 components
       ansible.builtin.include_role:
         name: "{{ item }}"

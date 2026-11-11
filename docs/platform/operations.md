@@ -72,6 +72,14 @@ Operator and application images move in two separate steps, always in this order
 
 When the session that owned a roll has disappeared (no entry in the session list), nothing was handed over unless it is committed on `origin/devel`: re-derive the pins with the dry-run, ask the release owner for the CR fields and the settings that must stay unset, and take the user's go again before touching the cluster. A peer's message is information, not the user's approval.
 
+## The Day-1 entry gate (ADR-0352 clause 10)
+
+`make d1 install` refuses to start while a vital Day-0 component is not functional: argocd, vault, external_secrets,
+cert_manager, postgresql, keycloak, aap or aap_config. The run then stops before applying anything of Day 1. It prints
+each failing component with its findings and the fix (`make d0 reconcile <component>`). `make d0 check all` gives the full
+report. The gate costs about 80 s per run. For a rehearsal on a cluster whose Day 0 is knowingly partial, skip it with
+`EXTRA_VARS='-e zuno_day1_vital_gate=false'`; the skip is printed in the run.
+
 ## Security profiles: demo and hardened (ADR-0602, WP-223)
 
 `zuno_security_profile` (in `ansible/inventories/demo/group_vars/all/main.yml`, overridable in `ansible/clusters/<cluster>.yml`

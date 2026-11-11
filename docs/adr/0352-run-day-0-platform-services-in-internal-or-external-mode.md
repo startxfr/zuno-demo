@@ -650,3 +650,16 @@ ADR-0561. For Keycloak they are replaced by the consumer inventory of the WP-211
 a2a-gateway, the token proxies, dify, kagent, open-webui, openclaw, unifai, world-model, models, openshift-oauth,
 namespaces, connectivity-link, rhtas, rhtas-config, trustyai-config, mlops, the image-signing scripts); the other
 components' work packages list their own consumers the same way. The decision itself is unchanged.
+
+## Update (2026-11-11) - clause 10, the Day-1 vital gate, is built
+
+`make d1 install` (all components or one) now starts with `ansible/tasks/check_day1_vital_gate.yml`: it runs the
+precheck of argocd, vault, external_secrets, cert_manager, postgresql, keycloak, aap and aap_config, and refuses to start
+Day 1 when one of them is not functional, listing its findings and the Day-0 fix. The prechecks are the functional
+assertions of clause 10 (internal mode: Applications Synced/Healthy plus CR readiness; external mode: the clause-7
+assertions of the external-capable prechecks). Advisory findings are shown and do not block. Break-glass:
+`-e zuno_day1_vital_gate=false`, printed in the run. Proven on demo333 the same day: it passed with the eight components
+functional (about 80 s), and refused with a non-functional component in the list. Building it found that
+`ansible/tasks/record_state.yml` set no `<role>_state_installed` fact on ansible-core 2.19 (a templated-dict `set_fact`);
+fixed. The external-mode work packages of the remaining components (WP-212 to WP-215, WP-218) inherit the gate through
+their prechecks.
