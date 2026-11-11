@@ -41,6 +41,21 @@ spec:
             -----END PUBLIC KEY-----
         outboundIdentity:
           mode: assertion
+        # ADR-0602 clause 10 (WP-225 lot C, user's go 2026-11-11, after the ai-gateway ran a clean golden path):
+        # only the Keycloak clients that carry the zuno-admin-api audience (read from the live realm) are admitted.
+        # An OpenShift token on /mcp (Lightspeed, TokenReview) has no azp and is not subject to the list. A forgotten
+        # client gets a 401: remove this key and re-run `make d2 install mcp` to go back to "any client of the realm".
+        jwtAllowedClients:
+          - unifai
+          - open-webui
+          - dify
+          - kagent
+          - world-model
+          - blender
+          - openclaw-*
+          - zuno-evaluations
+          - zuno-stresstest
+          - zuno-admin-api
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
