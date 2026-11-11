@@ -1,6 +1,6 @@
 # WP-248: Replace the OKF mirror with an internal Red Hat Quay that holds every zuno image
 
-- **State:** Not started
+- **State:** Not started (the owner's decisions of 2026-11-11 are recorded below; step 1 can start with his go)
 - **ADRs:** [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
   replaced by the ADR this WP writes), [ADR-0353](../../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md)
   (images sourced by family), [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
@@ -87,17 +87,27 @@ a freeze ([ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-
 until step 8 passes, and the gateways keep `quay.io` as their second source, so a failed cut-over is undone by moving the
 references back.
 
-## Open questions (decided in the new ADR from the step 1 measurement)
+## Decisions of the owner (2026-11-11) and open questions
 
-- Is a Quay entitlement available for demo333 (Quay is a subscription product)? If not, the WP stops at step 1.
-- Database: the operator-managed PostgreSQL, or a database on the existing PGO operator (backups already exist there)?
-- Object storage: the AWS bucket above (decided), or ODF if it is installed for another reason.
-- Vulnerability scanning (Clair): on from the start, or later; its database and cost.
-- Single replica or highly available: the platform runs single-replica workloads on purpose (ADR-0101); the registry is
-  now on the pod-start path of everything, which changes the trade-off.
-- Garbage collection and tag expiration so that the bucket does not grow without bound.
+Decided:
+
+- **Entitlement:** a Quay subscription is available for demo333, so the WP does not stop at step 1.
+- **Database:** the existing PGO operator hosts Quay's PostgreSQL (declared as an unmanaged component of the
+  `QuayRegistry`), so its backups and the CA trust rules of the PGO instances apply; the operator-managed database is not used.
+- **Object storage:** the AWS bucket of step 3 (not ODF).
+- **Vulnerability scanning:** Clair is on from the start; its database also runs on PGO unless step 1 shows it cannot.
+- **Availability:** no high availability, a single replica of each component (the platform's single-replica rule, ADR-0101).
+  The consequence is accepted on purpose: the registry is on the pod-start path, so a registry outage blocks pod
+  starts that need an image not yet on the node. The `quay.io` second source and the zot mirror (until retired) soften it.
+
+Open, to be decided in the new ADR:
+
+- Tag expiration and garbage collection, so that the bucket does not grow without bound: **to be defined after** the first
+  seeding, when the real volume is known.
 - Which public `quay.io` images are mirrored (the first list comes out of the step 1 inventory).
 - Whether the in-cluster ImageStream registry is kept for builds or retired once builds push to Quay.
+- Clair's resource cost on demo333 and whether its updater needs an egress rule (it fetches vulnerability data from the
+  internet; the EgressFirewall must allow only what step 1 measures).
 
 ## Acceptance
 
