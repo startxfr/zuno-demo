@@ -12,4 +12,5 @@ zuno_quay_clair_updater_sets: [rhel-vex]
 # cluster wildcard certificate (ACME, ADR-0211); set false only for a canary on the internal CA.
 zuno_quay_organization: zuno
 zuno_quay_admin_email: quayadmin@zuno.invalid  # Quay only needs a well-formed address
+zuno_quay_organization_email: registry@zuno.invalid  # must differ from the admin email
 zuno_quay_validate_certs: true

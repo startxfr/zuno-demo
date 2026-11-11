@@ -88,7 +88,19 @@
          else (_quay_registry_admin_vault.stdout | from_json).data.data.token }}
   no_log: true
 
-- name: "quay_registry | create the organisation (400 = exists)"
+# Look first, create on 404: accepting "400 = exists" would also swallow a real refusal (the first run did: the organisation
+# email must differ from the admin's).
+- name: "quay_registry | look up the organisation"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 404]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_org
+  no_log: true
+
+- name: "quay_registry | create the organisation"
   ansible.builtin.uri:
     url: "{{ _quay_registry_api }}/organization/"
     method: POST
@@ -97,23 +109,36 @@
     body_format: json
     body:
       name: "{{ zuno_quay_organization }}"
-      email: "{{ zuno_quay_admin_email }}"
-    status_code: [201, 400]
+      email: "{{ zuno_quay_organization_email }}"
+    status_code: [201]
     validate_certs: "{{ zuno_quay_validate_certs }}"
+  when: _quay_registry_org.status == 404
   no_log: true
 
-- name: "quay_registry | create the robot accounts (400 = exists)"
+- name: "quay_registry | look up the robot accounts"
   ansible.builtin.uri:
     url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item }}"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 404]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop: [pull, push]
+  register: _quay_registry_robot_lookup
+  no_log: true
+
+- name: "quay_registry | create the missing robot accounts"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item.item }}"
     method: PUT
     headers:
       Authorization: "Bearer {{ _quay_registry_token }}"
     body_format: json
     body:
-      description: "{{ 'Pull-only, used by the namespaces that run images' if item == 'pull' else 'Push, used by builds and admission' }}"
-    status_code: [201, 400]
+      description: "{{ 'Pull-only, used by the namespaces that run images' if item.item == 'pull' else 'Push, used by builds and admission' }}"
+    status_code: [201]
     validate_certs: "{{ zuno_quay_validate_certs }}"
-  loop: [pull, push]
+  loop: "{{ _quay_registry_robot_lookup.results }}"
+  when: item.status == 404
   no_log: true
 
 - name: "quay_registry | read the robot tokens"
