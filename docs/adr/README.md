@@ -212,9 +212,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) *(stub)* | Proposed | Introduce controlled shared agent memory |
-| [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) *(stub)* | Proposed | Expose agent delegation traces to users |
-| [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
@@ -427,6 +424,9 @@ part of its decision is still in force.
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
 | [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | v0.16 | Deprecated | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
+| [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) *(stub)* | v0.4 | Deprecated | Introduce controlled shared agent memory |
+| [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) *(stub)* | v0.4 | Deprecated | Expose agent delegation traces to users |
+| [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | v0.4 | Deprecated | Add specialized task-oriented frontend views |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Superseded by ADR-0218 and ADR-0568 | Automate source-specific knowledge ingestion |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |

@@ -89,3 +89,22 @@ here and decide again if the need returns.
   help to find an agent, not to run a structured task. The interface belongs to UnifAI now, so a task-oriented view would be proposed
   upstream first ([ADR-0575](../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)). Revisit if a demo needs one.
 
+## Decision (2026-11-11, user decision): three stubs withdrawn
+
+ADR-0404, ADR-0405 and ADR-0407 are `Deprecated`: withdrawn with no successor record. Their index rows moved to
+[Retired](../adr/README.md#retired). Nothing was built for them, and none has an owner or a demonstration that needs it.
+
+- **ADR-0404 (shared agent memory).** UnifAI's project memory covers what an agent keeps
+  ([WP-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md)); sharing promoted knowledge across agents has
+  no use case. A future need is a new ADR, proposed upstream first
+  ([ADR-0575](../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)).
+- **ADR-0405 (delegation traces shown to users).** The delegation chain is auditable: OTel spans
+  ([WP-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md)), the trace found in Tempo by run id (a
+  golden-path moment, [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)) and
+  the a2a-gateway access line. A user-facing view belongs to the UnifAI interface, so it would be proposed upstream first.
+- **ADR-0407 (task-oriented frontend views).** As the second pass above found, the interface belongs to UnifAI and the
+  need has no owner.
+
+ADR-0408 stays `Proposed`: its one open item is the live revocation proof described above (remove a persona from a
+group, query as that persona, get nothing).
+

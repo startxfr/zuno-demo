@@ -85,8 +85,8 @@ observability and project work actually delivered during it — ADR-0516,
 ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536, plus the webinar
 sovereign-AI demonstration (ADR-0550).
 
-**29 ADRs.** Open: ADR-0404, ADR-0405, ADR-0407, ADR-0408 (stubs), ADR-0550 (`Accepted`);
-WP-55, WP-093, WP-101, WP-112, WP-135, WP-136, WP-137.
+**30 ADRs.** Open: ADR-0408 (stub, one live proof). ADR-0404, ADR-0405 and ADR-0407 were withdrawn on 2026-11-11
+(`Deprecated`, user decision). No open work package.
 
 ## v0.5
 
