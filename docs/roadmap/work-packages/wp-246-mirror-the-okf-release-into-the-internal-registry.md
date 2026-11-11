@@ -155,4 +155,13 @@ the golden path passes 14 of 14; no CDN range was added to the EgressFirewall.
 ## Open questions
 
 - Does the internal registry list referrers, or do signatures only resolve by tag? Answered by step 1.
-- Retention: keep the last three releases in the mirror?
+- Retention: keep the last three releases in the mirror? **Decided 2026-11-11:** yes, by the git history of the lock, pruned
+  at admission (see the ADR-0611 update of that day).
+
+## Result of retention and the roll check (2026-11-11)
+
+`admit_okf_bundle.py prune` (dry run by default, `--apply` or `OKF_MIRROR_PRUNE=1` to delete, `OKF_MIRROR_KEEP` to change
+the three) and the shared check `ansible/tasks/okf_mirror_holds_lock.yml`, now also first in `make d2 install mcp`
+(mcp-gateway and a2a-gateway). Unit tests cover the keep set, a first install, a kept release the mirror never
+received, dry run versus apply, and the refusal when the locked release is absent. Not yet run against the live mirror: it
+holds one release, so the first real prune has nothing to delete until two more promotions have been mirrored.

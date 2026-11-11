@@ -88,3 +88,20 @@ firewall change. A promotion cycle is timed before and after to show the effect.
 
 [WP-246](../roadmap/work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) (measurement, `mirror`
 step, chart, NetworkPolicy, drill with `quay.io` blocked).
+
+## Update 2026-11-11: retention and the check before rolling
+
+Decisions of the owner. **The mirror keeps the last three releases the lock has pinned**, in the order of the git
+history of `platform/okf/agents.lock` (one commit per promoted release). `make d3 admit agents` runs `prune` after a
+successful `mirror`: it lists what no kept release names (release artifacts with their referrers, and the legacy
+`.sig` / `.att` tags of dropped artifacts) and deletes nothing unless `OKF_MIRROR_PRUNE=1`, so every deletion is a
+decision of the operator running admission from the workstation. `prune` refuses to run when the locked release is not
+on the mirror, skips a kept release the mirror never received (the mirror fills naturally at each promotion, nothing is
+back-filled), and leaves tags it does not recognise alone. Measured the same day: one release is about 100 KB of
+manifests and layers, so the 1 Gi volume holds the three releases with a large margin and is not resized.
+
+**Clause 5 holds at the roll, not at the merge.** The promotion workflow runs on GitHub and cannot reach a registry
+inside the cluster, so it cannot check the mirror. The check lives where the cluster is reachable:
+`ansible/tasks/okf_mirror_holds_lock.yml` runs in `make d2 check agents` and first in `make d2 install mcp`, which also
+installs a2a-gateway, and stops with the command that feeds the mirror when the locked digest is not on it. The
+`quay.io` fallback of clause 3 still covers a pod that restarts before the mirror is fed.
