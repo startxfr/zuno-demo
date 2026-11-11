@@ -28,6 +28,9 @@ spec:
   sourceRepos:
     - https://github.com/startxfr/zuno-demo.git
     - http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+    # ADR-0602 amendment 2026-11-11: the same repository over TLS (S3 REST endpoint). Both are listed while the
+    # charts move from the http alias to this URL; the http entry goes in the next step.
+    - https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   destinations:
     - {server: https://kubernetes.default.svc, namespace: "zuno-*"}
     # zuno-models-d1: MaaS model registrations and RHOAI serving runtimes.
