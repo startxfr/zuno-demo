@@ -1,7 +1,7 @@
 # WP-248: Replace the OKF mirror with an internal Red Hat Quay that holds every zuno image
 
 - **State:** Not started (the owner's decisions of 2026-11-11 are recorded below; step 1 can start with his go)
-- **ADRs:** [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
+- **ADRs:** [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (the decision, Proposed), [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
   replaced by the ADR this WP writes), [ADR-0353](../../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md)
   (images sourced by family), [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (per-cluster S3 buckets)
@@ -48,7 +48,7 @@ offline signature verification as today. Its blobs live in a dedicated AWS S3 bu
      attestations (referrers API and legacy `.sig` / `.att` tags), `cosign verify` reads them back by digest, the digest is
      identical; delete by digest works (the retention of ADR-0611); a pod reads the artifact through the mesh with a
      robot account. Record the resources the operator's components take (application, database, cache, scanner optional).
-2. **Decision record.** A new ADR (Proposed, then Accepted after step 1) that replaces the registry choice of ADR-0611
+2. **Decision record** ([ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md), written 2026-11-11). A new ADR (Proposed, then Accepted after step 1) that replaces the registry choice of ADR-0611
    clause 1, widens its scope (clause 7) to every zuno image, and amends ADR-0353 so that one internal registry serves all
    families. It states the open questions below as decisions.
 3. **The S3 bucket, provisioned by Ansible.** A role creates one additional bucket for the demo cluster, named by the

@@ -392,6 +392,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 | [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
 | [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) | Implemented | Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io |
+| [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) | Proposed | Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket |
 
 ## OKF v0.1
 
