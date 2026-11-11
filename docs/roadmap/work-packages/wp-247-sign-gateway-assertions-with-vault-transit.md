@@ -106,6 +106,18 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   exportable, no plaintext backup, signing only), the policy `mcp-call-assertion-signer` and the Kubernetes auth role
   `mcp-gateway`. No gateway pod was touched and no tool call changed. Still to do: image build (after zuno-demo's
   "R-543 proof done"), then the window.
+- **2026-11-11, lot 1 steps 4-6 on demo333 (user's go: build, then "option A" switch).** Build `mcp-gateway-54`
+  (devel `955663d`), signed by RHTAS (`sha256:7a548d0b`); the first roll kept `signer: file` and the confluence tool call
+  stayed 200. Before the window, a probe pod in `zuno-ai-run` running the gateway image with the `mcp-gateway`
+  ServiceAccount (inside the mesh) proved: Vault login OK, public key readable, `transit/keys/zuno-platform-signer`
+  refused (403), a signature verified with the fetched public key. Window 12:05:38Z-~12:15Z: one `make d2 install mcp`
+  switched the gateway to `signer: transit` and put the Transit public key in aap, git-forge and confluence.
+  Proofs: (a) `confluence.page.search` 200 in 791 ms (947 ms before), `git.repository.list` reaches git-forge; (b) a direct
+  call without assertion is 401 on all three servers; (c) the Secret `mcp-gateway-call-assertion` is gone and the key path
+  does not exist in the pod; 12 `transit/sign/mcp-call-assertion` events in the Vault log, 0 sign errors and 0 x 401 in the
+  gateway log. Not done: (d) stopping Vault to see the 502 live (the fail-closed path is covered by the unit tests; a live
+  outage of the one secret store was judged not worth the risk) and (e) the full golden path (zuno-demo runs it). The old key
+  `zuno/mcp/gateway-call-assertion` stays in Vault until (e) passes.
 
 ## Steps
 
