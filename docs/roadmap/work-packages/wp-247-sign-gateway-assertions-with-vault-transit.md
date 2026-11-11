@@ -162,6 +162,13 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   call still 200. The ai-gateway sync took about 2 minutes after the install returned (ArgoCD waits for resource health
   before the Deployment wave): the window is not over when `make` exits, check the pod. Left: the end-to-end proof (golden path
   `delegation`, played by zuno-demo), then retire `a2a/agent-chain` from `secret-access.yaml` and `make d0 install vault`.
+- **2026-11-11, lot 2 proven and the agent-chain key retired from every reader (user's go, option A).** Golden path by
+  zuno-demo after the window: 14/14, `delegation-approval` PASS (68 s, 19 calls through the a2a-gateway), 0 "agent chain
+  ignored", 0 "cannot sign", 0 x 401 over 20 minutes in the three gateways. The gateways log nothing when a chain verifies
+  (`signed_chain.py` warns only on fallback), so the evidence is "no fallback on 19 delegated calls", not a positive line.
+  `a2a/agent-chain` left `platform/vault/secret-access.yaml`; the now dead seed and export playbooks
+  (`wp225_seed_signing_keys.yml`, `wp225_export_public_keys.yml`, `wp225_seed_one_key.yml`) were removed, so nothing can
+  recreate or print a signing key. Vault data of both old keys is not deleted (separate step, separate go).
 
 ## Steps
 
