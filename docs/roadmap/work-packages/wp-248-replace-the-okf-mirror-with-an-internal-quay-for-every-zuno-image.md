@@ -258,3 +258,49 @@ every deviation in this WP, add the `quay-operator` known-good entry from the in
 registry running or `uninstall` it until step 5 of the WP starts.
 
 **Not in this canary**: moving any consumer (gateways, builds, UnifAI) to the registry; the zot mirror stays untouched.
+
+## Result of the canary (2026-11-11, `zuno-registry` itself, the owner's go)
+
+Baseline golden path PASS before; `make d2 install quay-registry` installed `quay-operator` v3.18.3 (channel `stable-3.18`, the
+version the catalog served today, 3.18.2 in the earlier canary), the PGO database, the `QuayRegistry` and the bootstrap. Twelve
+minutes from the Application to `Available`, then about 20 minutes of fixes found by running it.
+
+**Fixed in the repository during the run** (each one a commit): the role did not load the per-cluster variables; the
+organisation email had to differ from the admin's, and "400 = exists" had hidden that, so the bootstrap now looks up before
+creating (Quay answers 400 for a missing robot); the push robot needed a `creator` team to create repositories by pushing
+(401 otherwise); the S3 `s3_region` was missing from the storage config (presigned URLs were signed for `us-east-1`, S3 answered
+400 through the proxy); the operator ran two replicas of Quay and Clair, now one through `overrides.replicas`; the namespace
+EgressFirewall lacked the registry's own route, which Clair uses to fetch layers; `prune` also had to drop the bare
+referrers-index tag `sha256-<digest>` of a dropped artifact.
+
+**Passed**
+- `clair-config.yaml` from the config bundle is honoured: Clair logs `running updaters total=1` (`rhel-vex`) and no other host
+  was contacted. The NetworkPolicy label `quay-component: quay-app` is right.
+- Storage on the bucket with **proxy storage**: 57 objects under `datastorage/registry/`; every blob GET answers 302 to the
+  registry's own `/_storage_proxy/...` path, never to S3.
+- Seed: `make d3 admit agents` with the Quay prefix mirrored the nine artifacts and re-verified them from Quay with offline
+  `cosign` and `oras`, same digest. The two older locked releases were fed too.
+- A pod pulled `zuno/canary/fedora-minimal@sha256:f588...` from the route with the `zuno+pull` robot (6.7 s); the pull robot
+  has read only, the push robot creates repositories.
+- Restart: deleting the Quay application pod (and a rollout) lost nothing; the locked release verifies again afterwards.
+- Retention with `OKF_MIRROR_QUAY=1`: `--keep 3` listed nothing, `--keep 2` listed exactly the oldest release's three tags, the
+  apply removed them and the two kept releases still verify.
+
+**Open or negative**
+- **Untagged manifests are not collected at once.** After the tag deletion the oldest release's manifest was still fetchable by
+  digest. Quay keeps deleted tags for its time-machine period (two weeks by default) before the garbage collector may drop the
+  blobs, so the bucket does not shrink until then. If that matters, set the organisation's tag expiration (API
+  `change-tag-expiration`); to be decided with the tag-expiration question.
+- **Clair did not produce a report.** After the route rule was added, Clair fetched the layers, but Quay logged
+  `Security scanner response failed OpenAPI validation` and the manifest status stayed 520 (and `unsupported` for the
+  multi-arch index and for Fedora, as expected). It has to be told apart: our `rhel-vex`-only override against the default
+  updaters. Not done: it needs the other updater hosts opened for a comparison run.
+- **Pods cannot reach the registry by its Service.** The Service certificate is the cluster wildcard, so only the route host
+  validates; a consumer namespace therefore needs the route host in its EgressFirewall (as `zuno-registry` now has) or a
+  service-CA path. The kubelet pulls (node network) are not affected. To be decided before any consumer moves.
+- The Quay application used 4.8 GiB at rest after the seed and is the only large pod; Clair 73 MiB, its database 131 MiB.
+- `quay-operator` is in `platform/olm/known-good-demo333.yaml` (3.18.3). The admin and robot credentials are in Vault
+  (`zuno/registry/quay-admin`, `zuno/registry/quay-robots`); the scratch copies used for this run are in the session scratchpad
+  only (0600) and are deleted when the session ends.
+- Still not done: Vault copy of the bucket key, PGO backup of `quay-db` in the Day 3 schedule, step 6 (public images) beyond the
+  two test copies, and the cut-over of any consumer. The registry stays installed; the zot mirror is untouched.

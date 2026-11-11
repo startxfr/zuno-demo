@@ -142,6 +142,13 @@ operators:
     approval: Automatic
     class: ga
     version: "1.1.2"
+  - package: quay-operator
+    catalog: redhat-operators
+    namespace: zuno-registry
+    channel: stable-3.18
+    approval: Automatic
+    class: ga
+    version: "3.18.3"
   - package: rhbk-operator
     catalog: redhat-operators
     namespace: zuno-auth
