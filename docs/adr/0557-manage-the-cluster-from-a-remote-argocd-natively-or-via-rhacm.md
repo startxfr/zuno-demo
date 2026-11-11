@@ -239,3 +239,13 @@ Migration/evolution and Review evidence.
 The implementation of this study's pick is ADR-0352's argocd work package, WP-218, which moved to v0.17. This record
 follows it. ADR-0556, listed among its related records, was deprecated on 2026-11-07; the pick (a remote ArgoCD,
 natively or through RHACM) does not depend on it. No decision clause changes.
+
+## Amendment (2026-11-11): the pick confirmed
+
+The decision owners confirmed the Study's pick on 2026-11-11 (user decision): both push mechanisms ship together in
+v0.17, behind `zuno_argocd_external_flavor: native | rhacm`, with the clause-7 assertions identical for both. The
+choice of a native-only first delivery was considered and not taken. No decision clause changes.
+
+What this leaves to WP-218: demo333 is not managed by any RHACM hub, so the `rhacm` flavor's live proof needs a hub
+that registers the cluster; until one exists, that proof stays an open item of the work package, and the `native`
+flavor is rehearsed with a simulated remote ArgoCD.

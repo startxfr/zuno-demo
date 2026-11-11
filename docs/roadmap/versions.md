@@ -333,7 +333,7 @@ to WP-237 (WP-225 lots A, B and C Operator pending 2026-11-07).
 Run the remaining day-0 platform services in internal or external mode, one component per work package (ADR-0352:
 keycloak, vault, postgresql, redis, aap, then argocd; external_secrets and cert_manager are done, WP-216 and WP-217),
 each rehearsed against a service simulated in a canary namespace (ADR-0609), and implement the remote ArgoCD of ADR-0557
-with the argocd work package. Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
+with the argocd work package, in both flavors, native and RHACM (pick confirmed by the user on 2026-11-11). Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
 deprecated on 2026-11-07.
 
 One new experience: Blender 3D objects generated as `bpy` scripts by `gpt-oss-20b` through the ai-gateway, under
