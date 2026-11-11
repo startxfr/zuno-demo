@@ -79,6 +79,10 @@ class ChatCompletionRequest(BaseModel):
     model: str = "zuno-auto"
     messages: List[ChatMessage]
     stream: bool = False
+    # OpenAI `stream_options`: only `include_usage` is honoured. A caller that sets it (the UnifAI
+    # client does when a per-turn token ceiling applies, R-543) gets the terminal usage chunk of
+    # the OpenAI wire format; without it the stream is unchanged.
+    stream_options: Optional[Dict[str, Any]] = None
     # OpenAI reply caps. Dropped silently before 2026-10-31, so the 4096 the
     # UnifAI LLM client sends never reached the model and an arkos reply ran
     # to ~40k tokens on gpt-oss-20b. See main._effective_max_tokens.
