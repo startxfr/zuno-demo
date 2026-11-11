@@ -40,8 +40,27 @@
 
 ## WP-243 negative case
 
+**Done on 2026-11-11** ([evidence](../evidence/wp-243-negative-case-2026-11-11.md)). The experiences were blocked with a
+temporary AdminNetworkPolicy instead of being scaled to zero, which ArgoCD selfHeal and the operators undo.
+
+The original plan:
+
 For each experience with a browser check: scale it to zero, run `make demo browser`, see that check fail and the others
 pass, scale it back, see it pass. Run it right after that experience's rollback test, so each experience is down once.
+
+## Rule for single-version experiences (D3, user decision 2026-11-11)
+
+kagent, Dify and Open WebUI have only ever run one version, so they have no previous pin to return to, and their
+uninstall path is a deletion. Their rollback is tested at their first version change (ADR-0606 amendment of 2026-11-11):
+rows 1, 6 and 7 wait for that change. They no longer hold ADR-0606 open.
+
+## Evidence already recorded
+
+- **OpenClaw (row 5): rolled back live on 2026-11-03.** 2026.10.9 was pinned on 2026-11-02 (b41bdf2b). On demo333 it
+  asked for a state-database migration, then refused the `openclaw.json` that the claw operator writes. The pin went
+  back to the operator's default, 2026.7.1-2 (a759d6b9), and the assistants answered again. The rollback is a pin
+  revert, and it was exercised.
+- **World model (row 9):** its teardown ran on 2026-11-09 and on 2026-11-11.
 
 ## Decisions to take with the user before the operator rows
 

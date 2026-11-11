@@ -109,3 +109,14 @@ The rollback tests have their own work package,
 [WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md): one test per experience, cheapest first,
 with WP-243's scale-to-zero negative case. The world model's teardown already ran (2026-11-09 and 2026-11-11). This record
 moves to `Implemented` when WP-249 is Done.
+
+## Amendment (2026-11-11, user decision): a single-version experience is tested at its first version change
+
+Clause 1 asks for a rollback "tested once": the previous pinned digest, or the uninstall path. An experience that has only
+ever run one version (kagent, Dify, Open WebUI on 2026-11-11) has no previous pin to return to, and its uninstall path is
+a deletion. For those, the rollback is tested at the first version change: pin the new version, golden path, move back to
+the old pin, golden path, move forward again. This record moves to `Implemented` once the experiences that do have a
+version history have their rollback recorded (OpenClaw, UnifAI, Lightspeed, Blender, the first-party images, the world
+model) and WP-243's negative case is recorded. The single-version experiences stay tracked in
+[WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md) until their first upgrade. The other
+clauses are unchanged.

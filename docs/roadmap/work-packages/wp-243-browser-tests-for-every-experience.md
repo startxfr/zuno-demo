@@ -41,4 +41,6 @@ check of its own: it is a model choice inside Open WebUI, proven by the golden p
 `docs/demo/golden-path.md` now holds only what a person sees better than a script.
 
 Named gap: the negative case of the acceptance (each check fails when its experience is scaled to zero) was not run on
-demo333 before the 2026-11-09 demonstration; it is run in the post-demo window.
+demo333 before the 2026-11-09 demonstration; it is run in the post-demo window. **Closed on 2026-11-11:** all five checks
+fail while their experience is blocked and pass once it is open again ([evidence](../evidence/wp-243-negative-case-2026-11-11.md);
+the experiences were blocked with an AdminNetworkPolicy, since ArgoCD selfHeal and the operators undo a scale to zero).
