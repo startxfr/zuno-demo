@@ -1,6 +1,6 @@
 # WP-211: Keycloak internal/external mode
 
-- **State:** Operator pending (2026-11-11: lots A and B on `devel`; lot C, the live there-and-back, done on 2026-11-08 and 2026-11-09; left: three role fixes, the live clean-up and the evidence in both modes, see Status below)
+- **State:** Operator pending (2026-11-11: lots A and B on `devel`; lot C, the live there-and-back, done on 2026-11-08 and 2026-11-09; the three role fixes done; left: the live clean-up and the evidence in both modes, see Status below)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (the reconcile mechanics reused)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-216](wp-216-external-secrets-internal-external-mode.md) and [WP-217](wp-217-cert-manager-internal-external-mode.md) (mode-key mechanics: `mode.yml`, symmetric gating), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) (persona passwords)
@@ -342,10 +342,13 @@ they are exported.
 
 Left before Done:
 
-1. **Role fixes for the traps of the way back:**
-   - the apply merges the d0 Application values and never removes a seam value it no longer sets;
-   - `rhtas_config` waits for a `policy-controller-manager` Deployment that does not exist;
-   - `zuno_keycloak_ca_pem` in the `openshift_oauth` role.
+1. **Role fixes for the traps of the way back: done on 2026-11-11.**
+   - `apply_gitops_app.yml` states `values: ""` when a manifest's helm block has none, so the merge patch replaces a
+     seam value left by a previous run.
+   - `rhtas_config` finds the operator's Deployments by OLM owner label: v1.1.2 renamed `policy-controller-manager` to
+     `policy-controller-operator`.
+   - `openshift_oauth` joins the PEMs with a real newline: inside `{{ }}` in a `>-` block, `"\n"` stayed backslash + n
+     and broke `user-ca-bundle` on 2026-11-08. `check_docs.py` now reports that pattern anywhere in `ansible/`.
 2. **Live clean-up, each with the user's go:**
    - roll `zuno/keycloak/admin` back to the built-in credential and force-sync the `keycloak-admin` ExternalSecret
      (5151869f);
