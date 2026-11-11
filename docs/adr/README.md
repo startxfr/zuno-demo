@@ -371,7 +371,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Implemented | Derive data classification from OKF and only allow raising it |
-| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Accepted | Gate every live demo on a golden-path check and a freeze window |
+| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Implemented | Gate every live demo on a golden-path check and a freeze window |
 
 ## v0.16
 

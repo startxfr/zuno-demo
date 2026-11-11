@@ -311,7 +311,7 @@ stays `C1` by decision). A live demonstration is given only after a golden-path 
 each demonstration moment, inside a freeze window that starts with that check (ADR-0605, WP-238). The band was
 re-scoped on 2026-11-07 for the demonstration of 2026-11-09 09:00: the work that cannot close before it moved to v0.16.
 
-**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Accepted`.** Open work packages: WP-238.
+**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Implemented` (2026-11-11).** No open work package.
 
 ## v0.16
 

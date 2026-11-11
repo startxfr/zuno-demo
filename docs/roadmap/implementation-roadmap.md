@@ -37,7 +37,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 2 | 1 | 4 | WP-238 |
+| v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 5 | 26 | WP-221, WP-224, WP-227, WP-237, WP-247 |
 | v0.17 | 4 | 2 | 12 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -1093,7 +1093,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Repo work in review | first live run with the user's go, then the dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
+| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Done (2026-11-11) | none: dry run and baseline passed 14/14 (2026-11-08), demonstration given 2026-11-09; the Monday runs and the session acknowledgements are not recorded, accepted by the user; ADR-0605 Implemented |
 | WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Done (2026-11-07) | none: pushed on devel (f8149906); check_docs and the collision test pass (the lint workflow runs on main and pull requests) |
 | WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Done (2026-11-07) | none: known-good regenerated from demo333 with classes, `make d3 check operators` gate PASS live |
 | WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Done (2026-11-07) | after the 2026-11-09 demo: uninstall ECK (Subscription and CSV), then drop its external-operators.yaml entry |
