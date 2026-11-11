@@ -519,6 +519,7 @@ class QuayPruneTests(unittest.TestCase):
             for n in releases:
                 d = repos[name][n]
                 out += [{"name": f"release-{d[:12]}", "manifest_digest": "sha256:" + d},
+                        {"name": f"sha256-{d}", "manifest_digest": "sha256:" + "7" * 64},
                         {"name": f"sha256-{d}.sig", "manifest_digest": "sha256:" + "9" * 64},
                         {"name": f"sha256-{d}.att", "manifest_digest": "sha256:" + "8" * 64}]
             return out
@@ -556,8 +557,9 @@ class QuayPruneTests(unittest.TestCase):
         result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
         d1, t1 = self.CORP[1], self.TEKOS[1]
         self.assertEqual(sorted(ref for _k, ref in result["candidates"]), sorted([
-            f"zuno/okf-corp:release-{d1[:12]}", f"zuno/okf-corp:sha256-{d1}.sig", f"zuno/okf-corp:sha256-{d1}.att",
-            f"zuno/okf-tekos:release-{t1[:12]}", f"zuno/okf-tekos:sha256-{t1}.sig", f"zuno/okf-tekos:sha256-{t1}.att"]))
+            f"zuno/okf-corp:release-{d1[:12]}", f"zuno/okf-corp:sha256-{d1}", f"zuno/okf-corp:sha256-{d1}.sig",
+            f"zuno/okf-corp:sha256-{d1}.att", f"zuno/okf-tekos:release-{t1[:12]}", f"zuno/okf-tekos:sha256-{t1}",
+            f"zuno/okf-tekos:sha256-{t1}.sig", f"zuno/okf-tekos:sha256-{t1}.att"]))
         self.assertFalse([c for c in calls if c[0] == "DELETE"])
 
     def test_apply_deletes_exactly_the_listed_tags_with_the_token(self) -> None:
@@ -574,7 +576,7 @@ class QuayPruneTests(unittest.TestCase):
     def test_every_page_of_tags_is_read(self) -> None:
         _calls, http = self._world([1, 2, 3, 4], page_size=4)
         result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
-        self.assertEqual(len(result["candidates"]), 6)
+        self.assertEqual(len(result["candidates"]), 8)
 
     def test_it_refuses_when_the_locked_release_is_not_on_quay(self) -> None:
         _calls, http = self._world([1, 2, 3])

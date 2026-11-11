@@ -237,7 +237,7 @@ def mirror_release(reference: str, mirror: str, dev: bool = False) -> dict:
 # --- mirror retention (ADR-0611) --------------------------------------------------
 
 KEEP_RELEASES = 3
-_LEGACY_TAG_RE = re.compile(r"^sha256-([0-9a-f]{64})\.(sig|att)$")
+_LEGACY_TAG_RE = re.compile(r"^sha256-([0-9a-f]{64})(\.(sig|att))?$")  # .sig / .att, or the bare referrers-index tag (Quay)
 
 
 def _name(reference: str) -> str:
