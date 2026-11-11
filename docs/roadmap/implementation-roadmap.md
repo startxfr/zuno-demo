@@ -1110,7 +1110,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 | WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07) |
 | WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
 | WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0611 | WP-242 | Done | live on demo333 2026-11-10: gateways read the mirror, quay.io blocked drill passed |
-| WP-247 | [wp-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) | 0602 | WP-223, WP-225 | Not started | design settled 2026-11-11 (fail closed, one-shot key switch, two lots); lot 1 MCP assertion, lot 2 agent chain, then the `ocp-ai-dev` proof |
+| WP-247 | [wp-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) | 0602 | WP-223, WP-225 | Operator pending (2026-11-11) | lots 1 and 2 live on demo333 (Vault Transit signs the MCP assertion and the agent chain), golden path 14/14 after each switch, both old keys retired from every reader; left: the final `ocp-ai-dev` persona proof, deleting the old Vault values, and the workload token (its own WP) |
 
 ### OKF stream phases
 

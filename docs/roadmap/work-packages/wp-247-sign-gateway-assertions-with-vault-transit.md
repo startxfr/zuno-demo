@@ -1,6 +1,6 @@
 # WP-247: Sign the gateway assertions with Vault Transit
 
-- **State:** Not started (design settled 2026-11-11; lot 1 steps 1-3 in the repo, Vault side applied 2026-11-11, signer not live until the image and the window)
+- **State:** Operator pending (2026-11-11): both lots live on demo333 and proven by the golden path, both old keys retired from every reader. Left: the final proof as an `ocp-ai-dev` persona (needs the user's go), the deletion of the two old Vault values (own go), and the workload token (out of scope, own WP)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-223](wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) (Vault on KMS auto-unseal, raft,
