@@ -487,6 +487,20 @@ zuno_ai_gateway_workstation_entry: true
 # `evaluation` class from their group. User-facing clients are never listed.
 zuno_ai_gateway_trusted_platform_clients:
   - zuno-stresstest
+# ADR-0602 clause 10 (WP-225 lot C, user go 2026-11-11): only the Keycloak clients that carry the zuno-admin-api audience
+# (read from the live realm on 2026-11-11: 10 clients) may call the ai-gateway. A forgotten client gets a 401: empty
+# this list and re-run `make d2 install llm` to go back to "any client of the realm".
+zuno_ai_gateway_jwt_allowed_clients:
+  - unifai
+  - open-webui
+  - dify
+  - kagent
+  - world-model
+  - blender
+  - openclaw-*
+  - zuno-evaluations
+  - zuno-stresstest
+  - zuno-admin-api
 # ADR-0591 (WP-188, user go 2026-11-02): skip local models whose
 # LLMInferenceService is not Ready, and providers that just failed, instead of
 # waiting 180 s per *-maas candidate (GPU nodes down that day). Needs

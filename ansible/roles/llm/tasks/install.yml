@@ -51,6 +51,9 @@
     gitops_app_extra_helm_values:
       clusterBaseDomain: "{{ cluster_base_domain }}"
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
+      # ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens are admitted; empty = every client of the
+      # realm. A trailing * is a prefix; a bare * is refused by the chart.
+      jwtAllowedClients: "{{ zuno_ai_gateway_jwt_allowed_clients | default([]) }}"
       quotaLedger:
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
       # WP-184: empty outside a shared-quota proof.
