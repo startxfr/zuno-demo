@@ -32,7 +32,7 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
-- name: "rhtas_config | wait for the policy-controller-manager Deployment to become Available"
+- name: "rhtas_config | wait for the operator's own Deployments to become Available"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
@@ -42,13 +42,22 @@
     # zuno-rhtas - live finding, first real run of this never-before-
     # invoked role (2026-09-08).
     namespace: policy-controller-operator
-    name: policy-controller-manager
+    # Selected by OLM's owner label, not by name: the operator's Deployment
+    # was `policy-controller-manager` up to v1.0.x and is
+    # `policy-controller-operator` from v1.1.2, so a wait on the old name
+    # never ended after the upgrade (WP-211 way back, 2026-11-09). The
+    # label also leaves out the Helm-managed `zuno-policy-controller-webhook`
+    # the operator deploys from the PolicyController CR.
+    label_selectors:
+      - olm.owner.kind=ClusterServiceVersion
   register: _rhtas_config_operator_deployment
   until: >-
     (_rhtas_config_operator_deployment.resources | default([]) | length) > 0 and
-    (_rhtas_config_operator_deployment.resources[0].status.conditions | default([])
-     | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
-     | first | default('False')) == 'True'
+    (_rhtas_config_operator_deployment.resources
+     | map(attribute='status.conditions', default=[])
+     | map('selectattr', 'type', 'equalto', 'Available')
+     | map('selectattr', 'status', 'equalto', 'True')
+     | map('list') | map('length') | select('equalto', 0) | list | length) == 0
   retries: 60
   delay: 10
 

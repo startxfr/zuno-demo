@@ -1,8 +1,8 @@
 ---
 # State detection (never fails). Mirrors ansible/roles/rhtas/tasks/
 # precheck.yml's shape - install.yml's own two GitOps Applications plus the
-# live objects its waits treat as "done": the policy-controller-manager
-# Deployment (Available), the ClusterImagePolicy (Ready - the same
+# live objects its waits treat as "done": the operator's own Deployments
+# (Available, selected by OLM's owner label), the ClusterImagePolicy (Ready - the same
 # condition install.yml itself waits on, TrustRoot's readiness is implied
 # by it per install.yml's own KeysInlined dependency), and the
 # zuno-signer-client-secret Secret the image-signing Jobs actually consume.
@@ -27,12 +27,15 @@
 # OLM OwnNamespace install mode - the Subscription/CSV/Deployment all land
 # in policy-controller-operator, not zuno-rhtas (live finding, demo333
 # 2026-09-08, see install.yml's own comment on this same lookup).
-- name: "rhtas_config | look up the policy-controller-manager Deployment"
+- name: "rhtas_config | look up the operator's own Deployments"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
     namespace: policy-controller-operator
-    name: policy-controller-manager
+    # By OLM's owner label, not by name (renamed from policy-controller-manager
+    # to policy-controller-operator in v1.1.2), see install.yml.
+    label_selectors:
+      - olm.owner.kind=ClusterServiceVersion
   register: _rhtas_config_operator_deployment_lookup
 
 - name: "rhtas_config | look up the zuno-first-party-images ClusterImagePolicy"
@@ -57,9 +60,11 @@
         _rhtas_config_d0_installed
         and _rhtas_config_d1_installed
         and (_rhtas_config_operator_deployment_lookup.resources | default([]) | length) > 0
-        and (_rhtas_config_operator_deployment_lookup.resources[0].status.conditions | default([])
-             | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
-             | first | default('False')) == 'True'
+        and (_rhtas_config_operator_deployment_lookup.resources
+             | map(attribute='status.conditions', default=[])
+             | map('selectattr', 'type', 'equalto', 'Available')
+             | map('selectattr', 'status', 'equalto', 'True')
+             | map('list') | map('length') | select('equalto', 0) | list | length) == 0
         and (_rhtas_config_cip_lookup.resources | default([]) | length) > 0
         and (_rhtas_config_cip_lookup.resources[0].status.conditions | default([])
              | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
