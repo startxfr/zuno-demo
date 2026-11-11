@@ -772,6 +772,9 @@ platformNamespaces:
     # each lookup with other addresses out of a pool of hundreds (ADR-0611 F5), so the region's published ranges sit beside them.
     egressFirewall:
       apiServer: true
+      routeHosts:
+        - name: quay-quay-zuno-registry
+          reason: Clair fetches the layers through the registry's own route (proxy storage URLs name it); found by the WP-248 canary.
       hosts:
         - dnsName: s3.eu-central-1.amazonaws.com
           reason: Registry blobs (bucket zuno-demo333-registry), path-style endpoint.
