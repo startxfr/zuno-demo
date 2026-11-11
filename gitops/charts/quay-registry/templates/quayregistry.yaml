@@ -17,8 +17,15 @@ spec:
     - kind: {{ . }}
       managed: false
     {{- end }}
+    # One replica of each (ADR-0101, ADR-0612 clause 1): with the autoscaler unmanaged the operator would run two.
+    - kind: quay
+      managed: true
+      overrides:
+        replicas: {{ .Values.registry.replicas }}
     - kind: clair
       managed: true
+      overrides:
+        replicas: {{ .Values.registry.replicas }}
     - kind: clairpostgres
       managed: true
     - kind: redis

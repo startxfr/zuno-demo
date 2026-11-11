@@ -33,6 +33,7 @@ registry:
   name: quay
   # Name of the Secret holding config.yaml (database URI, S3 storage, proxy storage): created by roles/quay_registry.
   configBundleSecret: quay-config-bundle
+  replicas: 1
   # Components the operator does NOT manage (WP-248 step 1): database on PGO (PostgreSQL 15), object storage on S3,
   # no autoscaler (single replica, ADR-0101), no mirror workers, monitoring left to the platform.
   unmanaged: [postgres, objectstorage, horizontalpodautoscaler, mirror, monitoring]
