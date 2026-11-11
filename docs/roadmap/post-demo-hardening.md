@@ -42,7 +42,7 @@ The order is by risk reduction per effort.
 
 | Item | Switch | Waits for |
 |---|---|---|
-| REST entitlement | `restAgentEntitlement: true` | a post-demo golden-path run (it changes who may call a tool over REST) |
+| REST entitlement | `restAgentEntitlement: true` | **done 2026-11-11** (user's go): on the demo333 mcp-gateway (`AGENT_ENTITLEMENT_EVERY_CALL=true`), golden path 13/13 after |
 | Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway |
 | Token-proxy inbound auth | `dify_token_proxy_inbound_auth` | re-registering Dify's stored credentials |
 | Salesforce owner scoping | on with the connector | a Salesforce org (none today) |
@@ -57,8 +57,10 @@ The order is by risk reduction per effort.
 - GitHub settings on `main`: secret scanning with push protection, a ruleset against force-push and deletion, the
   required checks. The `main` Secret scan is red on a documented false positive until v0.14.5.
 - `startx-cluster-auth` and `startx-cluster-infra-config` OutOfSync (not from this wave).
-- WP-226 live steps: first rendered release (`make d3 release RENDER_DIGESTS=1`), `zuno_validate_route_certs`, the
-  AAP execution environment digest, `zuno-first-party-images` enforce extended to more namespaces.
+- WP-226 live steps: first rendered release (`make d3 release RENDER_DIGESTS=1`), the AAP execution environment
+  digest, `zuno-first-party-images` enforce extended to more namespaces.
+- `zuno_validate_route_certs`: **done 2026-11-11** (user's go). The three runs passed with it on, every Route these
+  tasks call verifies, and the default is `true` in `ansible/inventories/demo/group_vars/all/main.yml` (ADR-0603 M3).
 - WP-227 (hardened profile) not started.
 
 ## Accepted by the user

@@ -45,13 +45,15 @@ day2_report_format: text
 # serve the router's self-signed default certificate, which no control host
 # trusts. demo333's Routes do carry the Let's Encrypt wildcard (checked
 # 2026-11-07: keycloak, aap, rh-ai, grafana verify with the system trust
-# store), so the switch to true is a WP-226 Operator pending step: one run
-# with EXTRA_VARS="-e zuno_validate_route_certs=true", then this default.
+# store). Switched on 2026-11-11 (user's go): `make d0 check keycloak`, `make d0 check aap` and
+# `make d0 install aap-config` passed with it on, and every Route these tasks call (keycloak, aap, rh-ai,
+# ai-gateway, the mlops DSPA, the Tempo gateway, data-science-gateway, maas) verifies with the system trust store.
+# A cluster without the ACME wildcard sets it back to false in its own inventory.
 # It lives here, not in ansible/clusters/<cluster>.yml, because most of the
 # roles concerned (aap, aap_config, kagent, dify, openclaw) do not load the
 # cluster file. Calls to in-cluster Services signed by the service CA keep
 # their own reason in place.
-zuno_validate_route_certs: false
+zuno_validate_route_certs: true
 
 # Global OLM approval switch (post-demo 2026-11-09, ADR-0607 clause 2 can make Manual the rule): the approval mode of
 # every operator Subscription rendered by a gitops chart. `Automatic` lets OLM install new operator versions on its own;

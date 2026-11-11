@@ -226,7 +226,8 @@ A read-only review by the main session found the points below, fixed in one foll
 5. **First rendered release**, with the go for that release: `make d3 release TAG=v0.15.0 RENDER_DIGESTS=1`, review the
    `digest:` diff, commit the ledger and the values together, merge into `main`. Back-out:
    `python3 platform/supply-chain/render_release_digests.py --clear`.
-6. **Route certificate verification.** Run once with the switch on, then set the default in
+6. **Route certificate verification: done on 2026-11-11** (user's go; the three commands below passed, the default
+   is now `true`). Run once with the switch on, then set the default in
    `ansible/inventories/demo/group_vars/all/main.yml` to `true`:
 
    ```bash
