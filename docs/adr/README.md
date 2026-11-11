@@ -212,7 +212,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Proposed | Automate removal of inaccessible private RAG content |
+| [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Implemented | Automate removal of inaccessible private RAG content |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |

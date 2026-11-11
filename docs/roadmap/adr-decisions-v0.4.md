@@ -108,3 +108,11 @@ ADR-0404, ADR-0405 and ADR-0407 are `Deprecated`: withdrawn with no successor re
 ADR-0408 stays `Proposed`: its one open item is the live revocation proof described above (remove a persona from a
 group, query as that persona, get nothing).
 
+## ADR-0408 implemented (2026-11-11)
+
+The live proof ran on demo333: `stress-consultant-01`, removed from the three groups that gate the `tekos-satellite`
+source, got 0 Satellite chunks out of 10 on the first query with a new token (10 of 10 before and after restoring the
+groups; a control question on another source was unchanged). UnifAI's query-time filter on the caller's groups is the
+implementation; no embedding has to be removed. ADR-0408 is `Implemented`.
+[Evidence](evidence/adr-0408-revocation-proof-2026-11-11.md).
+
