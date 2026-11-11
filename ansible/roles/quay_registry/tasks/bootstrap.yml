@@ -142,6 +142,25 @@
   when: item.status != 200
   no_log: true
 
+# A robot cannot create a repository by pushing to it unless it belongs to a team with the `creator` role: without this the
+# first push of an artifact answers 401 (found by the canary). PUT is idempotent for both the team and the membership.
+- name: "quay_registry | the creators team (role creator) with the push robot as its member"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators{{ item.suffix }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    body_format: json
+    body: "{{ item.body }}"
+    status_code: [200, 201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop:
+    - suffix: ""
+      body: {role: creator, description: "Robots that may create repositories by pushing"}
+    - suffix: "/members/{{ zuno_quay_organization }}+push"
+      body: {}
+  no_log: true
+
 - name: "quay_registry | read the robot tokens"
   ansible.builtin.uri:
     url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item }}"
