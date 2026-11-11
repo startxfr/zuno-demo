@@ -154,6 +154,14 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   (`sha256:991e56ca`); the a2a-gateway rolled once with `signer=file`, key mount unchanged. Left: the switch window (a2a-gateway
   `transit` + the Transit public key in the mcp-gateway and ai-gateway values), the `delegation` proof, then retire
   `a2a/agent-chain` from `secret-access.yaml`.
+- **2026-11-11 13:37:51Z-13:45Z, lot 2 switch window on demo333 (user's go).** Probe pod with the `a2a-gateway`
+  ServiceAccount first: Vault login OK, public key read, `transit/keys/mcp-call-assertion` refused (403), a chain signed by
+  Vault verified with that public key. Then `make d2 install mcp` (a2a-gateway `signer: transit`, mcp-gateway
+  `agentChain.publicKey`) and `make d2 install llm` (ai-gateway key). After: a2a-gateway on `transit` with no
+  `a2a-gateway-agent-chain` Secret or key mount, mcp-gateway and ai-gateway on the new public key, 0 signing errors, a gateway tool
+  call still 200. The ai-gateway sync took about 2 minutes after the install returned (ArgoCD waits for resource health
+  before the Deployment wave): the window is not over when `make` exits, check the pod. Left: the end-to-end proof (golden path
+  `delegation`, played by zuno-demo), then retire `a2a/agent-chain` from `secret-access.yaml` and `make d0 install vault`.
 
 ## Steps
 
