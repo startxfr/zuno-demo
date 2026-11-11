@@ -753,7 +753,11 @@ case "$$verb" in \
     if [[ -n "$${OKF_MIRROR_TO:-}" ]]; then \
       mirror_args=(--to "$$OKF_MIRROR_TO"); \
       case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) mirror_args+=(--plain-http) ;; esac; \
-      python3 platform/supply-chain/admit_okf_bundle.py mirror "$${mirror_args[@]}"; \
+      python3 platform/supply-chain/admit_okf_bundle.py mirror "$${mirror_args[@]}" || exit $$?; \
+      prune_args=(--mirror "$$OKF_MIRROR_TO" --keep "$${OKF_MIRROR_KEEP:-3}"); \
+      case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) prune_args+=(--plain-http) ;; esac; \
+      case "$${OKF_MIRROR_PRUNE:-0}" in 1|true|yes) prune_args+=(--apply) ;; esac; \
+      python3 platform/supply-chain/admit_okf_bundle.py prune "$${prune_args[@]}"; \
     fi ;; \
   release) \
     case " $(DAY3_RELEASE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 release component: '$$component' (expected one of: $(DAY3_RELEASE_COMPONENTS) or all)" >&2; exit 2;; esac; \
