@@ -27,6 +27,10 @@ ADR-0602 clauses 12 and 13.
 1. A `hardened` profile in the inventory group vars and chart values that sets: auto-unseal, per-tenant stores, per-component
    passwords, STRICT mesh, restricted AppProject, `JWT_AUDIENCE_REQUIRED`, `ADMIN_AUTH_MODE=enforce`, guardrails `block`,
    `ClusterImagePolicy` enforce.
+   - The ArgoCD controller loses `cluster-admin`. It gets a ClusterRole built from the cluster-scoped kinds that
+     `zuno-platform` allows, plus `admin` in the managed namespaces. This was a user decision on 2026-11-11, recorded
+     in the ADR-0602 amendment of that date. The `demo` profile keeps `cluster-admin`. The check below lists every
+     kind an Application declares that the ClusterRole lacks.
 2. A check (`make check`) that fails when a `hardened` install has any of those off.
 3. `docs/security/threat-model.md` and `ai-security.md` rewritten from stubs: each of C1 to C10 with its attacker, asset and
    closing clause.

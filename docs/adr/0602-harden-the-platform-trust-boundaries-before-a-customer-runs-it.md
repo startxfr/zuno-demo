@@ -156,3 +156,22 @@ clause changes; only the order of the live steps is set.
   namespace-scoped switches in a canary namespace, its cluster-scoped ones (Vault, mesh-wide settings, ArgoCD scope)
   verified by its `make check` only and named as not rehearsed. There is no scratch cluster; demo333 stays on the `demo`
   profile.
+
+## Amendment (2026-11-11): the two open points of clause 5 decided
+
+The user decided the two points that clause 5 left open.
+
+- **The plain-HTTP chart repository: fixed at its source.** The startx Helm repository
+  (`sx-helm-repository-prod`, S3 static website hosting) has no TLS. Its `index.yaml` and the 1,542 chart archive URLs
+  it lists are `http://`. The S3 REST endpoint `https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable`
+  serves the same files over TLS: the same index byte for byte, and the archives answer 200 (checked on 2026-11-11).
+  Switching only zuno's repository URL would protect the index, not the archives. So the fix has two steps:
+  1. The helm-repository project publishes its index with HTTPS URLs: `HELM_REPO_BASEURL` in its `.tools/config`,
+     then its publish step. That project owns the change and its publish.
+  2. zuno then moves to HTTPS everywhere the repository appears: the `startx-helm-repo` repository Secret, the
+     `sourceRepos` of the `zuno-platform` and `zuno-apps` AppProjects, and every `Chart.lock`. Each chart is checked
+     with `helm dependency build`, and every Application is hard-refreshed.
+- **The ArgoCD controller's `cluster-admin`: moved to the `hardened` profile (WP-227).** That profile replaces the
+  binding with a ClusterRole built from the cluster-scoped kinds that `zuno-platform` allows, plus `admin` in the
+  managed namespaces. The `demo` profile keeps `cluster-admin`, as a risk the user accepts. Shrinking it on demo333
+  would turn any forgotten kind into a sync failure across about 106 Applications.

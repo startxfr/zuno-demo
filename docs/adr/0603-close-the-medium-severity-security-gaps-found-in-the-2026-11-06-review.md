@@ -118,3 +118,23 @@ decision clause changes.
   (`ClusterImagePolicy` from warn to enforce, digests rendered into the charts, `zuno_validate_route_certs`). Each one
   rebuilds or rolls shared components, so none of them runs inside the freeze of
   [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md).
+
+## Amendment (2026-11-11): M12 and M13 values decided
+
+User decisions of 2026-11-11 (post-demo hardening list, item 4). Both are now values in git.
+
+- **M13.** `metrics.query` is offered to `ocp-ai-ops` only. That group's PromQL is scoped to:
+  - the 13 namespaces that mcp-k8s already reads;
+  - `nvidia-gpu-operator`.
+  The values are in `metricsQuery.namespacesByGroup` in `gitops/apps/mcp/application-d1.yaml`. The kagent service
+  account carries `ocp-ai-ops`, so kagent keeps the tool. A node-level or cluster-level series, which has no
+  `namespace` label, selects nothing.
+- **M12.** The shared Confluence identity sees 42 spaces: 4 internal ones, about 12 customer or project spaces, and 26
+  personal spaces. It can write to them.
+  - `consultant`, `board`, `cdp` and `lightspeed_readonly` now reach only the four internal spaces: SXSI, SXS, SXSD
+    and SAC.
+  - `consultant`, `board` and `cdp` reach only `github:startxfr/*` on git-forge. The GitHub token is a fine-grained,
+    public, read-only token, so this narrows reads.
+  - The `"*"` entries of `sales`, `finance`, `adv` and `recrut` are removed. The tool policy gives those groups no
+    Confluence or git tool.
+  - A space or repository is added to a group when a flow needs it.

@@ -63,6 +63,27 @@ spec:
         # tool calls (env AGENT_ENTITLEMENT_EVERY_CALL); /mcp already enforced it. Back out: remove this key and re-run
         # `make d2 install mcp`.
         restAgentEntitlement: true
+        # ADR-0603 M13, post-demo item 4 (user decision 2026-11-11): metrics.query is offered to ocp-ai-ops only (tool
+        # policy); its PromQL is scoped to the namespaces mcp-k8s already reads (readNamespaces in
+        # gitops/charts/mcp-k8s/values.yaml) plus nvidia-gpu-operator for the GPU metrics. A series without a namespace
+        # label (node, cluster) selects nothing. Back out: remove this key and re-run `make d2 install mcp`.
+        metricsQuery:
+          namespacesByGroup:
+            ocp-ai-ops:
+              - zuno-ai-run
+              - zuno-ai-build
+              - zuno-auth
+              - zuno-data
+              - zuno-dify
+              - zuno-kagent
+              - zuno-mesh
+              - zuno-mlops
+              - zuno-monitoring
+              - zuno-openwebui
+              - zuno-unifai
+              - zuno-vault
+              - zuno-aap
+              - nvidia-gpu-operator
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

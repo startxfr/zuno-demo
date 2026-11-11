@@ -53,8 +53,8 @@ The order is by risk reduction per effort.
 | Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway |
 | Token-proxy inbound auth | `dify_token_proxy_inbound_auth` | re-registering Dify's stored credentials |
 | Salesforce owner scoping | on with the connector | a Salesforce org (none today) |
-| Namespace matcher on `metrics.query` | set the allowed namespaces per group | the list of groups that may query which namespaces |
-| Space and repository allowlists for the other groups | extend beyond the five groups | a decision on what consultants and board may read |
+| Namespace matcher on `metrics.query` | set the allowed namespaces per group | **decided 2026-11-11**: `ocp-ai-ops` (the only group with the tool) gets the 13 mcp-k8s namespaces plus `nvidia-gpu-operator`, set in `gitops/apps/mcp/application-d1.yaml` (ADR-0603 amendment) |
+| Space and repository allowlists for the other groups | extend beyond the five groups | **decided 2026-11-11**: consultant, board, cdp and lightspeed_readonly get the internal spaces SXSI, SXS, SXSD and SAC (no customer or personal space); consultant, board and cdp get `github:startxfr/*`; the unused `"*"` entries of sales, finance, adv and recrut are removed |
 | Guardrails `scanToolResults`, `/v1/messages` ceilings | on, with a ceiling per key | traffic numbers from a real week: **the measurement week started 2026-11-11 20:40 UTC** (user's go); read the per-key token and tool-result volumes from the ai-gateway metrics on 2026-11-18, then set the ceilings |
 
 ## 5. Other open items from the wave
@@ -68,7 +68,11 @@ The order is by risk reduction per effort.
   digest, `zuno-first-party-images` enforce extended to more namespaces.
 - `zuno_validate_route_certs`: **done 2026-11-11** (user's go). The three runs passed with it on, every Route these
   tasks call verifies, and the default is `true` in `ansible/inventories/demo/group_vars/all/main.yml` (ADR-0603 M3).
-- WP-227 (hardened profile) not started.
+- WP-227 (hardened profile) not started. It now carries the removal of ArgoCD's `cluster-admin` (user decision
+  2026-11-11, ADR-0602 amendment).
+- The plain-HTTP startx chart repository: **decided 2026-11-11**, fixed at its source. The helm-repository project
+  publishes HTTPS URLs, then zuno moves its repository Secret, AppProjects and `Chart.lock` files to HTTPS (ADR-0602
+  amendment).
 
 ## Accepted by the user
 
