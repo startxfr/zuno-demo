@@ -1,5 +1,5 @@
 ---
-# WP-225 lot C, rollout step 0b: export the PUBLIC halves of the two signing keys, so they can be
+# WP-225 lot C, rollout step 0b: export the PUBLIC half of the agent-chain signing key, so it can be
 # written into the Applications' values (the verifiers hold the public key as a chart value). Reads
 # only the `public_key` property, never `private_key`, and writes a YAML file of public keys.
 #
@@ -38,7 +38,6 @@
       register: _wp225_pub
       changed_when: false
       loop:
-        - mcp/gateway-call-assertion
         - a2a/agent-chain
       loop_control:
         label: "zuno/{{ item }} (public_key only)"
@@ -48,6 +47,5 @@
         dest: "{{ wp225_public_keys_out }}"
         mode: "0644"
         content: |
-          # Public halves only (Ed25519, PEM, base64). Safe to commit as chart values.
-          call_assertion_public_key_b64: "{{ _wp225_pub.results[0].stdout | trim }}"
-          agent_chain_public_key_b64: "{{ _wp225_pub.results[1].stdout | trim }}"
+          # Public half only (Ed25519, PEM, base64). Safe to commit as chart values.
+          agent_chain_public_key_b64: "{{ _wp225_pub.results[0].stdout | trim }}"

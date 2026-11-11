@@ -1,9 +1,13 @@
 ---
-# WP-225 lot C, rollout step 0 (ADR-0602 clause 10, ADR-0603 M14): seed the two Ed25519
-# signing key pairs in Vault.
+# WP-225 lot C, rollout step 0 (ADR-0602 clause 10, ADR-0603 M14): seed the Ed25519
+# signing key pair of the agent chain in Vault.
 #
-#   zuno/mcp/gateway-call-assertion   private_key, public_key   mcp-gateway signs the per-call assertion
 #   zuno/a2a/agent-chain              private_key, public_key   a2a-gateway signs the delegation chain
+#
+# The per-call assertion key (zuno/mcp/gateway-call-assertion) is no longer seeded: since WP-247
+# lot 1 the mcp-gateway signs with the Vault Transit key mcp-call-assertion, which the Vault
+# configure Job creates (ansible/roles/vault/kustomize/configure/configure.sh). Seeding the old
+# path again would recreate a readable private key.
 #
 # Idempotent and quiet: a pair that already exists is NEVER overwritten (rotating a key
 # means the verifiers' public keys change in the same window, see the brief), and no key
@@ -18,7 +22,6 @@
   vars:
     zuno_repo_root: "{{ playbook_dir }}/../.."
     wp225_key_paths:
-      - mcp/gateway-call-assertion
       - a2a/agent-chain
   tasks:
     - name: Resolve cluster API credentials
