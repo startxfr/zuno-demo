@@ -1,0 +1,30 @@
+# ADR-0612/WP-248: the QuayRegistry, its dedicated PGO database and NetworkPolicies. The config bundle Secret it points to
+# is created by roles/quay_registry (generated database password, bucket key); the operator waits for it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-quay-registry-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-162"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/quay-registry
+    helm:
+      releaseName: zuno-quay-registry-d1
+      values: |
+        namespace: zuno-registry
+        registry:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-registry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

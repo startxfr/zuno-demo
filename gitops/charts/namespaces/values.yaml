@@ -751,6 +751,78 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
 
+  # ADR-0612 / WP-248: the internal Red Hat Quay. quay-operator is OwnNamespace (its OperatorGroup lives here), so the
+  # namespace is repo-owned like zuno-rhtas. Not meshed: operator-owned workloads, TLS by the cluster wildcard on the route.
+  # Consumers pull through the Service; the baseline already admits the router.
+  - name: zuno-registry
+    displayName: Zuno Registry
+    description: >-
+      Internal Red Hat Quay (operator, Quay, Clair, Redis) holding the OKF release, the zuno images and a declared
+      selection of public images (ADR-0612).
+    allowedFromNamespaces:
+      - zuno-ai-run
+      - zuno-ai-build
+      - zuno-unifai
+      - openshift-operators
+      - openshift-gitops
+    extraLabels:
+      zuno.io/managed: "true"
+    # Egress: the API (operator), S3 for the blobs, and the Red Hat vulnerability feed for Clair (ADR-0612 clause 4: the
+    # other Clair updaters stay disabled, so no further host is opened). The S3 name rules are not enough alone: S3 answers
+    # each lookup with other addresses out of a pool of hundreds (ADR-0611 F5), so the region's published ranges sit beside them.
+    egressFirewall:
+      apiServer: true
+      hosts:
+        - dnsName: s3.eu-central-1.amazonaws.com
+          reason: Registry blobs (bucket zuno-demo333-registry), path-style endpoint.
+        - dnsName: zuno-demo333-registry.s3.eu-central-1.amazonaws.com
+          reason: Virtual-hosted name of the registry bucket.
+        - dnsName: security.access.redhat.com
+          reason: Clair's Red Hat VEX updater (the only updater set enabled).
+      cidrs:
+        - cidr: 1.178.10.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.12.24.0/21
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.12.32.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.15.20.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.2.112.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.2.70.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.120.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.134.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.136.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.65.246.0/28
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.65.246.16/28
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.140.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.168.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.169.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.170.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.208.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.210.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.211.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.218.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.44.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.72.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+
   # ADR-0524: OpenShift Lightspeed's operator namespace. The operator's CSV
   # is OwnNamespace-only and its OLSConfig operand is a mandatory singleton
   # that lives here, so the namespace is a permanent, CR-bearing part of the

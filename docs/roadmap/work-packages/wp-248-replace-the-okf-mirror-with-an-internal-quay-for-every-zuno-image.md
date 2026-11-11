@@ -185,3 +185,30 @@ dependency), and the key is written once to `~/.config/zuno/zuno-demo333-registr
 repository) because AWS never shows the secret again; the `quay_registry` role (step 4) moves it to Vault. The firewall
 CIDRs for S3 and the canary S3 test come with that role. The step-1 canary was deleted on the owner's order; the S3 test
 will run in a later canary together with other changes.
+
+## Prepared in the repository (2026-11-11, steps 4 and the namespace part of 3; nothing applied to the cluster)
+
+Done on the owner's order, to be rehearsed with the S3 test in the next canary ([ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md)):
+
+- **Chart `gitops/charts/quay-registry`** and Applications `zuno-quay-registry-d0` (operator: OperatorGroup + Subscription through
+  the vendored `operator` chart) and `-d1` (dedicated PGO `PostgresCluster` on PostgreSQL 15 with the `pg_trgm` init script,
+  `QuayRegistry` with postgres, objectstorage, autoscaler, mirror and monitoring unmanaged, a NetworkPolicy for the consumers).
+  The `QuayRegistry` carries `SkipDryRunOnMissingResource`, its CRD coming with the operator.
+- **Role `quay_registry`** (`make d2 install|check|uninstall quay-registry`, placed before `okf-mirror` in the Day 2 order, the
+  AAP install and check graphs, and the survey lists): resolves the operator package, applies d0 then d1, waits for PGO's
+  `quay-db-pguser-quay` Secret, builds the `quay-config-bundle` Secret (URL-encoded `DB_URI`, S3 storage on the bucket with
+  proxy storage on, the key read from the 0600 key file) and waits for `Available`. Uninstall deletes the `QuayRegistry` before
+  the operator (the canary namespace stuck otherwise) and never touches the bucket.
+- **Namespace `zuno-registry`** in the namespaces chart, not meshed, with an EgressFirewall: the API server,
+  `security.access.redhat.com`, the S3 names and the 21 published `eu-central-1` S3 ranges (syncToken 1794413225).
+- Checks run: `helm template` of both charts, `ansible-playbook --syntax-check`, `ansible-lint` (only the repository's usual
+  casing and prefix findings), the config-bundle expression rendered with a fake password, `check_mesh_mtls.py` 545/0,
+  `check_docs.py`.
+
+**To verify in the canary** (written from documentation, never run): the pod label `quay-component: quay-app` used by the
+NetworkPolicy; that the operator merges a `clair-config.yaml` holding only `updaters.sets: [rhel-vex]` from the config
+bundle (if it requires a complete file, the Clair restriction moves to the egress side alone); proxy storage with S3; whether
+`FEATURE_USER_INITIALIZE` plus the first `quayadmin` call can be scripted for the organisation and robot accounts (step 4,
+second half, not written yet); the known-good entry for `quay-operator` (the version is only known after the first install).
+Also still to do: the Quay variant of `prune`, the Vault copy of the bucket key, and the PGO backup of `quay-db` into the
+Day 3 schedule.

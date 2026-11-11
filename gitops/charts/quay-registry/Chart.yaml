@@ -1,0 +1,13 @@
+apiVersion: v2
+name: quay-registry
+description: >-
+  The internal Red Hat Quay (ADR-0612): operator subscription (d0), and the QuayRegistry, its dedicated PGO database and
+  NetworkPolicies (d1). Object storage is the S3 bucket of roles/registry_bucket; the config bundle Secret is created by
+  roles/quay_registry because it needs the generated database password and the bucket key.
+type: application
+version: 0.1.0
+appVersion: "3.18"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"

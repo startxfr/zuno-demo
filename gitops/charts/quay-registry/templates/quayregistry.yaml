@@ -1,0 +1,30 @@
+{{- if .Values.registry.enabled }}
+# The CRD exists only after the d0 operator is installed: do not fail the dry run before that.
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: {{ .Values.registry.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  configBundleSecret: {{ .Values.registry.configBundleSecret }}
+  components:
+    {{- range .Values.registry.unmanaged }}
+    - kind: {{ . }}
+      managed: false
+    {{- end }}
+    - kind: clair
+      managed: true
+    - kind: clairpostgres
+      managed: true
+    - kind: redis
+      managed: true
+    - kind: route
+      managed: true
+    - kind: tls
+      managed: true
+{{- end }}

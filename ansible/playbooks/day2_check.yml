@@ -26,6 +26,8 @@
       - namespaces
       - llm
       - models
+      # ADR-0612 (WP-248): the internal registry, before the OKF mirror it replaces.
+      - quay_registry
       # ADR-0611 (WP-246): before mcp, whose okf-fetch can read it.
       - okf_mirror
       - mcp

@@ -1,0 +1,59 @@
+# ADR-0612 / WP-248. Namespace zuno-registry is created by the namespaces chart (platformNamespaces).
+namespace: zuno-registry
+
+# d0 Application: the OwnNamespace operator (OperatorGroup + Subscription) through the vendored `operator` chart.
+# The Application passes enabled: true, the role passes the discovered channel and catalog.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: quay-registry
+    app: quay-registry
+  subscription:
+    enabled: true
+    name: quay-operator
+    namespace: zuno-registry
+    operator:
+      channel: ""
+      name: quay-operator
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: quay-operator-group
+    namespace: zuno-registry
+
+# d1 Application: the operand. Off by default so `helm template` with no values renders nothing.
+registry:
+  enabled: false
+  name: quay
+  # Name of the Secret holding config.yaml (database URI, S3 storage, proxy storage): created by roles/quay_registry.
+  configBundleSecret: quay-config-bundle
+  # Components the operator does NOT manage (WP-248 step 1): database on PGO (PostgreSQL 15), object storage on S3,
+  # no autoscaler (single replica, ADR-0101), no mirror workers, monitoring left to the platform.
+  unmanaged: [postgres, objectstorage, horizontalpodautoscaler, mirror, monitoring]
+  # Clair (and its database), Redis, route and TLS (cluster wildcard certificate) stay managed.
+
+database:
+  name: quay-db
+  postgresVersion: 15          # Quay documents 15; the shared zuno-data cluster is 18 (WP-248 step 1)
+  storage: 10Gi
+  storageClassName: ""         # empty: cluster default
+  backupRepoStorage: 5Gi
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {memory: 1Gi}
+
+# Pods allowed to reach the registry: every namespace that pulls or pushes images. The router (users, external pushes) and
+# the platform's own namespaces are in the namespaces chart baseline; this lists what the registry itself admits.
+consumers:
+  namespaces:
+    - zuno-ai-run
+    - zuno-ai-build
+    - zuno-unifai
+    - openshift-operators
+    - openshift-gitops

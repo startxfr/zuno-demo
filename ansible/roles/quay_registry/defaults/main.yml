@@ -1,0 +1,10 @@
+---
+zuno_quay_namespace: zuno-registry
+# Per-cluster (ansible/clusters/<cluster>.yml, ADR-0547): zuno_quay_s3_bucket, zuno_quay_s3_region.
+zuno_quay_s3_bucket: ""
+zuno_quay_s3_region: eu-central-1
+# The one-time key file written by roles/registry_bucket.
+zuno_quay_s3_key_file: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/{{ zuno_quay_s3_bucket }}-key.json"
+# ADR-0612 clause 4: Clair updater sets that run. Red Hat only = one egress host. Whether the operator merges a
+# clair-config.yaml from the config bundle is verified in the first canary (WP-248).
+zuno_quay_clair_updater_sets: [rhel-vex]

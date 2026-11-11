@@ -1,0 +1,124 @@
+---
+# ADR-0612/WP-248. Red Hat Quay (operator, OwnNamespace) with a PGO database and the S3 bucket of roles/registry_bucket.
+# Sequence: operator (d0) -> operand (d1: PostgresCluster, QuayRegistry waiting for its config bundle) -> config bundle
+# Secret built here (needs the generated database password and the bucket key, neither of which may be in git) -> wait.
+- name: "quay_registry | assert the bucket variable and the key file"
+  ansible.builtin.stat:
+    path: "{{ zuno_quay_s3_key_file }}"
+  register: _quay_registry_key_file
+
+- name: "quay_registry | fail when the S3 prerequisites are missing"
+  ansible.builtin.assert:
+    that:
+      - zuno_quay_s3_bucket | length > 0
+      - _quay_registry_key_file.stat.exists
+    fail_msg: >-
+      Set zuno_quay_s3_bucket in ansible/clusters/<cluster>.yml and create the bucket first:
+      ansible-playbook ansible/playbooks/registry_bucket.yml -e registry_bucket_apply=true (key file {{ zuno_quay_s3_key_file }}).
+    quiet: true
+
+- name: "quay_registry | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "quay-operator"
+    operator_subscription_namespace: "{{ zuno_quay_namespace }}"
+    operator_preferred_channel: "stable-3.18"
+    operator_package_catalog_hint: "quay"
+
+- name: "quay_registry | apply the operator GitOps Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
+  vars:
+    gitops_component_name: "quay-registry"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-quay-registry-d0"
+    gitops_app_extra_helm_values:
+      namespace: "{{ zuno_quay_namespace }}"
+      operator:
+        enabled: true
+        subscription:
+          operator:
+            channel: "{{ operator_package_channel }}"
+            source:
+              name: "{{ operator_package_catalog }}"
+    gitops_app_wait_retries: 60
+
+- name: "quay_registry | apply the operand GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "quay-registry"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-quay-registry-d1"
+    gitops_app_wait_retries: 60
+
+- name: "quay_registry | wait for the database user Secret that PGO generates"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-db-pguser-quay
+  register: _quay_registry_db_secret
+  until: _quay_registry_db_secret.resources | length > 0
+  retries: 60
+  delay: 10
+
+- name: "quay_registry | read the bucket key (never logged)"
+  ansible.builtin.set_fact:
+    _quay_registry_s3_key: "{{ lookup('ansible.builtin.file', zuno_quay_s3_key_file) | from_json }}"
+  no_log: true
+
+# The password goes in a URI: PGO passwords carry ; > ( * and the unencoded form crashed Quay's first start (WP-248 step 1).
+# Storage: proxy storage on, so clients are never redirected to a presigned S3 URL (the EgressFirewall allows few S3 addresses).
+# FEATURE_SECURITY_SCANNER is left to the operator (setting it here conflicts when Clair is managed).
+- name: "quay_registry | build the config bundle"
+  ansible.builtin.set_fact:
+    _quay_registry_config:
+      DB_URI: >-
+        postgresql://quay:{{ (_quay_registry_db_secret.resources[0].data.password | b64decode) | urlencode }}@quay-db-primary.{{
+        zuno_quay_namespace }}.svc:5432/quay?sslmode=require
+      DISTRIBUTED_STORAGE_CONFIG:
+        default:
+          - S3Storage
+          - host: "s3.{{ zuno_quay_s3_region }}.amazonaws.com"
+            s3_bucket: "{{ zuno_quay_s3_bucket }}"
+            storage_path: /datastorage/registry
+            s3_access_key: "{{ _quay_registry_s3_key.AccessKeyId }}"
+            s3_secret_key: "{{ _quay_registry_s3_key.SecretAccessKey }}"
+      DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS: []
+      DISTRIBUTED_STORAGE_PREFERENCE: [default]
+      FEATURE_PROXY_STORAGE: true
+      FEATURE_USER_INITIALIZE: true
+      SUPER_USERS: [quayadmin]
+  no_log: true
+
+- name: "quay_registry | apply the config bundle Secret"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: quay-config-bundle
+        namespace: "{{ zuno_quay_namespace }}"
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      stringData: >-
+        {{ {'config.yaml': (_quay_registry_config | to_nice_yaml)}
+           | combine({'clair-config.yaml': ({'updaters': {'sets': zuno_quay_clair_updater_sets}} | to_nice_yaml)}
+                     if (zuno_quay_clair_updater_sets | length > 0) else {}) }}
+  no_log: true
+
+- name: "quay_registry | wait for the QuayRegistry to be Available"
+  kubernetes.core.k8s_info:
+    api_version: quay.redhat.com/v1
+    kind: QuayRegistry
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay
+  register: _quay_registry_ready
+  until: >-
+    (_quay_registry_ready.resources | length) > 0 and
+    ((_quay_registry_ready.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list) == ['True'])
+  retries: 90
+  delay: 10

@@ -1,0 +1,31 @@
+---
+# Reverse of install.yml. The bucket and its contents are NOT touched: deleting the registry must never delete the images
+# (remove the bucket by hand when retiring the registry for good). Delete the QuayRegistry first so the operator runs its
+# finalizer while it still exists (deleting the operator first leaves the namespace stuck, WP-248 canary).
+- name: "quay_registry | delete the operand GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-quay-registry-d1"
+
+- name: "quay_registry | wait for the QuayRegistry to be gone"
+  kubernetes.core.k8s_info:
+    api_version: quay.redhat.com/v1
+    kind: QuayRegistry
+    namespace: "{{ zuno_quay_namespace }}"
+  register: _quay_registry_gone
+  until: (_quay_registry_gone.resources | length) == 0
+  retries: 30
+  delay: 10
+
+- name: "quay_registry | delete the config bundle Secret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Secret
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-config-bundle
+
+- name: "quay_registry | delete the operator GitOps Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-quay-registry-d0"

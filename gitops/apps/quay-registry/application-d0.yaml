@@ -1,0 +1,36 @@
+# ADR-0612/WP-248: the Red Hat Quay operator (OwnNamespace, so its own OperatorGroup in zuno-registry). The operand is a
+# separate Application (application-d1.yaml). Channel and catalog are discovered and passed by roles/quay_registry.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-quay-registry-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-169"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/quay-registry
+    helm:
+      releaseName: zuno-quay-registry-d0
+      values: |
+        namespace: zuno-registry
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-registry
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
