@@ -122,12 +122,14 @@ stack:
 # identity Route, stack.rag.confluenceUrl's host and, with stack.backup, the S3
 # endpoint and the bucket's virtual-hosted name. Hosts verified against the
 # live demo333 stack on 2026-11-06.
-# Off until the zuno-unifai rehearsal (canary window, user's go): never
-# rehearsed, and the stack may reach hosts not listed here (googleapis via
-# GOOGLE_APPLICATION_CREDENTIALS, a search API, docling model downloads).
+# On since 2026-11-11 (user's go, WP-224 step 6). Rehearsed on 2026-11-08 on a throwaway
+# stack (docs/roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md): the hosts
+# below answer through the firewall, everything else is blocked. A host the stack needs
+# and that is missing here fails silently in a restart path or a CronJob: add it with a
+# reason line. Rollback at once: `oc -n zuno-unifai delete egressfirewall default`, then
+# `enabled: false` plus a `disabledReason` here (ArgoCD recreates it otherwise).
 egress:
-  enabled: false
-  disabledReason: not rehearsed yet on zuno-unifai; enable in the canary window with the user's go (WP-224 rollout step 8).
+  enabled: true
   # The Kubernetes API on the control-plane nodes (6443): rag-server's
   # TokenReview (stack.rag.tokenReview; RAG_TOKENREVIEW_ENABLED=true live).
   apiServer: true
