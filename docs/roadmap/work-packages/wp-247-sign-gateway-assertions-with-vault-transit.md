@@ -1,6 +1,6 @@
 # WP-247: Sign the gateway assertions with Vault Transit
 
-- **State:** Not started (design settled 2026-11-11; lot 1 step 2 coded and tested locally, not deployed: nothing runs it until the Vault side, the chart and the image exist)
+- **State:** Not started (design settled 2026-11-11; lot 1 steps 1 and 2 coded in the repo (signer tested locally), not deployed: nothing runs until the chart, the image and the window exist)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-223](wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) (Vault on KMS auto-unseal, raft,
@@ -85,6 +85,13 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   Tests: `components/mcp-gateway/tests/test_wp247_transit_signer.py` (15, against a fake Vault holding a real Ed25519
   key) pass; `test_wp225_lot_c`, `test_downstream_streamable_http`, `test_mcp_frontdoor`, `test_auth` and
   `test_agent_chain` still pass. The default is unchanged, so the code is dormant until the chart switch.
+- **2026-11-11, lot 1 step 1 (Vault side), repo only, not applied.** `ansible/roles/vault/kustomize/configure/configure.sh`
+  now creates, create-if-missing, the non-exportable `ed25519` Transit key `mcp-call-assertion`, the policy
+  `mcp-call-assertion-signer` (`update` on `transit/sign/mcp-call-assertion`, `read` on `transit/keys/mcp-call-assertion`,
+  nothing else) and the Kubernetes auth role `mcp-gateway` (ServiceAccount `mcp-gateway`, namespace `zuno-ai-run`, 15 min
+  token). The configurator policy already allows `transit/keys/*`, so it needs no change. Nothing runs until the configure
+  Job is re-run (`make d0 install vault`, needs the user's go). Finding for step 3: the gateway Deployment sets
+  `automountServiceAccountToken` from `lightspeed.enabled`, so the chart must mount the token when `signer: transit`.
 
 ## Steps
 
