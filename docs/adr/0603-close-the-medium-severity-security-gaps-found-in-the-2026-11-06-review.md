@@ -138,3 +138,7 @@ User decisions of 2026-11-11 (post-demo hardening list, item 4). Both are now va
   - The `"*"` entries of `sales`, `finance`, `adv` and `recrut` are removed. The tool policy gives those groups no
     Confluence or git tool.
   - A space or repository is added to a group when a flow needs it.
+
+Both are live on demo333 since 2026-11-11 22:41 UTC. The golden path passed afterwards, and each restriction was
+checked with one allowed call and one refused call
+([evidence](../roadmap/evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)).
