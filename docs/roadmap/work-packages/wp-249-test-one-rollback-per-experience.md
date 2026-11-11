@@ -1,6 +1,6 @@
 # WP-249: Test one rollback per experience
 
-- **State:** Not started
+- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade; left: Lightspeed, Blender, UnifAI with v0.1.69, the first-party digests, decisions D1-D2)
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** [WP-243](wp-243-browser-tests-for-every-experience.md) (the browser checks used for the negative case)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) (golden path after each change), [ADR-0607](../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md) (OLM never downgrades), [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md) (canary namespaces)
