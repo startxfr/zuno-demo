@@ -143,8 +143,8 @@ oc exec -it -n zuno-auth zuno-0 -c keycloak -- bash -c '
   CFG="--config /tmp/kcadm.config"
   $KCADM config credentials $CFG \
     --server http://zuno-service.zuno-auth.svc:8080 --realm master \
-    --user "$(oc get secret keycloak-admin -n zuno-auth -o jsonpath="{.data.username}" | base64 -d)" \
-    --password "$(oc get secret keycloak-admin -n zuno-auth -o jsonpath="{.data.password}" | base64 -d)"
+    --user "$(oc get secret keycloak-automation -n zuno-auth -o jsonpath="{.data.username}" | base64 -d)" \
+    --password "$(oc get secret keycloak-automation -n zuno-auth -o jsonpath="{.data.password}" | base64 -d)"
 
   $KCADM create groups -r zuno $CFG -s name=aap_admin
   $KCADM create groups -r zuno $CFG -s name=aap_ops

@@ -161,6 +161,12 @@ on the user's `sub`; a re-created user gets a new id. The migration must keep th
    `make d1 check` green.
 5. ✋ Back: export the simulated realm with users, flip to `internal`, `make d0 install keycloak` and the same consumer
    roles, compare counts and ids, the same proofs, then delete `zuno-auth-ext`.
+   Also restore the bootstrap credential: the external flip overwrote Vault `zuno/keycloak/admin` (KV version 2), and
+   the vault role seeds create-if-missing (ADR-0345), so the path keeps the external admin after the flip back
+   (found 2026-11-11: `zuno-auth/keycloak-admin` still held `zuno-platform`). Run `vault kv rollback -version=1
+   zuno/keycloak/admin` (or re-seed the internal bootstrap credential), force-sync the `keycloak-admin` ExternalSecret,
+   and check the Secret no longer names the external admin. Sign-in is not affected meanwhile (`zuno-admin` and
+   `zuno-automation`, WP-192), only the bootstrap fallback is.
 
 Expected outage: each flip re-points every login; plan about 2 h with the user available for the console and
 experience logins.
