@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 10 | 5 | 26 | WP-224, WP-227, WP-237 |
+| v0.16 | 10 | 5 | 27 | WP-224, WP-227, WP-237, WP-249 |
 | v0.17 | 5 | 3 | 13 | WP-212, WP-213, WP-214, WP-215, WP-218, WP-248 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1099,6 +1099,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 | WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Done (2026-11-07) | after the 2026-11-09 demo: uninstall ECK (Subscription and CSV), then drop its external-operators.yaml entry |
 | WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Done (2026-11-07) | none: pattern rehearsed on demo333 (zuno-canary-wp-242 created, isolation checked, removed) |
 | WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Done (2026-11-07) | five browser checks pass on demo333 (`make demo browser`); the scale-to-zero negative case runs after the demo |
+| WP-249 | [wp-249](work-packages/wp-249-test-one-rollback-per-experience.md) | 0606 | WP-243 | Not started | opened 2026-11-11 (user decision): one rollback tested per experience, cheapest first, and WP-243's scale-to-zero negative case; decisions D1-D2 before the operator rows; each step with the user's go and a golden path |
 
 ### Phase 53 — Blender objects from text on a local model (added 2026-11-07)
 
@@ -1259,6 +1260,7 @@ moving.
 
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-11 — WP-249 added (Phase 52, v0.16): test one rollback per experience, the remaining condition of ADR-0606 (user decision).
 - 2026-11-09 — ADR-0611 and WP-246 added (Phase 53, v0.17), Proposed: mirror the admitted OKF release into the internal registry, from the quay.io egress measurement of the day.
 - 2026-11-07 — WP-245 added (Phase 53): ADR-0610 Implemented (prompt set measured, golden-path moment `blender`); Blender joins the 2026-11-09 demonstration.
 - 2026-11-07 — ADR-0610 and WP-244 added (Phase 53, v0.17): Blender objects from text on a local model, executed ahead of its band by user decision.

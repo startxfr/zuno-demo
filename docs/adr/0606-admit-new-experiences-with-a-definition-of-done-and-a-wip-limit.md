@@ -102,3 +102,10 @@ For the experiences already admitted (UnifAI, Open WebUI, OpenClaw, Dify, kagent
 Clauses 2 to 7 are in force, and the number check and the template are in place (WP-239). This record stays
 `Accepted` until each rollback has been tested once, which clause 1 requires; the tests run in the window after the
 2026-11-09 demonstration. The world model (ADR-0604) is the first experience admitted under this record, in v0.16.
+
+## Status note (2026-11-11)
+
+The rollback tests have their own work package,
+[WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md): one test per experience, cheapest first,
+with WP-243's scale-to-zero negative case. The world model's teardown already ran (2026-11-09 and 2026-11-11). This record
+moves to `Implemented` when WP-249 is Done.
