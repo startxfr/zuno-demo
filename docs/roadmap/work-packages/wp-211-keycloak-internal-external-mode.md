@@ -351,12 +351,21 @@ Left before Done:
      and broke `user-ca-bundle` on 2026-11-08. `check_docs.py` now reports that pattern anywhere in `ansible/`.
 2. **Live clean-up, each with the user's go:**
    - roll `zuno/keycloak/admin` back to the built-in credential and force-sync the `keycloak-admin` ExternalSecret
-     (5151869f);
+     (5151869f): done on 2026-11-11 (version 1, user `admin`, restored as version 3; the Secret carries `admin`);
    - empty the Blender add-on's issuer override on the presenter's laptop.
 3. **`zuno-auth-ext` and `certIdentityExtraIssuers` stay** until a release is signed through the built-in issuer. The
    v0.14.5 images were signed through `keycloak-ext`. Delete both after the next tag's ledger run.
-4. **Evidence in both modes:** only the golden path is recorded. `make d1 check`, `make d2 check agents` and
-   `make d2 check supply-chain` are not.
+4. **Evidence in both modes (user decision 2026-11-11):** the external mode is evidenced by its golden-path runs (14/14
+   on 2026-11-08), not by a second flip. The three checks ran in internal mode on 2026-11-11 (`-e
+   zuno_keycloak_mode=internal`):
+   - `make d1 check`: exit 0; 22 of 23 components installed. `openshift-ai` reports NOT installed for reasons that
+     predate WP-211 and do not involve Keycloak (DataScienceCluster `trustyai` module not ready on RHOAI 3.6 EA, the
+     TempoStack opa sidecar sizing, the pinned `3.6.0-ea.2` against a catalog serving `3.5.2`). `rhtas-config` is seen
+     installed again (the OLM-label fix).
+   - `make d2 check agents`: exit 0.
+   - `make d2 check supply-chain`: FAIL, 8 of 12 images. Their signatures carry the issuer `keycloak-ext` (v0.14.5 was
+     signed in external mode) and the check verifies against the built-in issuer only, while the admission policy accepts
+     both. It passes once a release is signed through the built-in issuer: item 3.
 
 Then: the brief to Done, an ADR-0352 clause-9 note, and clauses 5 and 6 amended to the consumer list of lot A.
 
