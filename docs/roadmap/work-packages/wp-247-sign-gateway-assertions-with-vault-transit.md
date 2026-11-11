@@ -134,6 +134,20 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   `a2a/agent-chain` remain readable; a gateway tool call still returns 200. The Vault data itself is **not deleted yet**
   (only `ansible-seeder` and root can still read it, and nothing reads it): deleting it is a separate step with its own go.
   The chart's `file` signer and its ExternalSecret stay as the documented rollback path.
+- **2026-11-11, lot 2 (agent chain) coded in the repo, not applied.** `signed_chain.sign()` takes an optional `signer`
+  callable (the three copies stay byte-identical, the lot C test compares them); the a2a-gateway gets
+  `app/transit_signer.py` (same Vault client as lot 1) and `AGENT_CHAIN_SIGNER` (`file` default, `transit`);
+  `clients._downstream_headers` now runs in a thread so a slow Vault cannot stall the event loop. Behaviour on a Vault
+  failure follows what the chain already does for an unreadable key: **no chain is sent** (the verifiers keep the
+  unverified headers and their floors), never a fallback to a local key. This differs from lot 1 (the call is refused);
+  to confirm with the user. Vault side in `configure.sh`: Transit key `agent-chain`, policy `agent-chain-signer`, role
+  `a2a-gateway` (ServiceAccount `a2a-gateway`, `zuno-ai-run`). Chart `a2a-gateway`: `agentChain.signer`/`agentChain.vault`,
+  token mounted and no ExternalSecret/volume in `transit` (rendered in the three modes). Tests: 14 new in
+  `components/a2a-gateway/tests/test_wp247_transit_chain.py`; the existing a2a (27), mcp-gateway and ai-gateway lot C
+  tests pass. Live steps left (each needs the user's go): `make d0 install vault`; build the a2a-gateway image (the
+  verifiers need no rebuild); one window that switches a2a-gateway to `transit` and puts the new public key in
+  `gitops/apps/mcp/application-d1.yaml` and `ansible/clusters/demo333.yml` (ai-gateway); golden path `delegation`;
+  then retire `a2a/agent-chain` from `secret-access.yaml`.
 
 ## Steps
 

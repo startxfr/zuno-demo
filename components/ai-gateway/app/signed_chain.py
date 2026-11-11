@@ -40,13 +40,14 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import os
 import re
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jwt
 from cryptography.hazmat.primitives import serialization
@@ -119,9 +120,14 @@ def parse_hops(delegated_by: Optional[str]) -> Hops:
     return tuple(hops)
 
 
+def _b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
 def sign(
     *,
-    private_key: Ed25519PrivateKey,
+    private_key: Optional[Ed25519PrivateKey] = None,
+    signer: Optional[Callable[[bytes], bytes]] = None,
     audience: str,
     token: str,
     agent: str,
@@ -148,6 +154,17 @@ def sign(
         "exp": issued + ttl,
         "jti": uuid.uuid4().hex,
     }
+    if signer is not None:
+        # WP-247 lot 2: the key lives in Vault Transit. `signer` takes the JWS signing input and
+        # returns the 64-byte Ed25519 signature; the header is the one PyJWT writes below.
+        header = {"typ": TYPE, "alg": ALGORITHM}
+        signing_input = (
+            _b64url(json.dumps(header, separators=(",", ":")).encode("utf-8")) + "."
+            + _b64url(json.dumps(claims, separators=(",", ":")).encode("utf-8"))
+        )
+        return signing_input + "." + _b64url(signer(signing_input.encode("ascii")))
+    if private_key is None:
+        raise ChainSignatureError("sign() needs a private key or a signer")
     return jwt.encode(claims, private_key, algorithm=ALGORITHM, headers={"typ": TYPE})
 
 

@@ -39,7 +39,8 @@ spec:
     spec:
       serviceAccountName: a2a-gateway
       priorityClassName: zuno-workload-default
-      automountServiceAccountToken: false
+      # WP-247 lot 2: the Transit signer authenticates to Vault with this token.
+      automountServiceAccountToken: {{ and .Values.agentChain.sign (eq .Values.agentChain.signer "transit") }}
       {{- if .Values.topologySpreadConstraints.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
@@ -146,8 +147,21 @@ spec:
               value: {{ .Values.toolsEnabled | quote }}
             {{- if .Values.agentChain.sign }}
             # WP-225 lot C: the signing key of X-Zuno-Agent-Chain (externalsecret-agent-chain.yaml).
+            {{- if eq .Values.agentChain.signer "transit" }}
+            - name: AGENT_CHAIN_SIGNER
+              value: transit
+            - name: VAULT_ADDR
+              value: {{ .Values.agentChain.vault.addr | quote }}
+            - name: VAULT_AUTH_ROLE
+              value: {{ .Values.agentChain.vault.authRole | quote }}
+            - name: VAULT_TRANSIT_KEY
+              value: {{ .Values.agentChain.vault.transitKey | quote }}
+            - name: VAULT_CACERT
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            {{- else }}
             - name: AGENT_CHAIN_SIGNING_KEY_FILE
               value: /var/run/zuno-agent-chain/private_key
+            {{- end }}
             {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
@@ -165,7 +179,7 @@ spec:
               mountPath: /okf
               readOnly: true
             {{- end }}
-            {{- if .Values.agentChain.sign }}
+            {{- if and .Values.agentChain.sign (eq .Values.agentChain.signer "file") }}
             - name: agent-chain-key
               mountPath: /var/run/zuno-agent-chain
               readOnly: true
@@ -187,7 +201,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if .Values.agentChain.sign }}
+        {{- if and .Values.agentChain.sign (eq .Values.agentChain.signer "file") }}
         - name: agent-chain-key
           secret:
             secretName: a2a-gateway-agent-chain

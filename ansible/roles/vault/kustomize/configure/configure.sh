@@ -326,6 +326,29 @@ vault write auth/kubernetes/role/mcp-gateway \
 
 echo "Transit key mcp-call-assertion and mcp-gateway role configured."
 
+# WP-247 lot 2: the same for the agent chain the a2a-gateway signs (X-Zuno-Agent-Chain). Key
+# agent-chain (ed25519, non-exportable), policy agent-chain-signer (sign + public-key read),
+# role a2a-gateway bound to the a2a-gateway ServiceAccount of zuno-ai-run only. Create-if-missing.
+if ! vault read transit/keys/agent-chain >/dev/null 2>&1; then
+  vault write -f transit/keys/agent-chain type=ed25519 >/dev/null
+  echo "Transit key agent-chain: generated"
+else
+  echo "Transit key agent-chain: already generated"
+fi
+vault write transit/keys/agent-chain/config \
+  exportable=false \
+  allow_plaintext_backup=false
+
+printf 'path "transit/sign/agent-chain" {\n  capabilities = ["update"]\n}\npath "transit/keys/agent-chain" {\n  capabilities = ["read"]\n}\n' | vault policy write agent-chain-signer -
+
+vault write auth/kubernetes/role/a2a-gateway \
+  bound_service_account_names=a2a-gateway \
+  bound_service_account_namespaces=zuno-ai-run \
+  policies=agent-chain-signer \
+  ttl=15m
+
+echo "Transit key agent-chain and a2a-gateway role configured."
+
 # In-cluster substitute for the Rekor transparency log this replaces:
 # every transit/sign call is now an audited event instead of a public
 # append-only log entry. Safe to re-run - "already enabled" is expected
