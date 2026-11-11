@@ -52,3 +52,12 @@ day2_report_format: text
 # cluster file. Calls to in-cluster Services signed by the service CA keep
 # their own reason in place.
 zuno_validate_route_certs: false
+
+# Global OLM approval switch (post-demo 2026-11-09, ADR-0607 clause 2 can make Manual the rule): the approval mode of
+# every operator Subscription rendered by a gitops chart. `Automatic` lets OLM install new operator versions on its own;
+# `Manual` leaves each new InstallPlan waiting for an approval (freeze, pinning). Applied by ansible/tasks/
+# install_plan_approval.yml at every Application apply, and mirrored by the chart defaults (Automatic).
+zuno_operator_install_plan_approval: Automatic
+# Components that ignore the switch: pre-GA operators that stay Manual (rhods 3.6 EA, claw-operator staging,
+# nfs-provisioner pre-GA) and unifai-operator, which is pinned by its catalog image (its chart sets the mode itself).
+zuno_operator_install_plan_approval_exempt: [openshift-ai, openclaw, nfs-provisioner, unifai]

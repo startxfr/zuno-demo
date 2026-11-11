@@ -1,6 +1,6 @@
 # ADR-0603: Close the medium-severity security gaps found in the 2026-11-06 review
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.16 (retargeted from v0.15 on 2026-11-07, with ADR-0602: v0.15 became the demo-ready band of ADR-0605)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team

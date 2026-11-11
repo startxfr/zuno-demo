@@ -40,6 +40,7 @@ class Session:
     state: str = "PREPARING_IMAGE"
     world_id: str = ""
     base_png_b64: str = ""  # the image the world started from, kept for reset
+    scene_prompt: str = ""  # the text it came from, passed to the runtime to anchor the scene against drift
     prompt_requested: int = 0
     prompt_applied: int = 0
     streaming: bool = False

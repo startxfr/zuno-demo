@@ -1,6 +1,6 @@
 # WP-224: Network and GitOps hardening: mesh, egress, AppProject, JWKS (delivers ADR-0602, ADR-0603)
 
-- **State:** Operator pending (2026-11-07): pushed (55ebf41f) and rolled out on demo333; left: the zuno-unifai firewall rehearsal, the agents scaffold `project:` fix and the GitHub settings on `main`. The code is complete in the worktree `zuno-demo-wp224` (branch
+- **State:** Operator pending (2026-11-11): pushed (55ebf41f) and rolled out on demo333; the zuno-unifai firewall is live since 2026-11-11 14:24Z; left: the agents scaffold on `main` and the GitHub settings on `main` (see Status below). Historical (2026-11-07): The code is complete in the worktree `zuno-demo-wp224` (branch
   `wp-224-network-gitops`). A live rehearsal on demo333 is under way: the mesh and egress objects are applied by hand,
   outside ArgoCD, one step at a time, each with the user's go. Nothing is pushed.
 - **ADRs:** ADR-0602, ADR-0603
@@ -136,3 +136,24 @@ only); Authorino and the RAGAS token still use the public HTTPS endpoint.
 - The plain-HTTP chart repository stays in `sourceRepos`.
 - No fine-grained `AuthorizationPolicy`. UnifAI and the experiences are not meshed, so the gateways stay PERMISSIVE
   on 8080.
+
+## Status (2026-11-11)
+
+- **Rehearsal done:** the zuno-unifai firewall rehearsal passed on a throwaway stack on 2026-11-08
+  ([evidence](../evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md)). Its finding: backups must use the
+  virtual-hosted S3 style, or they hang behind the firewall.
+- **Left, the real switch, in a window with the user's go:**
+  1. `make d2 install unifai`, so the backups use the virtual-hosted S3 style.
+  2. `make d3 backup unifai`, then a golden-path run.
+  3. In one commit: `egress.enabled: true` in `gitops/charts/unifai/values.yaml`, and `EGRESS_DEFERRABLE` removed from
+     `platform/security/check_mesh_mtls.py`.
+  4. A golden-path run after it.
+- **The real switch: done on 2026-11-11** (session zuno-main, user's go): pushed e7d315da; `zuno-unifai-d1` Synced and
+  Healthy; EgressFirewall `default` live since 14:24:26Z (the API server first, 13 Allow rules, a final Deny 0.0.0.0/0).
+  Proofs: golden path 14/14 before and after, `unifai-rag-server` restart Ready, example.com and pypi.org blocked and
+  api.github.com reached from unifai-backend, DNS resolves, pod logs clean. Not proven: an ingestion with real credentials
+  under the firewall, and the nightly backup (next run 02:00 UTC). Rollback: `oc -n zuno-unifai delete egressfirewall
+  default`, then `egress.enabled: false` with a `disabledReason` in `gitops/charts/unifai/values.yaml`.
+- **Agents scaffold:** `project: zuno-apps` is on `zuno-demo-agents` `devel` but not yet on `main`. The next agents
+  release carries it.
+- **GitHub settings on `main`:** the user, as repository admin.

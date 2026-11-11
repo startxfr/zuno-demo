@@ -101,6 +101,26 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/keycloak_seam_values.yml"
   when: (zuno_keycloak_mode | default('internal')) == 'external'
 
+# Global OLM approval switch (zuno_operator_install_plan_approval): one variable for every operator Subscription.
+- name: "gitops | apply the global OLM approval mode to the chart's Subscriptions"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/install_plan_approval.yml"
+  when: gitops_component_name not in (zuno_operator_install_plan_approval_exempt | default([]))
+
+# WP-211 way back (2026-11-09): the apply below is a merge patch, so a key the definition no longer carries is
+# never removed. Six d0 manifests have a helm block with no values (a2a-gateway, ai-gateway, kagent, mcp, mlops,
+# models; 29 live Applications are in that shape): the external-mode Keycloak seams added values to them, and the return to internal mode rendered no values key, so the live Applications kept the
+# external URLs until they were patched by hand. State the empty string instead, so the patch replaces what a
+# previous run left there. Manifests with values, or with no helm block, are untouched.
+- name: "gitops | state an empty helm.values when the manifest has none, so a stale value is replaced"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{ _gitops_app_definition | combine({'spec': {'source': {'helm': {'values': ''}}}}, recursive=True) }}
+  when:
+    - (_gitops_app_definition.spec | default({})).source is defined
+    - (_gitops_app_definition.spec.source.helm | default(none)) is mapping
+    - "'values' not in _gitops_app_definition.spec.source.helm"
+    - "'valuesObject' not in _gitops_app_definition.spec.source.helm"
+
 - name: "gitops | apply ArgoCD Application: zuno-{{ gitops_app_name }}"
   kubernetes.core.k8s:
     state: present

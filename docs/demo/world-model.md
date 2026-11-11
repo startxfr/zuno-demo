@@ -99,6 +99,9 @@ reaching the client, 4.4 Mbit/s of H.264, step 52 ms for 4 frames, FLUX first im
 ## What it does not show
 
 - **A persistent or accurate world.** No geometry, no physics, no memory beyond about ten seconds; two visitors never share one.
+  Walking makes the model lose its scene within about ten seconds; every two seconds of walking the runtime redraws the picture
+  from the scene text (banner "Stabilizing the world", about 0.6 s of frozen picture each time, the view shifts slightly). Say so: it
+  is a mitigation of a known limit of the model, not a cure (ADR-0604 D9).
 - **A prompt that is always obeyed.** The red sky and the volcano are a goal. If the edit does not read well, say so and reset.
 - **WebRTC.** The video runs over the HTTPS Route (WebSocket, H.264), so it crosses any network. WebRTC is a possible phase 2.
 - **Any browser.** Chrome and Edge only; others get a message, not a picture.
@@ -124,6 +127,12 @@ reaching the client, 4.4 Mbit/s of H.264, step 52 ms for 4 frames, FLUX first im
 - **A forgotten node**: the alert `ZunoWorldModelGpuNodeUpTooLong` fires after 8 hours. Disable below.
 
 ## After the session
+
+0. In the page, **Sign out** (top right, next to your name) frees the GPU if you hold it, ends the oauth2-proxy cookie, then
+   ends your Keycloak single sign-on session and brings you back to the site: the next visit asks for a login, so another
+   person can sign in on the same browser. Keycloak may show one "Do you want to log out?" confirmation first (no ID token is
+   passed to it by design). The client `world-model` must list `https://world-model.<domain>/*` in its post-logout redirect URIs
+   (set in the realm file, applied to a live realm by the client reconcile Job).
 
 1. `make d2 uninstall world-model` removes the application.
 2. `make d0 uninstall world-model-gpu` terminates the GPU node (it refuses while the application exists).

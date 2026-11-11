@@ -85,6 +85,11 @@ OKF-stream ADRs are authored as full standalone files from the start (no
 stub promotion); "Step 0" in these briefs is therefore only the ADR Status
 flip prescribed by each brief's Status-updates section.
 
+**Stream complete (2026-11-11).** Every ADR of the stream is closed (see the [ADR index](../adr/README.md)). The
+outcomes of OKF v0.2 and v0.3 were delivered in the platform bands by ADR-0576 (extraction into the
+`zuno-demo-agents` repository) and ADR-0580 (the corp bundle consumed by one digest pin, promoted by pull request);
+the two milestones stay vacant, and new OKF work is recorded in the platform bands.
+
 ## Tracker
 
 **Moved (2026-09-03).** The OKF work packages are tracked in the single

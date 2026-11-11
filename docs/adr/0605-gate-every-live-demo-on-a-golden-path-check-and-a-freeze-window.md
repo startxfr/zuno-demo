@@ -1,6 +1,6 @@
 # ADR-0605: Gate every live demo on a golden-path check and a freeze window
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.15
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team

@@ -113,11 +113,26 @@ jsonRpc:
 #              a binding with `user_token: true` keeps the bearer. Needs the key
 #              pair in Vault (vaultKey, fields private_key and public_key) and the
 #              key granted to zuno-ai-run in platform/vault/secret-access.yaml.
+#
+# WP-247 (ADR-0602 option A): who holds the signing key, when mode is assertion.
+#   file     the private key is a Kubernetes Secret (ExternalSecret from vaultKey)
+#            mounted in the pod (today's behaviour).
+#   transit  the key never leaves Vault: the gateway logs in with its
+#            ServiceAccount token (role vault.authRole) and asks transit/sign
+#            for each assertion. No ExternalSecret, no key mount. Vault down =
+#            the call is refused (502), never a fallback. Switch it in the same
+#            window that puts the Transit public key into each server's
+#            callAssertion.publicKey.
 outboundIdentity:
   mode: bearer
+  signer: file
   assertionTtlSeconds: 60
   vaultKey: mcp/gateway-call-assertion
   vaultProperty: private_key
+  vault:
+    addr: https://zuno-vault.zuno-vault.svc:8200
+    authRole: mcp-gateway
+    transitKey: mcp-call-assertion
 
 # ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
 # With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
@@ -230,6 +245,12 @@ okf:
   fetch:
     enabled: false
     corpReference: ""
+    # ADR-0611/WP-246: a registry prefix (e.g. okf-mirror.zuno-ai-run.svc:5000/okf) holding the release
+    # by the same digest. Set, okf-fetch reads from there first (2 short attempts) and falls back to
+    # `corpReference`'s own registry; verification is identical either way. Empty: today's behaviour.
+    mirror:
+      prefix: ""
+      plainHttp: false
     image:
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
       tag: latest

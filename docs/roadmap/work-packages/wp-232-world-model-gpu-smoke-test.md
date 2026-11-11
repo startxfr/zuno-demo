@@ -1,6 +1,6 @@
 # WP-232: World-model GPU smoke test (delivers ADR-0604 gates G0 to G4)
 
-- **State:** Operator pending
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-229 (including the toleration window), WP-231
 - **Blocks:** WP-237

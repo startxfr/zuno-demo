@@ -23,6 +23,8 @@ spec:
         # Vault a2a/agent-chain private_key. Verification is off until the verifiers hold the public key.
         agentChain:
           sign: true
+          # WP-247 lot 2 (ADR-0602 option A): Vault Transit signs the chain; no key Secret in the pod.
+          signer: transit
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

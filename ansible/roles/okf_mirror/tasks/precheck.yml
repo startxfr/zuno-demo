@@ -1,0 +1,26 @@
+---
+# State detection (never fails).
+- name: "okf_mirror | check the okf-mirror Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-okf-mirror-d1"
+
+- name: "okf_mirror | look up the okf-mirror Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-ai-run
+    name: okf-mirror
+  register: _okf_mirror_lookup
+
+- name: "okf_mirror | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _state_check_result
+        and (_okf_mirror_lookup.resources | default([]) | length) > 0
+        and (_okf_mirror_lookup.resources[0].status.readyReplicas | default(0)) > 0
+      }}
+
+- name: "okf_mirror | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

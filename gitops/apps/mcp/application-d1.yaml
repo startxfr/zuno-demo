@@ -35,12 +35,30 @@ spec:
         # the public key (gitops/apps/mcp-*); enforcing it (callAssertion.required) is a later, separate step.
         agentChain:
           verify: true
+          # WP-247 lot 2: the public half of the Vault Transit key agent-chain (the private half never leaves Vault).
           publicKey: |
             -----BEGIN PUBLIC KEY-----
-            MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+            MCowBQYDK2VwAyEAT/I4wgI087mkIC5Pl4R2a5wOVQN9VlrJQ+E/B6fWYz8=
             -----END PUBLIC KEY-----
         outboundIdentity:
           mode: assertion
+          # WP-247 (ADR-0602 option A): Vault Transit signs the assertion; no key Secret in the pod.
+          signer: transit
+        # ADR-0602 clause 10 (WP-225 lot C, user's go 2026-11-11, after the ai-gateway ran a clean golden path):
+        # only the Keycloak clients that carry the zuno-admin-api audience (read from the live realm) are admitted.
+        # An OpenShift token on /mcp (Lightspeed, TokenReview) has no azp and is not subject to the list. A forgotten
+        # client gets a 401: remove this key and re-run `make d2 install mcp` to go back to "any client of the realm".
+        jwtAllowedClients:
+          - unifai
+          - open-webui
+          - dify
+          - kagent
+          - world-model
+          - blender
+          - openclaw-*
+          - zuno-evaluations
+          - zuno-stresstest
+          - zuno-admin-api
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

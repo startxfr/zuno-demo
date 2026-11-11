@@ -26,6 +26,8 @@
       - namespaces
       - llm
       - models
+      # ADR-0611 (WP-246): before mcp, whose okf-fetch can read it.
+      - okf_mirror
       - mcp
       - agents
       - mlops

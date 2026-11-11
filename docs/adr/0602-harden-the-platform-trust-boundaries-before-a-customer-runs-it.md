@@ -1,6 +1,6 @@
 # ADR-0602: Harden the platform's trust boundaries before a customer runs it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.16 (retargeted from v0.15 on 2026-11-07: v0.15 became the demo-ready band of ADR-0605; the live part of the remaining work waits for the window after the 2026-11-09 demonstration)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team

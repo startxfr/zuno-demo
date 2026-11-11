@@ -1,7 +1,10 @@
 # zuno-unifai EgressFirewall rehearsal plan (WP-224 rollout step 6)
 
-Status: plan only. Nothing here has been run. Every cluster step needs the user's go, and the start waits for the
-end of the UnifAI canary (a9) and for the golden path and GPU window of other sessions.
+Status (2026-11-11): the rehearsal ran on 2026-11-08 and passed, see [the evidence](../roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md).
+This file is the plan it followed. What is left is the real switch in `zuno-unifai`, which needs the user's go and a
+window, and a note: the rehearsal used the UnifAI 0.1.65 images and `zuno-unifai` now runs 0.1.68 (pinned 2026-11-11), so
+the logs of the first restart after the switch are the check for a host that appeared since. Every cluster step needs the
+user's go.
 
 ## Why
 
@@ -14,9 +17,10 @@ switch, on a throwaway stack.
 
 ## Where
 
-A throwaway `UnifaiStack` in its own namespace (for example `unifai-fw-rehearsal`), with the same chart values as
-`zuno-unifai` plus `egress.enabled: true`. Not `zuno-unifai`, and not the `unifai-e2e-*` or `unifai-operator-canary`
-namespaces of a9. Ask a9 for the e2e make targets that create a stack. Delete the namespace at the end.
+A throwaway `UnifaiStack` in its own namespace (`unifai-fw-rehearsal` was used): a copy of the live stack's spec with
+`deletionPolicy: Delete` (the live one is `Retain`), placeholder Secrets, no Vault/ESO, and the EgressFirewall rendered from the
+chart and applied by hand. There is no e2e make target for this. Not `zuno-unifai`, and not the `unifai-e2e-*` or
+`unifai-operator-canary` namespaces of a9. Delete the namespace at the end.
 
 ## Hosts to test
 

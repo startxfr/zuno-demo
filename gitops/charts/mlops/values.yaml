@@ -211,7 +211,9 @@ pipeline:
   # WP-133: bumped for the new conditional merge_export DAG shape (per
   # agent.skipMerge) - comage's own rendered DAG is unchanged byte-for-byte,
   # but the compiled DAG SOURCE changed, which is this comment's own rule.
-  version: v0-3-0
+  # 2026-11-09: bumped because the compiled DAG changed when the first-party image digests were rendered and then
+  # cleared again (the pipeline references the mlops image); the role refused the immutable v0-3-0 re-apply.
+  version: v0-4-0
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true

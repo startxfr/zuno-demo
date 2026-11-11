@@ -1,9 +1,6 @@
 # ADR-0501: Establish the OKF stream with its own milestones and roadmap
 
-- **Status:** Accepted (2026-08-29) - the stream/roadmap mechanic is in
-  force and its OKF v0.1 milestone (in-repo content excellence) is done;
-  OKF v0.2 (extraction) and OKF v0.3 (live reconciliation) remain open
-  future work tracked in [docs/roadmap/okf-roadmap.md](../roadmap/okf-roadmap.md)
+- **Status:** Implemented
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
@@ -40,3 +37,20 @@ inherits the v0.1–v0.3 roadmap's execution model unchanged.
 See [Standard clauses](README.md#standard-clauses) for Context, Alternatives,
 Consequences, Security/Operational considerations, Migration/evolution and
 Related ADRs.
+
+## Update (2026-11-11): Implemented
+
+Nothing remains open under this record. The stream mechanic (the 05xx band, the `OKF v0.x` targets, one ADR index)
+has been in force since 2026-08-18, and the OKF v0.1 milestone closed on 2026-08-29. The outcomes of the two later
+milestones were delivered in the platform bands, by records that supersede the ones that first defined them:
+
+- **Extraction (OKF v0.2):** [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
+  moved the agent definitions and corp policies into the `zuno-demo-agents` repository (superseding ADR-0506, ADR-0507
+  and ADR-0510); [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) isolates OKF parsing
+  behind per-component hooks.
+- **Live delivery (OKF v0.3):** [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
+  consumes the signed corp OKF bundle by one digest pin, promoted by pull request (superseding ADR-0509), and
+  [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) serves the admitted release from an
+  in-cluster mirror.
+
+The OKF v0.2 and v0.3 milestones stay vacant; new OKF work is recorded in the platform bands.

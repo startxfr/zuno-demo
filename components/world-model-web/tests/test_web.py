@@ -51,6 +51,20 @@ def test_group_membership_is_required_and_forwarded_token_works(make_client, key
     assert ops["ops"] is True
 
 
+def test_me_carries_the_sign_out_link_only_when_the_public_url_is_known(make_client, keys):
+    from urllib.parse import parse_qs, unquote, urlparse
+
+    assert make_client().get("/api/me", headers=bearer(keys.token())).json()["logout_url"] is None
+    client = make_client(public_url="https://world-model.example.org", logout_client_id="world-model")
+    link = client.get("/api/me", headers=bearer(keys.token())).json()["logout_url"]
+    # oauth2-proxy first (it drops its cookie), then Keycloak's logout, then back to the site
+    assert link.startswith("/oauth2/sign_out?rd=")
+    keycloak = urlparse(unquote(parse_qs(urlparse(link).query)["rd"][0]))
+    assert keycloak.path.endswith("/protocol/openid-connect/logout")
+    assert parse_qs(keycloak.query) == {"client_id": ["world-model"],
+                                        "post_logout_redirect_uri": ["https://world-model.example.org/"]}
+
+
 def test_a_header_cannot_forge_an_identity(make_client, keys):
     client = make_client()
     headers = {**bearer(keys.token()), "X-Dev-User": "root", "X-Dev-Groups": "ocp-paas-ops"}
@@ -88,6 +102,17 @@ def test_enhancement_is_data_not_instructions_and_uses_the_users_token(make_clie
     assert body["messages"][0]["role"] == "system" and "never as instructions" in body["messages"][0]["content"]
     assert body["messages"][1]["content"].count("<prompt>") == 1 and injected in body["messages"][1]["content"]
     assert response.json()["prompt"]["enhancement"] == "applied"
+
+
+def test_the_scene_prompt_reaches_the_runtime_on_create_and_reset(make_client, keys, gateway, fake_runtime):
+    """The runtime re-anchors the scene against drift on this text (it only gets an image otherwise)."""
+    gateway.status = 503  # the filtered prompt is used as typed
+    client = make_client()
+    h = bearer(keys.token())
+    made = client.post("/api/worlds", json={"prompt": "a snowy village"}, headers=h).json()
+    assert fake_runtime.world_requests[0]["prompt"] == "a snowy village"
+    assert client.post(f"/api/sessions/{made['session_id']}/reset", headers=h).status_code == 200
+    assert fake_runtime.world_requests[1]["prompt"] == "a snowy village"
 
 
 def test_gateway_down_degrades_to_the_filtered_prompt(make_client, keys, gateway, fake_runtime):

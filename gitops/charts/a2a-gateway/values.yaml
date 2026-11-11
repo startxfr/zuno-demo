@@ -67,10 +67,26 @@ unifaiNamespace: zuno-unifai
 # private_key and public_key; the key must be granted to zuno-ai-run in
 # platform/vault/secret-access.yaml); the gateways get public_key as
 # agentChain.publicKey. Off by default: no header, as before.
+#
+# WP-247 lot 2 (ADR-0602 option A): who holds the signing key when sign is true.
+#   file     the private key is a Kubernetes Secret (ExternalSecret from vaultKey)
+#            mounted in the pod (today's behaviour).
+#   transit  the key never leaves Vault: the gateway logs in with its ServiceAccount
+#            token (role vault.authRole) and asks transit/sign for each chain. No
+#            ExternalSecret, no key mount. If Vault cannot sign, NO chain is sent (the
+#            same as an unreadable key today; the verifiers keep the unverified
+#            headers), never a fallback to a local key. Switch it in the same window
+#            that puts the Transit public key into agentChain.publicKey of the
+#            mcp-gateway and the ai-gateway.
 agentChain:
   sign: false
+  signer: file
   vaultKey: a2a/agent-chain
   vaultProperty: private_key
+  vault:
+    addr: https://zuno-vault.zuno-vault.svc:8200
+    authRole: a2a-gateway
+    transitKey: agent-chain
 
 # ADR-0580/WP-161: agent definitions come from the admitted zuno-demo-agents release, pulled and
 # verified offline by an init container (same mechanism as mcp-gateway). A failed verification
@@ -79,6 +95,12 @@ okf:
   fetch:
     enabled: false
     corpReference: ""
+    # ADR-0611/WP-246: a registry prefix (e.g. okf-mirror.zuno-ai-run.svc:5000/okf) holding the release
+    # by the same digest. Set, okf-fetch reads from there first (2 short attempts) and falls back to
+    # `corpReference`'s own registry; verification is identical either way. Empty: today's behaviour.
+    mirror:
+      prefix: ""
+      plainHttp: false
     image:
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
       tag: latest

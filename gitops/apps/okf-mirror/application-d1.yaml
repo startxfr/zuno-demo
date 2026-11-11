@@ -1,0 +1,28 @@
+---
+# ADR-0611/WP-246: the internal mirror of the admitted OKF release (zot, by digest). Read by the
+# okf-fetch init containers of mcp-gateway and a2a-gateway; written by `admit_okf_bundle.py mirror`
+# through a port-forward. Sync wave before the gateways (mcp is -150).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-okf-mirror-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-160"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/okf-mirror
+    helm:
+      releaseName: zuno-okf-mirror
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

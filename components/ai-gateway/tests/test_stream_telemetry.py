@@ -77,7 +77,7 @@ class _FakeStreamingModel:
             yield AIMessageChunk(content="", usage_metadata=self._usage)
 
 
-def _run_stream(fake_model, candidates=None):
+def _run_stream(fake_model, candidates=None, **stream_kwargs):
     """Drains `_stream_completion` while spying on every
     ModelCallRecorder.record_usage call, returning (sse_chunks, recorded)."""
     candidates = candidates or [ProviderCandidate(name="local", kind="local")]
@@ -90,7 +90,7 @@ def _run_stream(fake_model, candidates=None):
 
     async def _drain():
         chunks = []
-        async for c in app_main._stream_completion(candidates, "C1", [], "req-1"):
+        async for c in app_main._stream_completion(candidates, "C1", [], "req-1", **stream_kwargs):
             chunks.append(c)
         return chunks
 
@@ -172,3 +172,51 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --- R-543: stream_options.include_usage is answered with the OpenAI usage chunk ----------------
+
+
+def _usage_chunks(chunks):
+    import json as _json
+    out = []
+    for c in chunks:
+        if c.startswith("data: ") and not c.startswith("data: [DONE]"):
+            d = _json.loads(c[6:])
+            if d.get("usage") is not None:
+                out.append(d)
+    return out
+
+
+def test_streaming_republishes_usage_when_the_caller_asks_for_it() -> None:
+    fake = _FakeStreamingModel(
+        ["Hello", ", ", "world"],
+        usage={"input_tokens": 7, "output_tokens": 2, "total_tokens": 9},
+    )
+    chunks, _ = _run_stream(fake, include_usage=True)
+    usage = _usage_chunks(chunks)
+    assert len(usage) == 1
+    assert usage[0]["choices"] == []
+    assert usage[0]["usage"] == {"prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9}
+
+
+def test_usage_chunk_comes_after_the_finish_chunk_and_before_done() -> None:
+    import json as _json
+    fake = _FakeStreamingModel(["a"], usage={"input_tokens": 3, "output_tokens": 1, "total_tokens": 4})
+    chunks, _ = _run_stream(fake, include_usage=True)
+    assert chunks[-1] == "data: [DONE]\n\n"
+    assert _json.loads(chunks[-2][6:])["usage"]["total_tokens"] == 4
+    assert _json.loads(chunks[-3][6:])["choices"][0]["finish_reason"] == "stop"
+
+
+def test_streaming_wire_format_is_unchanged_without_include_usage() -> None:
+    fake = _FakeStreamingModel(["a"], usage={"input_tokens": 3, "output_tokens": 1, "total_tokens": 4})
+    chunks, _ = _run_stream(fake)
+    assert _usage_chunks(chunks) == []
+
+
+def test_the_request_accepts_stream_options() -> None:
+    from app.schemas import ChatCompletionRequest
+    req = ChatCompletionRequest.model_validate(
+        {"messages": [{"role": "user", "content": "u"}], "stream": True, "stream_options": {"include_usage": True}})
+    assert req.stream_options == {"include_usage": True}

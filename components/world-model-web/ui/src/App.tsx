@@ -9,7 +9,7 @@ import { ControlSender } from "./controls.ts";
 import { VideoPlayer, quantile } from "./video.ts";
 
 type RuntimeEvent =
-  | { type: "state"; state: string; engine?: string; image?: string; encoder?: string; precision?: string; message?: string }
+  | { type: "state"; state: string; engine?: string; image?: string; encoder?: string; precision?: string; message?: string; reason?: string }
   | { type: "stats"; step_ms: number; engine_fps: number }
   | { type: "prompt"; prompt_version: number; status: string; apply_ms?: number; message?: string };
 
@@ -49,7 +49,7 @@ export default function App() {
   const intentionalClose = useRef(false);
   const sessionRef = useRef<SessionInfo | null>(null);
 
-  const [me, setMe] = useState<{ user: string; ops: boolean } | null>(null);
+  const [me, setMe] = useState<{ user: string; ops: boolean; logout_url: string | null } | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
@@ -57,6 +57,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [ended, setEnded] = useState<string | null>(null);
   const [runtimeState, setRuntimeState] = useState("");
+  // The runtime redraws the picture from the scene prompt every few seconds of walking (drift control).
+  const [stabilizing, setStabilizing] = useState(false);
   const [hasFrame, setHasFrame] = useState(false);
   const [stats, setStats] = useState<{ step_ms: number; engine_fps: number } | null>(null);
   const [fps, setFps] = useState(0);
@@ -118,6 +120,7 @@ export default function App() {
   const handleEvent = useCallback((ev: RuntimeEvent) => {
     if (ev.type === "state") {
       setRuntimeState(ev.state);
+      setStabilizing(ev.state === "RECONDITIONING" && ev.reason === "stabilize");
       setLive((l) => ({ ...l, ...(ev.encoder ? { encoder: ev.encoder, engine: ev.engine, image: ev.image, precision: ev.precision } : {}) }));
       if (ev.state === "FAILED") setEnded(ev.message ?? "The world failed.");
       if (ev.state === "CLOSED") setEnded(ev.message ?? "The session ended.");
@@ -234,12 +237,26 @@ export default function App() {
     if (sid) await api.release(sid).catch(() => undefined);
   };
 
+  // Free the GPU, then leave: the oauth2-proxy cookie and the Keycloak SSO session both end, so the next visit asks for
+  // a login again (a different person can sign in on this browser).
+  const signOut = async () => {
+    if (!me?.logout_url) return;
+    const sid = session?.session_id;
+    closeStream();
+    if (sid) {
+      await Promise.race([api.release(sid).catch(() => undefined), new Promise((r) => setTimeout(r, 3000))]);
+    }
+    window.location.assign(me.logout_url);
+  };
+
   const releaseOthers = async () => {
     if (status?.holder_session_id) await api.release(status.holder_session_id).catch(() => undefined);
     setStatus(await api.status());
   };
 
-  const label = STATE_LABEL[runtimeState] ?? STATE_LABEL[session?.state ?? ""] ?? { text: "No world", color: "grey" as const };
+  const label = stabilizing && runtimeState === "RECONDITIONING"
+    ? { text: "Stabilizing the world", color: "blue" as const }
+    : STATE_LABEL[runtimeState] ?? STATE_LABEL[session?.state ?? ""] ?? { text: "No world", color: "grey" as const };
   const blocked = creating || (!!status?.busy && !status.you_hold);
   const mock = (live.engine ?? status?.engine) === "mock";
   const preset = presets.find((p) => session?.source === `preset:${p.id}`);
@@ -257,6 +274,9 @@ export default function App() {
             <Flex>
               <FlexItem><Label color={label.color}>{label.text}</Label></FlexItem>
               {me && <FlexItem>{me.user}</FlexItem>}
+              {me?.logout_url && (
+                <FlexItem><Button variant="secondary" size="sm" onClick={signOut}>Sign out</Button></FlexItem>
+              )}
             </Flex>
           </MastheadContent>
         </Masthead>
@@ -298,7 +318,7 @@ export default function App() {
                   )}
                   {(creating || runtimeState === "RECONDITIONING") && (
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.45)", color: "#fff", gap: 12, pointerEvents: "none" }}>
-                      <Spinner size="lg" /> {creating ? "Creating the world…" : "Editing the world…"}
+                      <Spinner size="lg" /> {creating ? "Creating the world…" : stabilizing ? "Stabilizing the world…" : "Editing the world…"}
                     </div>
                   )}
                   {ended && (

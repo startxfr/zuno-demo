@@ -616,6 +616,7 @@ async def chat_completions(
             candidates, classification, messages, request_id, adapter_decl,
             identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
             project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
+            include_usage=bool((payload.stream_options or {}).get("include_usage")),
         )
         if maas_adapter.quota_429_passthrough_enabled():
             # WP-157: a MaaS 429 must reach the caller as an HTTP 429, and a
@@ -1394,6 +1395,24 @@ def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[st
     ) + "\n\n"
 
 
+def _sse_usage_chunk(completion_id: str, created: int, model_name: str, prompt_tokens: int, completion_tokens: int) -> str:
+    """The OpenAI usage-only chunk (empty `choices`) sent when the request set stream_options.include_usage."""
+    return "data: " + json.dumps(
+        {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model_name,
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+    ) + "\n\n"
+
+
 async def _stream_completion(
     candidates: List[ProviderCandidate],
     classification: str,
@@ -1417,6 +1436,9 @@ async def _stream_completion(
     # which calls this endpoint non-streaming, ever drew the budget down).
     quota_class: str = "",
     max_tokens: Optional[int] = None,
+    # R-543: the caller asked for stream_options.include_usage, so the tokens this gateway read from
+    # the provider's terminal chunk are republished as the OpenAI usage-only chunk before [DONE].
+    include_usage: bool = False,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -1645,6 +1667,8 @@ async def _stream_completion(
             yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="tool_calls")
         else:
             yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="stop")
+        if include_usage:
+            yield _sse_usage_chunk(completion_id, created, effective_model_name, prompt_tokens, completion_tokens)
         yield "data: [DONE]\n\n"
         return
 

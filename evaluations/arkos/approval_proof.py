@@ -53,6 +53,11 @@ SILENCE_SECONDS = 330
 NEXT_REQUEST_SECONDS = 420
 
 
+def unseen_requests(events: list, seen: set) -> list:
+    """The approval_required events whose request_id was not answered yet, oldest first."""
+    return [e for e in events if e.get("type") == "approval_required" and e.get("request_id") not in seen]
+
+
 def main(argv: list) -> int:
     rounds = 1
     if "--rounds" in argv:
@@ -134,6 +139,13 @@ def main(argv: list) -> int:
             print("CAP message seen:", bool(capped), json.dumps(capped[0])[:300] if capped else "", flush=True)
         state = ""
         for _ in range(60):
+            if mode == "reject" and rounds == 1:
+                # Arkos sometimes retries the tool after a reject: a second request nobody answers keeps the session
+                # RUNNING until the 330 s expiry (326 s runs of the golden path, seen 2026-11-07 and 08). Reject it too.
+                for extra in unseen_requests(events, seen):
+                    seen.add(extra["request_id"])
+                    d = c.post(f"{base}/session.approval", json={"sessionId": sid, "requestId": extra["request_id"], "decision": "reject", "feedback": "live proof - do not retry this operation", **t._team_body()})
+                    print("ANSWER reject (retried request)", d.status_code, flush=True)
             state = c.get(f"{base}/session.status.get", params={"sessionId": sid, **t._team_body()}).text.strip().strip('"')
             if state in ("COMPLETED", "FAILED", "CANCELLED"):
                 break

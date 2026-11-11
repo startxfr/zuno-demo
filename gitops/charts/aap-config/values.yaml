@@ -114,7 +114,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, supply-chain]
+    surveyComponents: [namespaces, llm, models, okf-mirror, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -125,7 +125,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model]
+    surveyComponents: [namespaces, llm, models, okf-mirror, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -337,6 +337,9 @@ workflowTemplates:
         successNodes: [models]
       # mcp only needs models (ADR-0060).
       - id: models
+        successNodes: [okf-mirror]
+      # ADR-0611 (WP-246): the internal OKF release mirror, before the gateways that read it.
+      - id: okf-mirror
         successNodes: [mcp]
       - id: mcp
         successNodes: [agents]
@@ -382,6 +385,9 @@ workflowTemplates:
       - id: llm
         successNodes: [models]
       - id: models
+        successNodes: [okf-mirror]
+      # ADR-0611 (WP-246): the internal OKF release mirror, before the gateways that read it.
+      - id: okf-mirror
         successNodes: [mcp]
       - id: mcp
         successNodes: [agents]

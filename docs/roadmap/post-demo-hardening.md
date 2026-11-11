@@ -15,6 +15,11 @@ The order is by risk reduction per effort.
   ExternalSecrets in, and mount through a projected volume, plus an admission rule that refuses an ExternalSecret
   naming those Vault paths outside the platform's own namespaces.
 - **Proof.** As `ocp-ai-dev`, creating an ExternalSecret for those paths is refused; the golden path still passes.
+- **Brief.** [WP-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) (design settled with the user on
+  2026-11-11: Transit, fail closed, one-shot public-key switch, assertion first then agent chain).
+- **Status 2026-11-11 (WP-247 Done).** Both keys are in Vault Transit and no namespace store can read them (proved with the store's own
+  role); golden path 14/14 after each switch. Open: the final persona proof, deleting the two old Vault values, and the
+  workload token (a shared HMAC secret, needs its own design, see the WP).
 
 ## 2. `callAssertion.required: true`
 

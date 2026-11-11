@@ -5,6 +5,7 @@ ledger and the tool policy all see the real user, never this service (ADR-0563).
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 import logging
@@ -12,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app import signed_chain
+from app import signed_chain, transit_signer
 
 logger = logging.getLogger("a2a_gateway.clients")
 
@@ -36,15 +37,30 @@ def _signed_chain(audience: str, token: str, agent: str, task: str, extra: Dict[
     downstream call: the agent it runs, the task, the delegators the executor has
     already checked (verify_chain), bound to the caller's bearer and addressed to the
     receiving gateway (app/signed_chain.py). Empty unless AGENT_CHAIN_SIGNING_KEY_FILE
-    names a usable key (the chart value agentChain.sign), so the default changes nothing."""
-    key = signed_chain.private_key_from_env()
-    if key is None:
+    names a usable key (the chart value agentChain.sign), so the default changes nothing.
+
+    WP-247 lot 2: with AGENT_CHAIN_SIGNER=transit Vault signs instead (app/transit_signer.py); a Vault
+    failure sends no chain, the same as an unreadable key file, and never falls back to a local key.
+    This function blocks on Vault in that mode: call it through asyncio.to_thread."""
+    try:
+        use_transit = transit_signer.signer() == "transit"
+    except transit_signer.TransitUnavailable as exc:
+        logger.error("no agent chain signed for %s/%s: %s", agent, task, exc)
+        return {}
+    key = None if use_transit else signed_chain.private_key_from_env()
+    if key is None and not use_transit:
         return {}
     try:
         hops = signed_chain.parse_hops(extra.get("X-Zuno-Delegated-By"))
-        value = signed_chain.sign(private_key=key, audience=audience, token=token, agent=agent, task=task, hops=hops)
+        value = signed_chain.sign(
+            private_key=key, signer=transit_signer.sign if use_transit else None,
+            audience=audience, token=token, agent=agent, task=task, hops=hops,
+        )
     except signed_chain.ChainSignatureError as exc:
         logger.warning("no agent chain signed for %s/%s: %s", agent, task, exc)
+        return {}
+    except transit_signer.TransitUnavailable as exc:
+        logger.error("no agent chain signed for %s/%s, Vault cannot sign: %s", agent, task, exc)
         return {}
     return {signed_chain.HEADER: value}
 
@@ -89,7 +105,8 @@ class AiGatewayClient:
             response = await self._client.post(
                 f"{self._base}/v1/chat/completions",
                 json=body,
-                headers=_downstream_headers(token, agent, task, classification, run_id, chain_headers, "ai-gateway"),
+                headers=await asyncio.to_thread(
+                    _downstream_headers, token, agent, task, classification, run_id, chain_headers, "ai-gateway"),
             )
         except httpx.HTTPError as exc:
             logger.warning("ai-gateway unreachable: %s", exc)
@@ -130,13 +147,15 @@ class McpGatewayClient:
 
     async def list_tools(self, *, token: str, agent: str, task: str, classification: str, run_id: str,
                          chain_headers: Dict[str, str]) -> List[Dict[str, Any]]:
-        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
+        headers = await asyncio.to_thread(
+            _downstream_headers, token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
         result = await self._rpc("tools/list", {}, headers)
         return list(result.get("tools") or [])
 
     async def call_tool(self, name: str, arguments: Dict[str, Any], *, token: str, agent: str, task: str,
                         classification: str, run_id: str, chain_headers: Dict[str, str]) -> str:
-        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
+        headers = await asyncio.to_thread(
+            _downstream_headers, token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
         result = await self._rpc("tools/call", {"name": name, "arguments": arguments}, headers)
         text = "\n".join(
             str(part.get("text", "")) for part in (result.get("content") or []) if isinstance(part, dict)

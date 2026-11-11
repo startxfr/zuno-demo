@@ -20,7 +20,7 @@ from app.encoder import build_encoder
 from app.engine import MockEngine
 from app.imagegen import MockFlux
 from app.main import get_app
-from app.session import VIDEO_TAG
+from app.session import ANCHOR_CLEAN, ANCHOR_CUE, VIDEO_TAG, anchor_prompt, edit_size
 
 SMALL = Settings(width=320, height=176, mock_step_seconds=0.01, encoder="x264", gop_frames=8)
 
@@ -205,3 +205,153 @@ def test_the_image_can_serve_a_websocket():
     import importlib.util
 
     assert any(importlib.util.find_spec(name) for name in ("websockets", "wsproto"))
+
+
+# ---------------------------------------------------------------- drift anchoring
+def test_anchor_prompt_keeps_the_scene_and_the_latest_edit_without_the_first_person_cue():
+    scene = "a snowy medieval village at dusk, wooden houses with lit windows, cinematic first-person view"
+    text = anchor_prompt(scene, "the sky turns red, first-person view", 600)
+    assert text == ("a snowy medieval village at dusk, wooden houses with lit windows, the sky turns red"
+                    + ANCHOR_CUE + ANCHOR_CLEAN)
+    assert "first-person" not in text.lower(), "that cue makes FLUX draw first-person arms"
+    assert anchor_prompt("", "", 600) == "", "an image-only world has nothing to anchor on"
+    assert anchor_prompt("cinematic first-person view", "", 600) == ""
+    long = anchor_prompt("x" * 900, "", 600)
+    assert len(long) <= 600 and long.endswith(ANCHOR_CLEAN)
+
+
+def test_edit_size_parsing_and_validation():
+    import dataclasses
+
+    assert edit_size("") is None and edit_size("1024x512") == (1024, 512)
+    dataclasses.replace(SMALL, anchor_edit_size="1024x512").validate()
+    for bad in ("1024", "axb", "1000x512", "128x128"):
+        with pytest.raises(ValueError):
+            dataclasses.replace(SMALL, anchor_edit_size=bad).validate()
+
+
+def test_anchor_settings_are_validated():
+    import dataclasses
+
+    with pytest.raises(ValueError):
+        dataclasses.replace(SMALL, anchor_seconds=0.5).validate()
+    dataclasses.replace(SMALL, anchor_seconds=5).validate()
+    dataclasses.replace(SMALL, anchor_seconds=0).validate()
+
+
+def _events_until(ws, predicate, seconds):
+    events, deadline = [], time.time() + seconds
+    while time.time() < deadline and not predicate(events):
+        msg = ws.receive()
+        if msg.get("text"):
+            events.append(json.loads(msg["text"]))
+    return events
+
+
+def test_walking_re_anchors_the_scene_and_standing_still_does_not():
+    import dataclasses
+
+    with TestClient(get_app(dataclasses.replace(SMALL, anchor_seconds=1.0))) as c:
+        deadline = time.time() + 20
+        while c.get("/readyz").status_code != 200:
+            assert time.time() < deadline
+            time.sleep(0.05)
+        world = c.post("/internal/worlds", json={"prompt": "a quiet city street at night", "seed": 3}).json()
+        with c.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+            ws.receive_text()
+            # Idle for 1.5 s of wall time (far more than 1 s of video): no anchor.
+            idle = _events_until(ws, lambda ev: False, 1.5)
+            assert not any(e.get("type") == "anchor" for e in idle)
+            ws.send_text(json.dumps({"type": "control", "seq": 1, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+            events = _events_until(ws, lambda ev: any(e.get("type") == "anchor" for e in ev), 8)
+            anchors = [e for e in events if e.get("type") == "anchor"]
+            assert anchors and anchors[0]["status"] == "applied" and anchors[0]["count"] == 1
+            stab = [e for e in events if e.get("state") == "RECONDITIONING"]
+            assert stab and stab[0].get("reason") == "stabilize"
+            ws.send_text(json.dumps({"type": "stop"}))
+
+
+def test_a_world_from_an_image_alone_is_never_anchored():
+    import dataclasses
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (320, 176), (20, 80, 160)).save(buf, format="PNG")
+    with TestClient(get_app(dataclasses.replace(SMALL, anchor_seconds=1.0))) as c:
+        deadline = time.time() + 20
+        while c.get("/readyz").status_code != 200:
+            assert time.time() < deadline
+            time.sleep(0.05)
+        world = c.post("/internal/worlds", json={"image_png_b64": base64.b64encode(buf.getvalue()).decode()}).json()
+        with c.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+            ws.receive_text()
+            ws.send_text(json.dumps({"type": "control", "seq": 1, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+            events = _events_until(ws, lambda ev: any(e.get("type") == "anchor" for e in ev), 2)
+            assert not any(e.get("type") == "anchor" for e in events)
+            ws.send_text(json.dumps({"type": "stop"}))
+
+
+def test_raw_mode_upscales_on_the_gpu_path_to_the_display_size():
+    torch = pytest.importorskip("torch")
+    from app.engine import WaypointEngine
+
+    engine = WaypointEngine.__new__(WaypointEngine)
+    engine._torch, engine.raw, engine.width, engine.height = torch, True, 320, 180
+    out = torch.randint(0, 255, (4, 128, 256, 3), dtype=torch.uint8)
+    frames = engine._to_display(out)
+    assert frames.shape == (4, 180, 320, 3) and frames.dtype == np.uint8
+
+
+def test_an_anchor_restarts_the_engine_from_the_cleaned_frame_instead_of_splicing_it():
+    """Splicing keeps the old frames (and their weapons or collapsed textures) in the model's cache."""
+    import asyncio
+    import dataclasses
+
+    from app.session import Runtime, State, World
+
+    calls = []
+
+    class SpyEngine(MockEngine):
+        def reset(self, image):
+            calls.append("reset")
+            super().reset(image)
+
+        def splice(self, image):
+            calls.append("splice")
+            super().splice(image)
+
+    settings = dataclasses.replace(SMALL, anchor_seconds=1.0)
+    rt = Runtime(settings, SpyEngine(settings), MockFlux())
+    image = np.zeros((176, 320, 3), np.uint8)
+    rt.engine.reset(image)
+    calls.clear()
+    world = World(world_id="w", seed=1, image=image, scene_prompt="a quiet harbour", moving_seconds=2.0)
+    events = []
+
+    async def send_event(e):
+        events.append(e)
+
+    asyncio.run(rt._reanchor(world, build_encoder(settings), image, send_event))
+    assert calls == ["reset"], calls
+    assert world.anchors == 1 and world.moving_seconds == 0.0 and world.state == State.STREAMING
+    assert [e for e in events if e.get("type") == "anchor"][0]["status"] == "applied"
+
+
+def test_malformed_control_messages_do_not_end_the_stream(client):
+    world = client.post("/internal/worlds", json={"prompt": "a snowy medieval village at dusk", "seed": 7}).json()
+    bad = ["[1, 2]", "42", "not json", '"text"', json.dumps({"type": "control", "seq": 1, "keys": 5}),
+           json.dumps({"type": "control", "seq": 2, "keys": ["KeyW"], "mouse": [1, 2]}),
+           json.dumps({"type": "control", "seq": 3, "keys": ["KeyW"], "scroll": "up"}),
+           json.dumps({"type": "control", "seq": 4, "keys": [["KeyW"]], "mouse": {"dx": "x"}})]
+    with client.websocket_connect(f"/internal/worlds/{world['world_id']}/stream") as ws:
+        json.loads(ws.receive_text())
+        for text in bad:
+            ws.send_text(text)
+        ws.send_text(json.dumps({"type": "control", "seq": 10, "keys": ["KeyW"], "mouse": {"dx": 0, "dy": 0}}))
+        seen, deadline = set(), time.time() + 5
+        while 10 not in seen and time.time() < deadline:
+            msg = ws.receive()
+            if msg.get("bytes"):
+                seen.add(_video(msg["bytes"])[2])
+        assert 10 in seen, "a valid control sent after the malformed ones must still be applied"
+        ws.send_text(json.dumps({"type": "stop"}))

@@ -1,6 +1,6 @@
 # WP-238: Golden-path check, freeze protocol and demo-day runbook
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-11)
 - **ADRs:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)
 - **Depends on:** none
 - **Related:** [WP-136](wp-136-webinar-demo-orchestration.md) (`make demo check`), [WP-208](wp-208-five-experiences-demonstration.md) (the five-experiences script and its known defects), [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md) (the delegation check)
@@ -69,3 +69,21 @@ token. Both are required moments; the world model stays the only `roadmap` row.
 - `docs/demo/freeze-protocol.md` exists, and the freeze of 2026-11-08 20:00 was announced and acknowledged by every live
   working session.
 - ADR-0605 can then move to `Implemented`.
+
+## Closure (2026-11-11, user decision)
+
+The user accepted the recorded golden-path runs as the evidence for this work package and for ADR-0605 on 2026-11-11.
+What the [demo-day runbook](../../demo/demo-day-2026-11-09.md#golden-path-results) holds:
+
+- **Dry run:** the 14:18 run on Sunday 2026-11-08 was partial (an etcd member was down), the 14:59 run passed 14/14.
+- **Baseline:** the freeze baseline passed 14/14 at 19:1x on `67e747b0`, and the last run before the demonstration passed
+  14/14 at 21:56 on `6355c092`. After it, only documentation changed until the freeze was lifted (about 10:55 on
+  Monday).
+- **Demonstration:** given on 2026-11-09 at 09:00; every moment ran as planned except the world model, which is
+  reworked under ADR-0604 (WP-237).
+
+Named exceptions, accepted by the user:
+
+- The Monday 07:30 and 08:30 runs are not recorded in the repository.
+- The acknowledgement of each frozen session is not recorded (the table of the runbook stayed empty). The freeze held:
+  no cluster change is recorded between the 21:56 run and the lift.

@@ -1,0 +1,2004 @@
+[
+  {
+    "id": 1,
+    "query": "What is a namespace in OpenShift?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/authentication_and_authorization",
+      "openshift_container_platform/4.22/html-single/building_applications"
+    ],
+    "top5": [
+      {
+        "score": 1.59235,
+        "meta": {
+          "path": "ai_applications/mcp_server/mcp-server-overview.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Inspect clusters with MCP server for Red Hat OpenShift",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/ai_applications/mcp_server/mcp-server-overview.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0783986,
+        "meta": {
+          "path": "architecture/index.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Architecture overview",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/architecture/index.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9842931,
+        "meta": {
+          "path": "cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Important changes to OpenShift Jenkins images",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.85901606,
+        "meta": {
+          "path": "post_installation_configuration/preparing-for-users.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Preparing for users",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/preparing-for-users.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.85901606,
+        "meta": {
+          "path": "authentication/using-rbac.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using RBAC to define and apply permissions",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/authentication/using-rbac.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "query": "How do I connect OpenShift to Keycloak so users log in with their company account?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/authentication_and_authorization"
+    ],
+    "top5": [
+      {
+        "score": 1.6544548,
+        "meta": {
+          "path": "cicd/gitops/configuring-sso-for-argo-cd-using-keycloak.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring SSO for Argo CD using Keycloak",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/configuring-sso-for-argo-cd-using-keycloak.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6082401,
+        "meta": {
+          "path": "cicd/gitops/configuring-sso-for-argo-cd-on-openshift.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring SSO for Argo CD on OpenShift",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/configuring-sso-for-argo-cd-on-openshift.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3750384,
+        "meta": {
+          "path": "authentication/external-auth.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Enabling direct authentication with an external OIDC identity provider",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/authentication/external-auth.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2647297,
+        "meta": {
+          "path": "authentication/identity_providers/configuring-keystone-identity-provider.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring a Keystone identity provider",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/authentication/identity_providers/configuring-keystone-identity-provider.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0170774,
+        "meta": {
+          "path": "cicd/gitops/configuring-sso-for-argo-cd-on-openshift.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring SSO for Argo CD on OpenShift",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/configuring-sso-for-argo-cd-on-openshift.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "query": "How can I give a colleague admin rights on just one project?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/authentication_and_authorization"
+    ],
+    "top5": [
+      {
+        "score": 1.4031415,
+        "meta": {
+          "path": "post_installation_configuration/preparing-for-users.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Preparing for users",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/preparing-for-users.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.198129,
+        "meta": {
+          "path": "service_mesh/v2x/ossm-create-mesh.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Adding services to a service mesh",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/service_mesh/v2x/ossm-create-mesh.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1913776,
+        "meta": {
+          "path": "authentication/using-rbac.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using RBAC to define and apply permissions",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/authentication/using-rbac.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1434549,
+        "meta": {
+          "path": "authentication/using-rbac.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using RBAC to define and apply permissions",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/authentication/using-rbac.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0358597,
+        "meta": {
+          "path": "applications/projects/working-with-projects.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Working with projects",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/applications/projects/working-with-projects.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "query": "How do I ask for persistent storage for my pod?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/storage"
+    ],
+    "top5": [
+      {
+        "score": 1.7584575,
+        "meta": {
+          "path": "storage/understanding-ephemeral-storage.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding ephemeral storage",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/storage/understanding-ephemeral-storage.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.498558,
+        "meta": {
+          "path": "observability/monitoring/configuring-user-workload-monitoring/storing-and-recording-data-uwm.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Storing and recording data for user workload monitoring",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/monitoring/configuring-user-workload-monitoring/storing-and-recording-data-uwm.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4975165,
+        "meta": {
+          "path": "observability/monitoring/configuring-core-platform-monitoring/storing-and-recording-data.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Storing and recording data for core platform monitoring",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/monitoring/configuring-core-platform-monitoring/storing-and-recording-data.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4257302,
+        "meta": {
+          "path": "storage/container_storage_interface/persistent-storage-csi-gcp-pd.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "GCP PD CSI Driver Operator",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/storage/container_storage_interface/persistent-storage-csi-gcp-pd.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9515296,
+        "meta": {
+          "path": "scalability_and_performance/telco-ran-du-rds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Telco RAN DU reference design specification",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/scalability_and_performance/telco-ran-du-rds.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "query": "How do I expose the internal image registry outside the cluster?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/registry"
+    ],
+    "top5": [
+      {
+        "score": 1.7997534,
+        "meta": {
+          "path": "registry/securing-exposing-registry.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Exposing the registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/registry/securing-exposing-registry.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6178293,
+        "meta": {
+          "path": "registry/securing-exposing-registry.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Exposing the registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/registry/securing-exposing-registry.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.5288763,
+        "meta": {
+          "path": "post_installation_configuration/configuring-private-cluster.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring a private cluster",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/configuring-private-cluster.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4027015,
+        "meta": {
+          "path": "disconnected/configuring-registry-external.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring your cluster to use an external registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/configuring-registry-external.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3226204,
+        "meta": {
+          "path": "registry/accessing-the-registry.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Accessing the registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/registry/accessing-the-registry.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "query": "What is an update channel and which one should I pick to upgrade my cluster?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/updating_clusters"
+    ],
+    "top5": [
+      {
+        "score": 1.8228517,
+        "meta": {
+          "path": "updating/understanding_updates/understanding-update-channels-release.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding update channels and releases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/understanding_updates/understanding-update-channels-release.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.7317319,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the CLI",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4702631,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/updating/update-api.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Verifying cluster API versions between update versions",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/updating/update-api.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3045567,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-web-console.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the web console",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-web-console.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2971815,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/updating/update-api.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Verifying cluster API versions between update versions",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/updating/update-api.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "query": "How do I back up etcd before a risky change?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/backup_and_restore"
+    ],
+    "top5": [
+      {
+        "score": 2.0654624,
+        "meta": {
+          "path": "backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backing up and restoring etcd data",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 2.0070293,
+        "meta": {
+          "path": "etcd/etcd-backup-restore/etcd-backup.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backing up and restoring etcd data",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/etcd/etcd-backup-restore/etcd-backup.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3163893,
+        "meta": {
+          "path": "post_installation_configuration/cluster-tasks.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation cluster tasks",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/cluster-tasks.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2868445,
+        "meta": {
+          "path": "backup_and_restore/index.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backup and restore",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/index.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1617432,
+        "meta": {
+          "path": "hosted_control_planes/hcp_high_availability/hcp-disaster-recovery-aws.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Disaster recovery for a hosted cluster in AWS",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/hosted_control_planes/hcp_high_availability/hcp-disaster-recovery-aws.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "query": "How do I block traffic between two namespaces?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/network_security"
+    ],
+    "top5": [
+      {
+        "score": 1.245103,
+        "meta": {
+          "path": "observability/network_observability/configuring-operator.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring the Network Observability Operator",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/network_observability/configuring-operator.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1276143,
+        "meta": {
+          "path": "networking/network_security/AdminNetworkPolicy/ovn-k-anp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OVN-Kubernetes AdminNetworkPolicy",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/network_security/AdminNetworkPolicy/ovn-k-anp.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1034634,
+        "meta": {
+          "path": "networking/network_security/AdminNetworkPolicy/ovn-k-anp-recommended-practices.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Best practices for AdminNetworkPolicy",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/network_security/AdminNetworkPolicy/ovn-k-anp-recommended-practices.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0499169,
+        "meta": {
+          "path": "networking/multiple_networks/primary_networks/about-user-defined-networks.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "About-user-defined networks",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/multiple_networks/primary_networks/about-user-defined-networks.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0460513,
+        "meta": {
+          "path": "networking/network_security/AdminNetworkPolicy/ovn-k-egress-nodes-networks-peer.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Egress nodes and networks peer for AdminNetworkPolicy",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/network_security/AdminNetworkPolicy/ovn-k-egress-nodes-networks-peer.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "query": "How do I add more worker nodes automatically when the cluster is full?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/machine_management"
+    ],
+    "top5": [
+      {
+        "score": 1.9566329,
+        "meta": {
+          "path": "nodes/nodes/nodes-nodes-adding-node-iso.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Adding worker nodes to an on-premise cluster",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/nodes/nodes-nodes-adding-node-iso.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.5010185,
+        "meta": {
+          "path": "post_installation_configuration/cluster-tasks.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation cluster tasks",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/cluster-tasks.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.207051,
+        "meta": {
+          "path": "post_installation_configuration/cluster-tasks.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation cluster tasks",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/cluster-tasks.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1133183,
+        "meta": {
+          "path": "nodes/nodes/nodes-sno-worker-nodes.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Adding worker nodes to single-node OpenShift clusters",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/nodes/nodes-sno-worker-nodes.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.08366,
+        "meta": {
+          "path": "storage/persistent_storage_local/persistent-storage-using-lvms.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Persistent storage using logical volume manager storage",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/storage/persistent_storage_local/persistent-storage-using-lvms.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "query": "How do I keep normal pods off a node reserved for databases?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/nodes"
+    ],
+    "top5": [
+      {
+        "score": 1.0934894,
+        "meta": {
+          "path": "nodes/pods/nodes-pods-configuring.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring an OpenShift Container Platform cluster for pods",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/pods/nodes-pods-configuring.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.056332,
+        "meta": {
+          "path": "nodes/nodes/nodes-nodes-rebooting.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding node rebooting",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/nodes/nodes-nodes-rebooting.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0145501,
+        "meta": {
+          "path": "nodes/nodes/nodes-nodes-resources-configuring.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Allocating resources for nodes in an OpenShift Container Platform cluster",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/nodes/nodes-nodes-resources-configuring.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.96957,
+        "meta": {
+          "path": "networking/ovn_kubernetes_network_provider/ovn-kubernetes-architecture-assembly.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OVN-Kubernetes architecture",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/ovn_kubernetes_network_provider/ovn-kubernetes-architecture-assembly.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9668284,
+        "meta": {
+          "path": "nodes/scheduling/nodes-scheduler-taints-tolerations.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Controlling pod placement using node taints",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/nodes/scheduling/nodes-scheduler-taints-tolerations.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "query": "How do I forward application logs to an external Splunk?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/logging"
+    ],
+    "top5": [
+      {
+        "score": 1.8441375,
+        "meta": {
+          "path": "observability/logging/log_collection_forwarding/configuring-log-forwarding.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring log forwarding",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/log_collection_forwarding/configuring-log-forwarding.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.7685018,
+        "meta": {
+          "path": "observability/logging/log_collection_forwarding/configuring-log-forwarding.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring log forwarding",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/log_collection_forwarding/configuring-log-forwarding.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.676147,
+        "meta": {
+          "path": "observability/logging/logging-6.2/log6x-clf-6.2.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring log forwarding",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/logging-6.2/log6x-clf-6.2.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6167016,
+        "meta": {
+          "path": "observability/logging/logging-6.1/log6x-clf-6.1.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring log forwarding",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/logging-6.1/log6x-clf-6.1.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.5758529,
+        "meta": {
+          "path": "observability/logging/logging-6.0/log6x-clf.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring log forwarding",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/logging-6.0/log6x-clf.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "query": "How do I create an alert on my own application's metrics?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/monitoring"
+    ],
+    "top5": [
+      {
+        "score": 1.8356704,
+        "meta": {
+          "path": "observability/monitoring/about-ocp-monitoring/key-concepts.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding the monitoring stack - key concepts",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/monitoring/about-ocp-monitoring/key-concepts.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2330089,
+        "meta": {
+          "path": "observability/monitoring/about-ocp-monitoring/key-concepts.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding the monitoring stack - key concepts",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/monitoring/about-ocp-monitoring/key-concepts.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2329364,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/troubleshooting/oadp-monitoring.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP monitoring",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/troubleshooting/oadp-monitoring.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2264376,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Observability in OpenShift Container Platform clusters",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.217848,
+        "meta": {
+          "path": "observability/logging/logging_alerts/custom-logging-alerts.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Custom logging alerts",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/logging_alerts/custom-logging-alerts.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "query": "How do I mirror the release images to install a cluster with no internet access?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/disconnected_environments"
+    ],
+    "top5": [
+      {
+        "score": 1.7962573,
+        "meta": {
+          "path": "disconnected/installing-mirroring-installation-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Mirroring images for a disconnected installation by using the oc adm command",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/installing-mirroring-installation-images.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3199879,
+        "meta": {
+          "path": "installing/installing_azure/ipi/installing-restricted-networks-azure-installer-provisioned.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Installing a cluster on Azure in a disconnected environment",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_azure/ipi/installing-restricted-networks-azure-installer-provisioned.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.206827,
+        "meta": {
+          "path": "installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Setting up the environment for an OpenShift installation",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1994941,
+        "meta": {
+          "path": "installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Setting up the environment for an OpenShift installation",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0970874,
+        "meta": {
+          "path": "disconnected/installing-mirroring-installation-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Mirroring images for a disconnected installation by using the oc adm command",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/installing-mirroring-installation-images.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "query": "How do I create a Windows virtual machine on OpenShift?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/virtualization"
+    ],
+    "top5": [
+      {
+        "score": 1.4815743,
+        "meta": {
+          "path": "virt/managing_vms/virt-managing-vms-openshift-pipelines.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Manage virtual machines with OpenShift Pipelines",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/managing_vms/virt-managing-vms-openshift-pipelines.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3200952,
+        "meta": {
+          "path": "virt/creating_vm/virt-creating-vms-web.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Create virtual machines by using the web console",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/creating_vm/virt-creating-vms-web.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1681552,
+        "meta": {
+          "path": "virt/getting_started/virt-getting-started.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Getting started with OpenShift Virtualization",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/getting_started/virt-getting-started.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1625134,
+        "meta": {
+          "path": "virt/managing_vms/virt-edit-vms.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Edit the configuration of a virtual machine",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/managing_vms/virt-edit-vms.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.12558,
+        "meta": {
+          "path": "virt/about_virt/about-virt.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "About OpenShift Virtualization",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/about_virt/about-virt.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "query": "How do I serve a large language model with OpenShift AI?",
+    "expect": [
+      "red_hat_openshift_ai_self-managed/3.5"
+    ],
+    "top5": [
+      {
+        "score": 1.5433311,
+        "meta": {
+          "path": "ai_applications/mcp_server/mcp-server-overview.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Inspect clusters with MCP server for Red Hat OpenShift",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/ai_applications/mcp_server/mcp-server-overview.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2831324,
+        "meta": {
+          "path": "ai_workloads/leader_worker_set/index.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Leader Worker Set Operator overview",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/ai_workloads/leader_worker_set/index.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2153648,
+        "meta": {
+          "path": "ai_applications/mcp_server/mcp-server-overview.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Inspect clusters with MCP server for Red Hat OpenShift",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/ai_applications/mcp_server/mcp-server-overview.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1038787,
+        "meta": {
+          "path": "ai_workloads/index.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Overview of AI workloads on OpenShift Container Platform",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/ai_workloads/index.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0825841,
+        "meta": {
+          "path": "lightspeed/about/ols-openshift-lightspeed-overview.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OpenShift Lightspeed overview",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/lightspeed/about/ols-openshift-lightspeed-overview.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "query": "What is an ApplicationSet in Argo CD?",
+    "expect": [
+      "argo-cd.readthedocs.io/en/stable",
+      "red_hat_openshift_gitops/1.17"
+    ],
+    "top5": [
+      {
+        "score": 2.130035,
+        "meta": {
+          "path": "cicd/gitops/gitops-release-notes.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Red Hat OpenShift GitOps release notes",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/gitops-release-notes.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.968425,
+        "meta": {
+          "path": "cicd/gitops/argo-cd-custom-resource-properties.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Argo CD Operator",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/argo-cd-custom-resource-properties.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.3971595,
+        "meta": {
+          "path": "cicd/gitops/gitops-release-notes.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Red Hat OpenShift GitOps release notes",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/gitops-release-notes.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1569295,
+        "meta": {
+          "path": "cicd/gitops/configuring-an-openshift-cluster-by-deploying-an-application-with-cluster-configurations.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring an OpenShift cluster by deploying an application with cluster configurations",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/configuring-an-openshift-cluster-by-deploying-an-application-with-cluster-configurations.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1046011,
+        "meta": {
+          "path": "cicd/gitops/argo-cd-custom-resource-properties.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Argo CD Operator",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/gitops/argo-cd-custom-resource-properties.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "query": "How do I register a RHEL server to Satellite?",
+    "expect": [
+      "red_hat_satellite/6.17"
+    ],
+    "top5": [
+      {
+        "score": 2.0892038,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.5376856,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1840972,
+        "meta": {
+          "path": "installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Setting up the environment for an OpenShift installation",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.98722947,
+        "meta": {
+          "path": "installing/installing_azure/ipi/installing-azure-customizations.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Installing a cluster on Azure with customizations",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_azure/ipi/installing-azure-customizations.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.7390552,
+        "meta": {
+          "path": "post_installation_configuration/configuring-multi-arch-compute-machines/creating-multi-arch-compute-nodes-ibm-z-lpar.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Creating a cluster with multi-architecture compute machines on IBM Z and IBM LinuxONE in an LPAR",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/configuring-multi-arch-compute-machines/creating-multi-arch-compute-nodes-ibm-z-lpar.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "query": "What does the internal procedure S0R42 'Schedule Satellite' describe?",
+    "expect": [
+      "S0R42"
+    ],
+    "top5": [
+      {
+        "score": 1.018258,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0053895,
+        "meta": {
+          "path": "networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring PTP devices",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9845474,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9254271,
+        "meta": {
+          "path": "networking/advanced_networking/ptp/ptp-events-rest-api-reference-v2.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "PTP events REST API v2 reference",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/advanced_networking/ptp/ptp-events-rest-api-reference-v2.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9060161,
+        "meta": {
+          "path": "networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring PTP devices",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "query": "How do we restore a deleted project with OADP?",
+    "expect": [
+      "O0R62-RSNSO"
+    ],
+    "top5": [
+      {
+        "score": 1.5770333,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-3scale/restoring-3scale-api-management-by-using-oadp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Restoring 3scale API Management by using OADP",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-3scale/restoring-3scale-api-management-by-using-oadp.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4048526,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-use-cases/oadp-usecase-restore-different-namespace.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OpenShift API for Data Protection (OADP) restore use case",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-use-cases/oadp-usecase-restore-different-namespace.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.337457,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-features-plugins.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP features and plugins",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-features-plugins.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2626082,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/release-notes/oadp-upgrade-notes-1-6.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Upgrading OADP 1.5 to 1.6",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/release-notes/oadp-upgrade-notes-1-6.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9825372,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-advanced-topics/oadp-advanced-topics.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Advanced OADP features and functionalities",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-advanced-topics/oadp-advanced-topics.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "query": "What is our process for preparing a cluster upgrade?",
+    "expect": [
+      "O0R41-RDUPG"
+    ],
+    "top5": [
+      {
+        "score": 1.1044492,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/updating/update-rhacm-talm-z-stream.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Complete a z-stream cluster update with TALM",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/updating/update-rhacm-talm-z-stream.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.066905,
+        "meta": {
+          "path": "cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Important changes to OpenShift Jenkins images",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0429561,
+        "meta": {
+          "path": "updating/understanding_updates/understanding-update-channels-release.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding update channels and releases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/understanding_updates/understanding-update-channels-release.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0069327,
+        "meta": {
+          "path": "edge_computing/image_based_upgrade/ztp-image-based-upgrade.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Performing an image-based upgrade for single-node OpenShift clusters using GitOps ZTP",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/edge_computing/image_based_upgrade/ztp-image-based-upgrade.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.97954154,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the CLI",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "query": "A namespace is stuck and unstable, what is the fix procedure?",
+    "expect": [
+      "O0R62-EXONS"
+    ],
+    "top5": [
+      {
+        "score": 1.1074486,
+        "meta": {
+          "path": "operators/admin/olm-troubleshooting-operator-issues.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Troubleshooting Operator issues",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/operators/admin/olm-troubleshooting-operator-issues.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1074486,
+        "meta": {
+          "path": "support/troubleshooting/troubleshooting-operator-issues.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Troubleshooting Operator issues",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/support/troubleshooting/troubleshooting-operator-issues.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0622085,
+        "meta": {
+          "path": "cli_reference/tkn_cli/op-tkn-reference.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OpenShift Pipelines tkn reference",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cli_reference/tkn_cli/op-tkn-reference.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0101662,
+        "meta": {
+          "path": "web_console/dynamic-plugin/dynamic-plugins-reference.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Dynamic plugin reference",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/web_console/dynamic-plugin/dynamic-plugins-reference.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8788901,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP Self-Service namespace admin use cases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "query": "What was the revenue of our Brazilian subsidiary last quarter?",
+    "expect": null,
+    "top5": [
+      {
+        "score": 1.1566093,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP Self-Service namespace admin use cases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0320407,
+        "meta": {
+          "path": "security/compliance_operator/co-scans/compliance-operator-troubleshooting.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Troubleshooting Compliance Operator scans",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/security/compliance_operator/co-scans/compliance-operator-troubleshooting.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.98712987,
+        "meta": {
+          "path": "cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Important changes to OpenShift Jenkins images",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/jenkins/important-changes-to-openshift-jenkins-images.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.93689907,
+        "meta": {
+          "path": "networking/ingress_load_balancing/metallb/metallb-troubleshoot-support.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "MetalLB logging, troubleshooting, and support",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/ingress_load_balancing/metallb/metallb-troubleshoot-support.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8588348,
+        "meta": {
+          "path": "updating/understanding_updates/understanding-update-channels-release.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding update channels and releases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/understanding_updates/understanding-update-channels-release.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "query": "Give me a recipe for a chocolate cake.",
+    "expect": null,
+    "top5": [
+      {
+        "score": 1.0799419,
+        "meta": {
+          "path": "hosted_control_planes/hcp_high_availability/hcp-disaster-recovery-aws.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Disaster recovery for a hosted cluster in AWS",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/hosted_control_planes/hcp_high_availability/hcp-disaster-recovery-aws.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0535891,
+        "meta": {
+          "path": "web_console/creating-quick-start-tutorials.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Creating quick start tutorials in the web console",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/web_console/creating-quick-start-tutorials.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.97565967,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP Self-Service namespace admin use cases",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-self-service/oadp-self-service-namespace-admin-use-cases.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.88581586,
+        "meta": {
+          "path": "installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Setting up the environment for an OpenShift installation",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.88581586,
+        "meta": {
+          "path": "installing/installing_bare_metal/bare-metal-postinstallation-configuration.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation configuration",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/bare-metal-postinstallation-configuration.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "query": "How do I configure a Cisco Catalyst switch VLAN trunk?",
+    "expect": null,
+    "top5": [
+      {
+        "score": 1.7777116,
+        "meta": {
+          "path": "networking/hardware_networks/configuring-sriov-qinq-support.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring QinQ support for SR-IOV enabled workloads",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/hardware_networks/configuring-sriov-qinq-support.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6683154,
+        "meta": {
+          "path": "networking/multiple_networks/secondary_networks/creating-secondary-nwt-other-cni.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Creating secondary networks with other CNI plugins",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/multiple_networks/secondary_networks/creating-secondary-nwt-other-cni.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6683154,
+        "meta": {
+          "path": "virt/live_migration/virt-configuring-cross-cluster-live-migration-network.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring a cross-cluster live migration network",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/virt/live_migration/virt-configuring-cross-cluster-live-migration-network.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4109751,
+        "meta": {
+          "path": "networking/multiple_networks/secondary_networks/editing-additional-network.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Editing a secondary network",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/multiple_networks/secondary_networks/editing-additional-network.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2260859,
+        "meta": {
+          "path": "networking/multiple_networks/secondary_networks/creating-secondary-nwt-other-cni.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Creating secondary networks with other CNI plugins",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/multiple_networks/secondary_networks/creating-secondary-nwt-other-cni.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "query": "Comment demander un stockage persistant pour mon pod ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/storage"
+    ],
+    "top5": [
+      {
+        "score": 0.95237327,
+        "meta": {
+          "path": "storage/persistent_storage_local/persistent-storage-using-lvms.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Persistent storage using logical volume manager storage",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/storage/persistent_storage_local/persistent-storage-using-lvms.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.90436536,
+        "meta": {
+          "path": "observability/logging/troubleshooting/cluster-logging-log-store-status.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Viewing the status of the Elasticsearch log store",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/logging/troubleshooting/cluster-logging-log-store-status.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.90436536,
+        "meta": {
+          "path": "backup_and_restore/graceful-cluster-shutdown.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Shutting down the cluster gracefully",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/graceful-cluster-shutdown.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8714848,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating hardware on nodes running on vSphere",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.87068903,
+        "meta": {
+          "path": "post_installation_configuration/post-install-storage-configuration.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation storage configuration",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/post-install-storage-configuration.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "query": "Comment exposer le registre d'images interne en dehors du cluster ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/registry"
+    ],
+    "top5": [
+      {
+        "score": 1.096851,
+        "meta": {
+          "path": "openshift_images/managing_images/using-image-pull-secrets.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using image pull secrets",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/openshift_images/managing_images/using-image-pull-secrets.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.99125606,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Observability in OpenShift Container Platform clusters",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8856138,
+        "meta": {
+          "path": "disconnected/configuring-registry-external.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring your cluster to use an external registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/configuring-registry-external.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.86807436,
+        "meta": {
+          "path": "disconnected/configuring-registry-external.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring your cluster to use an external registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/configuring-registry-external.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.81471807,
+        "meta": {
+          "path": "registry/securing-exposing-registry.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Exposing the registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/registry/securing-exposing-registry.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "query": "Qu'est-ce qu'un canal de mise \u00e0 jour et lequel choisir pour mettre \u00e0 niveau mon cluster ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/updating_clusters"
+    ],
+    "top5": [
+      {
+        "score": 1.466458,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the CLI",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1363416,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the CLI",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-cli.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.97579056,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-cluster-web-console.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster using the web console",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-cluster-web-console.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9508048,
+        "meta": {
+          "path": "networking/hardware_networks/configuring-sriov-device.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring an SR-IOV network device",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/hardware_networks/configuring-sriov-device.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9442614,
+        "meta": {
+          "path": "updating/index.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating clusters overview",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/index.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "query": "Comment sauvegarder etcd avant un changement risqu\u00e9 ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/backup_and_restore"
+    ],
+    "top5": [
+      {
+        "score": 1.5774982,
+        "meta": {
+          "path": "backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backing up and restoring etcd data",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.558359,
+        "meta": {
+          "path": "etcd/etcd-backup-restore/etcd-backup.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backing up and restoring etcd data",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/etcd/etcd-backup-restore/etcd-backup.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.4468751,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating hardware on nodes running on vSphere",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1243949,
+        "meta": {
+          "path": "post_installation_configuration/cluster-tasks.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Postinstallation cluster tasks",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/cluster-tasks.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.99687433,
+        "meta": {
+          "path": "hosted_control_planes/hcp_high_availability/hcp-backup-restore-aws.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Backing up and restoring etcd on the management cluster",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/hosted_control_planes/hcp_high_availability/hcp-backup-restore-aws.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "query": "Comment bloquer le trafic entre deux namespaces ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/network_security"
+    ],
+    "top5": [
+      {
+        "score": 1.1739037,
+        "meta": {
+          "path": "observability/network_observability/configuring-operator.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring the Network Observability Operator",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/observability/network_observability/configuring-operator.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0122699,
+        "meta": {
+          "path": "networking/ingress_load_balancing/configuring_gateway_api/understand-gateway-api.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding Gateway API",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/ingress_load_balancing/configuring_gateway_api/understand-gateway-api.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0107696,
+        "meta": {
+          "path": "post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Observability in OpenShift Container Platform clusters",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/day_2_core_cnf_clusters/observability/observability.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.95294434,
+        "meta": {
+          "path": "networking/network_security/AdminNetworkPolicy/ovn-k-egress-nodes-networks-peer.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Egress nodes and networks peer for AdminNetworkPolicy",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/network_security/AdminNetworkPolicy/ovn-k-egress-nodes-networks-peer.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.86965114,
+        "meta": {
+          "path": "networking/ingress_load_balancing/configuring_gateway_api/understand-gateway-api.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Understanding Gateway API",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/ingress_load_balancing/configuring_gateway_api/understand-gateway-api.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "query": "Comment copier les images de release pour installer un cluster sans acc\u00e8s \u00e0 internet ?",
+    "expect": [
+      "openshift_container_platform/4.22/html-single/disconnected_environments"
+    ],
+    "top5": [
+      {
+        "score": 1.5878845,
+        "meta": {
+          "path": "installing/installing_azure/ipi/installing-restricted-networks-azure-installer-provisioned.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Installing a cluster on Azure in a disconnected environment",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_azure/ipi/installing-restricted-networks-azure-installer-provisioned.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2828097,
+        "meta": {
+          "path": "disconnected/installing-mirroring-installation-images.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Mirroring images for a disconnected installation by using the oc adm command",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/disconnected/installing-mirroring-installation-images.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1775781,
+        "meta": {
+          "path": "installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Setting up the environment for an OpenShift installation",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_bare_metal/ipi/ipi-install-installation-workflow.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1022153,
+        "meta": {
+          "path": "architecture/architecture.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OpenShift Container Platform architecture",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/architecture/architecture.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1002843,
+        "meta": {
+          "path": "openshift_images/samples-operator-alt-registry.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using the Cluster Samples Operator with an alternate registry",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/openshift_images/samples-operator-alt-registry.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "query": "Comment enregistrer un serveur RHEL aupr\u00e8s de Satellite ?",
+    "expect": [
+      "red_hat_satellite/6.17"
+    ],
+    "top5": [
+      {
+        "score": 2.1784253,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.6318634,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0204062,
+        "meta": {
+          "path": "security/network_bound_disk_encryption/nbde-tang-server-installation-considerations.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Tang server installation considerations",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/security/network_bound_disk_encryption/nbde-tang-server-installation-considerations.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9648132,
+        "meta": {
+          "path": "installing/installing_azure/ipi/installing-azure-customizations.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Installing a cluster on Azure with customizations",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_azure/ipi/installing-azure-customizations.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8904088,
+        "meta": {
+          "path": "post_installation_configuration/configuring-multi-arch-compute-machines/creating-multi-arch-compute-nodes-ibm-z-lpar.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Creating a cluster with multi-architecture compute machines on IBM Z and IBM LinuxONE in an LPAR",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/post_installation_configuration/configuring-multi-arch-compute-machines/creating-multi-arch-compute-nodes-ibm-z-lpar.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "query": "Que d\u00e9crit la proc\u00e9dure interne S0R42 \u00ab Schedule Satellite \u00bb ?",
+    "expect": [
+      "S0R42"
+    ],
+    "top5": [
+      {
+        "score": 1.1778759,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/backing_up_and_restoring/oadp-scheduling-backups-doc.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Scheduling backups using Schedule CR",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/backing_up_and_restoring/oadp-scheduling-backups-doc.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1018602,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.101389,
+        "meta": {
+          "path": "networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring PTP devices",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0778533,
+        "meta": {
+          "path": "cicd/builds/running-entitled-builds.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Red Hat subscriptions in builds",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/builds/running-entitled-builds.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.0744126,
+        "meta": {
+          "path": "networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring PTP devices",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/networking/advanced_networking/ptp/configuring-ptp.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "query": "Comment restaurer un projet supprim\u00e9 avec OADP ?",
+    "expect": [
+      "O0R62-RSNSO"
+    ],
+    "top5": [
+      {
+        "score": 1.2141193,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/troubleshooting/troubleshooting.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Troubleshooting",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/troubleshooting/troubleshooting.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.2052139,
+        "meta": {
+          "path": "updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating hardware on nodes running on vSphere",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1713591,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/cli-tools/oadp-cli-plugin.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP CLI plugin",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/cli-tools/oadp-cli-plugin.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 1.1141485,
+        "meta": {
+          "path": "backup_and_restore/application_backup_and_restore/oadp-features-plugins.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "OADP features and plugins",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/backup_and_restore/application_backup_and_restore/oadp-features-plugins.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9882785,
+        "meta": {
+          "path": "cicd/pipelines/using-pipelines-as-code.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Using Pipelines as Code",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/cicd/pipelines/using-pipelines-as-code.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  },
+  {
+    "id": 34,
+    "query": "Quel est notre processus pour pr\u00e9parer une mise \u00e0 niveau de cluster ?",
+    "expect": [
+      "O0R41-RDUPG"
+    ],
+    "top5": [
+      {
+        "score": 0.98116463,
+        "meta": {
+          "path": "edge_computing/ztp-deploying-far-edge-sites.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Installing managed clusters with RHACM and ClusterInstance resources",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/edge_computing/ztp-deploying-far-edge-sites.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9535717,
+        "meta": {
+          "path": "updating/updating_a_cluster/disconnected-update.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating a cluster in a disconnected environment",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/updating/updating_a_cluster/disconnected-update.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.9458402,
+        "meta": {
+          "path": "edge_computing/cnf-talm-for-cluster-upgrades.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating managed clusters with the Topology Aware Lifecycle Manager",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/edge_computing/cnf-talm-for-cluster-upgrades.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8470567,
+        "meta": {
+          "path": "installing/installing_ibm_cloud/installing-ibm-cloud-account.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Configuring an IBM Cloud account",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/installing/installing_ibm_cloud/installing-ibm-cloud-account.adoc",
+          "version": "4.22"
+        }
+      },
+      {
+        "score": 0.8410056,
+        "meta": {
+          "path": "edge_computing/cnf-talm-for-cluster-upgrades.adoc",
+          "product": "OpenShift Container Platform",
+          "title": "Updating managed clusters with the Topology Aware Lifecycle Manager",
+          "url": "https://github.com/openshift/openshift-docs/blob/enterprise-4.22/edge_computing/cnf-talm-for-cluster-upgrades.adoc",
+          "version": "4.22"
+        }
+      }
+    ]
+  }
+]

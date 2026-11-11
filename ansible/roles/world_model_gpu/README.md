@@ -1,6 +1,6 @@
 # world_model_gpu (Day 0, local)
 
-ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSet `zuno-gpu-world-model-a`
+ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSets `zuno-gpu-world-model-a` and `-b` (one per zone, replicas 0 unless listed in `zuno_world_model_gpu_azs`)
 (g7e.4xlarge, one whole RTX PRO 6000, `nvidia.com/mig.config: all-disabled`, label
 `zuno.io/gpu-workload: world-model`, taint `zuno.io/gpu-world-model=true:NoSchedule`), rendered by the Application
 `zuno-machines-world-model-d0` from `gitops/charts/machines`, apart from the GPU fleet's `zuno-machines-d0`.
@@ -11,6 +11,11 @@ ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSet 
 | `make d0 install world-model-gpu` | `false` | Removes a left-over node; refuses while `zuno-world-model-d1` is installed |
 | `make d0 uninstall world-model-gpu` | any | Removes the node (Application, MachineSet, Machine, EC2 instance); refuses while the app is installed |
 | `make d0 check world-model-gpu` | any | Reports the node against the switch; reads Nodes only, so it also runs under AAP |
+
+`zuno_world_model_gpu_azs` (cluster file, a list of zone letters, demo333: `["a", "b"]`) says which zones are scaled to 1: capacity for
+g7e.4xlarge comes and goes per zone (no capacity in a and b for hours on 2026-11-10, and zone c offers no g7e.4xlarge at all:
+InvalidConfiguration). Searching both zones at once is the fast way to get the node; when one zone has it, scale the other to 0
+(`oc scale machineset zuno-gpu-world-model-<z> -n openshift-machine-api --replicas=0`).
 
 The switch lives in `ansible/clusters/<cluster>.yml` (committed: AAP reads the SCM checkout) and can be overridden
 locally from `ansible/confidential.yml`. `zuno_world_model_gpu_az` (cluster file; demo333 sets `b`, because g7e.4xlarge had no

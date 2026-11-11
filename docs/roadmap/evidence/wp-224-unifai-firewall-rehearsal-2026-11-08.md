@@ -33,7 +33,7 @@ IP the rule does not hold. A backup job run with the firewall on hung on the upl
 Fix, proven in the namespace: no `endpoint` (virtual-hosted style). The same job then reached S3 and failed only on the
 placeholder credentials (`InvalidAccessKeyId`), which is an authentication answer, not a connection failure. The cli's
 own retries cover the remaining ~20% per attempt. Shipped in `ansible/roles/unifai/tasks/install.yml` (the derived backup
-values no longer carry `endpoint`). It reaches the live Application only at the next `make d1 install unifai`, which also
+values no longer carry `endpoint`). It reaches the live Application only at the next `make d2 install unifai`, which also
 moves the CronJobs to the virtual-hosted style; run `make d3 backup unifai` once after it and before the switch.
 
 ## Not covered
@@ -52,6 +52,6 @@ but the rule was broken and the probe list is fixed here: use `getent hosts` for
 
 ## Before the real switch
 
-1. `make d1 install unifai` with the new backup values, then `make d3 backup unifai`.
+1. `make d2 install unifai` with the new backup values, then `make d3 backup unifai`.
 2. A golden path by the session that owns it, just before.
 3. The user's explicit go; then `egress.enabled: true`, remove the `EGRESS_DEFERRABLE` entry for zuno-unifai.

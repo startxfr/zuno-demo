@@ -143,11 +143,15 @@
       data:
         ca.crt: >-
           {{ (
-               (_openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode) + "\n"
+               (_openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode) + _openshift_oauth_nl
                if 'ca.crt' in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
                else ''
              )
              + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
+  # A real newline, from a double-quoted YAML scalar: inside `{{ }}` in a `>-` block, "\n" stays the two characters
+  # backslash + n (ansible-core 2.19), which glued two PEMs into one bad bundle on 2026-11-08 (WP-211).
+  vars:
+    _openshift_oauth_nl: "\n"
 
 # ADR-0352 / WP-211, external mode: the same ConfigMap built from the SUPPLIED CA bundle (empty = the external
 # certificate is publicly trusted, so only the router CA the oauth-server already needs is kept).
@@ -162,9 +166,13 @@
         namespace: openshift-config
       data:
         ca.crt: >-
-          {{ ((zuno_keycloak_ca_pem + "\n") if (zuno_keycloak_ca_pem | length > 0) else '')
+          {{ ((zuno_keycloak_ca_pem + _openshift_oauth_nl) if (zuno_keycloak_ca_pem | length > 0) else '')
              + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
   when: zuno_keycloak_external_mode | bool
+  # A real newline, from a double-quoted YAML scalar: inside `{{ }}` in a `>-` block, "\n" stays the two characters
+  # backslash + n (ansible-core 2.19), which glued two PEMs into one bad bundle on 2026-11-08 (WP-211).
+  vars:
+    _openshift_oauth_nl: "\n"
 
 # ADR-0347: cluster-wide complement to openID.ca above (defense in depth) -
 # proxy/cluster.spec.trustedCA is consumed by every operator whose
@@ -233,7 +241,11 @@
     _openshift_oauth_pki_root_pem: >-
       {{ ((_openshift_oauth_vault_pki_cm.resources | default([{}]) | first | default({})).get('data', {}).get('ca.crt', '')
          or ((((_openshift_oauth_vault_root.resources | default([{}]))[0].data | default({})).get('ca.crt', '')) | b64decode))
-         + (("\n" + zuno_keycloak_ca_pem) if (zuno_keycloak_ca_pem | default('') | length > 0) else '') }}
+         + ((_openshift_oauth_nl + zuno_keycloak_ca_pem) if (zuno_keycloak_ca_pem | default('') | length > 0) else '') }}
+  # A real newline, from a double-quoted YAML scalar: inside `{{ }}` in a `>-` block, "\n" stays the two characters
+  # backslash + n (ansible-core 2.19), which glued two PEMs into one bad bundle on 2026-11-08 (WP-211).
+  vars:
+    _openshift_oauth_nl: "\n"
 - name: "openshift_oauth | reduce that to the boolean the three consumers key on"
   ansible.builtin.set_fact:
     _openshift_oauth_private_ca: >-

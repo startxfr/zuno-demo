@@ -1446,6 +1446,58 @@ def check_confidential_var_loaders() -> List[Finding]:
     return findings
 
 
+_BLOCK_SCALAR_KEY = re.compile(r"^(\s*)(-\s+)?[^#\s][^#]*?:\s*[>|][-+0-9]*\s*(#.*)?$")
+_JINJA_EXPR = re.compile(r"\{\{.*?\}\}", re.S)
+
+
+def jinja_newline_findings(rel: str, text: str) -> List[Finding]:
+    """`\n` written inside `{{ }}` in a YAML block scalar (`>`, `>-`, `|`, `|-`).
+
+    A block scalar does no escape processing, and on ansible-core 2.19 a `{{ }}`
+    expression then keeps "\n" as the two characters backslash + n (inside
+    `{% %}` statements it does become a newline). On 2026-11-08 this glued two
+    PEM certificates into one bad `user-ca-bundle` (openshift_oauth, WP-211) and
+    degraded the machine-config and network clusteroperators; WP-129 had hit the
+    same trap in a CA-bundle merge. The fix is a variable set from a
+    double-quoted YAML scalar, which YAML turns into a real newline.
+    """
+    findings: List[Finding] = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        m = _BLOCK_SCALAR_KEY.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        key_col = len(m.group(1)) + (len(m.group(2)) if m.group(2) else 0)
+        start = i + 1
+        j = start
+        while j < len(lines) and (not lines[j].strip()
+                                  or len(lines[j]) - len(lines[j].lstrip()) > key_col):
+            j += 1
+        block = "\n".join(lines[start:j])
+        for expr in _JINJA_EXPR.finditer(block):
+            for esc in re.finditer(r"\\n", expr.group(0)):
+                line_no = start + 1 + block.count("\n", 0, expr.start() + esc.start())
+                findings.append(Finding(
+                    "jinja_newline",
+                    f"{rel}:{line_no}: \\n inside {{{{ }}}} in a YAML block scalar stays the two "
+                    "characters backslash + n (ansible-core 2.19); use a variable set from a "
+                    "double-quoted scalar instead (`nl: \"\\n\"`, see "
+                    "ansible/roles/openshift_oauth/tasks/install.yml)"))
+        i = max(j, i + 1)
+    return findings
+
+
+def check_jinja_newline_in_block_scalars() -> List[Finding]:
+    """Every Ansible YAML file, checked with jinja_newline_findings()."""
+    findings: List[Finding] = []
+    root = REPO_ROOT / "ansible"
+    for path in sorted(list(root.rglob("*.yml")) + list(root.rglob("*.yaml"))):
+        findings += jinja_newline_findings(str(path.relative_to(REPO_ROOT)), path.read_text(errors="ignore"))
+    return findings
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1461,6 +1513,7 @@ def main() -> int:
         + check_debug_make_commands()
         + check_gitops_values_clobber()
         + check_confidential_var_loaders()
+        + check_jinja_newline_in_block_scalars()
         + check_version_consistency(profile)
         + check_model_roles()
         + check_doc_links()
@@ -1475,6 +1528,7 @@ def main() -> int:
           "consistency, Makefile component lists against aap-config's AAP "
           "workflow DAGs, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           "roles reading ansible/confidential.yml variables without loading the file, "
+          "\\n escapes inside {{ }} in YAML block scalars of ansible/, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
           "model architectural roles against provider-routing.yaml/"
           "model-routing-policy.yaml, relative ADR links in ADR/roadmap/"

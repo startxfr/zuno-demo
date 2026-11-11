@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.65, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.68, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:3e8657754180dcaf1dece8425fb03d7d31d1289bacf50b088f82f34d7462565d
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:e497eb34f7f1e71e56e3fca498ec64f8dc0772299af692a3772b3f0f67aa0f28
   catalogSourceName: unifai-operator-catalog
   channel: alpha
   package: unifai-operator
@@ -40,13 +40,7 @@ stack:
   # Extra environment by component (operator >= 0.1.22): multiagent,
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
-  extraEnv:
-    # UnifAI 0.1.65 starts the rag-celery worker without `git_queue`, so a `type: git` source stays in Syncing/pipeline
-    # forever (R-530; fork defect fixed in the operator default of a later release). An entry with the same name replaces
-    # the operator's value. Remove it once the pinned operator lists git_queue itself.
-    ragCelery:
-      - name: CELERY_QUEUES
-        value: slack_queue,document_queue,slack_events_queue,confluence_queue,web_queue,git_queue
+  extraEnv: {}
   # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
   # embedding model of `rag` below.
   memory:
@@ -128,12 +122,14 @@ stack:
 # identity Route, stack.rag.confluenceUrl's host and, with stack.backup, the S3
 # endpoint and the bucket's virtual-hosted name. Hosts verified against the
 # live demo333 stack on 2026-11-06.
-# Off until the zuno-unifai rehearsal (canary window, user's go): never
-# rehearsed, and the stack may reach hosts not listed here (googleapis via
-# GOOGLE_APPLICATION_CREDENTIALS, a search API, docling model downloads).
+# On since 2026-11-11 (user's go, WP-224 step 6). Rehearsed on 2026-11-08 on a throwaway
+# stack (docs/roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md): the hosts
+# below answer through the firewall, everything else is blocked. A host the stack needs
+# and that is missing here fails silently in a restart path or a CronJob: add it with a
+# reason line. Rollback at once: `oc -n zuno-unifai delete egressfirewall default`, then
+# `enabled: false` plus a `disabledReason` here (ArgoCD recreates it otherwise).
 egress:
-  enabled: false
-  disabledReason: not rehearsed yet on zuno-unifai; enable in the canary window with the user's go (WP-224 rollout step 8).
+  enabled: true
   # The Kubernetes API on the control-plane nodes (6443): rag-server's
   # TokenReview (stack.rag.tokenReview; RAG_TOKENREVIEW_ENABLED=true live).
   apiServer: true

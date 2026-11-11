@@ -53,6 +53,14 @@ runtime:
   encoder: auto
   # world_engine quantization once the smoke test (WP-232) has measured it: "", intw8a8, fp8w8a8 or nvfp4.
   quant: ""
+  # Drift control, measured 2026-11-09: Waypoint-1.5 loses the scene ~10 s into a walk (never while idle). Every N
+  # seconds of MOVEMENT the runtime redraws the current frame with FLUX from the scene prompt and splices it back
+  # (about 0.64 s freeze each). 0 turns it off.
+  anchorSeconds: 2
+  # Skip world_engine's bilinear 720p <-> 512x1024 round trip (sharper, same cost): true or false.
+  aeRaw: true
+  # Size of the frame given to FLUX for an anchor: the autoencoder's native 1024x512 (0.64 s instead of 1.17 s at 720p). "" = display size.
+  anchorEditSize: "1024x512"
   nodeSelector:
     zuno.io/gpu-workload: world-model
   toleration:

@@ -166,7 +166,7 @@ operator:
     operator:
       channel: ""
       name: rhbk-operator
-      installPlanApproval: Manual  # demo freeze (2026-11-08): no unattended operator upgrade until after the 2026-11-09 demo; back to Automatic after it
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
       source:
         name: ""
         namespace: openshift-marketplace

@@ -18,8 +18,8 @@ spec:
       releaseName: zuno-mcp-git-forge-d1
       values: |
         # WP-225 lot C, rollout step 3 (user's go 2026-11-07): verify the mcp-gateway's per-call assertion
-        # (public half of Vault mcp/gateway-call-assertion). Not required yet: a call without an assertion
-        # is still served until callAssertion.required is switched on, one server at a time, later.
+        # (public half of Vault mcp/gateway-call-assertion). Required since 2026-11-09 (user's go): a call without a valid assertion
+        # gets 401. The only caller is the mcp-gateway (NetworkPolicy), which signs every call and every schema read.
         # WP-225 lot B (user's go 2026-11-07): the dev and ops groups reach github:startxfr/zuno-demo only; the
         # groups the tool policy lets use git tools (consultant, board, cdp) keep every repository.
         repositoryAllowlist:
@@ -38,9 +38,11 @@ spec:
             recrut: ["*"]
           scope: all
         callAssertion:
+          required: true
+          # WP-247: the PUBLIC half of the Vault Transit key mcp-call-assertion (the private half never leaves Vault).
           publicKey: |
             -----BEGIN PUBLIC KEY-----
-            MCowBQYDK2VwAyEAlIAapqkGwFneDh3ZM2/thjjJbQa5ZnOq7S4Ro0Ju6FQ=
+            MCowBQYDK2VwAyEA3UJL9yklPJrs7fUan0/ESqoNUfsbxsCKvWAG9aHu2WE=
             -----END PUBLIC KEY-----
   destination:
     server: https://kubernetes.default.svc

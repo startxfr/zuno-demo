@@ -25,6 +25,8 @@
 # Overwrites the internally generated bootstrap credential at zuno/keycloak/admin: the Secret
 # zuno-auth/keycloak-admin, which the reconcile Job and the consumer roles read, then holds the external
 # one. The vault role seeds create-if-missing (ADR-0345), so a later `make d0 install vault` keeps it.
+# Going back to internal does NOT restore it: run `vault kv rollback -version=1 zuno/keycloak/admin` (WP-211 brief,
+# lot C, "Back"). Sign-in is unaffected meanwhile, the bootstrap admin is disabled (ADR-0595).
 - name: "keycloak | seed the external admin credential into Vault (zuno/keycloak/admin)"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

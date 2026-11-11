@@ -20,6 +20,9 @@ agent (ADR-0577). Nothing is trusted because of where it came from:
     diff      what changes between two extracted releases, for a promotion
               pull request (ADR-0580 clause 2)
     latest    the newest vX.Y.Z release in the registry
+    mirror    verify the release, copy it (corp artifact, every agent artifact,
+              their .sig/.att tags) by digest to a mirror registry, then verify
+              it again from there (ADR-0611, WP-246)
     admit     verify + extract + validate the locked release (or --release),
               optionally rewriting the lock (--update-lock)
 
@@ -47,7 +50,7 @@ import sys
 import tarfile
 import tempfile
 import textwrap
-from typing import Dict, Iterator, List, Optional, Set, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple
 
 import yaml
 
@@ -158,6 +161,172 @@ def offline_trust() -> Iterator[Dict[str, str]]:
         yield env
 
 
+# --- mirror (ADR-0611) ------------------------------------------------------------
+
+# A mirror inside the cluster may speak plain HTTP (the canary registry of WP-246
+# does). Only that one host gets plain HTTP; the source registry stays on TLS.
+_PLAIN_HTTP_HOST: Optional[str] = None
+
+
+def set_plain_http(mirror: Optional[str]) -> None:
+    global _PLAIN_HTTP_HOST
+    _PLAIN_HTTP_HOST = mirror.split("/", 1)[0] if mirror else None
+
+
+def _plain(reference: str) -> bool:
+    return _PLAIN_HTTP_HOST is not None and reference.split("/", 1)[0] == _PLAIN_HTTP_HOST
+
+
+def _oras_http(reference: str) -> List[str]:
+    return ["--plain-http"] if _plain(reference) else []
+
+
+def _cosign_http(reference: str) -> List[str]:
+    return ["--allow-http-registry", "--allow-insecure-registry"] if _plain(reference) else []
+
+
+def mirror_reference(reference: str, mirror: str) -> str:
+    """`quay.io/zuno/okf-corp@sha256:d` -> `<mirror>/okf-corp@sha256:d`: the
+    last path component and the digest are kept, only the registry prefix changes."""
+    if "@sha256:" not in reference:
+        raise AdmissionError(f"a mirror takes digest references, got {reference}")
+    if not mirror or "@" in mirror or mirror.endswith(":") or mirror.startswith("/"):
+        raise AdmissionError(f"not a registry prefix: {mirror!r}")
+    repository, digest = reference.split("@", 1)
+    return f"{mirror.rstrip('/')}/{repository.rsplit('/', 1)[-1]}@{digest}"
+
+
+def _hex(reference: str) -> str:
+    return reference.split("@sha256:", 1)[1]
+
+
+def _copy_artifact(source: str, mirror: str) -> str:
+    """Copy one artifact, its referrers and its `.sig`/`.att` tags; return the mirrored reference."""
+    target = mirror_reference(source, mirror)
+    src_repo, dst_repo = source.split("@", 1)[0], target.split("@", 1)[0]
+    digest = _hex(source)
+    flags = ["--to-plain-http"] if _plain(dst_repo) else []
+    # cosign v2 reads `sha256-<digest>.sig` and `.att`; `oras cp -r` copies referrers only, and a
+    # registry that stores an artifact by digest alone is not read back by some registries: tag it.
+    run([require("oras"), "cp", "-r", *flags, source, f"{dst_repo}:release-{digest[:12]}"])
+    for suffix in (".sig", ".att"):
+        tag = f"sha256-{digest}{suffix}"
+        try:
+            run([require("oras"), "cp", "-r", *flags, f"{src_repo}:{tag}", f"{dst_repo}:{tag}"])
+        except AdmissionError as exc:
+            if "not found" not in str(exc).lower():
+                raise
+    got = run([require("oras"), "resolve", *_oras_http(dst_repo), f"{dst_repo}:release-{digest[:12]}"]).strip()
+    if got != f"sha256:{digest}":
+        raise AdmissionError(f"mirror digest mismatch for {target}: the mirror holds {got}")
+    return target
+
+
+def mirror_release(reference: str, mirror: str, dev: bool = False) -> dict:
+    """Verify the release at its source, copy it to the mirror, verify it again from the mirror."""
+    index = verify(reference, dev)
+    for ref in [reference] + [a["reference"] for a in index["agents"]]:
+        _copy_artifact(ref, mirror)
+    verify(mirror_reference(reference, mirror), dev, mirror=mirror)
+    return index
+
+
+# --- mirror retention (ADR-0611) --------------------------------------------------
+
+KEEP_RELEASES = 3
+_LEGACY_TAG_RE = re.compile(r"^sha256-([0-9a-f]{64})\.(sig|att)$")
+
+
+def _name(reference: str) -> str:
+    return reference.split("@", 1)[0].rsplit("/", 1)[-1]
+
+
+def lock_history(keep: int = KEEP_RELEASES, git: Optional[Callable[[List[str]], str]] = None) -> List[str]:
+    """The corp references of the last `keep` distinct releases the lock has pinned, newest first.
+    Git is the ordered record of promotions (one commit per promoted release)."""
+    git = git or (lambda args: run(["git", *args], cwd=REPO_ROOT))
+    rel = str(LOCK_PATH.relative_to(REPO_ROOT))
+    seen: List[str] = []
+    for commit in git(["log", "--format=%H", "--", rel]).split():
+        try:
+            text = git(["show", f"{commit}:{rel}"])
+        except AdmissionError:
+            continue
+        ref = next((l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("#")), None)
+        if ref and "@sha256:" in ref and ref not in seen:
+            seen.append(ref)
+        if len(seen) == keep:
+            break
+    return seen
+
+
+def keep_digests(history: List[str], mirror: str) -> Tuple[Dict[str, Set[str]], List[str]]:
+    """{repository name: digests to keep} for the releases of `history` the mirror holds, and the references it does
+    not hold. The newest release (the lock) must be on the mirror: pruning never runs before it is in place."""
+    keep: Dict[str, Set[str]] = {}
+    absent: List[str] = []
+    for position, reference in enumerate(history):
+        on_mirror = mirror_reference(reference, mirror)
+        try:
+            index = json.loads(_layer(on_mirror, INDEX_MEDIA_TYPE))
+        except AdmissionError as exc:
+            if position == 0:
+                raise AdmissionError(f"the mirror does not hold the locked release {reference}; run `make d3 admit agents` "
+                                     f"with OKF_MIRROR_TO first ({exc})") from exc
+            absent.append(reference)
+            continue
+        keep.setdefault(_name(reference), set()).add(_hex(reference))
+        for agent in index["agents"]:
+            keep.setdefault(_name(agent["reference"]), set()).add(_hex(agent["reference"]))
+    return keep, absent
+
+
+def plan_prune(mirror: str, keep: Dict[str, Set[str]]) -> List[Tuple[str, str]]:
+    """What the mirror holds that no kept release names: [(kind, reference)], kind `manifest` (a release artifact,
+    deleted by digest with its referrers) or `tag` (a legacy `.sig` / `.att` tag of a dropped artifact)."""
+    registry, _, path = mirror.partition("/")
+    plain = _oras_http(registry + "/")
+    candidates: List[Tuple[str, str]] = []
+    for repository in run([require("oras"), "repo", "ls", *plain, registry]).split():
+        if not repository.startswith(path.rstrip("/") + "/"):
+            continue
+        name, full = repository.rsplit("/", 1)[-1], f"{registry}/{repository}"
+        wanted = keep.get(name, set())
+        for tag in run([require("oras"), "repo", "tags", *plain, full]).split():
+            legacy = _LEGACY_TAG_RE.match(tag)
+            if tag.startswith("release-"):
+                digest = run([require("oras"), "resolve", *plain, f"{full}:{tag}"]).strip()
+                if _hex(f"x@{digest}") not in wanted:
+                    candidates.append(("manifest", f"{full}@{digest}"))
+                    candidates.extend(("manifest", f"{full}@{d}") for d in _referrers(full, digest, plain))
+            elif legacy and legacy.group(1) not in wanted:
+                candidates.append(("tag", f"{full}:{tag}"))
+    return candidates
+
+
+def _referrers(repository: str, digest: str, plain: List[str]) -> List[str]:
+    out = run([require("oras"), "discover", *plain, "-o", "json", f"{repository}@{digest}"])
+    data = json.loads(out) if out.strip() else {}
+    return [m["digest"] for m in (data.get("referrers") or data.get("manifests") or [])]
+
+
+def prune_mirror(mirror: str, keep_releases: int = KEEP_RELEASES, apply: bool = False,
+                 history: Optional[List[str]] = None) -> dict:
+    """Keep the last `keep_releases` locked releases on the mirror, delete the rest (dry run unless `apply`)."""
+    history = history if history is not None else lock_history(keep_releases)
+    if not history:
+        raise AdmissionError("the lock history is empty: nothing says which releases to keep")
+    keep, absent = keep_digests(history, mirror)
+    candidates = plan_prune(mirror, keep)
+    # a digest can be listed twice (its release tag and a referrer relation): delete each once
+    unique = list(dict.fromkeys(candidates))
+    if apply:
+        registry = mirror.partition("/")[0]
+        for _kind, reference in unique:
+            run([require("oras"), "manifest", "delete", "--force", *_oras_http(registry + "/"), reference])
+    return {"kept": history, "absent": absent, "candidates": unique, "applied": apply}
+
+
 # --- verify / extract -----------------------------------------------------------
 
 def _subject(dev: bool) -> str:
@@ -166,25 +335,25 @@ def _subject(dev: bool) -> str:
 
 
 def verify_signature(reference: str, env: Dict[str, str], dev: bool) -> None:
-    run([require("cosign"), "verify", "--offline", reference,
+    run([require("cosign"), "verify", "--offline", *_cosign_http(reference), reference,
          "--certificate-oidc-issuer", identity()["issuer"],
          "--certificate-identity-regexp", _subject(dev), "--output", "json"], env=env)
 
 
 def verify_attestation(reference: str, env: Dict[str, str]) -> None:
     ident = identity()
-    run([require("cosign"), "verify-attestation", "--offline", reference,
+    run([require("cosign"), "verify-attestation", "--offline", *_cosign_http(reference), reference,
          "--type", ident["contract_tests_predicate"],
          "--certificate-oidc-issuer", ident["issuer"],
          "--certificate-identity-regexp", ident["release_subject_regexp"], "--output", "json"], env=env)
 
 
 def manifest(reference: str) -> dict:
-    return json.loads(run([require("oras"), "manifest", "fetch", reference]))
+    return json.loads(run([require("oras"), "manifest", "fetch", *_oras_http(reference), reference]))
 
 
 def fetch_blob(repository: str, digest: str) -> bytes:
-    result = subprocess.run([require("oras"), "blob", "fetch", f"{repository}@{digest}", "--output", "-"],
+    result = subprocess.run([require("oras"), "blob", "fetch", *_oras_http(repository), f"{repository}@{digest}", "--output", "-"],
                             capture_output=True)
     if result.returncode != 0:
         raise AdmissionError(f"oras blob fetch {repository}@{digest}: {result.stderr.decode()[:400]}")
@@ -215,8 +384,12 @@ def _optional_layer(reference: str, media_type: str) -> Optional[bytes]:
     return fetch_blob(repository, layers[0]["digest"]) if layers else None
 
 
-def verify(reference: str, dev: bool = False) -> dict:
-    """Verify the corp artifact and every agent it lists; return the index."""
+def verify(reference: str, dev: bool = False, mirror: Optional[str] = None) -> dict:
+    """Verify the corp artifact and every agent it lists; return the index.
+
+    With `mirror`, `reference` is already on the mirror and each agent reference of the
+    index (which names its source registry) is read from the mirror instead: same digest,
+    same signature check (ADR-0611)."""
     if "@sha256:" not in reference:
         raise AdmissionError(f"verify takes a digest reference, got {reference}")
     with offline_trust() as env:
@@ -228,6 +401,9 @@ def verify(reference: str, dev: bool = False) -> dict:
         if not dev:
             verify_attestation(reference, env)
         index = json.loads(_layer(reference, INDEX_MEDIA_TYPE))
+        if mirror:
+            for agent in index["agents"]:
+                agent["reference"] = mirror_reference(agent["reference"], mirror)
         for agent in index["agents"]:
             verify_signature(agent["reference"], env, dev)
             if not dev:
@@ -246,8 +422,8 @@ def _untar(data: bytes, dest: pathlib.Path) -> None:
             target.write_bytes(tar.extractfile(member).read())
 
 
-def extract(reference: str, out: pathlib.Path, dev: bool = False) -> dict:
-    index = verify(reference, dev)
+def extract(reference: str, out: pathlib.Path, dev: bool = False, mirror: Optional[str] = None) -> dict:
+    index = verify(reference, dev, mirror=mirror) if mirror else verify(reference, dev)
     _untar(_layer(reference, "application/vnd.zuno.okf.policies.v1.tar+gzip"), out / "policies")
     for agent in index["agents"]:
         _untar(_layer(agent["reference"], "application/vnd.zuno.okf.bundle.v2.tar+gzip"),
@@ -520,8 +696,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         p = sub.add_parser(name)
         p.add_argument("reference", nargs="?", help="corp artifact @sha256 reference (default: the lock)")
         p.add_argument("--dev", action="store_true", help="accept dev artifacts (testing only)")
+        p.add_argument("--mirror", help="registry prefix holding the release (reference is then on the mirror)")
+        p.add_argument("--plain-http", action="store_true", help="the mirror speaks plain HTTP (canary only)")
         if name == "extract":
             p.add_argument("--out", type=pathlib.Path, required=True)
+    p = sub.add_parser("mirror")
+    p.add_argument("reference", nargs="?", help="corp artifact @sha256 reference (default: the lock)")
+    p.add_argument("--to", required=True, help="registry prefix of the mirror, e.g. zot.example:5000/okf")
+    p.add_argument("--plain-http", action="store_true", help="the mirror speaks plain HTTP (canary only)")
+    p.add_argument("--dev", action="store_true", help="accept dev artifacts (testing only)")
+    p = sub.add_parser("prune")
+    p.add_argument("--mirror", required=True, help="registry prefix of the mirror, e.g. zot.example:5000/okf")
+    p.add_argument("--keep", type=int, default=KEEP_RELEASES, help="releases of the lock history to keep (default 3)")
+    p.add_argument("--plain-http", action="store_true", help="the mirror speaks plain HTTP (canary only)")
+    p.add_argument("--apply", action="store_true", help="delete (default: dry run, list only)")
     p = sub.add_parser("validate")
     p.add_argument("release_dir", type=pathlib.Path)
     p = sub.add_parser("diff")
@@ -533,16 +721,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--update-lock", action="store_true", help="write the admitted release to the lock")
     p.add_argument("--out", type=pathlib.Path, help="keep the extracted release here")
     args = parser.parse_args(argv)
+    if getattr(args, "plain_http", False):
+        set_plain_http(getattr(args, "to", None) or getattr(args, "mirror", None))
 
     try:
-        if args.command in ("verify", "extract"):
+        if args.command == "mirror":
+            reference = args.reference or read_lock()
+            if not reference:
+                raise AdmissionError(f"no reference given and {LOCK_PATH.relative_to(REPO_ROOT)} pins nothing")
+            index = mirror_release(reference, args.to, args.dev)
+            print(f"MIRRORED {reference} to {mirror_reference(reference, args.to)}: release {index['release']}, "
+                  f"{1 + len(index['agents'])} artifact(s), verified again from the mirror")
+        elif args.command == "prune":
+            result = prune_mirror(args.mirror, args.keep, args.apply)
+            for ref in result["kept"]:
+                note = " (not on the mirror, skipped)" if ref in result["absent"] else ""
+                print(f"KEEP {ref}{note}")
+            for kind, ref in result["candidates"]:
+                print(f"{'DELETED' if result['applied'] else 'WOULD DELETE'} {kind} {ref}")
+            if not result["candidates"]:
+                print("nothing to prune")
+            elif not result["applied"]:
+                print("dry run: nothing deleted; rerun with --apply (OKF_MIRROR_PRUNE=1 in make d3 admit agents)")
+        elif args.command in ("verify", "extract"):
             reference = args.reference or read_lock()
             if not reference:
                 raise AdmissionError(f"no reference given and {LOCK_PATH.relative_to(REPO_ROOT)} pins nothing")
             if args.command == "verify":
-                index = verify(reference, args.dev)
+                index = verify(reference, args.dev, args.mirror)
             else:
-                index = extract(reference, args.out, args.dev)
+                index = extract(reference, args.out, args.dev, args.mirror)
             print(f"VERIFIED {reference}: release {index['release']} ({index['channel']}), "
                   f"{len(index['agents'])} agent(s): "
                   + ", ".join(f"{a['name']} {a['version']}" for a in index["agents"]))
