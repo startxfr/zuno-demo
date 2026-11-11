@@ -2,6 +2,9 @@
 # ADR-0612/WP-248. Red Hat Quay (operator, OwnNamespace) with a PGO database and the S3 bucket of roles/registry_bucket.
 # Sequence: operator (d0) -> operand (d1: PostgresCluster, QuayRegistry waiting for its config bundle) -> config bundle
 # Secret built here (needs the generated database password and the bucket key, neither of which may be in git) -> wait.
+- name: "quay_registry | load the committed per-cluster variables (zuno_quay_s3_bucket, region)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "quay_registry | assert the bucket variable and the key file"
   ansible.builtin.stat:
     path: "{{ zuno_quay_s3_key_file }}"
