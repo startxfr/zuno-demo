@@ -1,6 +1,6 @@
 # WP-211: Keycloak internal/external mode
 
-- **State:** Repo work in review (2026-11-07: lots A and B built and tested locally; lot A is pushed, lot B is committed locally and waits for the end of the demo freeze; lot C, the live there-and-back, needs a window with the user)
+- **State:** Operator pending (2026-11-11: lots A and B on `devel`; lot C, the live there-and-back, done on 2026-11-08 and 2026-11-09; left: three role fixes, the live clean-up and the evidence in both modes, see Status below)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (the reconcile mechanics reused)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-216](wp-216-external-secrets-internal-external-mode.md) and [WP-217](wp-217-cert-manager-internal-external-mode.md) (mode-key mechanics: `mode.yml`, symmetric gating), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) (persona passwords)
@@ -331,4 +331,29 @@ ids into it (`SKIP`), re-run the consumer roles, same proofs, then delete `zuno-
 
 The data stays on the side it was last written on until the flip back: users created while external are lost unless
 they are exported.
+
+## Status (2026-11-11): lot C done live, the clean-up and three role fixes left
+
+- **Lot B** is on `devel` (4abc2ba1).
+- **Lot C, there:** Keycloak ran in external mode from 2026-11-08 (`keycloak-ext`, golden path 14/14 at 14:59) through
+  the demonstration of 2026-11-09.
+- **Lot C, back:** built-in Keycloak again on 2026-11-09, 11:36 to 12:40, with the same 38 users and ids, golden path
+  14/14 ([demo-day runbook](../../demo/demo-day-2026-11-09.md#back-on-the-built-in-keycloak-2026-11-09-1136-to-1240-cet)).
+
+Left before Done:
+
+1. **Role fixes for the traps of the way back:**
+   - the apply merges the d0 Application values and never removes a seam value it no longer sets;
+   - `rhtas_config` waits for a `policy-controller-manager` Deployment that does not exist;
+   - `zuno_keycloak_ca_pem` in the `openshift_oauth` role.
+2. **Live clean-up, each with the user's go:**
+   - roll `zuno/keycloak/admin` back to the built-in credential and force-sync the `keycloak-admin` ExternalSecret
+     (5151869f);
+   - empty the Blender add-on's issuer override on the presenter's laptop.
+3. **`zuno-auth-ext` and `certIdentityExtraIssuers` stay** until a release is signed through the built-in issuer. The
+   v0.14.5 images were signed through `keycloak-ext`. Delete both after the next tag's ledger run.
+4. **Evidence in both modes:** only the golden path is recorded. `make d1 check`, `make d2 check agents` and
+   `make d2 check supply-chain` are not.
+
+Then: the brief to Done, an ADR-0352 clause-9 note, and clauses 5 and 6 amended to the consumer list of lot A.
 

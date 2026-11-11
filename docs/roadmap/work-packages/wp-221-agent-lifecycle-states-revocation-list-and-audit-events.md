@@ -1,6 +1,6 @@
 # WP-221: Agent lifecycle states, revocation list and audit events
 
-- **State:** Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can)
+- **State:** Operator pending (2026-11-11: the operator part is released in UnifAI v0.1.60, demo333 runs v0.1.68; left: the canary rehearsal on demo333, see Status below)
 - **ADRs:** [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-167](wp-167-per-agent-entry-and-sheet.md) (done: the sheet already shows the state)
 - **Related:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
