@@ -1,6 +1,6 @@
 # WP-247: Sign the gateway assertions with Vault Transit
 
-- **State:** Not started (design settled 2026-11-11; lot 1 steps 1 and 2 coded in the repo (signer tested locally), not deployed: nothing runs until the chart, the image and the window exist)
+- **State:** Not started (design settled 2026-11-11; lot 1 steps 1-3 in the repo, Vault side applied 2026-11-11, signer not live until the image and the window)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-223](wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) (Vault on KMS auto-unseal, raft,
@@ -101,6 +101,11 @@ Not part of this WP's code, but the same hardening wave and the facts this desig
   the gateway pod has an Ingress-only policy (no egress limit) and `zuno-ai-run` is already in the `zuno-vault`
   `allowedFromNamespaces`, so no NetworkPolicy change is needed. To prove live: the Istio sidecar passing the
   gateway's own TLS to the non-meshed Vault (the first signature after the switch is the test).
+- **2026-11-11 10:35Z, lot 1 step 1 applied on demo333** (`make d0 install vault`, the user's go, zuno-demo and
+  unifai-main informed). The configure Job created the Transit key `mcp-call-assertion` (ed25519, version 1, not
+  exportable, no plaintext backup, signing only), the policy `mcp-call-assertion-signer` and the Kubernetes auth role
+  `mcp-gateway`. No gateway pod was touched and no tool call changed. Still to do: image build (after zuno-demo's
+  "R-543 proof done"), then the window.
 
 ## Steps
 
