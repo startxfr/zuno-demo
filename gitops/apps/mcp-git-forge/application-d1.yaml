@@ -39,9 +39,10 @@ spec:
           scope: all
         callAssertion:
           required: true
+          # WP-247: the PUBLIC half of the Vault Transit key mcp-call-assertion (the private half never leaves Vault).
           publicKey: |
             -----BEGIN PUBLIC KEY-----
-            MCowBQYDK2VwAyEAlIAapqkGwFneDh3ZM2/thjjJbQa5ZnOq7S4Ro0Ju6FQ=
+            MCowBQYDK2VwAyEA3UJL9yklPJrs7fUan0/ESqoNUfsbxsCKvWAG9aHu2WE=
             -----END PUBLIC KEY-----
   destination:
     server: https://kubernetes.default.svc

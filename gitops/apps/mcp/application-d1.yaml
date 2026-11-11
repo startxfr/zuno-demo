@@ -41,6 +41,8 @@ spec:
             -----END PUBLIC KEY-----
         outboundIdentity:
           mode: assertion
+          # WP-247 (ADR-0602 option A): Vault Transit signs the assertion; no key Secret in the pod.
+          signer: transit
         # ADR-0602 clause 10 (WP-225 lot C, user's go 2026-11-11, after the ai-gateway ran a clean golden path):
         # only the Keycloak clients that carry the zuno-admin-api audience (read from the live realm) are admitted.
         # An OpenShift token on /mcp (Lightspeed, TokenReview) has no azp and is not subject to the list. A forgotten
