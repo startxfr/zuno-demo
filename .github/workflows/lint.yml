@@ -77,6 +77,9 @@ jobs:
       # ADR-0606 clause 5 (WP-239): two ADR files under one number.
       - name: ADR number collision tests (ADR-0606)
         run: python3 platform/docs/tests/test_adr_number_collisions.py
+      # WP-211: a newline escape inside {{ }} in a YAML block scalar stays backslash + n.
+      - name: Jinja newline in YAML block scalars tests (WP-211)
+        run: python3 platform/docs/tests/test_jinja_newline_in_block_scalars.py
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).

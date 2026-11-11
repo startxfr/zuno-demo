@@ -150,7 +150,7 @@
          and (((_openshift_oauth_keycloak_ca_check.resources | default([])) | length) > 0 or (zuno_keycloak_external_mode | bool)) }}
 
 # Byte-for-byte the expression install.yml uses to build the ConfigMap - same
-# concatenation order, same conditional "\n". Any cosmetic divergence here
+# concatenation order, same conditional newline. Any cosmetic divergence here
 # would report drift that a reconcile could never resolve.
 #
 # The Secret's ca.crt is base64 (| b64decode); the ConfigMap's ca-bundle.crt
@@ -159,16 +159,20 @@
   ansible.builtin.set_fact:
     _openshift_oauth_serving_ca_expected: >-
       {{ (
-           (zuno_keycloak_ca_pem + "\n" if (zuno_keycloak_ca_pem | length > 0) else '')
+           (zuno_keycloak_ca_pem + _openshift_oauth_nl if (zuno_keycloak_ca_pem | length > 0) else '')
            if (zuno_keycloak_external_mode | bool)
            else (
-             (_openshift_oauth_keycloak_ca_check.resources[0].data['ca.crt'] | b64decode) + "\n"
+             (_openshift_oauth_keycloak_ca_check.resources[0].data['ca.crt'] | b64decode) + _openshift_oauth_nl
              if 'ca.crt' in (_openshift_oauth_keycloak_ca_check.resources[0].data | default({}))
              else ''
            )
          )
          + (_openshift_oauth_router_ca_check.resources[0].data['ca-bundle.crt']) }}
   when: _openshift_oauth_serving_ca_checkable | bool
+  # A real newline, from a double-quoted YAML scalar: inside `{{ }}` in a `>-` block, "\n" stays the two characters
+  # backslash + n (ansible-core 2.19), same value as install.yml writes (WP-211).
+  vars:
+    _openshift_oauth_nl: "\n"
 
 - name: "openshift_oauth | record the stale serving-CA snapshot finding"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
