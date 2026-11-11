@@ -120,7 +120,8 @@
     url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item }}"
     headers:
       Authorization: "Bearer {{ _quay_registry_token }}"
-    status_code: [200, 404]
+    # Quay answers 400 ("Could not find robot") for a robot that does not exist yet.
+    status_code: [200, 400, 404]
     validate_certs: "{{ zuno_quay_validate_certs }}"
   loop: [pull, push]
   register: _quay_registry_robot_lookup
@@ -138,7 +139,7 @@
     status_code: [201]
     validate_certs: "{{ zuno_quay_validate_certs }}"
   loop: "{{ _quay_registry_robot_lookup.results }}"
-  when: item.status == 404
+  when: item.status != 200
   no_log: true
 
 - name: "quay_registry | read the robot tokens"
