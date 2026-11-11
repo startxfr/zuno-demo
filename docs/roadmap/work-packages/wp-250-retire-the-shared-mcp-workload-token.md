@@ -1,6 +1,6 @@
 # WP-250: Retire the shared MCP workload token
 
-- **State:** Not started
+- **State:** Repo work in review (lot 1 code and tests written, not built or applied)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-247](wp-247-sign-gateway-assertions-with-vault-transit.md) (the assertion is signed by Vault Transit),
@@ -58,7 +58,25 @@ Vault would mean a Vault call per verification on every server.
 | 2 | Servers require the claims (no fallback); the gateway stops sending the two headers and the token. Bindings `gateway_token: false` and `caller_context` removed or folded | roll, golden path |
 | 3 | Remove `MCP_GATEWAY_WORKLOAD_TOKEN` from the charts, the ExternalSecret and `secret-access.yaml`; delete the Vault value only with a separate go | none for users |
 
-## Open questions for the user
+## Decisions (2026-11-11, the user)
+
+- **Q1 settled: yes.** The assertion becomes mandatory on salesforce-mcp and diagram-render (lot 2).
+- **Q2 settled: yes.** The evaluation security checks are rewritten to prove the 401 with the assertion, in lot 2.
+
+## Progress log
+
+- **2026-11-11, lot 1 code (repo only, not built, not applied).** The gateway adds a `ctx` claim (`groups`, `email`,
+  `email_verified`, `username`, from the validated identity only) to a tool-call assertion when the binding declares
+  `caller_context` (`caller_context.assertion_context`, `call_assertion.mint(caller=...)`); a schema-read assertion never
+  carries it. The four servers' byte-identical verifier block strips any client-sent `X-Zuno-Assertion-Caller` header,
+  rejects a malformed `ctx` (401), and after a verified assertion hands `ctx` to the tool code as that header;
+  `_verified_caller` prefers it and keeps the HMAC headers as the fallback, so the old and new mechanisms coexist.
+  Tests: `components/mcp-gateway/tests/test_wp250_assertion_context.py` (7) and
+  `components/mcp-servers/*/tests/test_wp250_assertion_caller.py` (9, byte-identical in the four servers); the existing
+  lot B, lot C, WP-247 and per-server assertion suites still pass. To do: build mcp-gateway and the four server images
+  (needs the user's go), roll, golden path, then lot 2.
+
+## Questions asked (answered above)
 
 - **Q1.** diagram-render and salesforce-mcp do not require an assertion today. Is it acceptable to make it mandatory on
   both (salesforce has no org on demo333)? Proposed: yes.

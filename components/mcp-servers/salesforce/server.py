@@ -114,6 +114,11 @@ def _caller_context_key() -> bytes:
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    # WP-250: a caller context signed inside the Transit-signed assertion wins; the
+    # HMAC-signed headers below are the fallback while both are sent.
+    from_assertion = _assertion_caller(headers, tool)
+    if from_assertion is not None:
+        return from_assertion
     if not headers or not GATEWAY_WORKLOAD_TOKEN:
         return None
     raw = headers.get(CALLER_CONTEXT_HEADER) or ""
@@ -451,6 +456,10 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
 # refused (403); a body that is not JSON 400, one past the size cap 413. With
 # MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
 # refused; without it a request carrying no assertion is served as before.
+# WP-250: the assertion may carry `ctx` (groups, email, email_verified, username), the
+# caller context signed with the assertion. After verification the middleware hands it to
+# the tool code as the header X-Zuno-Assertion-Caller; any such header sent by a client
+# is removed first, so only a verified assertion can set it (`_assertion_caller`).
 # This block is byte-identical in confluence, git-forge, salesforce and aap
 # (each image is built from its own directory, ADR-0119); the lot C tests
 # compare the copies.
@@ -515,6 +524,60 @@ def _call_assertion_public_key() -> Any:
     return _CALL_ASSERTION_KEYS[pem]
 
 
+ASSERTION_CALLER_HEADER = "x-zuno-assertion-caller"
+
+
+def _strip_assertion_caller(scope: Any) -> Any:
+    """The scope without any client-sent X-Zuno-Assertion-Caller header."""
+    headers = scope.get("headers") or []
+    wanted = ASSERTION_CALLER_HEADER.encode("latin-1")
+    if not any(k.lower() == wanted for k, _ in headers):
+        return scope
+    cleaned = dict(scope)
+    cleaned["headers"] = [(k, v) for k, v in headers if k.lower() != wanted]
+    return cleaned
+
+
+def _with_assertion_caller(scope: Any, claims: Dict[str, Any]) -> Any:
+    """The scope carrying the caller context of a VERIFIED assertion, if it has one."""
+    ctx = claims.get("ctx")
+    if not isinstance(ctx, dict):
+        return scope
+    payload = {
+        "sub": claims.get("sub", ""),
+        "tool": claims.get("tool", ""),
+        "groups": ctx.get("groups", []),
+        "email": ctx.get("email", ""),
+        "email_verified": ctx.get("email_verified") is True,
+        "username": ctx.get("username", ""),
+    }
+    raw = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("=")
+    carried = dict(scope)
+    carried["headers"] = list(scope.get("headers") or []) + [(ASSERTION_CALLER_HEADER.encode("latin-1"), raw.encode("ascii"))]
+    return carried
+
+
+def _assertion_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    """The caller of a call that arrived with a verified assertion carrying `ctx`, or None."""
+    raw = (headers.get(ASSERTION_CALLER_HEADER) if headers else "") or ""
+    if not raw:
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("tool") != tool:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
+        "username": str(payload.get("username") or ""),
+    }
+
+
 def _call_assertion_type(token: str) -> str:
     try:
         return str(_assertion_jwt.get_unverified_header(token).get("typ") or "")
@@ -549,6 +612,13 @@ def _verify_call_assertion(token: str, key: Any, now: Optional[float] = None) ->
         raise CallAssertionError("call assertion has no tool or jti")
     if "args" in claims and not isinstance(claims["args"], str):
         raise CallAssertionError("call assertion has a malformed args hash")
+    ctx = claims.get("ctx")
+    if ctx is not None and (
+        not isinstance(ctx, dict)
+        or not isinstance(ctx.get("groups", []), list)
+        or not all(isinstance(g, str) for g in ctx.get("groups", []))
+    ):
+        raise CallAssertionError("call assertion has a malformed caller context")
     return claims
 
 
@@ -591,6 +661,7 @@ class CallAssertionMiddleware:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
+        scope = _strip_assertion_caller(scope)
         key, required = _call_assertion_public_key(), _call_assertion_required()
         if not required and not os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip():
             await self.app(scope, receive, send)
@@ -650,7 +721,7 @@ class CallAssertionMiddleware:
                 return {"type": "http.request", "body": body, "more_body": False}
             return await receive()
 
-        await self.app(scope, replay, send)
+        await self.app(_with_assertion_caller(scope, claims), replay, send)
 
 
 # END call-assertion verifier (WP-225 lot C)

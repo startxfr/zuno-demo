@@ -268,6 +268,7 @@ def mint(
     key: Optional[Ed25519PrivateKey] = None,
     ttl: Optional[int] = None,
     now: Optional[float] = None,
+    caller: Optional[Dict[str, Any]] = None,
 ) -> str:
     if not audience:
         raise AssertionUnavailable("an assertion needs the backend name as its audience")
@@ -286,20 +287,25 @@ def mint(
     if tool:
         # A schema-read assertion (no tool) carries no args; it can call nothing.
         claims["args"] = args_hash(arguments)
+        if caller:
+            # WP-250: who the call is for (groups, email, email_verified, username), signed
+            # with the assertion, so a server needs no shared secret to trust it.
+            claims["ctx"] = caller
     if key is None and signer() == "transit":
         return _transit_encode(claims)
     return jwt.encode(claims, key or signing_key(), algorithm=ALGORITHM, headers={"typ": TYPE})
 
 
 def authorization_for(
-    binding: Any, bearer_token: str, *, sub: str, tool: str, arguments: Any = None
+    binding: Any, bearer_token: str, *, sub: str, tool: str, arguments: Any = None,
+    caller: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """The Authorization header of one streamable-HTTP tool call, or None for none."""
     if mode() == "bearer" or getattr(binding, "user_token", False):
         return f"Bearer {bearer_token}"
     if not getattr(binding, "gateway_token", True):
         return None  # a third-party backend: it receives no identity at all
-    return "Bearer " + mint(audience=binding.backend, sub=sub, tool=tool, arguments=arguments)
+    return "Bearer " + mint(audience=binding.backend, sub=sub, tool=tool, arguments=arguments, caller=caller)
 
 
 def schema_authorization_for(backend: str, gateway_token: bool) -> Optional[str]:

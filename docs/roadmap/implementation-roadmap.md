@@ -1100,7 +1100,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 | WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Done (2026-11-07) | none: pattern rehearsed on demo333 (zuno-canary-wp-242 created, isolation checked, removed) |
 | WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Done (2026-11-07) | five browser checks pass on demo333 (`make demo browser`); the negative case passed on 2026-11-11 (each check fails while its experience is blocked, passes again) |
 | WP-249 | [wp-249](work-packages/wp-249-test-one-rollback-per-experience.md) | 0606 | WP-243 | Operator pending | opened 2026-11-11 (user decision): one rollback tested per experience, cheapest first, and WP-243's scale-to-zero negative case; decisions D1-D2 before the operator rows; each step with the user's go and a golden path |
-| WP-250 | [wp-250](work-packages/wp-250-retire-the-shared-mcp-workload-token.md) | 0602 | WP-247, WP-225 | Not started | opened 2026-11-11 (user's go): fold the caller context into the Transit-signed assertion (recommended) and retire the shared workload token; questions Q1-Q2 before lot 1; each lot with the user's go and a golden path |
+| WP-250 | [wp-250](work-packages/wp-250-retire-the-shared-mcp-workload-token.md) | 0602 | WP-247, WP-225 | Repo work in review | opened 2026-11-11 (user's go): fold the caller context into the Transit-signed assertion and retire the shared workload token; Q1-Q2 settled yes; lot 1 code and tests done locally, not built or applied; each lot with the user's go and a golden path |
 
 ### Phase 53 — Blender objects from text on a local model (added 2026-11-07)
 

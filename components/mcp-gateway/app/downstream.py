@@ -179,6 +179,10 @@ async def _invoke_streamable_http(
         authorization = await asyncio.to_thread(
             call_assertion.authorization_for,
             binding, bearer_token, sub=caller_sub, tool=binding.provider_tool or "", arguments=arguments,
+            caller=(
+                caller_context.assertion_context(groups=caller_groups, claims=caller_claims)
+                if binding.caller_context else None
+            ),
         )
     except call_assertion.AssertionUnavailable as exc:
         logger.error("no call assertion for %s: %s", binding.backend, exc)

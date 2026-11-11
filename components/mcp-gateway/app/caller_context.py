@@ -59,6 +59,18 @@ def _claim(claims: Mapping[str, Any], name: str) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+def assertion_context(*, groups: Optional[List[str]], claims: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """WP-250: the caller context as claims of the signed call assertion (`ctx`), the same
+    fields as the HMAC-signed headers below, read from the validated identity only."""
+    claims = claims or {}
+    return {
+        "groups": sorted({str(g) for g in (groups or []) if g}),
+        "email": _claim(claims, "email").lower(),
+        "email_verified": claims.get("email_verified") is True,
+        "username": _claim(claims, "preferred_username"),
+    }
+
+
 def build(
     *,
     sub: str,
