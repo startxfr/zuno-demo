@@ -15,6 +15,8 @@ The order is by risk reduction per effort.
   ExternalSecrets in, and mount through a projected volume, plus an admission rule that refuses an ExternalSecret
   naming those Vault paths outside the platform's own namespaces.
 - **Proof.** As `ocp-ai-dev`, creating an ExternalSecret for those paths is refused; the golden path still passes.
+- **Brief.** [WP-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) (design settled with the user on
+  2026-11-11: Transit, fail closed, one-shot public-key switch, assertion first then agent chain).
 
 ## 2. `callAssertion.required: true`
 
