@@ -144,21 +144,37 @@
 
 # A robot cannot create a repository by pushing to it unless it belongs to a team with the `creator` role: without this the
 # first push of an artifact answers 401 (found by the canary). PUT is idempotent for both the team and the membership.
-- name: "quay_registry | the creators team (role creator) with the push robot as its member"
+- name: "quay_registry | the creators team (role creator)"
   ansible.builtin.uri:
-    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators{{ item.suffix }}"
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators"
     method: PUT
     headers:
       Authorization: "Bearer {{ _quay_registry_token }}"
     body_format: json
-    body: "{{ item.body }}"
+    body: {role: creator, description: "Robots that may create repositories by pushing"}
     status_code: [200, 201]
     validate_certs: "{{ zuno_quay_validate_certs }}"
-  loop:
-    - suffix: ""
-      body: {role: creator, description: "Robots that may create repositories by pushing"}
-    - suffix: "/members/{{ zuno_quay_organization }}+push"
-      body: {}
+  no_log: true
+
+- name: "quay_registry | look up the members of the creators team"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators/members"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_creators
+  no_log: true
+
+# Adding a member twice answers 400, so add only when absent.
+- name: "quay_registry | add the push robot to the creators team"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators/members/{{ zuno_quay_organization }}+push"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  when: (zuno_quay_organization ~ '+push') not in (_quay_registry_creators.json.members | default([]) | map(attribute='name') | list)
   no_log: true
 
 - name: "quay_registry | read the robot tokens"

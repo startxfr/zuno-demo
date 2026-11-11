@@ -84,6 +84,8 @@
           - S3Storage
           - host: "s3.{{ zuno_quay_s3_region }}.amazonaws.com"
             s3_bucket: "{{ zuno_quay_s3_bucket }}"
+            # Without the region the presigned URLs are signed for us-east-1 and S3 answers 400 (found by the canary).
+            s3_region: "{{ zuno_quay_s3_region }}"
             storage_path: /datastorage/registry
             s3_access_key: "{{ _quay_registry_s3_key.AccessKeyId }}"
             s3_secret_key: "{{ _quay_registry_s3_key.SecretAccessKey }}"
