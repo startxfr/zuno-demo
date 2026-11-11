@@ -87,6 +87,63 @@ a freeze ([ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-
 until step 8 passes, and the gateways keep `quay.io` as their second source, so a failed cut-over is undone by moving the
 references back.
 
+## Result of step 1 (2026-11-11, canary `zuno-canary-wp-248`, the owner's go)
+
+`quay-operator` v3.18.2 (channel `stable-3.18`, OwnNamespace in the canary), a `QuayRegistry` with PostgreSQL, object storage,
+autoscaler, mirror and monitoring unmanaged, and Clair, its database, Redis, route and TLS (cluster wildcard certificate)
+managed. The database is a separate PGO `PostgresCluster` (PostgreSQL 15, one instance). Storage is `LocalStorage` on the
+pod's volume: the S3 bucket of step 3 does not exist yet.
+
+**What passed**
+
+- **The OKF release and its signatures.** `admit_okf_bundle.py mirror --to <quay>/zuno` copied the corp artifact and the 8
+  agent artifacts (release 0.14.3, same digest `2918e463…`) and verified them again from Quay with offline `cosign` and
+  `oras`. The `release-*`, `.sig` and `.att` tags survived. Quay answers the OCI Referrers API (HTTP 200 with the manifest
+  list). Where the OpenShift internal registry failed this gate (WP-246 step 1), Quay passes.
+- **The database.** Quay runs and migrates on a PGO instance with `sslmode=require`, once `databaseInitSQL` has created
+  `pg_trgm` in the `quay` database (the repository's `\connect` pattern). The `DB_URI` password must be URL-encoded: PGO
+  passwords carry `;`, `>`, `(` and `*`, and the unencoded form crashed the first start (`invalid userinfo`).
+
+**What the measurement changed**
+
+- **Deleting needs Quay's API.** `oras manifest delete` is refused (Quay's registry token does not accept the `delete`
+  scope: "Unable to decode repository and actions"). Tags are deleted through `DELETE /api/v1/repository/<org>/<repo>/tag/<tag>`
+  (HTTP 204, the API then lists no active tag; the `/v2` tag list still showed them a few seconds later) and Quay's garbage
+  collector removes the untagged manifests. The retention of ADR-0611 therefore needs a Quay variant of `prune` that holds an
+  API token, not `oras`.
+- **Size.** Defaults per pod: Quay application 2 CPU and 8 Gi (request equals limit), Clair 2 CPU / 2 Gi request / 16 Gi
+  limit, Clair database 500m / 2 Gi, Redis 500m / 1 Gi / 16 Gi limit; about 5 CPU and 13 Gi requested for one replica of each,
+  before the database. The Quay application used 4.2 Gi after pushing nine artifacts, and a 4 Gi limit made it fail its
+  liveness probe and restart: do not shrink it. Clair, its database, Redis and the operator were each under 120 Mi at rest.
+  For comparison the zot mirror is one small pod.
+- **Storage must be object storage.** With `LocalStorage` on the pod's volume, a pod restart lost the blobs while the
+  database kept the metadata: pushes then failed with `Unknown blob` and reads with 502. The S3 bucket of step 3 is a
+  prerequisite for a stable registry; `FEATURE_PROXY_STORAGE` is set but not exercised (it only matters with S3).
+- **The shared PostgreSQL does not fit as is.** The platform's `zuno-data/zuno-postgresql` runs PostgreSQL 18 with three
+  replicas; Quay documents PostgreSQL 15. Use a small dedicated `PostgresCluster` (PGO, as decided) unless Quay's support for
+  18 is confirmed.
+- **Clair needs the internet.** Its updaters tried `linux.oracle.com`, `security.access.redhat.com`, `secdb.alpinelinux.org`,
+  `packages.vmware.com`, `ftp.suse.com`, `cdn.amazonlinux.com`, `repo.us-west-2.amazonaws.com`, `nvd.nist.gov`, `deb.debian.org`,
+  `api.launchpad.net` and `pkg.go.dev`, all blocked by the canary's default-deny. Under the platform's EgressFirewall each is a
+  `dnsName` rule, with the CDN stall risk measured on 2026-11-09. The new ADR decides whether Clair runs only the Red Hat
+  matchers (one host) or all of them.
+- **The operator brings no NetworkPolicy** (the `QuayRegistry` of 3.18.2 has no such component): the registry's ingress and
+  egress policies stay in the repository.
+- **Canary friction, for the next canary.** The canary's ResourceQuota requires limits on every pod, and the operator's own pod
+  sets none: a `LimitRange` with a default limit is needed. The default sizes above exceed the 4 CPU / 8 Gi default quota
+  (raised to 10 CPU / 20 Gi requested for this run). A default-deny policy also blocks the operators' calls to the API server:
+  an egress rule to the API service and its 6443 endpoints, and an ingress rule from the router, were added.
+
+**Not rehearsed**: S3 storage and proxy mode, a robot-account pull from a pod through the mesh, a Clair scan of an image,
+the public-image copy of step 6, and the first-party and UnifAI families. The canary is kept until the owner decides to remove it.
+
+**Inventory of image references running on demo333 (containers by registry, 2026-11-11).** In scope: the in-cluster registry
+(163, first-party builds), `quay.io/zuno` (18: UnifAI, OKF, signer), and the third-party images of the zuno charts:
+`docker.io` (library 18, hashicorp 15, langgenius 6), `public.ecr.aws/aws-cli` (10), `ghcr.io/openclaw` (8), `nvcr.io/nvidia`
+(41), plus a few public `quay.io` images (fedora, docling). Out of scope: the OpenShift release images
+(`quay.io/openshift-release-dev`, 855) and the Red Hat operator and product images (`registry.redhat.io`,
+`registry.connect.redhat.com`), which the cluster pulls with its own pull secret.
+
 ## Decisions of the owner (2026-11-11) and open questions
 
 Decided:
