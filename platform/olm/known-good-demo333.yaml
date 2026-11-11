@@ -37,13 +37,6 @@ operators:
     approval: Automatic
     class: ga
     version: "5.8.9"
-  - package: elasticsearch-eck-operator-certified
-    catalog: certified-operators
-    namespace: openshift-operators
-    channel: stable
-    approval: Automatic
-    class: ga
-    version: "3.5.0"
   - package: external-secrets-operator
     catalog: community-operators
     namespace: openshift-operators
