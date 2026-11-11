@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 5 | 26 | WP-221, WP-224, WP-227, WP-237 |
-| v0.17 | 4 | 2 | 12 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
+| v0.17 | 4 | 2 | 13 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-248 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1111,6 +1111,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 | WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
 | WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0611 | WP-242 | Done | live on demo333 2026-11-10: gateways read the mirror, quay.io blocked drill passed |
 | WP-247 | [wp-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) | 0602 | WP-223, WP-225 | Done (2026-11-11) | Vault Transit signs the MCP assertion and the agent chain on demo333, golden path 14/14 after each switch, both old keys unreadable from any namespace (proved with the store's role, no persona proof by decision); follow-ups: delete the two old Vault values, the workload token (its own WP) |
+| WP-248 | [wp-248](work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md) | 0611 | WP-246, WP-131, WP-242 | Not started | the owner's go for the Quay measurement in a canary; a Quay entitlement for demo333; the new ADR; the first Ansible-provisioned AWS bucket (also needs the owner's go) |
 
 ### OKF stream phases
 
@@ -1256,6 +1257,7 @@ moving.
 
 ## Change log
 
+- 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
 - 2026-11-09 — ADR-0611 and WP-246 added (Phase 53, v0.17), Proposed: mirror the admitted OKF release into the internal registry, from the quay.io egress measurement of the day.
 - 2026-11-07 — WP-245 added (Phase 53): ADR-0610 Implemented (prompt set measured, golden-path moment `blender`); Blender joins the 2026-11-09 demonstration.
