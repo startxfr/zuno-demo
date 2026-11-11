@@ -397,7 +397,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | Accepted | Establish the OKF stream with its own milestones and roadmap |
+| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | Implemented | Establish the OKF stream with its own milestones and roadmap |
 | [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | Implemented | Define the agent tests directory structure and promotion gate |

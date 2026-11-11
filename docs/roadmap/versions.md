@@ -351,10 +351,12 @@ from the platform bands — [OKF roadmap](okf-roadmap.md).
 - **OKF v0.1** — content excellence in-repo: the two-stage agent maturity
   model, generated per-agent authorization matrices, real `deployment/`
   content, the `tests/` target structure, per-conversation task tabs.
-  **8 ADRs.** Open: ADR-0501. No open work packages.
+  **8 ADRs, all closed** (ADR-0501 on 2026-11-11). No open work packages.
 - **OKF v0.2 / OKF v0.3** — extraction into `zuno-okf` and live operator
   reconciliation. Both milestones are **vacant**: every ADR that defined them
   (ADR-0506 – ADR-0510) was retargeted to platform v0.7 on 2026-08-30, then
   to its own platform v0.10 band on 2026-09-05. Their work packages
   (WP-48 – WP-53) are tracked as phases 34–35 of the
-  [implementation roadmap](implementation-roadmap.md).
+  [implementation roadmap](implementation-roadmap.md). Their outcomes were delivered in the platform bands by
+  ADR-0576 (extraction into `zuno-demo-agents`) and ADR-0580 (one digest pin, promoted by pull request), which
+  supersede ADR-0506, ADR-0507, ADR-0509 and ADR-0510.
