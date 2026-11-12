@@ -88,7 +88,7 @@ Handed to zuno-main, which owns the agent chain (WP-247, WP-250). Each live step
 - zuno-unifai EgressFirewall: see [the rehearsal plan](../platform/wp-224-unifai-firewall-rehearsal-plan.md).
 - Agents scaffold (`platform/templates/agent/scaffold_agent.py` in zuno-demo-agents) still emits `project: zuno`.
 - GitHub settings on `main`: secret scanning with push protection, a ruleset against force-push and deletion, the
-  required checks. The `main` Secret scan is red on a documented false positive until v0.14.5.
+  required checks. The `main` Secret scan is red on a documented false positive until v0.14.5. Also enable private vulnerability reporting (Settings, Security): `SECURITY.md` (ADR-0603 M19, 2026-11-12) sends reporters there; `.github/CODEOWNERS` names the owner and only blocks merges once a ruleset requires code-owner review.
 - `startx-cluster-auth` and `startx-cluster-infra-config` OutOfSync (not from this wave).
 - WP-226 live steps: the first rendered release ran with v0.14.5 on 2026-11-08 (`RENDER_DIGESTS=1`, then
   `--clear` the same evening, recorded as WP-249 row 4). Still open: a release that keeps its digests, the AAP

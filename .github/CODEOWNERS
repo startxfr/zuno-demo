@@ -1,0 +1,21 @@
+# ADR-0603 M19: who reviews what. GitHub requests a review from the owners below on every pull request that touches
+# the paths; it only blocks a merge when a ruleset on the branch requires code-owner review (left to the `hardened`
+# profile, ADR-0602 clause 5 and WP-227: a single maintainer cannot approve their own pull request).
+#
+# One maintainer today. The paths are listed so a second reviewer can be added to the sensitive ones without
+# re-deriving them.
+
+*                               @startxfr
+
+# Trust boundaries: CI, supply chain, secrets, identity, policies.
+/.github/                       @startxfr
+/platform/supply-chain/         @startxfr
+/platform/vault/                @startxfr
+/platform/security/             @startxfr
+/platform/python/               @startxfr
+/ansible/roles/vault/           @startxfr
+/ansible/roles/keycloak/        @startxfr
+/ansible/roles/argocd/          @startxfr
+/gitops/charts/rhtas-config/    @startxfr
+/gitops/charts/namespaces/      @startxfr
+/policies/                      @startxfr

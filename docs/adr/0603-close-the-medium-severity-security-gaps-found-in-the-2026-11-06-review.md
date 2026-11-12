@@ -168,7 +168,7 @@ The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
 | M16 | Partly done | digests rendered for v0.14.5 and cleared (2026-11-08); base images pinned by digest | a release that keeps its digests; the AAP execution environment base digest |
 | M17 | Partly done | `ClusterImagePolicy` enforce on the opt-in namespaces; CI keyless signing written, never run | zuno-ai-run opted in (with WP-227); one CI signing run (needs Quay credentials) |
 | M18 | Done in the repo | cosign and oras checksums, `ignore-unfixed` dropped, SBOM attestation written | the same CI run as M17 |
-| M19 | Partly done | actions pinned by SHA, `lint.yml` permissions, secret scan, pre-commit, Dependabot | CODEOWNERS and SECURITY.md; the GitHub settings on `main` (owner) |
+| M19 | Done in the repo | actions pinned by SHA, `lint.yml` permissions, secret scan, pre-commit, Dependabot; `.github/CODEOWNERS` and `SECURITY.md` added on 2026-11-12 | owner: enable private vulnerability reporting (the channel `SECURITY.md` names) and the GitHub settings on `main` |
 | M20 | Done in the repo | hashed locks, constraints, `kubernetes.core` pinned; the bootstrap tools hashed on 2026-11-12 (WP-226) | live as each image is rebuilt |
 | M21 | Done | the virtual environment is untracked | history purge is the user's choice |
 | M22 | Owner action | `.gitignore` is the only barrier | the maintainer rotates the keys and moves the files |
@@ -180,7 +180,7 @@ What still stands between this record and `Implemented`:
   - M12: Salesforce is deferred.
   - M14: the UnifAI signer gap is accepted.
   - M1: egress of the other namespaces.
-- Small repository items: M19 (CODEOWNERS, SECURITY.md) and M12 (the email allowlist values).
+- Small repository items: M12 (the email allowlist values). M19's files were added on 2026-11-12.
 - Steps that depend on other work: M16, M17 and M18 need a release that keeps its digests, the AAP execution
   environment digest and one CI signing run.
-- Owner actions: M22 and the GitHub settings on `main`.
+- Owner actions: M22, the GitHub settings on `main`, and enabling private vulnerability reporting (M19).
