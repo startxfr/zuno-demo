@@ -375,11 +375,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Partially implemented | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Implemented | Define agent lifecycle states, roles and incident revocation |
 | [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Accepted | Harden the platform's trust boundaries before a customer runs it |
 | [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Accepted | Close the medium-severity security gaps found in the 2026-11-06 review |
 | [ADR-0604](0604-introduce-an-interactive-generative-world-model-experience.md) | Accepted | Introduce an interactive generative world-model experience on OpenShift AI and NVIDIA Blackwell |
-| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Accepted | Admit new experiences with a definition of done and a WIP limit |
+| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Implemented | Admit new experiences with a definition of done and a WIP limit |
 | [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Implemented | Pin, gate and schedule pre-GA dependencies |
 | [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Implemented | Keep the repository the only source of cluster state |
 | [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Implemented | Rehearse on canary namespaces of demo333 |

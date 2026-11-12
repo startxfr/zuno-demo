@@ -1,6 +1,6 @@
 # WP-249: Test one rollback per experience
 
-- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade, D1-D2 decided; 2026-11-12: Lightspeed and Blender tested, the first-party cycle of 2026-11-08 recorded, D1 applied; left: UnifAI with v0.1.69)
+- **State:** Done (2026-11-12). Every experience with a version history has its rollback tested and recorded: OpenClaw, Lightspeed, Blender, the first-party images, UnifAI and the world model, plus WP-243's negative case. Named exception: kagent, Dify and Open WebUI have run one version only; their rollback is tested at their first version change (ADR-0606 amendment of 2026-11-11), tracked in the Tested column of `docs/demo/rollback.md`
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** [WP-243](wp-243-browser-tests-for-every-experience.md) (the browser checks used for the negative case)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) (golden path after each change), [ADR-0607](../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md) (OLM never downgrades), [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md) (canary namespaces)
@@ -35,7 +35,7 @@
 | 5 | OpenClaw assistant | previous `images.openclaw`, then forward | the assistant's own namespace state | one roll per assistant |
 | 6 | Open WebUI | backup, previous `image.tag`, then forward | its PostgreSQL database | one roll, backup first |
 | 7 | Dify | backup of its database, previous image tags, restore of the database, then forward | its database migrates on start | heaviest: a restore |
-| 8 | UnifAI | `pin_unifai_images.py v<previous> --cluster demo333`, `make d2 install unifai`, then the current pin | UnifAI's own databases (kept, the stack images only) | one stack roll; with unifai-main's agreement |
+| 8 | UnifAI | **done 2026-11-12** ([evidence](../evidence/wp-249-unifai-rollback-2026-11-12.md)): v0.1.69 pinned, stack images back to v0.1.68 and forward, golden path PASS each time; no `source_merge` stored | UnifAI's own databases (kept, the stack images only) | three stack rolls of 3 to 4 min |
 | 9 | World model | done: the teardown ran on 2026-11-09 and 2026-11-11 (`zuno_world_model_enabled: false`, role run) | weights in S3 | recorded, no new run |
 
 ## WP-243 negative case
