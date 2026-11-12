@@ -40,7 +40,19 @@ stack:
   # Extra environment by component (operator >= 0.1.22): multiagent,
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
-  extraEnv: {}
+  extraEnv:
+    # Defaults the UnifAI lineage 0.1 stops hard-coding for zuno (unifai-compare, 2026-11-12). Both are zuno values the
+    # stack keeps explicit until the typed fields ship (spec.rag.bearerAudience, spec.outboundAllowedHosts): then these
+    # entries are removed.
+    # RAG accepts only tokens whose `aud` is this client (mcp-gateway rag_query, trustyai-eval, evaluations).
+    rag:
+      - {name: RAG_BEARER_AUDIENCE, value: zuno-admin-api}
+    # The SSRF guard of multiagent: the stack's own namespace is repeated because extraEnv REPLACES the value the
+    # operator sets since 0.1.65. zuno-ai-run holds mcp-gateway and a2a-gateway (delegation).
+    multiagent:
+      - {name: OUTBOUND_ALLOWED_HOSTS, value: ".zuno-ai-run.svc,.zuno-ai-run.svc.cluster.local,.zuno-unifai.svc,.zuno-unifai.svc.cluster.local"}
+    multiagentWorker:
+      - {name: OUTBOUND_ALLOWED_HOSTS, value: ".zuno-ai-run.svc,.zuno-ai-run.svc.cluster.local,.zuno-unifai.svc,.zuno-unifai.svc.cluster.local"}
   # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
   # embedding model of `rag` below.
   memory:
