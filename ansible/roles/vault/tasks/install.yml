@@ -276,17 +276,15 @@
 # fallback kept for compatibility). A root certificate is public material:
 # a ConfigMap, not a Secret, is the right home.
 - name: "vault | read the PKI root certificate from the pki engine"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault read -field=certificate pki/cert/ca"
-  register: _vault_pki_root_raw
-  changed_when: false
-  # Same rule as every VAULT_TOKEN task in this role: the exec command line
-  # (token included) lands in the result on failure.
-  no_log: true
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "read -field=certificate pki/cert/ca"
+    vault_cli_capture_stdout: true
+    vault_cli_fail_on_error: false
+
+- name: "vault | keep the PKI root certificate"
+  ansible.builtin.set_fact:
+    _vault_pki_root_raw: "{{ vault_cli_result }}"
 
 - name: "vault | publish the PKI root to the well-known vault-pki-root-ca ConfigMap"
   kubernetes.core.k8s:
@@ -616,40 +614,38 @@
 # band by the operator (see ansible/confidential.example.yml's exact IAM
 # policy; never the AdministratorAccess research credentials).
 - name: "vault | seed the AWS Route53 DNS-01 access key from ansible/confidential.yml (ADR-0211)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aws/route53-dns01
-      access_key_id={{ zuno_aws_route53_access_key_id | quote }} secret_access_key={{ zuno_aws_route53_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/aws/route53-dns01 @PAYLOAD"
+    vault_cli_payload:
+      access_key_id: "{{ zuno_aws_route53_access_key_id }}"
+      secret_access_key: "{{ zuno_aws_route53_secret_access_key }}"
   when: >-
     zuno_aws_route53_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_aws_route53_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | seed the Google OAuth client from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/google-oauth/client
-      client_id={{ zuno_google_oauth_client_id | quote }} client_secret={{ zuno_google_oauth_client_secret | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/google-oauth/client @PAYLOAD"
+    vault_cli_payload:
+      client_id: "{{ zuno_google_oauth_client_id }}"
+      client_secret: "{{ zuno_google_oauth_client_secret }}"
   when: >-
     zuno_google_oauth_client_id | default('xxxxxx') != 'xxxxxx'
     and zuno_google_oauth_client_secret | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | seed the SMTP technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/smtp/technical
-      host={{ zuno_smtp_host | quote }} port={{ (zuno_smtp_port | default('587')) | quote }}
-      username={{ zuno_smtp_username | quote }} password={{ zuno_smtp_password | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/smtp/technical @PAYLOAD"
+    vault_cli_payload:
+      host: "{{ zuno_smtp_host }}"
+      port: "{{ (zuno_smtp_port | default('587')) }}"
+      username: "{{ zuno_smtp_username }}"
+      password: "{{ zuno_smtp_password }}"
   when: >-
     zuno_smtp_host | default('xxxxxx') != 'xxxxxx'
     and zuno_smtp_username | default('xxxxxx') != 'xxxxxx'
@@ -662,13 +658,12 @@
 # ADR-0024 chain, replacing that role's original direct confidential.yml
 # read).
 - name: "vault | seed the AAP Red Hat account credentials from ansible/confidential.yml (ADR-0354)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/rhn
-      username={{ zuno_aap_rhn_username | quote }} password={{ zuno_aap_rhn_password | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/aap/rhn @PAYLOAD"
+    vault_cli_payload:
+      username: "{{ zuno_aap_rhn_username }}"
+      password: "{{ zuno_aap_rhn_password }}"
   when: >-
     zuno_aap_rhn_username | default('xxxxxx') != 'xxxxxx'
     and zuno_aap_rhn_password | default('xxxxxx') != 'xxxxxx'
@@ -677,15 +672,14 @@
 # url/email are required alongside token: Atlassian Cloud's REST API uses
 # email+API-token Basic Auth, not a bearer token alone.
 - name: "vault | seed the Confluence technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/confluence/technical
-      url={{ zuno_atlassian_confluence_url | quote }} email={{ zuno_atlassian_confluence_email | quote }}
-      token={{ zuno_atlassian_confluence_token | quote }}
-      enabled={{ (zuno_atlassian_confluence_enabled | default(false)) | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/confluence/technical @PAYLOAD"
+    vault_cli_payload:
+      url: "{{ zuno_atlassian_confluence_url }}"
+      email: "{{ zuno_atlassian_confluence_email }}"
+      token: "{{ zuno_atlassian_confluence_token }}"
+      enabled: "{{ (zuno_atlassian_confluence_enabled | default(false)) }}"
   when: >-
     zuno_atlassian_confluence_url | default('xxxxxx') != 'xxxxxx'
     and zuno_atlassian_confluence_email | default('xxxxxx') != 'xxxxxx'
@@ -697,13 +691,12 @@
 # QUAY_USERNAME/QUAY_PASSWORD as GitHub Actions repo secrets set directly in
 # GitHub, not from Vault/confidential.yml.
 - name: "vault | seed the Quay registry credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/quay/registry
-      username={{ zuno_quay_username | quote }} password={{ zuno_quay_password | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/quay/registry @PAYLOAD"
+    vault_cli_payload:
+      username: "{{ zuno_quay_username }}"
+      password: "{{ zuno_quay_password }}"
   when: >-
     zuno_quay_username | default('xxxxxx') != 'xxxxxx'
     and zuno_quay_password | default('xxxxxx') != 'xxxxxx'
@@ -714,15 +707,14 @@
 # confluence/technical above (Jira Cloud uses the same Atlassian
 # email+API-token Basic Auth scheme).
 - name: "vault | seed the Jira technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/jira/technical
-      url={{ zuno_jira_url | quote }} email={{ zuno_jira_email | quote }}
-      token={{ zuno_jira_token | quote }}
-      enabled={{ (zuno_jira_enabled | default(false)) | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/jira/technical @PAYLOAD"
+    vault_cli_payload:
+      url: "{{ zuno_jira_url }}"
+      email: "{{ zuno_jira_email }}"
+      token: "{{ zuno_jira_token }}"
+      enabled: "{{ (zuno_jira_enabled | default(false)) }}"
   when: >-
     zuno_jira_url | default('xxxxxx') != 'xxxxxx'
     and zuno_jira_email | default('xxxxxx') != 'xxxxxx'
@@ -735,14 +727,13 @@
 # rather than email+token Basic Auth (Salesforce's own REST API
 # convention, ADR-0208 service-identity).
 - name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/salesforce/technical
-      url={{ zuno_salesforce_url | quote }} access_token={{ zuno_salesforce_access_token | quote }}
-      enabled={{ (zuno_salesforce_enabled | default(false)) | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/salesforce/technical @PAYLOAD"
+    vault_cli_payload:
+      url: "{{ zuno_salesforce_url }}"
+      access_token: "{{ zuno_salesforce_access_token }}"
+      enabled: "{{ (zuno_salesforce_enabled | default(false)) }}"
   when: >-
     zuno_salesforce_url | default('xxxxxx') != 'xxxxxx'
     and zuno_salesforce_access_token | default('xxxxxx') != 'xxxxxx'
@@ -755,14 +746,12 @@
 # carry the delete_repo scope - delete_repository refuses regardless, but
 # the credential itself should never be able to either.
 - name: "vault | seed the GitHub technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/github/technical
-      token={{ zuno_github_token | quote }}
-      enabled={{ (zuno_github_enabled | default(false)) | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/github/technical @PAYLOAD"
+    vault_cli_payload:
+      token: "{{ zuno_github_token }}"
+      enabled: "{{ (zuno_github_enabled | default(false)) }}"
   when: >-
     zuno_github_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
@@ -773,15 +762,13 @@
 # any reachable project - Developer/Maintainer is enough for read/write/
 # create/fork.
 - name: "vault | seed the GitLab technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/gitlab/technical
-      url={{ ((zuno_gitlab_url | default('xxxxxx')) == 'xxxxxx') | ternary('https://gitlab.com', zuno_gitlab_url | default('https://gitlab.com')) | quote }}
-      token={{ zuno_gitlab_token | quote }}
-      enabled={{ (zuno_gitlab_enabled | default(false)) | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/gitlab/technical @PAYLOAD"
+    vault_cli_payload:
+      url: "{{ ((zuno_gitlab_url | default('xxxxxx')) == 'xxxxxx') | ternary('https://gitlab.com', zuno_gitlab_url | default('https://gitlab.com')) }}"
+      token: "{{ zuno_gitlab_token }}"
+      enabled: "{{ (zuno_gitlab_enabled | default(false)) }}"
   when: >-
     zuno_gitlab_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
@@ -802,13 +789,11 @@
 # while the placeholder remains, so maasAdapter.enabled stays effectively
 # inert (MAAS_GATEWAY_API_KEY unset) until this is seeded.
 - name: "vault | seed the MaaS gateway API key from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/maas/gateway-api-key
-      api_key={{ zuno_maas_gateway_api_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/maas/gateway-api-key @PAYLOAD"
+    vault_cli_payload:
+      api_key: "{{ zuno_maas_gateway_api_key }}"
   when: >-
     zuno_maas_gateway_api_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
@@ -817,15 +802,15 @@
 # since the ExternalSecret that reads it only renders under the same
 # condition (postgresql role's backups.s3.enabled).
 - name: "vault | seed the PostgreSQL backup S3 credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/postgresql/backup-s3
-      bucket={{ zuno_postgresql_backup_s3_bucket | quote }} endpoint={{ zuno_postgresql_backup_s3_endpoint | quote }}
-      region={{ zuno_postgresql_backup_s3_region | quote }} access_key={{ zuno_postgresql_backup_s3_access_key | quote }}
-      secret_key={{ zuno_postgresql_backup_s3_secret_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/postgresql/backup-s3 @PAYLOAD"
+    vault_cli_payload:
+      bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
+      endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
+      region: "{{ zuno_postgresql_backup_s3_region }}"
+      access_key: "{{ zuno_postgresql_backup_s3_access_key }}"
+      secret_key: "{{ zuno_postgresql_backup_s3_secret_key }}"
   when: >-
     zuno_postgresql_backup_s3_bucket | default('xxxxxx') != 'xxxxxx'
     and zuno_postgresql_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx'
@@ -840,14 +825,12 @@
 # gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml's
 # remoteRef.property - unlike postgresql/backup-s3's snake_case above.
 - name: "vault | seed the MariaDB backup S3 credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/mariadb/s3
-      accessKeyId={{ zuno_mariadb_backup_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_mariadb_backup_s3_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/mariadb/s3 @PAYLOAD"
+    vault_cli_payload:
+      accessKeyId: "{{ zuno_mariadb_backup_s3_access_key_id }}"
+      secretAccessKey: "{{ zuno_mariadb_backup_s3_secret_access_key }}"
   when: >-
     zuno_mariadb_backup_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
@@ -859,14 +842,12 @@
 # Property names (accessKeyId/secretAccessKey), same camelCase convention as
 # mariadb/s3 above.
 - name: "vault | seed the RAG corpus S3 credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/rag/s3
-      accessKeyId={{ zuno_rag_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_rag_s3_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/rag/s3 @PAYLOAD"
+    vault_cli_payload:
+      accessKeyId: "{{ zuno_rag_s3_access_key_id }}"
+      secretAccessKey: "{{ zuno_rag_s3_secret_access_key }}"
   when: >-
     zuno_rag_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
@@ -875,16 +856,14 @@
 # Dify's dedicated file storage bucket (ADR-0599, WP-204; user decision 2026-11-04).
 # Same four-field shape as aap/hub-s3 below; skipped while the placeholders are unset.
 - name: "vault | seed the Dify S3 config from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/dify/s3
-      bucketName={{ zuno_dify_s3_bucket_name | quote }}
-      region={{ zuno_dify_s3_region | quote }}
-      accessKeyId={{ zuno_dify_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_dify_s3_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/dify/s3 @PAYLOAD"
+    vault_cli_payload:
+      bucketName: "{{ zuno_dify_s3_bucket_name }}"
+      region: "{{ zuno_dify_s3_region }}"
+      accessKeyId: "{{ zuno_dify_s3_access_key_id }}"
+      secretAccessKey: "{{ zuno_dify_s3_secret_access_key }}"
   when: >-
     zuno_dify_s3_bucket_name | default('xxxxxx') != 'xxxxxx'
     and zuno_dify_s3_region | default('xxxxxx') != 'xxxxxx'
@@ -897,16 +876,14 @@
 # plain chart values) per explicit request - all 4 fields read together by
 # externalsecret-hub-s3.yaml.
 - name: "vault | seed the AAP Hub S3 config from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/aap/hub-s3
-      bucketName={{ zuno_aap_hub_s3_bucket_name | quote }}
-      region={{ zuno_aap_hub_s3_region | quote }}
-      accessKeyId={{ zuno_aap_hub_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_aap_hub_s3_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/aap/hub-s3 @PAYLOAD"
+    vault_cli_payload:
+      bucketName: "{{ zuno_aap_hub_s3_bucket_name }}"
+      region: "{{ zuno_aap_hub_s3_region }}"
+      accessKeyId: "{{ zuno_aap_hub_s3_access_key_id }}"
+      secretAccessKey: "{{ zuno_aap_hub_s3_secret_access_key }}"
   when: >-
     zuno_aap_hub_s3_bucket_name | default('xxxxxx') != 'xxxxxx'
     and zuno_aap_hub_s3_region | default('xxxxxx') != 'xxxxxx'
@@ -920,16 +897,14 @@
 # chart values - read by
 # gitops/charts/openshift-ai/templates/externalsecret-traces-s3.yaml.
 - name: "vault | seed the RHOAI monitoring traces S3 config from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/rhoai/traces-s3
-      bucketName={{ zuno_rhoai_traces_s3_bucket_name | quote }}
-      region={{ zuno_rhoai_traces_s3_region | quote }}
-      accessKeyId={{ zuno_rhoai_traces_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_rhoai_traces_s3_secret_access_key | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/rhoai/traces-s3 @PAYLOAD"
+    vault_cli_payload:
+      bucketName: "{{ zuno_rhoai_traces_s3_bucket_name }}"
+      region: "{{ zuno_rhoai_traces_s3_region }}"
+      accessKeyId: "{{ zuno_rhoai_traces_s3_access_key_id }}"
+      secretAccessKey: "{{ zuno_rhoai_traces_s3_secret_access_key }}"
   when: >-
     zuno_rhoai_traces_s3_bucket_name | default('xxxxxx') != 'xxxxxx'
     and zuno_rhoai_traces_s3_region | default('xxxxxx') != 'xxxxxx'
@@ -937,13 +912,10 @@
     and zuno_rhoai_traces_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-- name: "vault | check whether operator-supplied secrets already exist"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/{{ secret_path }}"
+# ADR-0603 M9: the existence check and the placeholder go through vault_seed_if_missing.yml (token and values as
+# files). It also stops on a read error other than "no value found", where the old loop seeded a placeholder.
+- name: "vault | seed an empty placeholder only where no secret exists yet (never overwrite operator-supplied values)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   loop:
     - google-oauth/client
     - smtp/technical
@@ -954,26 +926,11 @@
     - aws/route53-dns01
     - aap/rhn
   loop_control:
-    loop_var: secret_path
-    label: "{{ secret_path }}"
-  register: _vault_existing_secrets
-  changed_when: false
-  failed_when: false
-  no_log: true
-
-- name: "vault | seed an empty placeholder only where no secret exists yet (never overwrite operator-supplied values)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/{{ secret_result.secret_path }} _placeholder=true"
-  loop: "{{ _vault_existing_secrets.results }}"
-  loop_control:
-    loop_var: secret_result
-    label: "{{ secret_result.secret_path }}"
-  when: secret_result.rc != 0
-  no_log: true
+    loop_var: vault_seed_path
+    label: "{{ vault_seed_path }}"
+  vars:
+    vault_seed_fields:
+      _placeholder: "true"
 
 - name: "vault | operator action required"
   ansible.builtin.debug:
@@ -993,13 +950,7 @@
 # externalsecret-{openai,gemini,anthropic,mistral}.yaml each resolve
 # `api_key`, so both real seed and placeholder must use that same key.
 - name: "vault | seed real LLM provider API keys from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/providers/{{ provider_key.key }}
-      api_key={{ provider_key.value | quote }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   loop: "{{ _llm_provider_real_keys | dict2items }}"
   loop_control:
     loop_var: provider_key
@@ -1007,6 +958,9 @@
   when: provider_key.value | default('xxxxxx') != 'xxxxxx'
   no_log: true
   vars:
+    vault_cli_args: "kv put zuno/providers/{{ provider_key.key }} @PAYLOAD"
+    vault_cli_payload:
+      api_key: "{{ provider_key.value }}"
     _llm_provider_real_keys:
       openai: "{{ zuno_llm_provider_openai_api_key | default('xxxxxx') }}"
       gemini: "{{ zuno_llm_provider_gemini_api_key | default('xxxxxx') }}"
@@ -1020,41 +974,21 @@
       # OVHcloud AI Endpoints).
       ovhcloud: "{{ zuno_llm_provider_ovhcloud_api_key | default('xxxxxx') }}"
 
-- name: "vault | check whether LLM provider API keys already exist"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/providers/{{ provider }}"
-  loop:
-    - openai
-    - gemini
-    - anthropic
-    - mistral
-    - mistral-codestral
-    - ovhcloud
-  loop_control:
-    loop_var: provider
-    label: "{{ provider }}"
-  register: _vault_existing_provider_secrets
-  changed_when: false
-  failed_when: false
-  no_log: true
-
 - name: "vault | seed an empty LLM provider placeholder only where no key exists yet"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
-  loop: "{{ _vault_existing_provider_secrets.results }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  loop:
+    - providers/openai
+    - providers/gemini
+    - providers/anthropic
+    - providers/mistral
+    - providers/mistral-codestral
+    - providers/ovhcloud
   loop_control:
-    loop_var: provider_result
-    label: "{{ provider_result.provider }}"
-  when: provider_result.rc != 0
-  no_log: true
+    loop_var: vault_seed_path
+    label: "{{ vault_seed_path }}"
+  vars:
+    vault_seed_fields:
+      api_key: __placeholder__
 
 - name: "vault | LLM provider operator action required"
   ansible.builtin.debug:
@@ -1075,12 +1009,8 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
 - name: "vault | store the cluster's apps domain"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
-  # See the PKI root read above: unmasked, a failure here prints the Vault
-  # token via invocation.module_args.
-  no_log: true
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/platform/cluster-domain @PAYLOAD"
+    vault_cli_payload:
+      domain: "{{ cluster_base_domain }}"
