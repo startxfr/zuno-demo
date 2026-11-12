@@ -538,6 +538,8 @@ platformNamespaces:
       routeHosts:
         - name: unifai-ui-zuno-unifai
           reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).
+        - name: quay-quay-zuno-registry
+          reason: okf-fetch of both gateways pulls the OKF release from the internal Quay through its route (ADR-0612 addendum; the Service certificate does not cover the Service name).
       # S3 answers each name lookup with other addresses out of a pool of hundreds; a name rule holds only the few it
       # resolved, so the storage-initializer of a recreated model pod stalled on blocked connections (embeddings-predictor
       # down 2026-11-08 02:30 to 14:30, found by the RAG pilot). The published eu-west-2 S3 ranges (syncToken 1794088025,

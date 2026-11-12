@@ -286,3 +286,25 @@
       region: "{{ zuno_quay_s3_region }}"
       access_key_id: "{{ _quay_registry_s3_key.AccessKeyId }}"
       secret_access_key: "{{ _quay_registry_s3_key.SecretAccessKey }}"
+
+# The workstation verifies the mirror (okf_mirror_holds_lock.yml) and feeds it (make d3 admit agents) through the route with
+# the robots' docker configs, kept beside the bucket key. Rewritten at every run so a rotated token is picked up.
+- name: "quay_registry | create the workstation docker config directories"
+  ansible.builtin.file:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/quay-{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: [pull, push]
+
+- name: "quay_registry | write the workstation docker configs for the pull and push robots (0600)"
+  ansible.builtin.copy:
+    dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/quay-{{ item.role }}/config.json"
+    mode: "0600"
+    content: >-
+      {{ {'auths': {_quay_registry_host: {'auth': ((item.user ~ ':' ~ item.token) | b64encode)}}} | to_nice_json }}
+  loop:
+    - {role: pull, user: "{{ zuno_quay_organization }}+pull", token: "{{ _quay_registry_robots.results[0].json.token }}"}
+    - {role: push, user: "{{ zuno_quay_organization }}+push", token: "{{ _quay_registry_robots.results[1].json.token }}"}
+  loop_control:
+    label: "{{ item.role }}"
+  no_log: true

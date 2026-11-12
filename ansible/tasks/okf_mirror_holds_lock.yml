@@ -11,6 +11,19 @@
 - name: "okf mirror | verify that the internal mirror holds the locked release (ADR-0611)"
   ansible.builtin.shell: |
     set -u
+    # ADR-0612: a prefix that is not the in-cluster zot Service is Quay, reached through its route with the pull robot's docker
+    # config written by roles/quay_registry (no port-forward, TLS, no --plain-http).
+    case "{{ zuno_okf_registry_mirror }}" in
+      *.svc:*) ;;
+      *)
+        export DOCKER_CONFIG="${HOME}/.config/zuno/quay-pull"
+        [ -f "$DOCKER_CONFIG/config.json" ] || { echo "missing $DOCKER_CONFIG/config.json: run make d2 install quay-registry" >&2; exit 1; }
+        prefix="{{ zuno_okf_registry_mirror }}"
+        lock="$(grep -v '^#' platform/okf/agents.lock | grep .)"
+        ref="$(python3 -c 'import sys; sys.path.insert(0, "platform/supply-chain"); import admit_okf_bundle as a; print(a.mirror_reference(sys.argv[1], sys.argv[2]))' "$lock" "$prefix")"
+        exec python3 platform/supply-chain/admit_okf_bundle.py verify "$ref" --mirror "$prefix"
+        ;;
+    esac
     oc -n zuno-ai-run port-forward svc/okf-mirror 15002:5000 >/dev/null 2>&1 &
     pf=$!
     trap 'kill $pf 2>/dev/null' EXIT
