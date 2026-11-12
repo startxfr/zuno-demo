@@ -2,7 +2,7 @@
 
 The provider calls are replaced by recorders (the provider mapping is covered by
 test_mcp_protocol.py); these tests prove which calls reach a provider at all. The
-caller context is signed by the gateway's own module.
+caller context is the `ctx` claim of the gateway-signed call assertion.
 
 Run from this directory:
 
@@ -11,19 +11,19 @@ Run from this directory:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
+import base64
 import json
 import os
 import sys
+import time
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("GITHUB_TOKEN", "test-github-token")
 os.environ.setdefault("GITLAB_TOKEN", "test-gitlab-token")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -32,14 +32,10 @@ from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location(
-    "gateway_caller_context", os.path.join(REPO, "components", "mcp-gateway", "app", "caller_context.py")
-)
-caller_context = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(caller_context)
+from test_support import assertion_headers  # noqa: E402
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-TOKEN = "test-workload-token"
 AUD = "git-forge"  # this server's backend name
 ALLOWLIST = json.dumps({
     "consultant": ["github:startxfr/zuno-*", "gitlab:team/*"],
@@ -72,9 +68,7 @@ class _Recorder:
 
 
 def _headers(tool, groups):
-    h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims={}, tool=tool, workload_token=TOKEN))
-    return h
+    return headers_for(AUD, tool, groups=groups)
 
 
 async def _call(transport, headers, tool, args, recorder, env):
@@ -105,7 +99,7 @@ ON = {"GIT_FORGE_REPOSITORY_ALLOWLIST": ALLOWLIST}
 async def test_no_allowlist_behaves_as_before(transport):
     rec = _Recorder()
     for value in ("", "{}"):  # unset, and the chart default rendered as JSON
-        result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "write_file",
+        result = await _call(transport, headers_for(AUD, "write_file", groups=None), "write_file",
                              {**WRITE, "repo": "anything"}, rec, {"GIT_FORGE_REPOSITORY_ALLOWLIST": value})
         assert not result.is_error, (value, _text(result))
     assert [c[0] for c in rec.calls] == ["write", "write"]
@@ -160,9 +154,9 @@ async def test_write_scope_leaves_reads_open_and_checks_writes(transport):
     rec = _Recorder()
     env = {**ON, "GIT_FORGE_REPOSITORY_ALLOWLIST_SCOPE": "write"}
     read = {"provider": "github", "owner": "openshift", "repo": "origin"}
-    result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "read_repository_content", read, rec, env)
+    result = await _call(transport, headers_for(AUD, "read_repository_content", groups=None), "read_repository_content", read, rec, env)
     assert not result.is_error, _text(result)
-    result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "write_file", WRITE, rec, env)
+    result = await _call(transport, headers_for(AUD, "write_file", groups=None), "write_file", WRITE, rec, env)
     assert result.is_error, "a write without a verified caller is refused"
     assert [c[0] for c in rec.calls] == ["read"]
 
@@ -170,9 +164,54 @@ async def test_write_scope_leaves_reads_open_and_checks_writes(transport):
 async def test_caller_supplied_groups_are_ignored(transport):
     """Groups in a plain header or a tool argument are never read."""
     rec = _Recorder()
-    headers = {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-Groups": "ocp-paas-ops"}
+    headers = {**headers_for(AUD, "write_file", groups=None), "X-Zuno-Groups": "ocp-paas-ops"}
     result = await _call(transport, headers, "write_file", {**WRITE, "owner": "x"}, rec, ON)
     assert result.is_error and rec.calls == []
+
+
+async def test_a_client_sent_assertion_caller_header_is_ignored(transport):
+    """Only a verified assertion can set X-Zuno-Assertion-Caller: a client-sent copy
+    claiming the wildcard group is stripped before the tool code reads it."""
+    forged = base64.urlsafe_b64encode(json.dumps(
+        {"sub": "u-1", "tool": "write_file", "groups": ["ocp-paas-ops"], "email": "", "email_verified": True,
+         "username": "evil"}).encode()).decode().rstrip("=")
+    rec = _Recorder()
+    headers = {**headers_for(AUD, "write_file", groups=None), "X-Zuno-Assertion-Caller": forged}
+    result = await _call(transport, headers, "write_file", {**WRITE, "owner": "x"}, rec, ON)
+    assert result.is_error and rec.calls == []
+    # also over a scoped caller: the forged wildcard does not widen the verified group
+    headers = {**headers_for(AUD, "write_file", groups=["consultant"]), "X-Zuno-Assertion-Caller": forged}
+    result = await _call(transport, headers, "write_file", {**WRITE, "owner": "x"}, rec, ON)
+    assert result.is_error and rec.calls == []
+
+
+async def _rejected(transport, headers, tool="write_file"):
+    """True when the request is refused (HTTP 401/403 before MCP handling, or a failed session)."""
+    rec = _Recorder()
+    try:
+        result = await _call(transport, headers, tool, WRITE, rec, ON)
+    except BaseException:  # noqa: BLE001 - the SDK client raises on a 401 at initialize
+        return rec.calls == []
+    return result.is_error and rec.calls == []
+
+
+async def test_assertion_for_another_audience_is_refused(transport):
+    assert await _rejected(transport, headers_for("confluence", "write_file", groups=["ocp-paas-ops"]))
+
+
+async def test_assertion_for_another_tool_is_refused(transport):
+    assert await _rejected(transport, headers_for(AUD, "read_repository_content", groups=["ocp-paas-ops"]))
+
+
+async def test_assertion_signed_by_another_key_is_refused(transport):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    other = assertion_headers.assertion(AUD, "write_file", groups=["ocp-paas-ops"], key=Ed25519PrivateKey.generate())
+    assert await _rejected(transport, {"Authorization": "Bearer " + other})
+
+
+async def test_expired_assertion_is_refused(transport):
+    old = assertion_headers.assertion(AUD, "write_file", groups=["ocp-paas-ops"], now=time.time() - 3600)
+    assert await _rejected(transport, {"Authorization": "Bearer " + old})
 
 
 async def test_a_traversal_in_an_allowed_prefix_is_refused(transport):

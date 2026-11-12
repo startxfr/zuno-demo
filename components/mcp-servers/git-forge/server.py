@@ -96,11 +96,6 @@ GITLAB_TOKEN = os.getenv("GITLAB_TOKEN", "")
 GITLAB_BASE_URL = os.getenv("GITLAB_BASE_URL", "https://gitlab.com")
 HTTP_TIMEOUT_SECONDS = float(os.getenv("GIT_FORGE_HTTP_TIMEOUT_SECONDS", "20"))
 
-# ADR-0037: required, not optional - this server has no purpose other than
-# serving the gateway (same reasoning as every other server in
-# components/mcp-servers/).
-GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
-
 logger = logging.getLogger("git_forge")
 
 
@@ -119,56 +114,12 @@ logger = logging.getLogger("git_forge")
 # The audience of the caller context: this server's backend name in
 # platform/bindings/tools/tool-bindings.yaml.
 CALLER_CONTEXT_AUDIENCE = "git-forge"
-CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
-CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
-CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
-# A context dated in the future beyond clock skew is refused, so a signed context
-# cannot be minted to stay valid for longer than its age bound.
-CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
-
-
-def _caller_context_key() -> bytes:
-    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
-    # for another backend does not verify here.
-    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
-    # WP-250: a caller context signed inside the Transit-signed assertion wins; the
-    # HMAC-signed headers below are the fallback while both are sent.
-    from_assertion = _assertion_caller(headers, tool)
-    if from_assertion is not None:
-        return from_assertion
-    if not headers or not GATEWAY_WORKLOAD_TOKEN:
-        return None
-    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
-    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
-    if not raw or not signature:
-        return None
-    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature):
-        return None
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
-    except (ValueError, TypeError):
-        return None
-    if not isinstance(payload, dict) or payload.get("v") != 1:
-        return None
-    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
-        return None
-    iat = payload.get("iat")
-    now = time.time()
-    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
-        return None
-    groups = payload.get("groups")
-    return {
-        "sub": str(payload.get("sub") or ""),
-        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
-        "email": str(payload.get("email") or "").lower(),
-        "email_verified": payload.get("email_verified") is True,
-        "username": str(payload.get("username") or ""),
-    }
+    # WP-250: the caller is read from the verified call assertion only (`ctx`, see the
+    # call-assertion verifier block). No shared secret is involved any more.
+    return _assertion_caller(headers, tool)
 
 
 def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
@@ -910,17 +861,6 @@ async def delete_repository(provider: Provider, owner: str, repo: str) -> Dict[s
     }
 
 
-class GatewayTokenMiddleware(BaseHTTPMiddleware):
-    """ADR-0037 workload-identity check, ahead of any MCP protocol handling
-    (identical pattern to every other server in components/mcp-servers/)."""
-
-    async def dispatch(self, request: Request, call_next):
-        caller_token = request.headers.get("x-zuno-gateway-token", "")
-        if not GATEWAY_WORKLOAD_TOKEN or not hmac.compare_digest(caller_token, GATEWAY_WORKLOAD_TOKEN):
-            return JSONResponse({"detail": "missing or invalid X-Zuno-Gateway-Token"}, status_code=401)
-        return await call_next(request)
-
-
 # --------------------------------------------------------------------------
 # BEGIN call-assertion verifier (WP-225 lot C)
 #
@@ -935,8 +875,8 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
 # refused (401). A tools/call whose name is not the assertion's tool, whose
 # arguments do not match its `args` hash, or whose jti was already consumed, is
 # refused (403); a body that is not JSON 400, one past the size cap 413. With
-# MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
-# refused; without it a request carrying no assertion is served as before.
+# A request without a valid assertion is always refused (WP-250 lot 2: the env switch
+# MCP_CALL_ASSERTION_REQUIRED is no longer read).
 # WP-250: the assertion may carry `ctx` (groups, email, email_verified, username), the
 # caller context signed with the assertion. After verification the middleware hands it to
 # the tool code as the header X-Zuno-Assertion-Caller; any such header sent by a client
@@ -970,7 +910,9 @@ class CallAssertionError(ValueError):
 
 
 def _call_assertion_required() -> bool:
-    return os.getenv("MCP_CALL_ASSERTION_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+    # WP-250 lot 2: always. The assertion is the only way in (the shared workload token is
+    # gone); without a configured public key every request is refused (fail closed).
+    return True
 
 
 def _call_assertion_max_body_bytes() -> int:
@@ -1220,7 +1162,5 @@ mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
         ).split(","),
     ),
 )
-mcp_asgi_app.add_middleware(GatewayTokenMiddleware)
-# WP-225 lot C: added last, so it runs first (outermost), ahead of the workload-token check.
 mcp_asgi_app.add_middleware(CallAssertionMiddleware)
 app.mount("/", mcp_asgi_app)

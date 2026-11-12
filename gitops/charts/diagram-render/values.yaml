@@ -36,3 +36,9 @@ resources:
 gatewayToken:
   secretName: mcp-gateway-workload-token
   secretKey: token
+
+# WP-250 lot 2: the PUBLIC half of the Vault Transit key mcp-call-assertion (the private half never leaves Vault).
+# /render accepts only a call assertion signed by it (components/diagram-render/assertion.js). Empty = every
+# /render call is refused, by design. The gatewayToken above is no longer read (removed in lot 3).
+callAssertion:
+  publicKey: ""

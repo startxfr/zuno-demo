@@ -1,6 +1,6 @@
 # WP-250: Retire the shared MCP workload token
 
-- **State:** Operator pending (lot 1 live on demo333 2026-11-12, lots 2 and 3 to do)
+- **State:** Operator pending (lot 1 live on demo333 2026-11-12; lot 2 code and tests done locally, not built; lot 3 to do)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-247](wp-247-sign-gateway-assertions-with-vault-transit.md) (the assertion is signed by Vault Transit),
@@ -86,6 +86,28 @@ Vault would mean a Vault call per verification on every server.
   copy of the verifier is covered by the unit tests only. Playbook trap: the one-off build/sign playbooks need
   `-e cluster_base_domain=apps.demo333.startx.fr`, or the signing step fails after the first image and stops the loop.
   Next: lot 2 (servers require the claims, the gateway stops sending the token and the two headers).
+
+- **2026-11-12, lot 2 code and tests (repo only, not built, not applied).**
+  - **Servers.** confluence, aap, git-forge and salesforce no longer read `MCP_GATEWAY_WORKLOAD_TOKEN`: `GatewayTokenMiddleware`,
+    `_caller_context_key` and the HMAC fallback are gone, the assertion is ALWAYS required (the byte-identical verifier block's
+    `_call_assertion_required()` returns True; `MCP_CALL_ASSERTION_REQUIRED` is no longer read; no public key = every request
+    refused), and `_verified_caller` returns the assertion's `ctx` caller only.
+  - **Gateway.** `downstream.py` stops sending `X-Zuno-Gateway-Token` and the two HMAC headers; `caller_context.py` keeps only
+    `assertion_context`. `generate_diagram` now calls diagram-render with an assertion (audience `diagram-render`, tool `render`).
+  - **diagram-render (Q1).** `components/diagram-render/assertion.js` verifies the assertion in Node (Ed25519 signature,
+    issuer, audience, lifetime <= 60 s, gateway actor, tool, single use per jti; no `args` hash: the `/render` body is not the
+    tool-call arguments JSON). A Python-minted assertion verifies in Node. Chart: `callAssertion.publicKey` (env
+    `MCP_CALL_ASSERTION_PUBLIC_KEY`), set in `gitops/apps/diagram-render/application-d1.yaml`; the token env stays until lot 3.
+  - **Evaluations (Q2).** The five `direct_call_to_*_mcp_denied_without_gateway_token` checks also send a bogus bearer and
+    require a 401 for both (the names are kept: ADR-0037's acceptance test).
+  - **Tooling.** `check_mcp_server_conformance.py` requires `CallAssertionMiddleware`; the scaffold (`new_mcp_server.py`) copies
+    the verifier block from the confluence server and generates a server, tests and chart on the assertion; lint.yml runs the new
+    tests (servers, gateway, a Node 20 step for `assertion.js`). Test helper: `components/mcp-servers/test_support/assertion_headers.py`.
+  - **Roll order (when built).** Image triggers make a build a roll, so build and roll the servers and diagram-render FIRST (they
+    still work with a gateway that sends the assertion), the gateway LAST. Lot 3 then drops the token env, the Secrets and the
+    `secret-access.yaml` key. Weak spot: git-forge's `_rejected` test helper accepts any exception at initialize.
+  - Tests: server suites 4x(call assertion 23, assertion caller 11, protocol, scoping) pass, gateway suites pass (except
+    `test_rag_query` and `test_web_search`, which need pytest or a different cwd and were not run), Node 16 assertion tests 16/16.
 
 ## Questions asked (answered above)
 

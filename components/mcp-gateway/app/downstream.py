@@ -50,7 +50,6 @@ DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "40")
 # here (unlike the downstream server's own validation) so this gateway still starts and
 # serves every other tool if the secret hasn't landed yet - the MCP call
 # itself degrades to a clear 502 from the missing/rejected header.
-MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 # The in-process demo-mode backends themselves (ADR-0116: this is the
 # physical-backend catalog the `in-process` transport dispatches into, keyed
@@ -162,7 +161,7 @@ async def _invoke_streamable_http(
     # Authorization was forwarded for audit/observability even though
     # downstream servers don't themselves re-validate it (the gateway's
     # ADR-0011 policy intersection already happened);
-    # X-Zuno-Gateway-Token is the one that's actually enforced (ADR-0037).
+    # The signed call assertion is what the servers enforce (ADR-0037, WP-250).
     # WP-225 lot C makes what is sent per binding (see below).
     endpoint = binding.endpoint_url()
     # The headers are built here from binding data and the validated identity only;
@@ -188,23 +187,10 @@ async def _invoke_streamable_http(
         logger.error("no call assertion for %s: %s", binding.backend, exc)
         raise DownstreamError(502, f"{binding.backend}: the gateway cannot sign the call assertion") from exc
     headers = {"Authorization": authorization} if authorization else {}
-    if binding.gateway_token:
-        headers["X-Zuno-Gateway-Token"] = MCP_GATEWAY_WORKLOAD_TOKEN
-    if binding.caller_context:
-        # ADR-0603 M12 (WP-225 lot B): who the call is for, signed for this backend
-        # only (app/caller_context.py). A shared-credential server scopes its
-        # technical identity with it (space, repository, owner allowlists; AAP
-        # launch rate limit). Sent only where the binding declares it.
-        headers.update(
-            caller_context.build(
-                sub=caller_sub,
-                groups=caller_groups,
-                claims=caller_claims,
-                tool=binding.provider_tool or "",
-                audience=binding.backend,
-                workload_token=MCP_GATEWAY_WORKLOAD_TOKEN,
-            )
-        )
+    # WP-250 lot 2: no X-Zuno-Gateway-Token and no HMAC caller-context headers any more.
+    # A Zuno server trusts the Vault-Transit-signed assertion alone, and the caller context
+    # (ADR-0603 M12: space, repository, owner allowlists, AAP launch rate limit) rides inside
+    # it as the `ctx` claim, for bindings that declare `caller_context`.
     try:
         http_client = httpx2.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS, headers=headers)
         async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
@@ -285,7 +271,7 @@ def _tool_input_schema(tool: Any) -> Optional[Dict[str, Any]]:
 
 
 async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True, backend: str = "") -> Dict[str, Dict[str, Any]]:
-    headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN} if gateway_token else {}
+    headers: Dict[str, str] = {}
     # WP-225 lot C: in assertion mode a Zuno server may require an assertion on every
     # request; a schema read carries one for the gateway itself, with no tool.
     authorization = await asyncio.to_thread(call_assertion.schema_authorization_for, backend, gateway_token)

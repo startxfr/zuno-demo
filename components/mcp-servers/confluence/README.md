@@ -17,9 +17,10 @@ happened before this server is ever reached.
 
 Network location (`gitops/charts/mcp-confluence`'s
 `NetworkPolicy`, restricting ingress to the gateway's pods specifically)
-is not the only control. Every `POST /mcp` call must also carry
-`X-Zuno-Gateway-Token`, a shared secret only the gateway holds (same
-pattern as salesforce).
+is not the only control. Every `POST /mcp` call must also carry the
+gateway's Vault-Transit-signed call assertion (`Authorization: Bearer`; WP-250
+retired the shared `X-Zuno-Gateway-Token`); the caller's groups come from its
+`ctx` claim.
 
 **Authentication mode: `service-identity`.** Every call to
 Confluence uses one shared technical identity - email + API token, HTTP

@@ -230,10 +230,19 @@ jobs:
           # instead of the forwarded bearer, one entitlement check for REST and /mcp,
           # the signed agent chain, the azp allowlist.
           python3 tests/test_wp225_lot_c.py
+          # WP-250: the caller context inside the call assertion, and generate_diagram's assertion.
+          python3 tests/test_wp250_assertion_context.py
+          python3 tests/test_wp250_diagram_assertion.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
           python3 -m pytest -q tests/test_rag_query.py
+      # WP-250 lot 2: diagram-render verifies the gateway's call assertion (assertion.js), in the Node 20 image.
+      - name: diagram-render call-assertion tests (WP-250)
+        run: |
+          docker run --rm -v "$PWD/components/diagram-render:/work" -w /work \
+            docker.io/library/node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb \
+            node test/assertion.test.js
       - name: world-model-runtime tests on the CPU mocks (ADR-0604)
         working-directory: components/world-model-runtime
         run: |
@@ -339,6 +348,8 @@ jobs:
           python3 tests/test_wp225_space_allowlist.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       # ADR-0119: was missing (a real gap the new
       # check_mcp_server_conformance.py checker caught) - these tests
       # existed but never ran in CI.
@@ -351,6 +362,8 @@ jobs:
           python3 tests/test_wp225_owner_scoping.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: git-forge MCP server tests (ADR-0120)
         working-directory: components/mcp-servers/git-forge
         run: |
@@ -360,6 +373,8 @@ jobs:
           python3 tests/test_wp225_repository_allowlist.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: aap MCP server tests (ADR-0355)
         working-directory: components/mcp-servers/aap
         run: |
@@ -369,6 +384,8 @@ jobs:
           python3 tests/test_wp225_launch_rate_limit.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

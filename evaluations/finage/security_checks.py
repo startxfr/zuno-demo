@@ -238,17 +238,27 @@ def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
             timeout=15,
         )
+
+        # WP-250: the shared workload token is retired; the server's only credential is the gateway's signed call
+        # assertion, so a bearer that is not one must be refused too (401).
+        bogus = httpx.post(
+            f"{CONFLUENCE_MCP_URL}/mcp",
+            json={"jsonrpc": "2.0"},
+            headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
+            headers={"Authorization": "Bearer not-a-gateway-assertion"},
+            timeout=15,
+        )
     except httpx.TransportError as exc:
         return CheckResult(
             "direct_call_to_confluence_mcp_denied_without_gateway_token",
             True,
             f"denied at the network layer (NetworkPolicy) before any HTTP response: {exc}",
         )
-    ok = resp.status_code == 401
+    ok = resp.status_code == 401 and bogus.status_code == 401
     return CheckResult(
         "direct_call_to_confluence_mcp_denied_without_gateway_token",
         ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
+        f"status={resp.status_code} (bogus bearer: {bogus.status_code}) body={resp.text[:200]}",
     )
 
 

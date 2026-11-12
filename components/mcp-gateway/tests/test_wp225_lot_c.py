@@ -95,7 +95,7 @@ def _capture(binding_name: str, env: dict, schema: bool = False):
         raise _Captured()
 
     binding = gateway_main.binding_registry.resolve(binding_name)
-    with mock.patch.dict(os.environ, env), mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", "wt"), \
+    with mock.patch.dict(os.environ, env), \
             mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
             mock.patch.object(downstream, "streamable_http_client", _stop):
         try:
@@ -138,9 +138,9 @@ class CallAssertionTest(unittest.TestCase):
                          ("consultant-01", {"sub": "mcp-gateway"}, binding.provider_tool))
         self.assertLessEqual(claims["exp"] - claims["iat"], 60)
         self.assertTrue(claims["jti"])
-        # Lot B's headers are unchanged.
-        self.assertEqual(captured["X-Zuno-Gateway-Token"], "wt")
-        self.assertIn("X-Zuno-Caller-Context", captured)
+        # WP-250: the shared token and the HMAC headers are gone.
+        self.assertNotIn("X-Zuno-Gateway-Token", captured)
+        self.assertNotIn("X-Zuno-Caller-Context", captured)
 
     def test_each_call_gets_its_own_jti(self):
         _, first = _capture("confluence.page.search", ASSERTION)

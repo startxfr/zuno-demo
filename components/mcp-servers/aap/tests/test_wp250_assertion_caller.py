@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""WP-250 lot 1: the caller context rides inside the Transit-signed call assertion (`ctx`).
+"""WP-250: the caller context rides inside the Transit-signed call assertion (`ctx`).
 
 The middleware hands a VERIFIED `ctx` to the tool code as X-Zuno-Assertion-Caller and strips any such header a
-client sent. `_verified_caller` prefers it and still falls back to the HMAC-signed headers. This file is
-byte-identical in confluence, git-forge, salesforce and aap; the assertions are minted by the gateway's own module.
+client sent. `_verified_caller` reads it and nothing else: since lot 2 the HMAC-signed headers and the shared
+workload token are retired. This file is byte-identical in confluence, git-forge, salesforce and aap; the
+assertions are minted by the gateway's own module.
 
 Run from the server directory:
 
@@ -26,7 +27,6 @@ _SERVER_DIR = _HERE.parents[1]
 _REPO_ROOT = _HERE.parents[4]
 sys.path.insert(0, str(_SERVER_DIR))
 for _name, _value in {
-    "MCP_GATEWAY_WORKLOAD_TOKEN": "test-workload-token",
     "CONFLUENCE_BASE_URL": "https://example.atlassian.net",
     "CONFLUENCE_EMAIL": "technical@example.com",
     "CONFLUENCE_API_TOKEN": "test-token",
@@ -53,7 +53,7 @@ def _load(name: str):
 
 
 ca = _load("call_assertion")
-cc = _load("caller_context")
+cc = _load("caller_context")  # assertion_context(): the `ctx` claim
 AUD = server.CALLER_CONTEXT_AUDIENCE
 KEY = Ed25519PrivateKey.generate()
 PEM = KEY.public_key().public_bytes(
@@ -108,21 +108,26 @@ class AssertionCallerTest(unittest.TestCase):
         self.assertEqual(caller, {"sub": "ana-sub", "groups": ["a", "b"], "email": "ana@example.com",
                                   "email_verified": True, "username": "ana"})
 
-    def test_verified_caller_prefers_the_assertion_over_the_hmac_headers(self):
+    def test_verified_caller_is_the_assertion_caller(self):
         _, seen = _run({"authorization": _bearer()}, _call("t"))
-        # a context the workload token could sign for another person: the assertion wins
-        forged = cc.build(sub="eve", groups=["admin"], claims={"email": "eve@x"}, tool="t", audience=AUD,
-                          workload_token=server.GATEWAY_WORKLOAD_TOKEN)
-        seen = {**seen, **{k.lower(): v for k, v in forged.items()}}
         self.assertEqual(server._verified_caller(seen, "t")["sub"], "ana-sub")
 
-    def test_without_ctx_the_hmac_headers_still_work(self):
+    def test_without_ctx_there_is_no_caller(self):
         _, seen = _run({"authorization": _bearer(caller=None)}, _call("t"))
         self.assertNotIn(server.ASSERTION_CALLER_HEADER, seen)
-        hmac_headers = cc.build(sub="ana-sub", groups=["a"], claims=IDENTITY, tool="t", audience=AUD,
-                                workload_token=server.GATEWAY_WORKLOAD_TOKEN)
-        merged = {**seen, **{k.lower(): v for k, v in hmac_headers.items()}}
-        self.assertEqual(server._verified_caller(merged, "t")["groups"], ["a"])
+        self.assertIsNone(server._verified_caller(seen, "t"))
+
+    def test_the_retired_hmac_headers_are_ignored(self):
+        _, seen = _run({"authorization": _bearer(caller=None),
+                        "x-zuno-caller-context": "e30", "x-zuno-caller-signature": "0" * 64,
+                        "x-zuno-gateway-token": "anything"}, _call("t"))
+        self.assertIsNone(server._verified_caller(seen, "t"))
+        self.assertFalse(hasattr(server, "GATEWAY_WORKLOAD_TOKEN"))
+        self.assertFalse(hasattr(server, "GatewayTokenMiddleware"))
+
+    def test_a_request_without_an_assertion_is_refused(self):
+        status, _ = _run({}, _call("t"))
+        self.assertEqual(status, 401)
 
     def test_a_header_sent_by_a_client_is_removed(self):
         fake = base64.urlsafe_b64encode(json.dumps(

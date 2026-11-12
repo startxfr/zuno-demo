@@ -66,8 +66,9 @@ Transport: a real, standards-compliant MCP server - the official `mcp`
 Python SDK's `MCPServer`, streamable-HTTP transport, mounted at `POST /mcp`
 - same shape as every other server in `components/mcp-servers/`. The
 gateway remains the trust boundary; this server does not re-validate the
-caller's end-user JWT. Every `/mcp` call must also carry
-`X-Zuno-Gateway-Token`, a shared secret only the gateway holds.
+caller's end-user JWT. Every `/mcp` call must also carry the gateway's
+Vault-Transit-signed call assertion (`Authorization: Bearer`, WP-250: the shared
+`X-Zuno-Gateway-Token` is retired); the caller's groups come from its `ctx` claim.
 
 **Authentication mode: `service-identity`** (ADR-0208). One shared
 technical identity per provider:

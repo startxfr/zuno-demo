@@ -36,10 +36,10 @@ HARDENING_CHECK_PATH = REPO_ROOT / "platform" / "security" / "check_workload_har
 LINT_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "lint.yml"
 
 REQUIRED_SERVER_PY_SNIPPETS = {
-    "GatewayTokenMiddleware": "ADR-0037 gateway-token middleware class",
+    "CallAssertionMiddleware": "the call-assertion middleware class (ADR-0037, WP-250: the gateway token is retired)",
     "/healthz": "a /healthz route",
     "TransportSecuritySettings(": "DNS-rebinding protection (transport_security)",
-    "mcp_asgi_app.add_middleware(GatewayTokenMiddleware)": "the middleware actually wired onto the mounted MCP app",
+    "mcp_asgi_app.add_middleware(CallAssertionMiddleware)": "the middleware actually wired onto the mounted MCP app",
 }
 
 
