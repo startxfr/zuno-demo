@@ -64,7 +64,7 @@ olsConfig:
     # gpt-oss-20b is served with maxModelLen: 131072, its native window
     # (gitops/charts/models/values.yaml gptOssModel block, raised from 32768
     # on 2026-10-25); matched here.
-    contextWindowSize: 131072
+    contextWindowSize: 32768  # WP-249 rollback test: the 2026-10-24 OLSConfig (f5d66b66); reverted right after
     maxTokensForResponse: 2048
     # Lightspeed inspects every tool result with a classifier that calls THIS model with a hard-coded
     # 128-token limit. gpt-oss-20b reasons by default and the reasoning eats the 128 tokens, so every
