@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(HERE, "..", ".."))
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
 from mcp.client.session import ClientSession  # noqa: E402
+from mcp.shared.exceptions import MCPError  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
@@ -185,12 +186,26 @@ async def test_a_client_sent_assertion_caller_header_is_ignored(transport):
     assert result.is_error and rec.calls == []
 
 
+def _leaves(exc):
+    """The innermost exceptions of a (nested) ExceptionGroup, or the exception itself."""
+    if isinstance(exc, BaseExceptionGroup):
+        return [leaf for sub in exc.exceptions for leaf in _leaves(sub)]
+    return [exc]
+
+
 async def _rejected(transport, headers, tool="write_file"):
-    """True when the request is refused (HTTP 401/403 before MCP handling, or a failed session)."""
+    """True when the request is refused: HTTP 401/403 before MCP handling, or a tool error.
+
+    The SDK client surfaces a refused request as an MCPError ("Server returned an error response")
+    inside nested ExceptionGroups. Only that counts as a refusal: any other exception (a TypeError
+    from a bug, a timeout) propagates and fails the test instead of passing as "rejected".
+    """
     rec = _Recorder()
     try:
         result = await _call(transport, headers, tool, WRITE, rec, ON)
-    except BaseException:  # noqa: BLE001 - the SDK client raises on a 401 at initialize
+    except BaseExceptionGroup as group:
+        leaves = _leaves(group)
+        assert leaves and all(isinstance(leaf, MCPError) for leaf in leaves), [repr(leaf) for leaf in leaves]
         return rec.calls == []
     return result.is_error and rec.calls == []
 
