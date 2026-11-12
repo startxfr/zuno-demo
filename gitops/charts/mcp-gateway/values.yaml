@@ -251,6 +251,9 @@ okf:
     mirror:
       prefix: ""
       plainHttp: false
+      # ADR-0612: name of the Secret holding a docker config.json (key config.json) for a Quay prefix. mcp-gateway renders it
+      # from Vault registry/quay-pull; a2a-gateway only mounts it. Empty: anonymous pulls (zot).
+      pullSecret: ""
     image:
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
       tag: latest

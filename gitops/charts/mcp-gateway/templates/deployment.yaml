@@ -114,12 +114,21 @@ spec:
             {{- end }}
             - name: HOME
               value: /tmp
+            {{- if .Values.okf.fetch.mirror.pullSecret }}
+            - name: DOCKER_CONFIG
+              value: /quay-pull
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
             readOnlyRootFilesystem: true
           volumeMounts:
+            {{- if .Values.okf.fetch.mirror.pullSecret }}
+            - name: quay-pull
+              mountPath: /quay-pull
+              readOnly: true
+            {{- end }}
             - name: okf
               mountPath: /okf
             - name: okf-tmp
@@ -280,4 +289,9 @@ spec:
           emptyDir: {}
         - name: okf-tmp
           emptyDir: {}
+        {{- if .Values.okf.fetch.mirror.pullSecret }}
+        - name: quay-pull
+          secret:
+            secretName: {{ .Values.okf.fetch.mirror.pullSecret }}
+        {{- end }}
         {{- end }}
