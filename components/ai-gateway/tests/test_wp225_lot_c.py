@@ -111,6 +111,50 @@ def test_a_client_required_to_present_a_chain_gets_its_agent_header_ignored() ->
     assert decisions[-1]["classification"] == "C3"
 
 
+def _identity(client: str) -> CallerIdentity:
+    return CallerIdentity(sub="u", groups=[], raw_claims={"azp": client}, token="t")
+
+
+def test_wp251_a_listed_client_may_name_itself_without_a_chain() -> None:
+    env = {**VERIFY, "AGENT_CHAIN_REQUIRE_FOR": "dify,kagent,open-webui,openclaw-*,blender"}
+    with mock.patch.dict(os.environ, env), mock.patch.object(app_main.logger, "warning") as warning:
+        for client, name in (("dify", "dify"), ("kagent", "kagent"), ("open-webui", "open-webui"),
+                             ("blender", "blender"), ("openclaw-sale-01", "openclaw"),
+                             ("openclaw-consultant-02", "openclaw"), ("dify", " Dify ")):
+            got = app_main._agent_identity("", name, "chat", _identity(client))
+            assert got == (name, "chat", False), (client, name, got)
+        assert not warning.called, "the self name is kept silently"
+
+
+def test_wp251_a_listed_client_naming_another_agent_is_still_ignored() -> None:
+    env = {**VERIFY, "AGENT_CHAIN_REQUIRE_FOR": "dify,openclaw-*"}
+    with mock.patch.dict(os.environ, env), mock.patch.object(app_main.logger, "warning") as warning:
+        assert app_main._agent_identity("", "tekos", "x", _identity("dify")) == ("", "x", False)
+        assert app_main._agent_identity("", "arkos", "x", _identity("openclaw-sale-01")) == ("", "x", False)
+        # another client's self name is not this client's
+        assert app_main._agent_identity("", "kagent", "x", _identity("dify")) == ("", "x", False)
+        assert app_main._agent_identity("", "openclaw-sale-01", "x", _identity("openclaw-sale-01")) == ("", "x", False)
+    assert any("AGENT_CHAIN_REQUIRE_FOR" in (c.args[0] if c.args else "") for c in warning.call_args_list)
+
+
+def test_wp251_an_unlisted_client_and_a_valid_chain_are_unchanged() -> None:
+    with mock.patch.dict(os.environ, {**VERIFY, "AGENT_CHAIN_REQUIRE_FOR": "dify"}):
+        assert app_main._agent_identity("", "tekos", "x", _identity("unifai")) == ("tekos", "x", False)
+        assert app_main._agent_identity(_chain(), "tekos", "x", _identity("dify")) == ("cognos", "coming-soon", True)
+    with mock.patch.dict(os.environ, {**VERIFY, "AGENT_CHAIN_REQUIRE_FOR": ""}):
+        assert app_main._agent_identity("", "tekos", "x", _identity("dify")) == ("tekos", "x", False)
+
+
+def test_wp251_a_dify_token_cannot_borrow_the_tekos_floor_but_keeps_its_own_label() -> None:
+    env = {**VERIFY, "AGENT_CHAIN_REQUIRE_FOR": "unifai", "CLASSIFICATION_CLIENT_FLOORS": "unifai=C2"}
+    claims_cognos = {"X-Zuno-Data-Classification": "C1", "X-Zuno-Agent": "cognos", "X-Zuno-Task": "coming-soon"}
+    resp, _, decisions, _ = w209._chat(claims_cognos, env=env)
+    assert decisions[-1]["classification"] == "C2", "cognos (C3) ignored, only the client floor"
+    resp, _, decisions, _ = w209._chat({**claims_cognos, "X-Zuno-Agent": "unifai"}, env=env)
+    assert resp.status_code == 200, resp.text
+    assert decisions[-1]["classification"] == "C2", "the client's own name changes nothing: the client floor applies"
+
+
 def test_a_bare_star_allowlist_refuses_to_start() -> None:
     import importlib
 
@@ -163,6 +207,10 @@ TESTS = [
     test_the_metered_paths_resolve_the_same_agent,
     test_an_unverified_low_floor_agent_cannot_drop_below_the_client_floor,
     test_a_client_required_to_present_a_chain_gets_its_agent_header_ignored,
+    test_wp251_a_listed_client_may_name_itself_without_a_chain,
+    test_wp251_a_listed_client_naming_another_agent_is_still_ignored,
+    test_wp251_an_unlisted_client_and_a_valid_chain_are_unchanged,
+    test_wp251_a_dify_token_cannot_borrow_the_tekos_floor_but_keeps_its_own_label,
     test_a_bare_star_allowlist_refuses_to_start,
     test_the_allowed_clients_list_refuses_another_azp,
 ]

@@ -1,6 +1,6 @@
 # WP-251: Require the agent chain for experience clients, with a self-name exemption
 
-- **State:** Not started
+- **State:** Operator pending (lot 1 code and tests local, not pushed; lot 2 needs the user's go)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M14, the agent chain)
 - **Depends on:** [WP-225](wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) lot C (the chain and `agentChain.requireFor`),
@@ -69,3 +69,13 @@ non-empty:
 ## Out of scope
 
 - Listing `unifai` (needs the fork signer, through unifai-main and b9) and `zuno-evaluations` (names the agents directly).
+
+## Progress log
+
+- **2026-11-12, lot 1 code and tests (repo only, not built, not applied).** `client_self_name()` and the exemption in `_agent_identity`
+  (components/ai-gateway/app/main.py): a client listed in `AGENT_CHAIN_REQUIRE_FOR` that names itself (its `azp`, `openclaw` for
+  `openclaw-*`, compared trimmed and case-insensitively) keeps the header silently; any other agent it names is ignored and logged as
+  before; an unlisted client and a valid chain are unchanged. Four tests in `components/ai-gateway/tests/test_wp225_lot_c.py` (13/13
+  pass; `test_wp225_guardrails_metering` 57/57; `test_wp209_classification_floor` exits 0). The role now passes
+  `zuno_ai_gateway_agent_chain_require_for` (default empty) to the chart in `ansible/roles/llm/tasks/install.yml`; the cluster value
+  (`dify, kagent, open-webui, openclaw-*, blender, world-model`) is added to `ansible/clusters/demo333.yml` only in lot 2.

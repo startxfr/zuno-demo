@@ -398,6 +398,15 @@ def agent_chain_required_clients() -> List[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
 
 
+def client_self_name(client: str) -> str:
+    """WP-251: the name an experience client may give itself as X-Zuno-Agent without a chain:
+    its Keycloak client (`azp`), and `openclaw` for the per-assistant `openclaw-*` clients (the
+    name the metrics already carry). Such a name matches nothing in the floors, the routing
+    policy or the guardrails modes, so letting it through protects nothing and breaks nothing."""
+    client = (client or "").strip().lower()
+    return "openclaw" if client.startswith("openclaw-") else client
+
+
 def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerIdentity) -> "tuple[str, str, bool]":
     """ADR-0603 M14 (WP-225 lot C): the (agent, task) a call is made for, and
     whether it comes from a verified chain.
@@ -410,7 +419,8 @@ def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerId
     Without a verified chain the headers apply, as before, and the floor is the
     higher of the agent's and the client's. A client listed in
     AGENT_CHAIN_REQUIRE_FOR that names an agent without a valid chain gets the
-    agent header ignored (logged): only its client floor applies."""
+    agent header ignored (logged): only its client floor applies. WP-251: unless the
+    header is the client's own name (`client_self_name`), which stays as it is."""
     resolved = signed_chain.resolve(
         chain_header, agent, task, token=identity.token, audience="ai-gateway", log=logger
     )
@@ -418,6 +428,8 @@ def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerId
         return resolved.agent, resolved.task, True
     required = agent_chain_required_clients()
     if (agent or "").strip() and required and client_allowed(identity.client, required):
+        if agent.strip().lower() == client_self_name(identity.client):
+            return resolved.agent, resolved.task, False
         logger.warning(
             "X-Zuno-Agent %r ignored: client %s must present a valid agent chain (AGENT_CHAIN_REQUIRE_FOR)",
             agent, identity.client,
