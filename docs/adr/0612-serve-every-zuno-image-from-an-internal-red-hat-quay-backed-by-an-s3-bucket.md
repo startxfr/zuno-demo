@@ -94,3 +94,25 @@ owner's go.
 ## Work packages
 
 [WP-248](../roadmap/work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md).
+
+## Addendum 2026-11-12: consumer access, tag expiration and cut-over order
+
+Decided by the owner after the canary and the first week of the live registry.
+
+- **Access.** Pods reach the registry through its route, `quay-quay-zuno-registry.apps.demo333.startx.fr`. The Service
+  address is not usable: its certificate carries the route name only (measured). The route certificate is the wildcard
+  issued by Let's Encrypt, so no CA has to be distributed. Each consumer namespace needs the route host in its
+  EgressFirewall and the router in its NetworkPolicy egress; the pull credential is the `zuno+pull` robot, read from
+  Vault `zuno/registry/quay-robots`.
+- **Tag expiration.** First-party images and UnifAI release images keep the five latest tags per repository; a tag
+  referenced by digest in the repository is never removed. The OKF repositories keep three releases (clause 6). The
+  mirrored public images (clause 7d) never expire: the list is closed and every entry is deliberate. Quay's own
+  time-machine delay (about two weeks for untagged manifests) is left as it is, so a tag removed by mistake can be
+  recovered.
+- **Clair.** No vulnerability data on this cluster (owner decision, WP-248): the `rhel-vex` update never completes
+  because the Akamai addresses of `security.access.redhat.com` alternate between reachable and blocked under the
+  `dnsName` rule. Clause 4 is delivered in part: the scanner runs, its data does not load. Reopen with the two observed
+  Akamai /24 ranges in the zuno-registry EgressFirewall if scanning becomes a requirement.
+- **Cut-over order** (clause 8, a golden path before and after each step, never in a freeze): (a) the OKF release read by
+  the two gateways, (c) the UnifAI release images, (b) first-party images, (d) public images, each from a list that
+  `platform/supply-chain/mirrored-images.yaml` names. The zot drill closes the sequence.
