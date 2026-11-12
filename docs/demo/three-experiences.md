@@ -64,7 +64,8 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 
 ## One platform behind the three
 
-This block has no scenario page yet: the one-budget scenario is planned for wave 2. Play it in Grafana as
+This block condenses the [one-budget scenario](scenarios/governance/quotas.md) and the routing story of the
+[model routing scenario](scenarios/governance/ai-gateway-routing.md) into one dashboard tour. Play it in Grafana as
 **ai-ops-01**, after the three experiences.
 
 | Time | Do | Say | You should see |
@@ -99,7 +100,7 @@ Shorten the inline block to its first and third steps. Do not drop an experience
   consumption is counted, so the budget is spent with one large turn, not a burst.
 - **Not in this workshop:** Dify, kagent, Lightspeed and Blender (see the
   [longer workshop](five-experiences.md)), the classification rules (see the
-  [sovereignty scenario](scenarios/governance/ai-gateway-sovereignty.md)), guardrails (planned).
+  [sovereignty scenario](scenarios/governance/ai-gateway-sovereignty.md)), [guardrails](scenarios/governance/guardrails.md).
 
 ## Appendix A - HLD
 

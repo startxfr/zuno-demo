@@ -121,7 +121,7 @@ Run the 5-minute version, then:
 | 503 "no eligible provider is available" | No local model is ready. A turn with a Confluence result may only use local models. Check `oc get llminferenceservice -n zuno-ai-run`. | "The gateway refuses rather than sending internal data to a SaaS model." |
 | A slow answer | A local model is cold or busy. Start a new session and ask again; do not wait on stage. | |
 | The assistant ran code with its built-in `exec` tool | Carry on. The result of `exec` is unmarked, so the rest of the turn is served by local models ([WP-194 evidence](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md), T4). | "Anything that came from a tool keeps the turn on our own GPUs." |
-| A red cross on a Gmail call (`delegated_credential_missing`) | Carry on. | "Gmail needs a delegated Google token, and no Google Workspace tenant is connected to this demo." |
+| A red cross on a Gmail or Drive call (`delegated_credential_missing`) | Carry on. | "Gmail and Drive need a delegated Google token, and no Google Workspace tenant is connected to this demo." |
 | `oc get claw -A` is not Ready, or the UI is down | Run `ONLY=openclaw make demo golden-path`: it calls the model from inside each assistant's pod through its proxy. Show its `PASS` line and the 15-minute configuration steps instead. | |
 | The claw-operator manager restarts (seen on 2026-11-12) | Ignore it on stage. The assistant, its proxy and its front door keep running; the operator only reconciles them. | |
 | No series in Grafana, or 0 tokens for OpenClaw in the budget row | Widen the time range. Export and scrape take about a minute. The 0-token rows were seen on 2026-11-06 and not explained. | |

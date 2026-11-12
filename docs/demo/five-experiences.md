@@ -90,7 +90,9 @@ experience, or show its recording labelled as recorded, as its page describes.
 
 ## Same rules, one dashboard
 
-This block has no scenario page yet: the guardrails and one-budget scenarios are planned for wave 2. Play it in
+This block condenses three governance scenarios into one dashboard tour:
+[guardrails](scenarios/governance/guardrails.md), [one budget per persona](scenarios/governance/quotas.md) and
+[MCP tools by group](scenarios/governance/mcp-tools-by-group.md). Their pages give the 5- and 15-minute versions. Play it in
 Grafana as **ai-ops-01**, on the dashboard **Five experiences**, after the experiences, so that every series has data.
 Keep Dify open in **consultant-02**'s profile for one step.
 
@@ -123,16 +125,17 @@ UnifAI, Open WebUI, OpenClaw, Dify, kagent and the inline block. For a 30-minute
 ## Limits
 
 - **The shared budget is shown, not proven.** The proof is one persona refused everywhere after spending its budget
-  in one experience. It needs a tight quota class, a revert and a five-minute window, so it belongs to the one-budget
-  scenario (planned, wave 2).
+  in one experience. It needs a tight quota class, a revert and a five-minute window, so it belongs to the
+  [one-budget scenario](scenarios/governance/quotas.md).
 - **Dify and kagent count per persona.** The platform cannot tell two Dify users apart
   ([ADR-0601](../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md),
   decision 5).
-- **Gmail.** Open WebUI and OpenClaw may try the Gmail tool and show a red cross. No Google Workspace tenant is
-  connected, so the gateway refuses the call (`delegated_credential_missing`). That is the delegation rule at work.
+- **Gmail and Drive.** Open WebUI and OpenClaw may try the Gmail or Drive tool and show a red cross. Both need a
+  delegated Google token and no Google Workspace tenant is connected, so the gateway refuses the call
+  (`delegated_credential_missing`). That is the delegation rule at work.
 - **Not in this workshop:**
   - classification and sovereignty: see the [sovereignty scenario](scenarios/governance/ai-gateway-sovereignty.md);
-  - delegation between agents (planned);
+  - delegation between agents: see the [agentic AI workshop](workshops/agentic-ai.md);
   - the RAG upload: see [UnifAI live RAG](unifai-live-rag.md);
   - the world model.
 

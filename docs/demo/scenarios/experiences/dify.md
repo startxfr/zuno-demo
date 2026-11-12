@@ -141,7 +141,7 @@ Run the 5-minute version, then:
   `zuno-dify` may call it, as the NetworkPolicy allows.
 - **The Workflow stall (D1)** is a closed known limit: its cause is inside Dify and was not named.
 - **Guardrails are not shown here.** The golden-path probe `guardrails` sends its DAN prompt through Dify's token
-  proxy, so a `dify` series with outcome `detected` may appear on the dashboard. The guardrails scenario (planned)
+  proxy, so a `dify` series with outcome `detected` may appear on the dashboard. The [guardrails scenario](../governance/guardrails.md)
   shows it.
 
 ## Appendix A - HLD

@@ -116,7 +116,7 @@ Run the 5-minute version, then:
 | 11:00 | `oc get unifaillm tekos-answer-technical-question -n zuno-unifai -o jsonpath='{.spec.config}'` | "Tekos calls the ai-gateway with the user's own token and says which agent, task and data level it is. The gateway picks the model. The tool provider is built the same way, towards the mcp-gateway." | `base_url` `http://ai-gateway.zuno-ai-run.svc:8080/v1`, `model_name` `auto`, `forward_user_token` true, headers `X-Zuno-Agent: tekos`, `X-Zuno-Task: answer-technical-question`, `X-Zuno-Data-Classification: C2`. |
 | 12:00 | Grafana **Five experiences**, row **Same tools, governed: cluster reads (ADR-0600)**, panel **Cluster read tool calls by tool and outcome (over range)** | "Every tool call of every experience is audited in one place. The read of ai-ops-01 is here. consultant-02 has no line: the tool was never offered, so there was nothing to refuse." | `k8s.events.read` (or another `k8s.*` tool) with outcome `allowed`. |
 | 13:00 | Row **Same models, same routing**, panel **Which provider served each experience (over range)** | "UnifAI is one client of the gateway like the other experiences: same models, same routing rules." | A row for `unifai` with a local provider (`local-...`) when the local models are Ready. |
-| 14:00 | Close | Repeat the message. Name what comes next: one agent delegating to another with a human approval, the scenario "A2A delegation with approval" (planned). | |
+| 14:00 | Close | Repeat the message. Name what comes next: one agent delegating to another with a human approval, the scenario [A2A delegation with approval](../governance/a2a-delegation-approval.md). | |
 
 ## If something goes wrong
 

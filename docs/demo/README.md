@@ -65,19 +65,19 @@ play; it does not copy their steps.
 
 | Scenario | Shows | Personas | Golden-path probe | Page |
 |---|---|---|---|---|
-| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (pilot) |
-| Model routing and fallback | "Zuno Code" to Codestral, preferred and fallback order, fail-fast on unready models | sale-01 | `zuno-code` | planned (wave 2) |
-| Guardrails | A prompt injection detected in observe mode, the guardrails dashboard | consultant-02 | `guardrails` | planned (wave 2) |
-| One budget per persona | One token budget across all experiences, the stress-test evidence, the per-turn ceiling | sale-01 | none (rehearse first) | planned (wave 2) |
-| MCP tools by group | The same question from two personas, two tool sets, one audit | sale-01, consultant-02 | `tools` | planned (wave 2) |
-| A2A delegation with approval | Arkos delegates to Tekos, a human approves, expiry | consultant-02 | `delegation-approval` | planned (wave 2) |
-| Identity and personas | One identity, groups drive entitlements, negative fixtures | several | none (rehearse first) | planned (wave 2) |
+| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (wave 0) |
+| [Model routing and fallback](scenarios/governance/ai-gateway-routing.md) | "Zuno Code" to Codestral first, preferred and fallback lists per task, `local_only_for`, unready models skipped with an immediate 503, the routing decision API | sale-01, ai-ops-01, paas-ops-01 | `zuno-code` | written (wave 2) |
+| [Guardrails](scenarios/governance/guardrails.md) | A prompt injection detected in observe mode through Dify, the TrustyAI dashboard, the mode per classification level, what blocking would do | consultant-02, ai-ops-01, paas-ops-01 | `guardrails` | written (wave 2) |
+| [One budget per persona](scenarios/governance/quotas.md) | One token budget per persona across the experiences, the 2026-11-03 evidence, MaaS budgets versus persona budgets, fail-closed classes, the per-turn ceiling | sale-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 2) |
+| [MCP tools by group](scenarios/governance/mcp-tools-by-group.md) | The same question from two personas, two tool sets, the five checks, signed markers, the delegated-credential refusal, one audit | sale-01, consultant-02, finance-01, ai-ops-01, paas-ops-01 | `tools`, `open-webui` | written (wave 2) |
+| [A2A delegation with approval](scenarios/governance/a2a-delegation-approval.md) | Arkos asks Tekos for a cluster audit with consultant-02's identity, a human approves in UnifAI, the AAP job link, expiry, limits on depth, cycles and budget, the trace | consultant-02, ai-ops-01, paas-ops-01 | `delegation-approval` (the probe proves the request and a refusal; rehearse the approval, the job and the trace) | written (wave 2) |
+| [Identity and personas](scenarios/governance/identity-personas.md) | One Keycloak account, three group dimensions, the same group opening a workspace and a tool set, OpenShift groups at first sign-in, service accounts, negative fixtures | consultant-02, sale-01, paas-ops-01 | none (rehearse first) | written (wave 2) |
 
 ### Red Hat OpenShift AI and models
 
 | Scenario | Shows | Personas | Golden-path probe | Page |
 |---|---|---|---|---|
-| [MaaS portal and API keys](scenarios/rhoai/maas-portal-api-keys.md) | A self-service key on a group subscription, token limits, revocation | ai-dev-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (pilot) |
+| [MaaS portal and API keys](scenarios/rhoai/maas-portal-api-keys.md) | A self-service key on a group subscription, token limits, revocation | ai-dev-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 0) |
 | GenAI playground | The ready-made playground, its MCP tools by group (9 vs 0) | ai-ops-01, ai-dev-01 | none (rehearse first) | planned (wave 3) |
 | Model serving with llm-d on MIG | LLMInferenceService, the llm-d router, MIG slices, hardware profiles | presenter terminal | none (rehearse first) | planned (wave 3) |
 | External models | Mistral and OVHcloud published through MaaS | presenter terminal | none (rehearse first) | planned (wave 3) |
@@ -103,8 +103,8 @@ play; it does not copy their steps.
 |---|---|---|---|
 | [One backend, three experiences](three-experiences.md) | UnifAI, Open WebUI, OpenClaw, then one dashboard block (backend, routing, one budget) | 30 min | written (wave 1) |
 | [One governed backend, many experiences](five-experiences.md) | UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget) | 45-55 min | written (wave 1) |
-| Sovereign and governed AI | Identity, sovereignty, routing, guardrails, budget, trace | about 45 min | planned (wave 2) |
-| Agentic AI | UnifAI agents, MCP tools, RAG, delegation with approval, kagent, AAP audit | about 60 min | planned (wave 2) |
+| [Sovereign and governed AI](workshops/sovereign-governed-ai.md) | Identity, tools, sovereignty, routing, guardrails, budget, then the trace | 45 min | written (wave 2) |
+| [Agentic AI](workshops/agentic-ai.md) | UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty | 60 min | written (wave 2) |
 | RHOAI end to end | Catalog, serving, external models, MaaS key, playground, LoRA, evaluation | 60-90 min | planned (wave 3) |
 | Trusted platform and operations | GitOps, signed release and admission, Vault, mesh, observability, AAP | about 60 min | planned (wave 4) |
 
