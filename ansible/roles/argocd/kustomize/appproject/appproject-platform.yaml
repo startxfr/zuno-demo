@@ -74,6 +74,7 @@ spec:
     - {group: autoscaling.openshift.io, kind: ClusterAutoscaler}
     - {group: cert-manager.io, kind: ClusterIssuer}
     - {group: config.openshift.io, kind: APIServer}
+    - {group: config.openshift.io, kind: ImageDigestMirrorSet}
     - {group: config.openshift.io, kind: OAuth}
     - {group: config.openshift.io, kind: Proxy}
     - {group: console.openshift.io, kind: ConsolePlugin}

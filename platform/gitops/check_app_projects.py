@@ -98,6 +98,8 @@ LIVE_ONLY_KINDS: Dict[str, str] = {
 # rendering them here keeps what a real install applies inside the check.
 # Source: the include of ansible/tasks/apply_gitops_app.yml in each role.
 PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
+    # ADR-0612 family (c): the redirect of the UnifAI images is committed off; a real install after the owner's flip renders it.
+    "zuno-quay-registry-d0": {"redirects": {"enabled": True, "host": "quay.example"}},
     # ansible/roles/cert_manager: both ADR-0211 consumer patches (APIServer, IngressController).
     "zuno-cert-manager-d1": {"acme": {"consumers": {"routerDefaultCert": True, "apiServerNamedCert": True}}},
     # ansible/roles/nvidia_gpu: the ClusterPolicy with the discovered spec.

@@ -62,3 +62,20 @@ consumers:
     - zuno-unifai
     - openshift-operators
     - openshift-gitops
+
+# d0 Application, cluster-scoped: ImageDigestMirrorSet sending the digest pulls of the UnifAI repositories to this registry.
+# Off until the images are in the registry and the owner gives the go (the node configuration is reloaded when it is created).
+redirects:
+  enabled: false
+  host: ""                      # the registry route host; the Application passes it (apps.mycluster.example.com is replaced)
+  source: quay.io/zuno
+  organization: zuno
+  repositories:
+    - unifai-backend
+    - unifai-identity
+    - unifai-multiagent
+    - unifai-rag
+    - unifai-ui
+    - unifai-operator
+    - unifai-operator-bundle
+    - unifai-operator-catalog

@@ -19,6 +19,10 @@ spec:
         namespace: zuno-registry
         operator:
           enabled: true
+        # Family (c): flipped to true with the owner's go once the UnifAI images are in the registry.
+        redirects:
+          enabled: false
+          host: quay-quay-zuno-registry.apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-registry
