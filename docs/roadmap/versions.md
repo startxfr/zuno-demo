@@ -280,6 +280,8 @@ Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
 
 **9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165) and ADR-0580 (2026-10-24, first full promotion cycle). Open: ADR-0579, ADR-0581 – ADR-0584; WP-161, WP-163, WP-164, WP-167.
 
+Documentation follow-up (2026-11-13): WP-255 to WP-259 write the OKF reference, the "add an agent" guide, the publish-verify-rollback page and the `UnifaiAgentBundle` page in `zuno-demo-agents`, so UnifAI can link to them. No ADR changes.
+
 ## v0.13
 
 Show that the platform is the governed chain, not the UI: three user

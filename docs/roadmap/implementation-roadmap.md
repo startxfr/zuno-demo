@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 23 | — | 28 | — |
-| v0.12 | 8 | — | 9 | — |
+| v0.12 | 8 | — | 14 | WP-255, WP-256, WP-257, WP-258, WP-259 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
@@ -1119,6 +1119,20 @@ the 2026-11-09 demonstration); the freeze window still applies.
 | WP-253 | [wp-253](work-packages/wp-253-verify-full-database-transport-for-every-client.md) | 0613 | none | Not started | planned about 2026-12-15 to 17: `verify-full` for every PostgreSQL and MariaDB client, one client per lot (ADR-0603 M2, hardening); the user's go per window |
 | WP-254 | [wp-254](work-packages/wp-254-intermediate-ca-and-separate-istio-service-account.md) | 0613 | WP-253 | Not started | planned about 2026-12-17 to 18: intermediate CA under the Vault root and a separate ServiceAccount for the Istio role (ADR-0603 M7, hardening); rehearse first, the user's go per window |
 
+### Phase 54 — documentation of the agents repository for reuse (added 2026-11-13)
+
+UnifAI becomes generic (decision of 2026-11-12) and will only link to the OKF and `UnifaiAgentBundle` documentation, which must live in
+`zuno-demo-agents`. Documentation only; the work lands in that repository by pull request, each page checked against the schemas, the
+release scripts or the operator types. No new ADR: the records that govern the repository stay ADR-0576 to ADR-0580.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-255 | [wp-255](work-packages/wp-255-okf-field-reference-in-the-agents-repository.md) | 0576, 0579 | none | Not started | none (repo work, then a pull request) |
+| WP-256 | [wp-256](work-packages/wp-256-add-an-agent-guide-and-bundle-file-list-to-the-agents-repository.md) | 0576 | WP-255 | Not started | none |
+| WP-257 | [wp-257](work-packages/wp-257-publish-verify-and-roll-back-an-okf-release-documented.md) | 0577, 0578, 0580 | none | Not started | the SBOM decision (the user); a canary pin for the rollback check |
+| WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Not started | a server-side dry run on a canary operator |
+| WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Not started | none; sends the final anchors to unifai-compare |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1265,6 +1279,7 @@ moving.
 
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-13 — WP-255 to WP-259 added (Phase 54), Not started, by the user's go at the request of unifai-compare: the OKF field reference, the "add an agent" guide, publish and verify and rollback, the UnifaiAgentBundle page and the positioning of zuno-demo-agents. Documentation only, landed in that repository by pull request; no new ADR.
 - 2026-11-12 — ADR-0613 and WP-252 to WP-254 added (Phase 53, v0.17), Proposed / Not started, by the user's request: the three remaining live hardening items of ADR-0603 (M4, M2, M7), planned for mid-December 2026. Hardening in depth, not fixes of a known flaw.
 - 2026-11-12 — WP-251 added (Phase 52, v0.16), Not started: `agentChain.requireFor` with a self-name exemption, handed over by the zuno-avancement session (user's go).
 - 2026-11-11 — WP-250 added (Phase 52, v0.16), Not started: retire the shared MCP workload token by folding the caller context into the Transit-signed assertion (user's go).
