@@ -23,6 +23,8 @@ spec:
         redirects:
           enabled: true
           host: quay-quay-zuno-registry.apps.mycluster.example.com
+        publicRedirects:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-registry
