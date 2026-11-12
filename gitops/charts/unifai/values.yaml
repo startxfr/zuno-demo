@@ -130,6 +130,26 @@ stack:
 # `enabled: false` plus a `disabledReason` here (ArgoCD recreates it otherwise).
 egress:
   enabled: true
+  # The address ranges AWS publishes for S3 in the backup bucket's region (stack.backup.region), allowed on 443 next to
+  # the name rules (templates/egressfirewall.yaml says why). Refresh: curl -s https://ip-ranges.amazonaws.com/ip-ranges.json |
+  # jq -r '.prefixes[] | select(.service=="S3" and .region=="<region>") | .ip_prefix' | sort -u. A region missing here
+  # keeps the name rules only: it works, slowly. eu-west-2 from syncToken 1794458826 (2026-11-12).
+  s3CidrsByRegion:
+    eu-west-2:
+      - 1.178.94.0/24
+      - 16.12.15.0/24
+      - 16.12.16.0/23
+      - 18.168.37.160/28
+      - 18.168.37.176/28
+      - 3.2.110.0/24
+      - 3.2.72.0/24
+      - 3.5.244.0/22
+      - 52.219.219.0/24
+      - 52.95.142.0/23
+      - 52.95.144.0/24
+      - 52.95.148.0/23
+      - 52.95.150.0/24
+      - 52.95.191.0/24
   # The Kubernetes API on the control-plane nodes (6443): rag-server's
   # TokenReview (stack.rag.tokenReview; RAG_TOKENREVIEW_ENABLED=true live).
   apiServer: true

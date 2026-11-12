@@ -85,3 +85,11 @@ new images) so it does not collide with other heavy actions.
 ## Result
 
 Run on 2026-11-08, see [the evidence file](../roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md).
+
+## 2026-11-12: S3 address ranges added to the backup rules
+
+The first scheduled backups under the firewall (02:00 UTC, 2026-11-12) succeeded but took 7 min 16 s (MongoDB) and 13 min (Qdrant)
+instead of 11-14 s and 27-35 s: the dump takes 1 s, the S3 upload crawled because the `dnsName` rules hold only the few S3 addresses
+they resolved out of a pool of hundreds (same finding as the world-model copy, 2026-11-08). `egress.s3CidrsByRegion` (chart `unifai`,
+eu-west-2 from syncToken 1794458826) now allows the region's published S3 ranges on 443 next to the name rules, only while
+`stack.backup.region` is set and `stack.backup.endpoint` is not. Proof: a manual backup after the sync, compared with the durations above.
