@@ -19,9 +19,9 @@ spec:
         namespace: zuno-registry
         operator:
           enabled: true
-        # Family (c): flipped to true with the owner's go once the UnifAI images are in the registry.
+        # Family (c): flipped on 2026-11-12 with the owner's go, the UnifAI images being in the registry (WP-248).
         redirects:
-          enabled: false
+          enabled: true
           host: quay-quay-zuno-registry.apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
