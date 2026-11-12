@@ -333,3 +333,11 @@ Decisions are in the ADR-0612 addendum of 2026-11-12. Measured while planning: t
 3. Feeding: `make d3 admit agents` with `OKF_MIRROR_TO=<route>/zuno` using the `zuno+push` robot (already seeded), and `okf_mirror_holds_lock.yml` verifies through the route instead of the zot port-forward when the prefix is a Quay one.
 4. Switch `zuno_okf_registry_mirror` to the Quay prefix with `plainHttp: false`, roll the gateways, golden path before and after, then pods started with quay.io blocked as the proof.
 5. zot stays until the drill of clause 8.
+
+## Result of family (a): the gateways read the OKF release from Quay (2026-11-12)
+
+Live on demo333, owner's go, no other window open. Sequence: route egress for `zuno-ai-run` (pushed, synced by ArgoCD); `make d0 install vault` (configure Job applies the `registry/quay-pull` grant); `make d2 install quay-registry` (seeds `zuno/registry/quay-pull`, writes the workstation docker configs); the OKF release 0.14.3 mirrored to `quay-quay-zuno-registry.apps.demo333.startx.fr/zuno` and verified with the pull robot; golden path PASS; `make d2 install mcp` with `zuno_okf_registry_mirror` on Quay; golden path PASS (13 moments).
+
+Proof: the `okf-fetch` init container of mcp-gateway and a2a-gateway both print `VERIFIED quay-quay-zuno-registry…/zuno/okf-corp@sha256:2918e463…: release 0.14.3, 8 agents` and neither log contains "falling back" or a failed attempt, so no pod went back to quay.io. Quay's access log shows the pulls.
+
+Found on the way: the free-form shell string of `okf_mirror_holds_lock.yml` is split by Ansible, so an apostrophe in a comment broke the parse of `make d2 install mcp` for a few minutes (fixed in 4bda8185); and the readiness probe failed when one OLM list call returned no `resources` (now tolerated). Rollback to zot: restore the three previous values noted in `ansible/clusters/demo333.yml`. zot stays until the clause 8 drill; not tested yet: gateways starting with quay.io blocked.
