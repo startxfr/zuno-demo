@@ -1114,7 +1114,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 | WP-245 | [wp-245](work-packages/wp-245-blender-prompt-set-and-golden-path-probe.md) | 0610 | WP-244 | Done | none (persona live; the `blender` moment runs in every `make demo golden-path`) |
 | WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0612 | WP-242 | Done | live on demo333 2026-11-10: gateways read the mirror, quay.io blocked drill passed |
 | WP-247 | [wp-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) | 0602 | WP-223, WP-225 | Done (2026-11-11) | Vault Transit signs the MCP assertion and the agent chain on demo333, golden path 14/14 after each switch, both old keys unreadable from any namespace (proved with the store's role, no persona proof by decision); follow-ups: delete the two old Vault values, the workload token (its own WP) |
-| WP-248 | [wp-248](work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md) | 0612 | WP-246, WP-131, WP-242 | Not started | the owner's go for the Quay measurement in a canary (entitlement, PGO database, Clair and no HA decided 2026-11-11); the new ADR; the first Ansible-provisioned AWS bucket (also needs the owner's go) |
+| WP-248 | [wp-248](work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md) | 0612 | WP-246, WP-131, WP-242 | Operator pending | live on demo333 2026-11-12: OKF release, UnifAI images and public images served by Quay, drill passed, zot removed; left: first-party images and the ImageStream retirement (ADR-0612 clause 9, the owner's decision) |
 
 ### OKF stream phases
 

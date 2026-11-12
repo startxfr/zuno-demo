@@ -101,7 +101,6 @@ publicRedirects:
     - ghcr.io/kagent-dev/kagent/ui
     - ghcr.io/open-webui/open-webui
     - ghcr.io/openclaw/openclaw
-    - ghcr.io/project-zot/zot-linux-amd64
     - quay.io/docling-project/docling-serve-cpu
     - quay.io/fedora/redis-7
     - quay.io/jetstack/cert-manager-istio-csr

@@ -245,7 +245,7 @@ okf:
   fetch:
     enabled: false
     corpReference: ""
-    # ADR-0611/WP-246: a registry prefix (e.g. okf-mirror.zuno-ai-run.svc:5000/okf) holding the release
+    # ADR-0611/WP-246: a registry prefix (e.g. quay-quay-zuno-registry.apps.<domain>/zuno, ADR-0612) holding the release
     # by the same digest. Set, okf-fetch reads from there first (2 short attempts) and falls back to
     # `corpReference`'s own registry; verification is identical either way. Empty: today's behaviour.
     mirror:

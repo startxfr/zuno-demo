@@ -93,11 +93,6 @@ images:
     pin: digest
     signature: none
     reason: OpenClaw assistants (WP-182)
-  - source: ghcr.io/project-zot/zot-linux-amd64
-    digest: sha256:46f688dc26315a35a247e1784368829e66a67bf91de94c7d8d1645044fac1d5b
-    pin: digest
-    signature: none
-    reason: workload of zuno-ai-run
   - source: docker.io/langgenius/dify-api
     digest: sha256:52be6088dd842e01bc58cdb23a701266a55aa3814b24057c18adfb4d351f8079
     tag: "1.17.0"

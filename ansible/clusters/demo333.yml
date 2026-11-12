@@ -575,11 +575,11 @@ zuno_ai_gateway_agent_chain_require_for:
   - "openclaw-*"
   - blender
   - world-model
-# ADR-0611/WP-246: the gateways' okf-fetch reads the admitted OKF release from the in-cluster mirror
-# (roles/okf_mirror) first and falls back to the source registry. Plain HTTP inside the mesh (mTLS).
-# ADR-0612 addendum (WP-248 family a): the internal Quay, through its route (the Service certificate does not cover the Service
-# name). The pull robot's docker config comes from Vault registry/quay-pull through the quay-pull ExternalSecret. Roll back to zot
-# with the three previous values: "okf-mirror.zuno-ai-run.svc:5000/okf", plain HTTP true, no pull secret.
+# ADR-0612 (WP-248 family a): the gateways' okf-fetch reads the admitted OKF release from the internal Quay, through its route
+# (the Service certificate does not cover the Service name), and falls back to the source registry. The pull robot's docker
+# config comes from Vault registry/quay-pull through the quay-pull ExternalSecret. The zot mirror of ADR-0611 was removed on
+# 2026-11-12 after the drill (WP-248); the zuno-ai-run EgressFirewall no longer allows quay.io, so an empty value here also
+# needs the four quay.io dnsName rules back (gitops/charts/namespaces/values.yaml).
 zuno_okf_registry_mirror: "quay-quay-zuno-registry.apps.demo333.startx.fr/zuno"
 # WP-248 family (c): the UnifAI admission policies read the image signatures from the internal registry (one policy per
 # repository). Empty = quay.io, as before (rollback: remove the line, then make d1 install rhtas-config).

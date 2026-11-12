@@ -1,6 +1,6 @@
 # ADR-0611: Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (2026-11-12, WP-248) - the registry (the in-cluster zot `okf-mirror`, removed on 2026-11-12 after the drill) is now the internal Quay; the admitted-release mirroring, the offline verification and the mirror-before-roll check stay in force
 - **Target:** v0.17
 - **Date:** 2026-11-09
 - **Decision owners:** Zuno Demo architecture team
@@ -105,3 +105,11 @@ inside the cluster, so it cannot check the mirror. The check lives where the clu
 `ansible/tasks/okf_mirror_holds_lock.yml` runs in `make d2 check agents` and first in `make d2 install mcp`, which also
 installs a2a-gateway, and stops with the command that feeds the mirror when the locked digest is not on it. The
 `quay.io` fallback of clause 3 still covers a pod that restarts before the mirror is fed.
+
+## Addendum 2026-11-12 (WP-248): zot retired, Quay serves the release
+
+The gateways read the OKF release from the internal Quay (`zuno_okf_registry_mirror`), proven with quay.io unreachable for the pods
+(the `zuno-ai-run` EgressFirewall no longer allows `quay.io` and its CDN hosts; both gateways restarted and verified the bundle from Quay).
+The `okf-mirror` component (chart, Application, role, Makefile and AAP workflow entries) is removed. What stays from this record: the mirror
+holds only the admitted release with its signatures, `okf-fetch` verifies offline by digest, and `ansible/tasks/okf_mirror_holds_lock.yml`
+blocks a gateway roll when the registry lacks the locked digest. The retention and prune plan of the zot mirror was never needed and is dropped.

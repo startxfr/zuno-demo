@@ -27,7 +27,6 @@
       - mlops
       - agents
       - mcp
-      - okf_mirror
       # ADR-0612 (WP-248): after everything that pulls from it.
       - quay_registry
       - models

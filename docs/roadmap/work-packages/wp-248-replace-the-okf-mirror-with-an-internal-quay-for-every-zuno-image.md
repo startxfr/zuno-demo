@@ -1,6 +1,6 @@
 # WP-248: Replace the OKF mirror with an internal Red Hat Quay that holds every zuno image
 
-- **State:** Not started (the owner's decisions of 2026-11-11 are recorded below; step 1 can start with his go)
+- **State:** Operator pending (2026-11-12): families (a) OKF release, (c) UnifAI images and (d) public images are live on demo333, the drill passed and the zot mirror is removed; left: family (b) first-party images and the retirement of the ImageStream registry (ADR-0612 clause 9, the owner's decision), and Clair vulnerability data (the owner chose to leave it without)
 - **ADRs:** [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (the decision, Accepted 2026-11-11), [ADR-0611](../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) (its registry choice is
   replaced by the ADR this WP writes), [ADR-0353](../../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md)
   (images sourced by family), [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
@@ -383,3 +383,16 @@ The UnifAI admission policy no longer reads signatures from quay.io. The policy-
 **Consequence for every UnifAI pin:** the release must be copied into Quay (`mirror_unifai_images.py --version X`) before the pin is rolled, otherwise the signature check finds nothing and the pods are refused. Rollback: remove `zuno_unifai_signature_mirror_host` and run `make d1 install rhtas-config`.
 
 Still open: the final drill (quay.io and docker.io blocked, a gateway, the UnifAI operator and a first-party component start, a forged digest refused), the fallback when Quay is down, and the retirement of zot.
+
+## Drill and retirement of zot (2026-11-12, owner's go)
+
+Proofs, in the order they were taken (window announced, golden path 13/13 before and after):
+
+1. **Presence:** all 22 digest-pinned public images answer an anonymous `oras manifest fetch` on the Quay route with the expected digest.
+2. **Served by Quay alone (nodes):** node image pulls cannot be filtered by a NetworkPolicy, an AdminNetworkPolicy or an EgressFirewall (CRI-O pulls on the host). The proof is a canary: the digest of `oauth2-proxy` copied into `zuno/mirror/library/nginx` (a digest that does not exist at `docker.io/library/nginx`), referenced as `docker.io/library/nginx@sha256:8498b0d0...`. A pod with `imagePullPolicy: Always` pulled and ran it in 0.4 s, so only Quay could have served it. The tag was deleted afterwards.
+3. **quay.io blocked for the pods:** the `quay.io` and `cdn01..03.quay.io` rules were removed from the `zuno-ai-run` EgressFirewall (they existed only for okf-fetch, found live 2026-11-07). A pod of that namespace times out on quay.io and its CDN and reaches the Quay route. `mcp-gateway` and `a2a-gateway` were restarted: okf-fetch printed `VERIFIED .../zuno/okf-corp@sha256:2918e463... release 0.14.3, 8 agent(s)` from Quay.
+4. **Fallback when Quay is down:** a temporary AdminNetworkPolicy (Deny ingress to the Quay app pods; the route answered 000 meanwhile) and a pod with `imagePullPolicy: Always` on `quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0...`: the node tried the mirror, then fell back to the source and pulled in 21 s. The policy and the pod were removed.
+5. **Forged digest:** `docker.io/library/nginx@sha256:bbbb...` ends in `ErrImagePull`.
+6. **UnifAI signatures:** the eight policies read Quay; a forged UnifAI digest is denied by the webhook (see the previous section).
+
+Removal: `make d2 uninstall okf-mirror` (Application and PVC pruned), then the repository: chart `okf-mirror`, its Application, role `okf_mirror`, the Makefile, day2 playbook and AAP workflow entries, the hardening checker entry, the zot image in the mirrored list and in the IDMS, and the plain-HTTP port-forward branch of `okf_mirror_holds_lock.yml`. The owner asked for the removal as soon as these proofs existed, instead of after a week of use as ADR-0612 clause 8 first said.
