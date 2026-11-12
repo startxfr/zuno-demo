@@ -22,7 +22,9 @@ Every scenario page has the same structure. You can open any page and find the s
 | Appendix A - HLD | The platform map, with the brick highlighted |
 | Appendix B - LLD | The brick's internals, drawn from its chart and component |
 
-New pages start from [`_template-scenario.md`](_template-scenario.md).
+New pages start from [`_template-scenario.md`](_template-scenario.md) for a scenario and
+[`_template-workshop.md`](_template-workshop.md) for a workshop. A workshop links its scenarios and the version to
+play; it does not copy their steps.
 
 ## Before any live session
 
@@ -41,7 +43,6 @@ New pages start from [`_template-scenario.md`](_template-scenario.md).
 - **Not show-ready**: a named reason prevents it today (for example, the GPU node of the world model is off).
 - **Page**:
   - **written**: in the new format;
-  - **legacy**: an earlier script, rewritten in the new format in wave 1;
   - **planned (wave N)**: not written yet.
 
 ## Scenarios
@@ -50,15 +51,15 @@ New pages start from [`_template-scenario.md`](_template-scenario.md).
 
 | Scenario | Shows | Personas | Golden-path probe | Page |
 |---|---|---|---|---|
-| [Open WebUI](scenarios/experiences/open-webui.md) | SSO, "Zuno" and "Zuno Code" models, tools by group | sale-01, consultant-02, ai-ops-01 | `open-webui`, `zuno-code` | written (pilot) |
-| OpenClaw | One assistant per persona, egress token injection, different tools per persona | consultant-02, sale-01 | `openclaw` | planned (wave 1) |
-| Dify | The three pre-imported apps (agent, chatflow, workflow), persona through the token proxy | consultant-02 | `dify` | planned (wave 1) |
-| kagent | Cluster diagnosis with read-only tools, a Secret read refused | ai-ops-01 | `kagent` | planned (wave 1) |
-| OpenShift Lightspeed | The console assistant served by MaaS | any OpenShift user | `lightspeed` | planned (wave 1) |
-| UnifAI agents | Team and Personal workspaces, the Tekos agent | consultant-02, ai-ops-01 | `unifai-tekos` | planned (wave 1) |
-| [UnifAI live RAG](unifai-live-rag.md) | Upload, indexing and ACL isolation of documents | consultant-01, sale-01 | none (rehearse first) | legacy |
-| [Blender 3D](blender-3d.md) | A sentence becomes editable 3D objects through a local model | ai-dev-01 | `blender` | legacy |
-| [World model](world-model.md) | An interactive generated world on an on-demand GPU | ai-ops-01 | `world-model` (not show-ready while its GPU node is off) | legacy |
+| [Open WebUI](scenarios/experiences/open-webui.md) | SSO, "Zuno" and "Zuno Code" models, tools by group | sale-01, consultant-02, ai-ops-01 | `open-webui`, `zuno-code` | written (wave 0) |
+| [OpenClaw](scenarios/experiences/openclaw.md) | One assistant per persona, two sign-ins, token injected by the egress proxy, Confluence for consultant-02 and not for sale-01 | consultant-02, sale-01, ai-ops-01 | `openclaw` | written (wave 1) |
+| [Dify](scenarios/experiences/dify.md) | The three imported apps (agent, chatflow, workflow), the External Knowledge adapter, every call made as consultant-02 through the token proxy | consultant-02, ai-ops-01, paas-ops-01 | `dify` | written (wave 1) |
+| [kagent](scenarios/experiences/kagent.md) | Cluster diagnosis with five governed read-only tools, a Secret read refused, acting as ai-ops-01 through the token proxy | ai-ops-01, paas-ops-01 | `kagent` | written (wave 1) |
+| [OpenShift Lightspeed](scenarios/experiences/lightspeed.md) | The console assistant on a local model through MaaS, cluster reads with the user's own rights, Zuno tools through the mcp-gateway | consultant-02, sale-01, paas-ops-01 (only `consultant`, `sales` and cluster-admins may open the chat) | `lightspeed` | written (wave 1) |
+| [UnifAI agents](scenarios/experiences/unifai-agents.md) | Workspaces from Keycloak groups, Tekos from the signed release, cluster tools for ai-ops-01 only, starters and templates | consultant-02, ai-ops-01 | `unifai-tekos` (the cluster-tools contrast has no probe) | written (wave 1) |
+| [UnifAI live RAG](unifai-live-rag.md) | Upload (docling, qwen3-embedding, Qdrant), cited answers, isolation from team workflows and from another persona, optional Confluence resync | consultant-01, sale-01 | none (rehearse first) | written (wave 1) |
+| [Blender 3D](blender-3d.md) | A sentence becomes editable Blender objects on a local model, behind the workstation entry and the C3 client floor | ai-dev-01, ai-ops-01, paas-ops-01 | `blender` | written (wave 1) |
+| [World model](world-model.md) | Walk into a generated world and change it, prompts screened, on an on-demand GPU node | ai-ops-01, paas-ops-01 | `world-model` (not show-ready: no GPU node) | written (wave 1) |
 
 ### Governance of the backend
 
@@ -100,8 +101,8 @@ New pages start from [`_template-scenario.md`](_template-scenario.md).
 
 | Workshop | Built from | Duration | Page |
 |---|---|---|---|
-| [One backend, three experiences](three-experiences.md) | UnifAI, Open WebUI, OpenClaw, one budget | 30 min | legacy (wave 1) |
-| [One governed backend, many experiences](five-experiences.md) | The live experiences, routing, tools, guardrails, the dashboard | 45-60 min | legacy (wave 1) |
+| [One backend, three experiences](three-experiences.md) | UnifAI, Open WebUI, OpenClaw, then one dashboard block (backend, routing, one budget) | 30 min | written (wave 1) |
+| [One governed backend, many experiences](five-experiences.md) | UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget) | 45-55 min | written (wave 1) |
 | Sovereign and governed AI | Identity, sovereignty, routing, guardrails, budget, trace | about 45 min | planned (wave 2) |
 | Agentic AI | UnifAI agents, MCP tools, RAG, delegation with approval, kagent, AAP audit | about 60 min | planned (wave 2) |
 | RHOAI end to end | Catalog, serving, external models, MaaS key, playground, LoRA, evaluation | 60-90 min | planned (wave 3) |
@@ -137,6 +138,10 @@ and what it may see on the cluster. Source of truth: `gitops/charts/keycloak/fil
 | **ai-ops-01** | AI platform operator, back office | `ocp-ai-ops` (admin on the Zuno namespaces), `agent_tekos`, `openwebui_admin` | kagent, Tekos with cluster tools, Grafana and Tempo, the world model, the playground (nine tools) |
 | **paas-dev-01** | Platform developer, back office | `ocp-paas-dev` (cluster-reader), `agent_tekos`, `aap_ops` | not used yet |
 | **paas-ops-01** | Platform operator, back office | `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin` | the presenter's `oc` terminal: probes and cluster-wide checks |
+
+An OpenShift group is created when its first member signs in. On 2026-11-12, **sale-01** and **paas-ops-01** had never
+signed in to OpenShift on demo333: sign each persona in once before a session that needs its OpenShift rights
+(Lightspeed, the MaaS portal, the presenter's terminal).
 
 Other identities, never signed in on stage:
 - `eval-consultant-01` and the other `eval-*` accounts are copies used by the golden-path probes and the evaluations.
