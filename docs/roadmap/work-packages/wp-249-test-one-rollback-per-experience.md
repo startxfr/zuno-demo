@@ -1,6 +1,6 @@
 # WP-249: Test one rollback per experience
 
-- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade, D1-D2 decided; left: Lightspeed, Blender, UnifAI with v0.1.69, the first-party digests with the next release)
+- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade, D1-D2 decided; 2026-11-12: Lightspeed and Blender tested; left: UnifAI with v0.1.69, the first-party digests with the next release, the operators' restore paths (D1))
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** [WP-243](wp-243-browser-tests-for-every-experience.md) (the browser checks used for the negative case)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) (golden path after each change), [ADR-0607](../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md) (OLM never downgrades), [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md) (canary namespaces)
@@ -29,8 +29,8 @@
 | # | Experience | Test | Data | Live cost |
 |---|---|---|---|---|
 | 1 | kagent | previous image pin, then forward | none | one roll |
-| 2 | Lightspeed | `git revert` of the last `OLSConfig` change in a canary copy, then forward | none | none for users |
-| 3 | Blender | remove the four edge objects and the client, the workstation is refused (401/404), restore | none | the Blender moment is down for minutes |
+| 2 | Lightspeed | **done 2026-11-12** ([evidence](../evidence/wp-249-lightspeed-rollback-2026-11-12.md)): `git revert` live (a singleton has no canary copy); the 2026-10-24 version answers 413 today, forward restored | none | the app server rolls twice |
+| 3 | Blender | **done 2026-11-12** ([evidence](../evidence/wp-249-blender-edge-rollback-2026-11-12.md)): the four edge objects removed (edge 503) and restored (401, moment PASS); the client kept | none | the Blender moment was down for 3 min |
 | 4 | first-party images | `render_release_digests.py --release v0.15.0` (the ledgered digests), roll, golden path; then `--clear` back to `:latest` | none | every first-party pod rolls twice |
 | 5 | OpenClaw assistant | previous `images.openclaw`, then forward | the assistant's own namespace state | one roll per assistant |
 | 6 | Open WebUI | backup, previous `image.tag`, then forward | its PostgreSQL database | one roll, backup first |
