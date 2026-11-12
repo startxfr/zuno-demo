@@ -92,7 +92,7 @@ aap_config_job_templates:
   - name: zuno-day3-backup
     credential: zuno-aap-installer
     gated: true
-    survey_components: [postgresql]
+    survey_components: [postgresql, unifai, quay-registry]
   - name: zuno-day3-restore
     credential: zuno-aap-installer
     gated: true

@@ -143,7 +143,7 @@ jobTemplates:
     playbook: ansible/playbooks/day3_backup.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql, unifai]
+    surveyComponents: [postgresql, unifai, quay-registry]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day3-restore
     playbook: ansible/playbooks/day3_restore.yml

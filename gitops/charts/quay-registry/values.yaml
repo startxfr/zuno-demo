@@ -45,6 +45,10 @@ database:
   storage: 10Gi
   storageClassName: ""         # empty: cluster default
   backupRepoStorage: 5Gi
+  # pgBackRest on repo1 (the PVC above), UTC. The image blobs are in the S3 bucket and are not covered: only the Quay metadata is.
+  backupSchedules:
+    full: "0 4 * * 0"
+    differential: "0 4 * * 1-6"
   resources:
     requests: {cpu: 250m, memory: 512Mi}
     limits: {memory: 1Gi}

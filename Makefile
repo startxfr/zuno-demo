@@ -106,7 +106,7 @@ DAY2_RECONCILE_COMPONENTS := models
 # availability test for agents/platform and to each component's own
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
-DAY3_BACKUP_COMPONENTS := postgresql unifai
+DAY3_BACKUP_COMPONENTS := postgresql unifai quay-registry
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
 # (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and

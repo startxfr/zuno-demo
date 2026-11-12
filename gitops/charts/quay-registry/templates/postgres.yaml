@@ -49,8 +49,14 @@ spec:
         {{- toYaml .Values.database.resources | nindent 8 }}
   backups:
     pgbackrest:
+      # Without a manual block PGO ignores the pgbackrest-backup annotation (same trap as the shared cluster, WP-131).
+      manual:
+        repoName: repo1
       repos:
         - name: repo1
+          schedules:
+            full: {{ .Values.database.backupSchedules.full | quote }}
+            differential: {{ .Values.database.backupSchedules.differential | quote }}
           volume:
             volumeClaimSpec:
               accessModes: [ReadWriteOnce]

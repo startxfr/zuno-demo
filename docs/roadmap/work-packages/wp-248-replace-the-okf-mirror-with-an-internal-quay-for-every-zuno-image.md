@@ -304,3 +304,12 @@ referrers-index tag `sha256-<digest>` of a dropped artifact.
   only (0600) and are deleted when the session ends.
 - Still not done: Vault copy of the bucket key, PGO backup of `quay-db` in the Day 3 schedule, step 6 (public images) beyond the
   two test copies, and the cut-over of any consumer. The registry stays installed; the zot mirror is untouched.
+
+## Prepared after the canary: Vault copy of the bucket key and quay-db backups
+
+Repository only, nothing applied to the cluster yet.
+
+- `roles/quay_registry/tasks/bootstrap.yml` seeds `zuno/registry/quay-bucket` (bucket, region, access key id and secret) on the first run. Until now the key lived only in `~/.config/zuno` on the workstation that ran `registry_bucket.yml`. The existing key is copied at the next `make d2 install quay-registry`, which needs the owner's go like every cluster write.
+- The `quay-db` PostgresCluster now carries pgBackRest schedules on repo1 (full on Sunday, differential Monday to Saturday, 04:00 UTC, `database.backupSchedules`) and the `manual` block that PGO needs to honour the on-demand annotation.
+- `make d3 backup quay-registry` (new `roles/quay_registry/tasks/backup.yml`, also in the `zuno-day3-backup` survey) runs an on-demand backup and waits for that exact run to succeed.
+- Limits: repo1 is a PVC in the same cluster, so it covers a bad write or a lost database volume but not the loss of the cluster; the image blobs are in the S3 bucket and are not part of this backup; there is no restore drill yet.

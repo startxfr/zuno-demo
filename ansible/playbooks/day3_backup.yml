@@ -11,6 +11,9 @@
       # ADR-0568/WP-149: MongoDB dump + Qdrant snapshots of the UnifAI stack;
       # restore is a drill into a scratch namespace (roles/unifai/tasks/restore.yml).
       - unifai
+      # WP-248: on-demand pgBackRest backup of the dedicated quay-db (zuno-registry); the
+      # image blobs live in the S3 bucket and are not part of it.
+      - quay_registry
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
