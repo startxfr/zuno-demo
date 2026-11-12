@@ -50,7 +50,7 @@ The order is by risk reduction per effort.
 | Item | Switch | Waits for |
 |---|---|---|
 | REST entitlement | `restAgentEntitlement: true` | **done 2026-11-11** (user's go): on the demo333 mcp-gateway (`AGENT_ENTITLEMENT_EVERY_CALL=true`), golden path 13/13 after |
-| Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway. **Analysed 2026-11-12, handed to zuno-main** (see below the table) |
+| Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway. **Live 2026-11-12** ([WP-251](work-packages/wp-251-agent-chain-required-for-experience-clients.md), zuno-main): dify, kagent, open-webui, `openclaw-*`, blender and world-model may name only themselves without a chain; a dify token naming tekos is ignored and served on its client floor; golden path 13/13. Still unlisted: unifai (needs the fork's per-call signer) and zuno-evaluations (see below the table) |
 | Token-proxy inbound auth | `dify_token_proxy_inbound_auth` | re-registering Dify's stored credentials |
 | Salesforce owner scoping | on with the connector | a Salesforce org (none today) |
 | Namespace matcher on `metrics.query` | set the allowed namespaces per group | **done 2026-11-11** (user's go): `ocp-ai-ops` (the only group with the tool) gets the 13 mcp-k8s namespaces plus `nvidia-gpu-operator`; live, golden path PASS, a query outside them returns nothing ([evidence](evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)) |
