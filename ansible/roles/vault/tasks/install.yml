@@ -540,7 +540,7 @@
 
 # Grafana's oauth-proxy sidecar (gitops/charts/grafana): AES-key-sized
 # opaque secret for signing/encrypting its session cookie, same
-# single-opaque-value shape as mcp/gateway-workload-token below.
+# single-opaque-value shape as the other generated secrets.
 - name: "vault | generate and seed the Grafana oauth-proxy cookie secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
@@ -558,14 +558,6 @@
     vault_seed_fields:
       password: "{{ zuno_admin_demo_personas_root_password |
         default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-
-- name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037, idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: mcp/gateway-workload-token
-    vault_seed_fields:
-      token: "{{ zuno_admin_mcp_gateway_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
 # WP-156: the per-agent frontend session secrets (<agent>/frontend-session,
 # ADR-0042) left with agent-frontend, their only consumer; existing Vault

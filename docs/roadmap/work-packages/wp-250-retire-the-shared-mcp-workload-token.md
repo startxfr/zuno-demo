@@ -120,6 +120,15 @@ Vault would mean a Vault call per verification on every server.
   `MCP_GATEWAY_WORKLOAD_TOKEN` env and the ExternalSecret from the charts, `mcp/gateway-workload-token` from `secret-access.yaml`;
   delete the Vault value only with a separate go).
 
+- **2026-11-12, lot 3 code (repo only, not applied).** Two commits so the Secret never disappears under a pod that still references it:
+  3a removes `MCP_GATEWAY_WORKLOAD_TOKEN` from the mcp-gateway, aap, confluence, git-forge, salesforce and diagram-render
+  Deployments (and the diagram-render `gatewayToken` value); 3b deletes the mcp-gateway chart's `externalsecret-gateway-token.yaml`
+  (the Secret `mcp-gateway-workload-token` is then pruned by ArgoCD), drops `mcp/gateway-workload-token` from `zuno-ai-run` in
+  `platform/vault/secret-access.yaml` and stops seeding it in the vault role. Rollout: push 3a, `make d2 install mcp` (the six pods
+  roll once), golden path; push 3b, `make d2 install mcp` and `make d0 install vault` (the per-namespace policies lose the key; no
+  pod rolls), then the store-role proof that `zuno-ai-run` can no longer read the path. The Vault value itself is deleted only with
+  a separate go.
+
 ## Questions asked (answered above)
 
 - **Q1.** diagram-render and salesforce-mcp do not require an assertion today. Is it acceptable to make it mandatory on

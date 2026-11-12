@@ -25,11 +25,8 @@ zuno_envId: demo
 # (seed-only-if-missing, ADR-0345): hardened is meant for fresh installs.
 zuno_security_profile: demo
 
-# WP-223: the MCP Gateway workload token (Vault mcp/gateway-workload-token) no
-# longer derives from the admin password ("token-<password>" made the token as
-# guessable as the password). It is unset here on purpose so the vault role's
-# random default applies; seeding is seed-only-if-missing, so the live value of
-# an existing cluster does not move. The unused zuno_admin_vault_token went with it.
+# WP-250: the MCP Gateway workload token (Vault mcp/gateway-workload-token) is retired: the gateway's Vault-Transit-signed call
+# assertion is the only credential the MCP servers accept. The Vault value is no longer seeded or readable by any namespace store.
 
 # ADR-0057: default report format for `make day2|d2 test|stresstest` -
 # text (raw table, always printed regardless) | json | csv. Override
