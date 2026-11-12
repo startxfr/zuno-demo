@@ -313,3 +313,13 @@ Repository only, nothing applied to the cluster yet.
 - The `quay-db` PostgresCluster now carries pgBackRest schedules on repo1 (full on Sunday, differential Monday to Saturday, 04:00 UTC, `database.backupSchedules`) and the `manual` block that PGO needs to honour the on-demand annotation.
 - `make d3 backup quay-registry` (new `roles/quay_registry/tasks/backup.yml`, also in the `zuno-day3-backup` survey) runs an on-demand backup and waits for that exact run to succeed.
 - Limits: repo1 is a PVC in the same cluster, so it covers a bad write or a lost database volume but not the loss of the cluster; the image blobs are in the S3 bucket and are not part of this backup; there is no restore drill yet.
+
+## Clair without vulnerability data (owner decision, 2026-11-12)
+
+Measured: the `rhel-vex` updater hits its 30 minute deadline on every run and the Clair `vuln` table stays empty, so Quay shows no vulnerability report. It is neither CPU nor database bound: the download of the 412 MB VEX archive stalls because the Akamai addresses of `security.access.redhat.com` alternate between reachable and blocked under the `dnsName` rule of the zuno-registry EgressFirewall (the same pool mismatch as the S3 copies). Reachable addresses download the archive in about 3.5 s.
+
+Options put to the owner: add the two observed Akamai /24 ranges to the firewall; mirror the archive in the cluster and point `updaters.config.rhel-vex.url` at it; or leave Clair without data. **Decision: leave Clair without data.** The registry serves and signs images as intended, and scanning is not needed for the first consumer cut-over. Consequences to keep in mind:
+
+- Quay's security column stays empty; do not read it as "no vulnerabilities".
+- Clair keeps retrying every six hours and failing; it is harmless but noisy in its log.
+- ADR-0612 clause 4 (Clair on, Red Hat sources only) is therefore only partly delivered. Reopen with the first option if scanning becomes a requirement.
