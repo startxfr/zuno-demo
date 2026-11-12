@@ -594,18 +594,10 @@ platformNamespaces:
           reason: KServe storage-initializer of every model (S3_ENDPOINT/AWS_ENDPOINT_URL).
         - dnsName: zuno-demo-sources.s3.eu-west-2.amazonaws.com
           reason: Virtual-hosted name of the model bucket (storageUri s3://zuno-demo-sources).
-        # okf-fetch init containers (a2a-gateway, mcp-gateway) pull the signed
-        # OKF bundles from quay.io/zuno/okf-* and verify them with cosign
-        # --offline; blobs are redirected to Quay's CDN. Found live 2026-11-07:
-        # without these a new gateway pod stays in Init:CrashLoopBackOff.
-        - dnsName: quay.io
-          reason: okf-fetch pulls the signed OKF bundles (quay.io/zuno/okf-*) and their cosign signatures.
-        - dnsName: cdn01.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
-        - dnsName: cdn02.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
-        - dnsName: cdn03.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
+        # WP-248: the okf-fetch init containers (a2a-gateway, mcp-gateway) read the signed OKF bundles from the internal Quay
+        # (zuno_okf_registry_mirror), so quay.io and its CDN hosts are no longer allowed here. The hosts were added 2026-11-07
+        # ("a new gateway pod stays in Init:CrashLoopBackOff" without them); to go back to quay.io, empty
+        # zuno_okf_registry_mirror AND restore the four dnsName rules quay.io, cdn01.quay.io, cdn02.quay.io, cdn03.quay.io.
         # TEMPORARY (WP-224 rehearsal, 2026-11-07): only the acceptance-gate Job
         # (ansible/roles/agents/tasks/run_acceptance_gate.yml) pip-installs its
         # requirements from PyPI at start-up; garak and ragas run from built
