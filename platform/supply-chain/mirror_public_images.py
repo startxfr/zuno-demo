@@ -18,6 +18,7 @@ import os
 import pathlib
 import re
 import sys
+import time
 from typing import Callable, Dict, List, Optional
 
 import yaml
@@ -69,7 +70,17 @@ def copy_one(item: dict, host: str, run: Callable[..., str] = admit.run) -> str:
     digest = item["digest"]
     target = mirror_target(item["source"], host)
     tag = f"d-{digest.split(':')[1][:12]}"
-    run([admit.require("oras"), "cp", "-r", f"{item['source']}@{digest}", f"{target}:{tag}"])
+    # Referrers (-r) only when a signature is expected: Docker Hub buildx indexes carry
+    # attestation manifests whose referrers lookup makes Quay answer 404 (temporalio/temporal).
+    flags = ["-r"] if item.get("signature", "none") != "none" else []
+    for attempt in (1, 2, 3):  # public registries drop connections now and then
+        try:
+            run([admit.require("oras"), "cp", *flags, f"{item['source']}@{digest}", f"{target}:{tag}"])
+            break
+        except admit.AdmissionError:
+            if attempt == 3:
+                raise
+            time.sleep(10)
     got = run([admit.require("oras"), "resolve", f"{target}:{tag}"]).strip()
     if got != digest:
         raise ListError(f"{item['source']}: the mirror holds {got}, expected {digest}")
@@ -86,7 +97,10 @@ def mirror_all(images: List[dict], host: str, dry_run: bool = False, only: str =
         if item["pin"] != "digest":
             waiting.append(f"{item['source']}:{item.get('tag')}")
             continue
-        done.append(f"{mirror_target(item['source'], host)}@{item['digest']}" if dry_run else copy(item, host))
+        ref = f"{mirror_target(item['source'], host)}@{item['digest']}" if dry_run else copy(item, host)
+        if not dry_run:
+            print("MIRRORED " + ref, flush=True)
+        done.append(ref)
     return {"copied": done, "waiting_for_a_digest_pin": waiting}
 
 
@@ -102,8 +116,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (ListError, admit.AdmissionError) as exc:
         print(f"REFUSED {exc}", file=sys.stderr)
         return 1
-    for ref in result["copied"]:
-        print(("WOULD COPY " if args.dry_run else "MIRRORED ") + ref)
+    for ref in result["copied"] if args.dry_run else []:
+        print("WOULD COPY " + ref)
     for ref in result["waiting_for_a_digest_pin"]:
         print("WAITING (pinned by tag, not copied) " + ref)
     token = os.environ.get("QUAY_API_TOKEN", "")
