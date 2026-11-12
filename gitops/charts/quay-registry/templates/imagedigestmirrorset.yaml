@@ -19,3 +19,22 @@ spec:
       mirrorSourcePolicy: AllowContactingSource
     {{- end }}
 {{- end }}
+{{- if .Values.publicRedirects.enabled }}
+---
+# WP-248 family (d): the same redirect for the closed list of public third-party images (platform/supply-chain/mirrored-images.yaml,
+# digest-pinned entries only). Source `<registry>/<path>` -> `<host>/<org>/mirror/<path>`; fallback to the origin registry.
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: zuno-public-via-registry
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  imageDigestMirrors:
+    {{- range .Values.publicRedirects.sources }}
+    - source: {{ . }}
+      mirrors:
+        - {{ required "redirects.host is required when publicRedirects.enabled" $.Values.redirects.host }}/{{ $.Values.redirects.organization }}/mirror/{{ . | splitList "/" | rest | join "/" }}
+      mirrorSourcePolicy: AllowContactingSource
+    {{- end }}
+{{- end }}

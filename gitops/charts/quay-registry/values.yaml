@@ -79,3 +79,28 @@ redirects:
     - unifai-operator
     - unifai-operator-bundle
     - unifai-operator-catalog
+
+# WP-248 family (d): redirect of public third-party images (digest pins only). Keep in step with
+# platform/supply-chain/mirrored-images.yaml (a test compares both). Needs redirects.host.
+publicRedirects:
+  enabled: false
+  sources:
+    - docker.io/bitnamilegacy/rabbitmq
+    - docker.io/grafana/grafana
+    - docker.io/langgenius/dify-api
+    - docker.io/langgenius/dify-plugin-daemon
+    - docker.io/langgenius/dify-web
+    - docker.io/library/mongo
+    - docker.io/library/nginx
+    - docker.io/qdrant/qdrant
+    - docker.io/redis/redisinsight
+    - docker.io/temporalio/temporal
+    - ghcr.io/containers/kubernetes-mcp-server
+    - ghcr.io/kagent-dev/kagent/controller
+    - ghcr.io/kagent-dev/kagent/ui
+    - ghcr.io/open-webui/open-webui
+    - ghcr.io/openclaw/openclaw
+    - ghcr.io/project-zot/zot-linux-amd64
+    - quay.io/docling-project/docling-serve-cpu
+    - quay.io/fedora/redis-7
+    - quay.io/oauth2-proxy/oauth2-proxy

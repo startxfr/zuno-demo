@@ -22,6 +22,12 @@ class ListTests(unittest.TestCase):
         self.assertGreater(len(images), 10)
         self.assertTrue(all(i["signature"] == "none" for i in images))
 
+    def test_the_chart_redirects_exactly_the_digest_pinned_sources(self):
+        import yaml
+        values = yaml.safe_load((HERE.parents[2] / "gitops/charts/quay-registry/values.yaml").read_text())
+        wanted = sorted({i["source"] for i in m.load_list() if i["pin"] == "digest"})
+        self.assertEqual(sorted(values["publicRedirects"]["sources"]), wanted)
+
     def write(self, text):
         d = tempfile.mkdtemp()
         p = pathlib.Path(d) / "l.yaml"
