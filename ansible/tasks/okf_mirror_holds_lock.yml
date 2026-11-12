@@ -11,7 +11,7 @@
 - name: "okf mirror | verify that the internal mirror holds the locked release (ADR-0611)"
   ansible.builtin.shell: |
     set -u
-    # ADR-0612: a prefix that is not the in-cluster zot Service is Quay, reached through its route with the pull robot's docker
+    # ADR-0612: a prefix that is not the in-cluster zot Service is Quay, reached through its route with the docker
     # config written by roles/quay_registry (no port-forward, TLS, no --plain-http).
     case "{{ zuno_okf_registry_mirror }}" in
       *.svc:*) ;;
