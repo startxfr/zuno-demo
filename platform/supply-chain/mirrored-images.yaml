@@ -40,8 +40,9 @@ images:
     signature: none
     reason: Dify (gitops/charts/dify)
   - source: docker.io/library/python
+    digest: sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
     tag: "3.12-slim"
-    pin: tag
+    pin: digest
     signature: none
     reason: workload of zuno-ai-run
   - source: docker.io/qdrant/qdrant
@@ -136,8 +137,9 @@ images:
     signature: none
     reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
   - source: quay.io/jetstack/cert-manager-istio-csr
+    digest: sha256:b62b26e10339803cc0e3643ec90dc2ceaf6eb43b29bf0cadda71a9912a3e6d72
     tag: "v0.16.0"
-    pin: tag
+    pin: digest
     signature: none
     reason: istio-csr (service mesh certificates)
   - source: quay.io/jooholee/nfs-provisioner-operator

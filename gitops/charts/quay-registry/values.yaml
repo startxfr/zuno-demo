@@ -92,6 +92,7 @@ publicRedirects:
     - docker.io/langgenius/dify-web
     - docker.io/library/mongo
     - docker.io/library/nginx
+    - docker.io/library/python
     - docker.io/qdrant/qdrant
     - docker.io/redis/redisinsight
     - docker.io/temporalio/temporal
@@ -103,4 +104,5 @@ publicRedirects:
     - ghcr.io/project-zot/zot-linux-amd64
     - quay.io/docling-project/docling-serve-cpu
     - quay.io/fedora/redis-7
+    - quay.io/jetstack/cert-manager-istio-csr
     - quay.io/oauth2-proxy/oauth2-proxy
