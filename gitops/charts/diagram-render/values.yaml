@@ -31,14 +31,8 @@ resources:
     cpu: "1"
     memory: 768Mi
 
-# ADR-0037 defense-in-depth second layer - same shared secret
-# app/downstream.py already reads for every other MCP-backing service.
-gatewayToken:
-  secretName: mcp-gateway-workload-token
-  secretKey: token
-
 # WP-250 lot 2: the PUBLIC half of the Vault Transit key mcp-call-assertion (the private half never leaves Vault).
 # /render accepts only a call assertion signed by it (components/diagram-render/assertion.js). Empty = every
-# /render call is refused, by design. The gatewayToken above is no longer read (removed in lot 3).
+# /render call is refused, by design.
 callAssertion:
   publicKey: ""

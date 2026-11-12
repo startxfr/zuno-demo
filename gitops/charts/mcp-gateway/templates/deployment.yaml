@@ -191,11 +191,6 @@ spec:
               value: {{ .Values.metricsQuery.namespacesByGroup | default dict | toJson | quote }}
             - name: MCP_MAX_BATCH_SIZE
               value: {{ .Values.jsonRpc.maxBatchSize | quote }}
-            - name: MCP_GATEWAY_WORKLOAD_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: mcp-gateway-workload-token
-                  key: token
             {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
             {{- if eq .Values.outboundIdentity.mode "assertion" }}
             - name: MCP_OUTBOUND_IDENTITY

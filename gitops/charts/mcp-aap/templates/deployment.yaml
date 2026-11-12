@@ -59,11 +59,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.credentials.secretName }}
                   key: url
-            - name: MCP_GATEWAY_WORKLOAD_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: mcp-gateway-workload-token
-                  key: token
             {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
             {{- if .Values.callAssertion.publicKey }}
             - name: MCP_CALL_ASSERTION_PUBLIC_KEY
