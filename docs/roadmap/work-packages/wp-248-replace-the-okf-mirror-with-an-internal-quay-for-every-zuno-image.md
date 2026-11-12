@@ -396,3 +396,13 @@ Proofs, in the order they were taken (window announced, golden path 13/13 before
 6. **UnifAI signatures:** the eight policies read Quay; a forged UnifAI digest is denied by the webhook (see the previous section).
 
 Removal: `make d2 uninstall okf-mirror` (Application and PVC pruned), then the repository: chart `okf-mirror`, its Application, role `okf_mirror`, the Makefile, day2 playbook and AAP workflow entries, the hardening checker entry, the zot image in the mirrored list and in the IDMS, and the plain-HTTP port-forward branch of `okf_mirror_holds_lock.yml`. The owner asked for the removal as soon as these proofs existed, instead of after a week of use as ADR-0612 clause 8 first said.
+
+## Incident of the zot removal: removing an IDMS source drains the nodes (2026-11-12)
+
+Dropping the zot image from `publicRedirects.sources` (21 to 20 sources) was the one change of the evening that is not a pure addition. Adding sources reloads `registries.conf` without a drain (both earlier IDMS changes did); **removing one makes the MCO cordon and drain every node**, one by one: the four workers took about 50 minutes, and the last master stayed cordoned because its drain was blocked by the single-replica PodDisruptionBudgets (a2a-gateway, mcp-gateway, ai-gateway, Keycloak `zuno-0`; ADR-0101 accepts 31-65 s of outage there). With the owner's go the four pods were deleted, the drain passed and both pools reached Updated.
+
+Consequences seen: the Quay application pod was rescheduled and stayed not Ready for more than an hour (its liveness probe, 10 failures at 15 s, kills it before the slow start ends), so for that time the gateways could not read the OKF release and fell back to quay.io, which the EgressFirewall now denies (`Init:Error`); the gateways recovered by themselves once Quay was Ready (pods deleted to retry), UnifAI multiagent needed its two pods recreated (`failed to prepare subPath` after the move).
+
+Left open at the time of writing: the MaaS gateway answers 503 for every model (also without a token) and Authorino answers `UNAVAILABLE` (code 14) for part of the requests since its pod was recreated by the drain; golden path moments `lightspeed` and `blender` fail on it. Restarting Authorino was not done (shared Kuadrant component, refused by the permission check and not covered by the owner's go).
+
+Rule for next time: batch every IDMS source removal into one change, announce a window of at least two hours, and expect a Quay outage of the duration of the drain; consider a startup probe on the Quay application pod.
