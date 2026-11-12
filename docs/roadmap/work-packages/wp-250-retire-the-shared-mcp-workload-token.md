@@ -1,6 +1,6 @@
 # WP-250: Retire the shared MCP workload token
 
-- **State:** Operator pending (lots 1 and 2 live on demo333 2026-11-12; lot 3 to do)
+- **State:** Done (2026-11-12): lots 1 to 3 live on demo333. Open follow-up, own go: delete the Vault values `zuno/mcp/gateway-workload-token`, `zuno/mcp/gateway-call-assertion` and `zuno/a2a/agent-chain` (no namespace store can read them any more)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-247](wp-247-sign-gateway-assertions-with-vault-transit.md) (the assertion is signed by Vault Transit),
@@ -128,6 +128,16 @@ Vault would mean a Vault call per verification on every server.
   roll once), golden path; push 3b, `make d2 install mcp` and `make d0 install vault` (the per-namespace policies lose the key; no
   pod rolls), then the store-role proof that `zuno-ai-run` can no longer read the path. The Vault value itself is deleted only with
   a separate go.
+
+- **2026-11-12, lot 3 live (user's go).** 3a (devel d43cc551): `MCP_GATEWAY_WORKLOAD_TOKEN` removed from the mcp-gateway, aap, confluence,
+  git-forge, salesforce and diagram-render Deployments, `make d2 install mcp`, five pods rolled once, golden path 13/13. 3b (devel
+  c9296a7a): the mcp-gateway chart's workload-token ExternalSecret deleted (ArgoCD pruned it and the Secret
+  `mcp-gateway-workload-token`), `mcp/gateway-workload-token` dropped from the `zuno-ai-run` store in `platform/vault/secret-access.yaml`,
+  seeding removed, `make d0 install vault` (configure Job only: no Vault pod restarted, still unsealed). Golden path PASS again.
+  Proof with the namespace store's own role (`vault-reader` ServiceAccount, Vault role `ns-zuno-ai-run`, token capabilities, no secret
+  value read): deny on `mcp/gateway-workload-token`, `mcp/gateway-call-assertion` and `a2a/agent-chain`; read on
+  `confluence/technical`. Trap met: `make d2 install mcp` failed at parse time for a few minutes on another session's commit (an
+  apostrophe in a shell comment of `okf_mirror_holds_lock.yml`, fixed by zuno-demo in 4bda8185). The Vault values are not deleted.
 
 ## Questions asked (answered above)
 

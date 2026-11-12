@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 10 | 5 | 29 | WP-224, WP-227, WP-237, WP-249, WP-250 |
+| v0.16 | 10 | 5 | 29 | WP-224, WP-227, WP-237, WP-249 |
 | v0.17 | 5 | 3 | 13 | WP-212, WP-213, WP-215, WP-218, WP-248 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1100,7 +1100,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 | WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Done (2026-11-07) | none: pattern rehearsed on demo333 (zuno-canary-wp-242 created, isolation checked, removed) |
 | WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Done (2026-11-07) | five browser checks pass on demo333 (`make demo browser`); the negative case passed on 2026-11-11 (each check fails while its experience is blocked, passes again) |
 | WP-249 | [wp-249](work-packages/wp-249-test-one-rollback-per-experience.md) | 0606 | WP-243 | Operator pending | opened 2026-11-11 (user decision): one rollback tested per experience, cheapest first, and WP-243's scale-to-zero negative case; D1 (operator = restore) and D2 (digests with the next release) decided 2026-11-11; each step with the user's go and a golden path |
-| WP-250 | [wp-250](work-packages/wp-250-retire-the-shared-mcp-workload-token.md) | 0602 | WP-247, WP-225 | Operator pending | opened 2026-11-11 (user's go): fold the caller context into the Transit-signed assertion and retire the shared workload token; Q1-Q2 settled yes; lot 1 live on demo333 2026-11-12 (golden path 13/13, allowlists proven through ctx); each lot with the user's go and a golden path |
+| WP-250 | [wp-250](work-packages/wp-250-retire-the-shared-mcp-workload-token.md) | 0602 | WP-247, WP-225 | Done (2026-11-12) | opened 2026-11-11 (user's go): fold the caller context into the Transit-signed assertion and retire the shared workload token; Q1-Q2 settled yes; lot 1 live on demo333 2026-11-12 (golden path 13/13, allowlists proven through ctx); each lot with the user's go and a golden path |
 | WP-251 | [wp-251](work-packages/wp-251-agent-chain-required-for-experience-clients.md) | 0603 | WP-225, WP-247 | Done (2026-11-12) | opened 2026-11-12 (user's go, request of zuno-avancement): `agentChain.requireFor` for dify, kagent, open-webui, openclaw-*, blender and world-model with a self-name exemption in `_agent_identity`; unifai waits for the fork signer; lots 1 and 2 live on demo333, dify token proof and golden path 13/13 |
 
 ### Phase 53 — Blender objects from text on a local model (added 2026-11-07)

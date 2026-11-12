@@ -19,7 +19,7 @@ The order is by risk reduction per effort.
   2026-11-11: Transit, fail closed, one-shot public-key switch, assertion first then agent chain).
 - **Status 2026-11-11 (WP-247 Done).** Both keys are in Vault Transit and no namespace store can read them (proved with the store's own
   role); golden path 14/14 after each switch. Open: the final persona proof, deleting the two old Vault values, and the
-  workload token (a shared HMAC secret, needs its own design, see the WP).
+  workload token, retired by [WP-250](work-packages/wp-250-retire-the-shared-mcp-workload-token.md) (Done 2026-11-12: the caller context rides inside the Transit-signed assertion).
 
 ## 2. `callAssertion.required: true`
 
