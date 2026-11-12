@@ -184,6 +184,11 @@ The user decided the two points that clause 5 left open.
     Secret, and AppProjects without http.
   - (c) The argocd role runs again.
   The startx archives carry their own subcharts, so nothing is fetched over http afterwards.
+
+  Step 2 was done live on demo333 on 2026-11-12, between 04:23 and 04:35 UTC. The Applications kept the states they
+  had before, and the golden path passed
+  ([evidence](../roadmap/evidence/adr-0602-c4-startx-charts-over-https-2026-11-12.md)). Of the C4 finding, only the
+  controller's `cluster-admin` remains, and it is moved to WP-227.
 - **The ArgoCD controller's `cluster-admin`: moved to the `hardened` profile (WP-227).** That profile replaces the
   binding with a ClusterRole built from the cluster-scoped kinds that `zuno-platform` allows, plus `admin` in the
   managed namespaces. The `demo` profile keeps `cluster-admin`, as a risk the user accepts. Shrinking it on demo333
