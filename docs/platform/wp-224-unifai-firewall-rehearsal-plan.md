@@ -93,3 +93,7 @@ instead of 11-14 s and 27-35 s: the dump takes 1 s, the S3 upload crawled becaus
 they resolved out of a pool of hundreds (same finding as the world-model copy, 2026-11-08). `egress.s3CidrsByRegion` (chart `unifai`,
 eu-west-2 from syncToken 1794458826) now allows the region's published S3 ranges on 443 next to the name rules, only while
 `stack.backup.region` is set and `stack.backup.endpoint` is not. Proof: a manual backup after the sync, compared with the durations above.
+
+Result (user's go, devel 4c799be9): ArgoCD applied the rules (28 in the EgressFirewall, 14 of them S3 ranges), no pod rolled. Manual backup Jobs
+right after: MongoDB 12 s (was 7 min 16 s), Qdrant 33 s (was 13 min). Golden path 13/13, no timeout or blocked line in the multiagent logs.
+Still not hand-checked under the firewall: the ingestion of the git, web and Confluence sources.
