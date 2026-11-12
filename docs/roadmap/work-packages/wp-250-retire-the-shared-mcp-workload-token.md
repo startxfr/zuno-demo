@@ -1,6 +1,6 @@
 # WP-250: Retire the shared MCP workload token
 
-- **State:** Operator pending (lot 1 live on demo333 2026-11-12; lot 2 code and tests done locally, not built; lot 3 to do)
+- **State:** Operator pending (lots 1 and 2 live on demo333 2026-11-12; lot 3 to do)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-247](wp-247-sign-gateway-assertions-with-vault-transit.md) (the assertion is signed by Vault Transit),
@@ -108,6 +108,17 @@ Vault would mean a Vault call per verification on every server.
     `secret-access.yaml` key. Weak spot: git-forge's `_rejected` test helper accepts any exception at initialize.
   - Tests: server suites 4x(call assertion 23, assertion caller 11, protocol, scoping) pass, gateway suites pass (except
     `test_rag_query` and `test_web_search`, which need pytest or a different cwd and were not run), Node 16 assertion tests 16/16.
+
+- **2026-11-12, lot 2 live (user's go).** Pushed as devel 08c717d5. Order used: `make d2 install mcp` (diagram-render receives
+  `MCP_CALL_ASSERTION_PUBLIC_KEY`), then builds of mcp-aap, mcp-confluence, mcp-git-forge and diagram-render (each build is a
+  roll through the image triggers), then mcp-gateway last; all signed in cluster, `make d2 check supply-chain` 12/12. Proofs: golden
+  path 13/13 PASS; consultant-01 through the gateway unchanged (SXSI 200, CDF refused by the space allowlist, startxfr/zuno-demo 200,
+  kubernetes/kubernetes refused by the repository allowlist), so the `ctx` claim is now the only source of the groups; a direct
+  `tools/list` to confluence-mcp, git-forge-mcp, aap-mcp and a `/render` to diagram-render with no credential, with the old
+  `X-Zuno-Gateway-Token`, or with a bogus bearer all answer 401; `generate_diagram` through the gateway answers 200 (assertion for
+  `diagram-render`). Salesforce-mcp is not deployed on demo333: its copy is covered by the unit tests only. Next: lot 3 (drop the
+  `MCP_GATEWAY_WORKLOAD_TOKEN` env and the ExternalSecret from the charts, `mcp/gateway-workload-token` from `secret-access.yaml`;
+  delete the Vault value only with a separate go).
 
 ## Questions asked (answered above)
 
