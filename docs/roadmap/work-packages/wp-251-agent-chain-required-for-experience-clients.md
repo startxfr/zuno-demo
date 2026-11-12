@@ -1,6 +1,6 @@
 # WP-251: Require the agent chain for experience clients, with a self-name exemption
 
-- **State:** Operator pending (lot 1 code and tests local, not pushed; lot 2 needs the user's go)
+- **State:** Done (2026-11-12): lots 1 and 2 live on demo333; unifai joins the list when the UnifAI per-call signer exists (fork work, out of scope)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M14, the agent chain)
 - **Depends on:** [WP-225](wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) lot C (the chain and `agentChain.requireFor`),
@@ -79,3 +79,11 @@ non-empty:
   pass; `test_wp225_guardrails_metering` 57/57; `test_wp209_classification_floor` exits 0). The role now passes
   `zuno_ai_gateway_agent_chain_require_for` (default empty) to the chart in `ansible/roles/llm/tasks/install.yml`; the cluster value
   (`dify, kagent, open-webui, openclaw-*, blender, world-model`) is added to `ansible/clusters/demo333.yml` only in lot 2.
+- **2026-11-12, lot 2 live (user's go).** Pushed as devel 3104287e. ai-gateway rebuilt from it (a build is a roll through the image
+  trigger), then `make d2 install llm` set `agentChain.requireFor` to dify, kagent, open-webui, `openclaw-*`, blender, world-model
+  (`zuno_ai_gateway_agent_chain_require_for` in `ansible/clusters/demo333.yml`). `REDIS_ADDR` unchanged (internal Redis). Golden path
+  13/13 PASS. Proof with a real token of the dify client (client_credentials, never printed): `X-Zuno-Agent: tekos` logs
+  "X-Zuno-Agent 'tekos' ignored: client dify must present a valid agent chain (AGENT_CHAIN_REQUIRE_FOR)" and answers 200 on the
+  client floor; `X-Zuno-Agent: dify` logs nothing and answers 200. The golden path's own dify, kagent, open-webui and blender
+  moments logged no ignored agent, so none of them claimed another agent. Rollback: remove the list from `demo333.yml` and re-run
+  `make d2 install llm`.
