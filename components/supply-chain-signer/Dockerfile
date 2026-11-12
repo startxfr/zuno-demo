@@ -47,12 +47,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # Checksum from the release's oras_1.2.2_checksums.txt (ADR-0603 M18).
 ARG ORAS_VERSION=1.2.2
 ARG ORAS_SHA256=bff970346470e5ef888e9f2c0bf7f8ee47283f5a45207d6e7a037da1fb0eae0d
+COPY platform/python/bootstrap/pyyaml/requirements.txt /tmp/bootstrap-pyyaml.txt
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sSL -o /tmp/oras.tar.gz "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" \
     && echo "${ORAS_SHA256}  /tmp/oras.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras && rm -f /tmp/oras.tar.gz \
     && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir pyyaml==6.0.2
+    && pip install --no-cache-dir --require-hashes -r /tmp/bootstrap-pyyaml.txt
 COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/
 COPY platform/okf/sigstore ./platform/okf/sigstore
 # OpenShift runs the container as an arbitrary non-root UID: the copied

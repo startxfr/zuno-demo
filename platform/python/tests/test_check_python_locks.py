@@ -91,6 +91,43 @@ def test_a_lock_for_the_wrong_interpreter_fails() -> None:
     assert any("resolved with Python 3.12" in p for p in _check(root, [a])), "header not checked"
 
 
+def _dockerfile_root(dockerfile: str, copy: str = None, original: str = "pip==26.0.1 --hash=sha256:" + "1" * 64) -> pathlib.Path:
+    root = pathlib.Path(tempfile.mkdtemp())
+    (root / cpl.BOOTSTRAP_TOOLS).parent.mkdir(parents=True)
+    (root / cpl.BOOTSTRAP_TOOLS).write_text(original)
+    d = root / "components" / "mcp-servers" / "x"
+    d.mkdir(parents=True)
+    (d / "Dockerfile").write_text(dockerfile)
+    if copy is not None:
+        (d / cpl.BOOTSTRAP_COPY).write_text(copy)
+    return root
+
+
+def test_a_pinned_tool_on_the_pip_command_line_fails() -> None:
+    root = _dockerfile_root("FROM x\nRUN apt-get update && \\\n    pip install --no-cache-dir --upgrade pip==26.0.1 wheel==0.48.0\n")
+    problems = cpl.dockerfile_problems(root)
+    assert len(problems) == 1 and "pip==26.0.1 wheel==0.48.0" in problems[0], problems
+
+
+def test_a_hashed_lock_install_and_comments_pass() -> None:
+    original = "pip==26.0.1 --hash=sha256:" + "1" * 64
+    root = _dockerfile_root("FROM x\n# the old way was pip install pip==1.0\nCOPY bootstrap-tools.txt /tmp/b.txt\n"
+                            "RUN pip install --require-hashes --upgrade -r /tmp/b.txt && pip install -r requirements.txt\n",
+                            copy=original, original=original)
+    assert cpl.dockerfile_problems(root) == [], cpl.dockerfile_problems(root)
+
+
+def test_a_missing_or_stale_bootstrap_copy_fails() -> None:
+    dockerfile = "FROM x\nCOPY bootstrap-tools.txt /tmp/b.txt\nRUN pip install -r /tmp/b.txt\n"
+    assert any("missing" in p for p in cpl.dockerfile_problems(_dockerfile_root(dockerfile)))
+    assert any("differs" in p for p in cpl.dockerfile_problems(_dockerfile_root(dockerfile, copy="pip==25.0\n")))
+
+
+def test_the_repository_dockerfiles_pass() -> None:
+    problems = cpl.dockerfile_problems()
+    assert problems == [], problems
+
+
 def test_the_repository_locks_pass() -> None:
     problems = cpl.check(cpl.discover())
     assert problems == [], problems

@@ -1,0 +1,2 @@
+# ADR-0603 M20: the pip upgrade of the mlops image (it upgrades pip only, setuptools and wheel come from its base).
+pip==26.0.1

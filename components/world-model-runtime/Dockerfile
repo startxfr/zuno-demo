@@ -14,10 +14,11 @@ FROM ${BASE_IMAGE}
 # gcc and libc6-dev: Triton (used by gemlite and world_engine) compiles a small C launcher stub at run time, in
 # TRITON_CACHE_DIR; without a compiler every Waypoint quantization fails with "Failed to find C compiler" (first GPU
 # smoke test, 2026-11-07). Python.h and cuda.h already come with the base image and the triton wheel.
+COPY platform/python/bootstrap/tools/requirements.txt /tmp/bootstrap-tools.txt
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends curl ca-certificates gcc libc6-dev && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
+    pip install --no-cache-dir --require-hashes --upgrade -r /tmp/bootstrap-tools.txt
 
 WORKDIR /app
 

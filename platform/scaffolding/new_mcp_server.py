@@ -186,6 +186,13 @@ def _requirements_in() -> str:
     return "fastapi==0.141.1\nuvicorn[standard]==0.32.0\nhttpx==0.28.1\nmcp==2.0.0\nPyJWT==2.10.1\ncryptography==44.0.0\n"
 
 
+def _bootstrap_tools() -> str:
+    # ADR-0603 M20: the MCP servers build from their own directory, so each one carries a copy of the hashed
+    # installer lock; check_python_locks.py fails when a copy differs from the original.
+    return (REPO_ROOT / "platform" / "python" / "bootstrap" / "tools"
+            / "requirements.txt").read_text()
+
+
 def _dockerfile() -> str:
     return '''# Defaults to the zuno-ai-build ImageStream mirror
 # (ansible/roles/image_mirrors), not docker.io directly.
@@ -197,8 +204,12 @@ FROM ${BASE_IMAGE}
 # ADR-0115: patch known HIGH CVEs baked into the upstream base image at
 # build time - apt upgrade picks up patched OS packages, pip upgrade picks
 # up patched pip/setuptools/wheel.
+# ADR-0603 M20: the upgrade installs a hashed lock, a copy of
+# platform/python/bootstrap/tools/requirements.txt (check_python_locks.py keeps
+# the copy identical; the build context is this directory).
+COPY bootstrap-tools.txt /tmp/bootstrap-tools.txt
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \\
-    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
+    pip install --no-cache-dir --require-hashes --upgrade -r /tmp/bootstrap-tools.txt
 
 WORKDIR /app
 COPY requirements.txt .
@@ -672,6 +683,7 @@ FILES = {
     "components/mcp-servers/{name}/server.py": lambda n, d: _server_py(n, d),
     "components/mcp-servers/{name}/requirements.in": lambda n, d: _requirements_in(),
     "components/mcp-servers/{name}/Dockerfile": lambda n, d: _dockerfile(),
+    "components/mcp-servers/{name}/bootstrap-tools.txt": lambda n, d: _bootstrap_tools(),
     "components/mcp-servers/{name}/README.md": lambda n, d: _readme_md(n, d),
     "components/mcp-servers/{name}/tests/test_mcp_protocol.py": lambda n, d: _test_mcp_protocol_py(n),
     "gitops/charts/mcp-{name}/Chart.yaml": lambda n, d: _chart_yaml(n, d),
