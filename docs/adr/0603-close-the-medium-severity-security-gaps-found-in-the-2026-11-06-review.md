@@ -158,7 +158,7 @@ The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
 | M6 | Done in the `hardened` profile only | 1 h idle in `keycloak/values.yaml` for `hardened`; demo333 runs `demo` (8 h) | decide whether the profile closes it, or wait for WP-227 |
 | M7 | Open | `configure.sh:130-134`: root `ttl=87600h`, no intermediate; the three cert-manager roles share one ServiceAccount | an intermediate (or an offline root) and a separate ServiceAccount for the Istio role; no work package yet |
 | M8 | Done live | Vault UI Route off; htpasswd kept as break-glass by decision (WP-223) | nothing |
-| M9 | Partly done | `no_log` set, but seeding still passes values in `sh -c` strings (`vault/tasks/install.yml`) | read the values from files |
+| M9 | Done live for the vault role (2026-11-12) | `ansible/tasks/vault_cli.yml` passes the token and the values as files copied into the pod; the vault role and `vault_seed_if_missing.yml` use it; role run and golden path PASS ([evidence](../roadmap/evidence/adr-0603-m9-vault-seeding-2026-11-12.md)) | 20 calls in other roles (aap_config, dify, quay_registry, the external modes, openclaw, the KMS migration playbook) and the one-time root-token steps |
 | M10 | Done live | `/admin/*` needs an admin token (WP-222) | nothing |
 | M11 | Done live | CQL escaping, space-key check, caps (WP-222) | nothing |
 | M12 | Partly done | Confluence and git allowlists live 2026-11-11; `email.recipientAllowlist: {}` (the handler is in demo mode and sends nothing); Salesforce owner scoping waits for an org | email allowlist values; Salesforce recorded as deferred |
@@ -174,7 +174,8 @@ The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
 | M22 | Owner action | `.gitignore` is the only barrier | the maintainer rotates the keys and moves the files |
 
 What still stands between this record and `Implemented`:
-- Live windows: M2, M4, M7 and M9. M7 is also the only one without a work package.
+- Live windows: M2, M4 and M7; M9's remaining calls in other roles, one role run each. M7 is also the only one without a
+  work package.
 - Decisions or residuals to record:
   - M6: does the `hardened` profile close it?
   - M12: Salesforce is deferred.
