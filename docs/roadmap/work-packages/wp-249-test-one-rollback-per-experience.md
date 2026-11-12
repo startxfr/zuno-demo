@@ -1,6 +1,6 @@
 # WP-249: Test one rollback per experience
 
-- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade, D1-D2 decided; 2026-11-12: Lightspeed and Blender tested; left: UnifAI with v0.1.69, the first-party digests with the next release, the operators' restore paths (D1))
+- **State:** Operator pending (2026-11-11: the WP-243 negative case done, the OpenClaw and world-model rollbacks recorded, single-version experiences deferred to their first upgrade, D1-D2 decided; 2026-11-12: Lightspeed and Blender tested, the first-party cycle of 2026-11-08 recorded, D1 applied; left: UnifAI with v0.1.69)
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** [WP-243](wp-243-browser-tests-for-every-experience.md) (the browser checks used for the negative case)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) (golden path after each change), [ADR-0607](../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md) (OLM never downgrades), [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md) (canary namespaces)
@@ -31,7 +31,7 @@
 | 1 | kagent | previous image pin, then forward | none | one roll |
 | 2 | Lightspeed | **done 2026-11-12** ([evidence](../evidence/wp-249-lightspeed-rollback-2026-11-12.md)): `git revert` live (a singleton has no canary copy); the 2026-10-24 version answers 413 today, forward restored | none | the app server rolls twice |
 | 3 | Blender | **done 2026-11-12** ([evidence](../evidence/wp-249-blender-edge-rollback-2026-11-12.md)): the four edge objects removed (edge 503) and restored (401, moment PASS); the client kept | none | the Blender moment was down for 3 min |
-| 4 | first-party images | `render_release_digests.py --release v0.15.0` (the ledgered digests), roll, golden path; then `--clear` back to `:latest` | none | every first-party pod rolls twice |
+| 4 | first-party images | **done 2026-11-08, recorded 2026-11-12** ([evidence](../evidence/wp-249-first-party-digests-2026-11-08.md)): v0.14.5 rendered (`RENDER_DIGESTS=1`), golden path 14/14, `--clear`, golden path 14/14; identical bits both ways | none | every first-party pod rolled twice |
 | 5 | OpenClaw assistant | previous `images.openclaw`, then forward | the assistant's own namespace state | one roll per assistant |
 | 6 | Open WebUI | backup, previous `image.tag`, then forward | its PostgreSQL database | one roll, backup first |
 | 7 | Dify | backup of its database, previous image tags, restore of the database, then forward | its database migrates on start | heaviest: a restore |
@@ -68,6 +68,12 @@ rows 1, 6 and 7 wait for that change. They no longer hold ADR-0606 open.
   counts as its rollback tested. No uninstall and reinstall is required. OLM never downgrades (ADR-0607).
 - **D2, decided: with the next release.** Row 4 runs together with the next release's `RENDER_DIGESTS=1` step, not in
   a window of its own. That release comes after zuno-demo's WP-248 Quay cutover.
+  **Satisfied 2026-11-12 (user decision):** the v0.14.5 release of 2026-11-08 already ran that step and its `--clear`,
+  with a golden path each way; it is recorded as row 4's evidence.
+- **D1 applied (user decision 2026-11-12).** UnifAI's operator data has a real restore on record (the `UnifaiRestore`
+  drill of 2026-10-23). For Lightspeed, OpenClaw and nfs-provisioner, `rollback.md` keeps "operator: forward fix
+  only": none of them holds data a restore would bring back for the demonstration. No further operator restore is
+  required before ADR-0606 moves.
 
 ## Acceptance
 
