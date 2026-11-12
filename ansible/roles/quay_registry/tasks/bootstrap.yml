@@ -88,6 +88,39 @@
          else (_quay_registry_admin_vault.stdout | from_json).data.data.token }}
   no_log: true
 
+# Quay gives the initialization token a one-day life (measured: expires_at 2026-11-11 23:36, the second run answered 401 and the
+# log said "OAuth access with an expired token"). Vault keeps the same token string, so a rejected token is revived by moving its
+# expiry forward in the Quay database, once per run; no new secret is created and the scope is unchanged.
+- name: "quay_registry | probe the admin token"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/user/"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 401]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_token_probe
+  no_log: true
+
+- name: "quay_registry | find the Quay database primary"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ zuno_quay_namespace }}"
+    label_selectors:
+      - postgres-operator.crunchydata.com/cluster=quay-db
+      - postgres-operator.crunchydata.com/role=master
+  register: _quay_registry_db_primary
+  when: _quay_registry_token_probe.status == 401
+
+- name: "quay_registry | extend the admin token by one day"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ zuno_quay_namespace }}"
+    pod: "{{ _quay_registry_db_primary.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -d quay -v ON_ERROR_STOP=1 -c "update oauthaccesstoken set expires_at = now() + interval '1 day' where authorized_user_id = 1"
+  when: _quay_registry_token_probe.status == 401
+
 # Look first, create on 404: accepting "400 = exists" would also swallow a real refusal (the first run did: the organisation
 # email must differ from the admin's).
 - name: "quay_registry | look up the organisation"
