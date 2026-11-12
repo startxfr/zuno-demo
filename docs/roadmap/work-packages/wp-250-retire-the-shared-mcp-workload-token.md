@@ -1,6 +1,6 @@
 # WP-250: Retire the shared MCP workload token
 
-- **State:** Repo work in review (lot 1 code and tests written, not built or applied)
+- **State:** Operator pending (lot 1 live on demo333 2026-11-12, lots 2 and 3 to do)
 - **ADRs:** [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md),
   [ADR-0603](../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
 - **Depends on:** [WP-247](wp-247-sign-gateway-assertions-with-vault-transit.md) (the assertion is signed by Vault Transit),
@@ -75,6 +75,17 @@ Vault would mean a Vault call per verification on every server.
   `components/mcp-servers/*/tests/test_wp250_assertion_caller.py` (9, byte-identical in the four servers); the existing
   lot B, lot C, WP-247 and per-server assertion suites still pass. To do: build mcp-gateway and the four server images
   (needs the user's go), roll, golden path, then lot 2.
+
+- **2026-11-12, lot 1 live (user's go, roll included).** Built from devel 848b0fa (contains dcfa21b5): mcp-gateway,
+  mcp-aap, mcp-confluence, mcp-git-forge, signed in cluster (`make d2 check supply-chain` 12/12). Finding: each of
+  the four Deployments carries an active `image.openshift.io/triggers` annotation on its `:latest` tag, so a build IS a
+  roll (ADR-0059); "build only" is not possible without pausing the triggers. Golden path 13/13. Proof of the `ctx`
+  path with consultant-01 (groups from the signed assertion, same results as before the roll): `search_confluence`
+  space SXSI 200, space CDF refused by the space allowlist; `git.repository.read` github:startxfr/zuno-demo 200,
+  github:kubernetes/kubernetes refused by the repository allowlist. Salesforce-mcp is not deployed on demo333, so its
+  copy of the verifier is covered by the unit tests only. Playbook trap: the one-off build/sign playbooks need
+  `-e cluster_base_domain=apps.demo333.startx.fr`, or the signing step fails after the first image and stops the loop.
+  Next: lot 2 (servers require the claims, the gateway stops sending the token and the two headers).
 
 ## Questions asked (answered above)
 
