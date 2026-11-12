@@ -50,12 +50,38 @@ The order is by risk reduction per effort.
 | Item | Switch | Waits for |
 |---|---|---|
 | REST entitlement | `restAgentEntitlement: true` | **done 2026-11-11** (user's go): on the demo333 mcp-gateway (`AGENT_ENTITLEMENT_EVERY_CALL=true`), golden path 13/13 after |
-| Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway |
+| Agent chain required | `agentChain.requireFor` | every caller that reaches the gateways signs, including agents called without a2a-gateway. **Analysed 2026-11-12, handed to zuno-main** (see below the table) |
 | Token-proxy inbound auth | `dify_token_proxy_inbound_auth` | re-registering Dify's stored credentials |
 | Salesforce owner scoping | on with the connector | a Salesforce org (none today) |
 | Namespace matcher on `metrics.query` | set the allowed namespaces per group | **done 2026-11-11** (user's go): `ocp-ai-ops` (the only group with the tool) gets the 13 mcp-k8s namespaces plus `nvidia-gpu-operator`; live, golden path PASS, a query outside them returns nothing ([evidence](evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)) |
 | Space and repository allowlists for the other groups | extend beyond the five groups | **done 2026-11-11** (user's go): consultant, board, cdp and lightspeed_readonly get the internal spaces SXSI, SXS, SXSD and SAC (no customer or personal space); consultant, board and cdp get `github:startxfr/*`; the unused `"*"` entries of sales, finance, adv and recrut are removed; live, a customer space and a non-startxfr repository are refused ([evidence](evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)) |
 | Guardrails `scanToolResults`, `/v1/messages` ceilings | on, with a ceiling per key | traffic numbers from a real week: **the measurement week started 2026-11-11 20:40 UTC** (user's go); read the per-key token and tool-result volumes from the ai-gateway metrics on 2026-11-18, then set the ceilings |
+
+### `agentChain.requireFor`: analysis of 2026-11-12
+
+`agentChain.requireFor` is the ai-gateway's list of Keycloak clients that must present a valid agent chain when they
+name an agent. Over seven days, `zuno_model_tokens_total` broken down by client and agent shows this:
+
+| Client | Agents named | Chain |
+|---|---|---|
+| unifai | arkos (about 43,000 tokens), tekos (about 27,000) | only on the turns the a2a-gateway runs; the operator-rendered resources send static headers |
+| zuno-evaluations | arkos, tekos | none: the probes and the golden path name the agent directly |
+| dify, kagent, open-webui, `openclaw-*` (as `openclaw`), blender | their own name only | none |
+
+No client can be listed today without a change of behaviour:
+
+- **unifai** needs the per-call signer in the UnifAI fork described in WP-225: a hook in the outbound LLM and MCP
+  clients that signs a chain with its own key, which the verifiers accept as a second issuer.
+- **The experience clients** name only themselves. Those names match nothing in the classification floors, the
+  routing policy or the guardrails modes, which are all generated from the agents release; only the `agent` label of
+  the metrics uses them. Listing these clients as the code is today would blank that label and protect nothing.
+  Proposed change in the ai-gateway: a listed client may name itself without a chain (the agent equals its `azp`, with
+  `openclaw-*` mapped to `openclaw`), and any other agent needs the chain. These clients could then be listed with no
+  change of behaviour, and none of them could claim an agent such as tekos (its routing preferences and guardrails
+  mode) any more.
+- **zuno-evaluations** stays unlisted until its probes go through the a2a-gateway.
+
+Handed to zuno-main, which owns the agent chain (WP-247, WP-250). Each live step needs the user's go.
 
 ## 5. Other open items from the wave
 
