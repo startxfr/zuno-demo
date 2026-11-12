@@ -363,3 +363,13 @@ The Machine Config Operator rolled the new rendered config through all seven nod
 Proof of use: `kubectl rollout restart deploy/unifai-ui` pulled `quay.io/zuno/unifai-ui@sha256:f214c180…` (554 MB in 4.5 s, the pod references and the signature policy still say quay.io) and Quay's access log shows `GET /v2/zuno/unifai-ui/manifests/sha256:f214c180… 200`, anonymous.
 
 Not proven: a pod start with quay.io blocked (the signature check still needs it, see question 4 above) and the fallback to quay.io when Quay is down. Rollback: set `redirects.enabled: false` in `gitops/apps/quay-registry/application-d0.yaml` and run `make d2 install quay-registry` (the nodes reload again).
+
+## Result of family (d): the public third-party images (2026-11-12, owner's go for the copy and for the IDMS)
+
+The closed list `platform/supply-chain/mirrored-images.yaml` (27 images read from live pods) is copied by `mirror_public_images.py`: the 20 digest-pinned entries (19 repositories, `mongo` carries two digests) are in Quay under `zuno/mirror/<path>`, all publicly readable, digests identical to the source. None of them carries a signature to copy. Docker Hub buildx indexes make Quay answer 404 on the referrers lookup (`temporalio/temporal`), so the tool passes `oras cp -r` only when a signature is expected, retries a failed copy up to three times (a ghcr.io blip stopped one run) and prints each image as it lands.
+
+UnifAI 0.1.69 was copied the same way as 0.1.68 (8 digests, signatures verified at the source and from the copy).
+
+`ImageDigestMirrorSet` `zuno-public-via-registry` (19 sources, `AllowContactingSource`) is live through `make d2 install quay-registry` (the d0 Application values live in the Application object, not in git; the role merges the manifest). The seven nodes reloaded without drain or reboot, golden path 13/13 before and after. A throwaway pod referencing `quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0…` pulled in 1.9 s and Quay's access log shows 16 requests on `mirror/oauth2-proxy`.
+
+Not mirrored, by design: the seven tag-pinned images. `claw-operator`, `claw-proxy`, `nfs-provisioner-operator` and kagent's `golang-adk` are named by tag inside operator bundles or controller defaults that we cannot repin from our charts, and an IDMS only matches digests. `hashicorp/vault` is imported into an ImageStream (pods never pull it from Docker Hub). `istio-csr` and `python:3.12-slim` can be pinned in our own charts and tasks (next step). Rollback: `publicRedirects.enabled: false` in `gitops/apps/quay-registry/application-d0.yaml`, then `make d2 install quay-registry`.
