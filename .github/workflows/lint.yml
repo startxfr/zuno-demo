@@ -80,6 +80,9 @@ jobs:
       # WP-211: a newline escape inside {{ }} in a YAML block scalar stays backslash + n.
       - name: Jinja newline in YAML block scalars tests (WP-211)
         run: python3 platform/docs/tests/test_jinja_newline_in_block_scalars.py
+      # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
+      - name: Markdown link and anchor tests (doc_links)
+        run: python3 platform/docs/tests/test_doc_links.py
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).
