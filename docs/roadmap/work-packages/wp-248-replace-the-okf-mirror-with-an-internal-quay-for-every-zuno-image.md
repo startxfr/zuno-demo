@@ -353,3 +353,13 @@ Prepared, not applied: the IDMS template in the quay-registry chart (d0, platfor
 Measured on OpenShift 4.22.20: the Machine Config Operator's disruption policy for `/etc/containers/registries.conf` is `Special`, which is the no-drain, no-reboot path for mirror changes (CRI-O is reloaded). To be confirmed live on the first worker, with `oc get mcp` and node age unchanged.
 
 Question 4 (the admission policy reads signatures on quay.io): the ClusterImagePolicy CRD has no mirror field, but each authority takes `source.oci`, a repository that holds the signatures. Signature tags are named by image digest, so one repository can hold the signatures of every image. Moving the policy there means copying the signatures of the eight digests into that repository and pointing the UnifAI authority at it; the policy-controller would then no longer need quay.io for UnifAI pods. Not done: it changes the admission policy, which is enforced for opted-in namespaces. Until then the quay.io-blocked test is partial for UnifAI pods (new pods in `zuno-unifai` and `unifai-operator` need quay.io for the signature check only).
+
+## Result of family (c): the IDMS is live (2026-11-12, owner's second go)
+
+Sequence: golden path PASS (13 moments); `make d0 install argocd` (platform AppProject admits `ImageDigestMirrorSet`); flip commit f700cab2; `make d2 install quay-registry`; ArgoCD created `zuno-unifai-via-registry` (eight repositories, `AllowContactingSource`); golden path PASS again.
+
+The Machine Config Operator rolled the new rendered config through all seven nodes (3 masters, 4 workers) in a few minutes: a node check on every 6 s poll saw no node cordoned and none NotReady, node ages unchanged, so no drain and no reboot, as the `Special` disruption policy for `registries.conf` predicts. While it ran the pools showed Updating; both ended Updated (`rendered-master-032b713e…`, `rendered-worker-d737a4a2…`).
+
+Proof of use: `kubectl rollout restart deploy/unifai-ui` pulled `quay.io/zuno/unifai-ui@sha256:f214c180…` (554 MB in 4.5 s, the pod references and the signature policy still say quay.io) and Quay's access log shows `GET /v2/zuno/unifai-ui/manifests/sha256:f214c180… 200`, anonymous.
+
+Not proven: a pod start with quay.io blocked (the signature check still needs it, see question 4 above) and the fallback to quay.io when Quay is down. Rollback: set `redirects.enabled: false` in `gitops/apps/quay-registry/application-d0.yaml` and run `make d2 install quay-registry` (the nodes reload again).
