@@ -7,7 +7,10 @@ Operational documentation will cover agent enable/disable, model health, MCP hea
 The Sigstore policy-controller (webhook `policy.rhtas.com`, namespace `policy-controller-operator`) checks the keyless signature of every
 `quay.io/zuno/unifai-**` image of a pod created in an opted-in namespace (`zuno-unifai`, `unifai-operator`: label `policy.rhtas.com/include=true`).
 The policy is `ClusterImagePolicy zuno-unifai-images`; its identities come from `platform/supply-chain/image-identities.yaml` (release workflows
-always, the `devel` build only on a cluster that accepts development signatures). Images that match no policy (MongoDB, Qdrant, RabbitMQ, Redis,
+always, the `devel` build only on a cluster that accepts development signatures). When `zuno_unifai_signature_mirror_host` is set in the cluster
+file (WP-248), the signatures are read from the internal registry and the policy is split into one `ClusterImagePolicy` per repository,
+`zuno-unifai-images-<repository>` (the webhook accepts one signature source per authority; exact globs, because `unifai-operator**` would also
+catch the bundle and the catalog). Images that match no policy (MongoDB, Qdrant, RabbitMQ, Redis,
 Temporal, docling, the backup Jobs) are only reported (`no-match-policy: warn`). zuno's own verifier and drift check
 (`make d2 check unifai`) stay the main guard: the admission is the second one, at the cluster.
 

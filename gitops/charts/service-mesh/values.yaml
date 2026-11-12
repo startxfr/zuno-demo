@@ -104,6 +104,10 @@ cluster-istio:
 # `resources`/`nodeSelector` or a future chart version.
 cert-manager-istio-csr:
   replicaCount: 2
+  # WP-248 family (d): pinned by digest (index of v0.16.0) so the internal registry can serve it (an ImageDigestMirrorSet only
+  # redirects digest pulls). Changing it rolls the two istio-csr pods.
+  image:
+    digest: sha256:b62b26e10339803cc0e3643ec90dc2ceaf6eb43b29bf0cadda71a9912a3e6d72
   app:
     certmanager:
       # Namespace istio-csr creates its own CertificateRequests in - must be
