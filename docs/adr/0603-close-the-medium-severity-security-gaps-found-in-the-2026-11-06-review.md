@@ -151,12 +151,12 @@ The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
 | Finding | Status | Evidence | What is left |
 |---|---|---|---|
 | M1 | Partly done | deny-all EgressFirewall live on zuno-ai-run (2026-11-07) and zuno-unifai (2026-11-11, WP-224) | TEMPORARY `pypi.org` entries until the acceptance gate runs from a prebuilt image; egress of the other namespaces |
-| M2 | Open | `destinationrule-postgres.yaml:59` and `destinationrule-mariadb.yaml:23` still `mode: DISABLE`; clients use `require`/`prefer` | database-native `verify-full` for every client |
+| M2 | Open | `destinationrule-postgres.yaml:59` and `destinationrule-mariadb.yaml:23` still `mode: DISABLE`; clients use `require`/`prefer` | database-native `verify-full` for every client: [WP-253](../roadmap/work-packages/wp-253-verify-full-database-transport-for-every-client.md), planned mid-December ([ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)) |
 | M3 | Done live | `zuno_validate_route_certs: true` since 2026-11-11 | nothing |
-| M4 | Open | the Keycloak CR keeps `httpEnabled: true`; the operator's NetworkPolicy admits 8080 from any source | limit 8080 to its callers, or accept it here |
+| M4 | Open | the Keycloak CR keeps `httpEnabled: true`; the operator's NetworkPolicy admits 8080 from any source | limit 8080 to its callers, or accept it here: [WP-252](../roadmap/work-packages/wp-252-limit-or-accept-the-keycloak-http-listener.md), planned mid-December |
 | M5 | Done live | the reconcile Job updates realm settings (WP-223) | nothing |
 | M6 | Done in the `hardened` profile only | 1 h idle in `keycloak/values.yaml` for `hardened`; demo333 runs `demo` (8 h) | decide whether the profile closes it, or wait for WP-227 |
-| M7 | Open | `configure.sh:130-134`: root `ttl=87600h`, no intermediate; the three cert-manager roles share one ServiceAccount | an intermediate (or an offline root) and a separate ServiceAccount for the Istio role; no work package yet |
+| M7 | Open | `configure.sh:130-134`: root `ttl=87600h`, no intermediate; the three cert-manager roles share one ServiceAccount | an intermediate (or an offline root) and a separate ServiceAccount for the Istio role; [WP-254](../roadmap/work-packages/wp-254-intermediate-ca-and-separate-istio-service-account.md), planned mid-December |
 | M8 | Done live | Vault UI Route off; htpasswd kept as break-glass by decision (WP-223) | nothing |
 | M9 | Done live for the vault role (2026-11-12) | `ansible/tasks/vault_cli.yml` passes the token and the values as files copied into the pod; the vault role and `vault_seed_if_missing.yml` use it; role run and golden path PASS ([evidence](../roadmap/evidence/adr-0603-m9-vault-seeding-2026-11-12.md)) | 20 calls in other roles (aap_config, dify, quay_registry, the external modes, openclaw, the KMS migration playbook) and the one-time root-token steps |
 | M10 | Done live | `/admin/*` needs an admin token (WP-222) | nothing |
@@ -174,8 +174,8 @@ The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
 | M22 | Owner action | `.gitignore` is the only barrier | the maintainer rotates the keys and moves the files |
 
 What still stands between this record and `Implemented`:
-- Live windows: M2, M4 and M7; M9's remaining calls in other roles, one role run each. M7 is also the only one without a
-  work package.
+- Live windows: M2, M4 and M7; M9's remaining calls in other roles, one role run each. M2, M4 and M7 now have work packages
+  (WP-253, WP-252, WP-254, [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)), planned for mid-December 2026.
 - Decisions or residuals to record:
   - M6: does the `hardened` profile close it?
   - M12: Salesforce is deferred.

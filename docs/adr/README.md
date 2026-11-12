@@ -393,6 +393,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
 | [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) | Superseded in part by ADR-0612 | Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io |
 | [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) | Accepted | Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket |
+| [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md) | Proposed | Close the three remaining live hardening items of ADR-0603 (M4, M2, M7) in mid-December |
 
 ## OKF v0.1
 

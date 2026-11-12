@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 5 | 3 | 13 | WP-212, WP-213, WP-215, WP-218, WP-248 |
+| v0.17 | 6 | 4 | 16 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1115,6 +1115,9 @@ the 2026-11-09 demonstration); the freeze window still applies.
 | WP-246 | [wp-246](work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) | 0612 | WP-242 | Done | live on demo333 2026-11-10: gateways read the mirror, quay.io blocked drill passed |
 | WP-247 | [wp-247](work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) | 0602 | WP-223, WP-225 | Done (2026-11-11) | Vault Transit signs the MCP assertion and the agent chain on demo333, golden path 14/14 after each switch, both old keys unreadable from any namespace (proved with the store's role, no persona proof by decision); follow-ups: delete the two old Vault values, the workload token (its own WP) |
 | WP-248 | [wp-248](work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md) | 0612 | WP-246, WP-131, WP-242 | Operator pending | live on demo333 2026-11-12: OKF release, UnifAI images and public images served by Quay, drill passed, zot removed; left: first-party images and the ImageStream retirement (ADR-0612 clause 9, the owner's decision) |
+| WP-252 | [wp-252](work-packages/wp-252-limit-or-accept-the-keycloak-http-listener.md) | 0613 | none | Not started | planned about 2026-12-14: measure the callers of Keycloak port 8080, then limit it or accept it with a reason (ADR-0603 M4, hardening); the user's go per window |
+| WP-253 | [wp-253](work-packages/wp-253-verify-full-database-transport-for-every-client.md) | 0613 | none | Not started | planned about 2026-12-15 to 17: `verify-full` for every PostgreSQL and MariaDB client, one client per lot (ADR-0603 M2, hardening); the user's go per window |
+| WP-254 | [wp-254](work-packages/wp-254-intermediate-ca-and-separate-istio-service-account.md) | 0613 | WP-253 | Not started | planned about 2026-12-17 to 18: intermediate CA under the Vault root and a separate ServiceAccount for the Istio role (ADR-0603 M7, hardening); rehearse first, the user's go per window |
 
 ### OKF stream phases
 
@@ -1262,6 +1265,7 @@ moving.
 
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
+- 2026-11-12 — ADR-0613 and WP-252 to WP-254 added (Phase 53, v0.17), Proposed / Not started, by the user's request: the three remaining live hardening items of ADR-0603 (M4, M2, M7), planned for mid-December 2026. Hardening in depth, not fixes of a known flaw.
 - 2026-11-12 — WP-251 added (Phase 52, v0.16), Not started: `agentChain.requireFor` with a self-name exemption, handed over by the zuno-avancement session (user's go).
 - 2026-11-11 — WP-250 added (Phase 52, v0.16), Not started: retire the shared MCP workload token by folding the caller context into the Transit-signed assertion (user's go).
 - 2026-11-11 — WP-249 added (Phase 52, v0.16): test one rollback per experience, the remaining condition of ADR-0606 (user decision).
