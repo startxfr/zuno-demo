@@ -142,3 +142,45 @@ User decisions of 2026-11-11 (post-demo hardening list, item 4). Both are now va
 Both are live on demo333 since 2026-11-11 22:41 UTC. The golden path passed afterwards, and each restriction was
 checked with one allowed call and one refused call
 ([evidence](../roadmap/evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)).
+
+## Status of M1 to M22 (2026-11-12)
+
+The record had no status per finding. This is the state on devel e2be4384 plus the bootstrap locks of 2026-11-12.
+The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
+
+| Finding | Status | Evidence | What is left |
+|---|---|---|---|
+| M1 | Partly done | deny-all EgressFirewall live on zuno-ai-run (2026-11-07) and zuno-unifai (2026-11-11, WP-224) | TEMPORARY `pypi.org` entries until the acceptance gate runs from a prebuilt image; egress of the other namespaces |
+| M2 | Open | `destinationrule-postgres.yaml:59` and `destinationrule-mariadb.yaml:23` still `mode: DISABLE`; clients use `require`/`prefer` | database-native `verify-full` for every client |
+| M3 | Done live | `zuno_validate_route_certs: true` since 2026-11-11 | nothing |
+| M4 | Open | the Keycloak CR keeps `httpEnabled: true`; the operator's NetworkPolicy admits 8080 from any source | limit 8080 to its callers, or accept it here |
+| M5 | Done live | the reconcile Job updates realm settings (WP-223) | nothing |
+| M6 | Done in the `hardened` profile only | 1 h idle in `keycloak/values.yaml` for `hardened`; demo333 runs `demo` (8 h) | decide whether the profile closes it, or wait for WP-227 |
+| M7 | Open | `configure.sh:130-134`: root `ttl=87600h`, no intermediate; the three cert-manager roles share one ServiceAccount | an intermediate (or an offline root) and a separate ServiceAccount for the Istio role; no work package yet |
+| M8 | Done live | Vault UI Route off; htpasswd kept as break-glass by decision (WP-223) | nothing |
+| M9 | Partly done | `no_log` set, but seeding still passes values in `sh -c` strings (`vault/tasks/install.yml`) | read the values from files |
+| M10 | Done live | `/admin/*` needs an admin token (WP-222) | nothing |
+| M11 | Done live | CQL escaping, space-key check, caps (WP-222) | nothing |
+| M12 | Partly done | Confluence and git allowlists live 2026-11-11; `email.recipientAllowlist: {}` (the handler is in demo mode and sends nothing); Salesforce owner scoping waits for an org | email allowlist values; Salesforce recorded as deferred |
+| M13 | Done live | the 2026-11-11 amendment above | nothing |
+| M14 | Done live | call assertion required, REST entitlement, Transit signing, workload token retired, `requireFor` (WP-225, WP-247, WP-250, WP-251) | unifai and zuno-evaluations stay out of `requireFor` until the UnifAI fork signs its calls: a residual to accept |
+| M15 | Done live | no per-user label, JSON-RPC batch cap 20, AAP launch limit (WP-225) | nothing |
+| M16 | Partly done | digests rendered for v0.14.5 and cleared (2026-11-08); base images pinned by digest | a release that keeps its digests; the AAP execution environment base digest |
+| M17 | Partly done | `ClusterImagePolicy` enforce on the opt-in namespaces; CI keyless signing written, never run | zuno-ai-run opted in (with WP-227); one CI signing run (needs Quay credentials) |
+| M18 | Done in the repo | cosign and oras checksums, `ignore-unfixed` dropped, SBOM attestation written | the same CI run as M17 |
+| M19 | Partly done | actions pinned by SHA, `lint.yml` permissions, secret scan, pre-commit, Dependabot | CODEOWNERS and SECURITY.md; the GitHub settings on `main` (owner) |
+| M20 | Done in the repo | hashed locks, constraints, `kubernetes.core` pinned; the bootstrap tools hashed on 2026-11-12 (WP-226) | live as each image is rebuilt |
+| M21 | Done | the virtual environment is untracked | history purge is the user's choice |
+| M22 | Owner action | `.gitignore` is the only barrier | the maintainer rotates the keys and moves the files |
+
+What still stands between this record and `Implemented`:
+- Live windows: M2, M4, M7 and M9. M7 is also the only one without a work package.
+- Decisions or residuals to record:
+  - M6: does the `hardened` profile close it?
+  - M12: Salesforce is deferred.
+  - M14: the UnifAI signer gap is accepted.
+  - M1: egress of the other namespaces.
+- Small repository items: M19 (CODEOWNERS, SECURITY.md) and M12 (the email allowlist values).
+- Steps that depend on other work: M16, M17 and M18 need a release that keeps its digests, the AAP execution
+  environment digest and one CI signing run.
+- Owner actions: M22 and the GitHub settings on `main`.

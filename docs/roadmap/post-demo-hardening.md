@@ -90,8 +90,9 @@ Handed to zuno-main, which owns the agent chain (WP-247, WP-250). Each live step
 - GitHub settings on `main`: secret scanning with push protection, a ruleset against force-push and deletion, the
   required checks. The `main` Secret scan is red on a documented false positive until v0.14.5.
 - `startx-cluster-auth` and `startx-cluster-infra-config` OutOfSync (not from this wave).
-- WP-226 live steps: first rendered release (`make d3 release RENDER_DIGESTS=1`), the AAP execution environment
-  digest, `zuno-first-party-images` enforce extended to more namespaces.
+- WP-226 live steps: the first rendered release ran with v0.14.5 on 2026-11-08 (`RENDER_DIGESTS=1`, then
+  `--clear` the same evening, recorded as WP-249 row 4). Still open: a release that keeps its digests, the AAP
+  execution environment digest, and `zuno-first-party-images` enforce extended to more namespaces (with WP-227).
 - `zuno_validate_route_certs`: **done 2026-11-11** (user's go). The three runs passed with it on, every Route these
   tasks call verifies, and the default is `true` in `ansible/inventories/demo/group_vars/all/main.yml` (ADR-0603 M3).
 - WP-227 (hardened profile) not started. It now carries the removal of ArgoCD's `cluster-admin` (user decision

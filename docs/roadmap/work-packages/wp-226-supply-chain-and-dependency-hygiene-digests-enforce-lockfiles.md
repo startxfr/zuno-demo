@@ -1,6 +1,6 @@
 # WP-226: Supply chain and dependency hygiene: digests, enforce mode, lockfiles (delivers ADR-0603)
 
-- **State:** Done (2026-11-07, user decision). On `devel`; the image policy is in `enforce` on demo333 for the opt-in namespaces after a clean warn run. The live steps still open (first rendered release, `zuno_validate_route_certs`, AAP execution environment digest) are listed in [post-demo-hardening.md](../post-demo-hardening.md) and each needs the user's go.
+- **State:** Done (2026-11-07, user decision). On `devel`; the image policy is in `enforce` on demo333 for the opt-in namespaces after a clean warn run. The live steps still open (first rendered release, `zuno_validate_route_certs`, AAP execution environment digest) are listed in [post-demo-hardening.md](../post-demo-hardening.md) and each needs the user's go. Since then: the first rendered release ran with v0.14.5 on 2026-11-08 and was cleared the same evening, `zuno_validate_route_certs` is on since 2026-11-11, and the unhashed tool installs were closed on 2026-11-12 (below); the AAP execution environment digest is still open.
 - **ADRs:** ADR-0603
 - **Depends on:** WP-222
 - **Blocks:** WP-227
@@ -75,7 +75,7 @@ ADR-0603 clause 4.
 ### M17: enforce mode and keyless CI signing
 
 6. `gitops/charts/rhtas-config`: `policyOperand.clusterImagePolicy.mode` is a value (`warn` in git; the template accepts
-   only `warn` or `enforce`). Live today: `zuno-first-party-images` is `warn`, `zuno-unifai-images` is already `enforce`.
+   only `warn` or `enforce`). Live on 2026-11-07, before the switch: `zuno-first-party-images` was `warn` and `zuno-unifai-images` already `enforce`; `zuno-first-party-images` is `enforce` since the warn run below.
 7. `build-publish.yml`: each build job gets `id-token: write`, signs the pushed digest keylessly (`cosign sign`, public
    Sigstore, GitHub OIDC), attaches the SBOM as a signed `spdxjson` attestation (`cosign attest`) and verifies both
    against this identity:
@@ -243,10 +243,23 @@ A read-only review by the main session found the points below, fixed in one foll
 
 - **The AAP execution environment base** (`registry.redhat.io/.../ee-supported-rhel9:latest`) is not digest-pinned:
   resolving its digest needs a registry.redhat.io login that this workstation does not hold. Pin it at its next rebuild.
-- **Unhashed tool installs.** The pip upgrade before each lock is now pinned exactly (`pip==26.0.1 setuptools==84.2.1
-  wheel==0.48.0`, mlops `pip==26.0.1`), and `pyyaml==6.0.2` in the okf-release stages and the signer is pinned too, but
-  none of them carries a hash: hashing them needs a requirements file the per-directory build contexts of the MCP
-  servers cannot reach. Dependabot does not see these pins; bump them with the base-image refresh.
+- **Unhashed tool installs: closed on 2026-11-12.**
+  - Three hashed locks under `platform/python/bootstrap/`, compiled by `compile_locks.py` like the component locks:
+    `tools` (pip, setuptools, wheel and wheel's `packaging`), `pip` (the mlops upgrade) and `pyyaml` (the okf-release
+    stages of ai-gateway and mlops, and the signer).
+  - The 15 Dockerfiles copy a lock and run `pip install --require-hashes -r` on it.
+  - Each of the four MCP servers builds from its own directory, so it carries a byte-identical copy,
+    `bootstrap-tools.txt`. The scaffold `new_mcp_server.py` writes that copy for a new server.
+  - `check_python_locks.py` now also fails when a Dockerfile passes a `name==version` to `pip install`, or when an MCP
+    server's copy differs from the original. Its tests went from 9 to 12.
+  - Checked with podman:
+    - the locks install in python 3.11-slim, 3.12-slim and UBI9 python-311;
+    - a tampered hash is refused;
+    - the zuno-token-proxy image (repository-root context) and the confluence MCP server image (its own directory)
+      both build with pip 26.0.1, setuptools 84.2.1 and wheel 0.48.0.
+  - Live once each image is rebuilt (a build is a roll on demo333).
+  - Bump these locks with the base-image refresh: `compile_locks.py platform/python/bootstrap/*`, then copy
+    `tools/requirements.txt` to each MCP server.
 - **The ledger header** in `release_ledger.py` still says no deployment consumes the ledger. It is left as is: the
   ledger file is never hand-edited, and its header changes with the next release write.
 - **History purge** of `evaluations/.venv-gate`: the user's decision (item 16).
