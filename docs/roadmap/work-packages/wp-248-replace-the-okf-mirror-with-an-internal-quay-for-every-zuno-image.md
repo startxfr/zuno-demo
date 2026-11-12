@@ -330,6 +330,6 @@ Decisions are in the ADR-0612 addendum of 2026-11-12. Measured while planning: t
 
 1. Chart: `okf.fetch.mirror` in mcp-gateway and a2a-gateway gains an optional pull Secret mounted as `DOCKER_CONFIG`; the Secret is an ExternalSecret over Vault `zuno/registry/quay-robots` (`pull_username`, `pull_token`).
 2. Network: route host in the `zuno-ai-run` EgressFirewall, router egress in its NetworkPolicy; checked by a pod-level pull, not by TCP probes.
-3. Feeding: `make d3 admit agents` with `OKF_MIRROR_TO=<route>/zuno/okf` using the `zuno+push` robot (already seeded), and `okf_mirror_holds_lock.yml` verifies through the route instead of the zot port-forward when the prefix is a Quay one.
+3. Feeding: `make d3 admit agents` with `OKF_MIRROR_TO=<route>/zuno` using the `zuno+push` robot (already seeded), and `okf_mirror_holds_lock.yml` verifies through the route instead of the zot port-forward when the prefix is a Quay one.
 4. Switch `zuno_okf_registry_mirror` to the Quay prefix with `plainHttp: false`, roll the gateways, golden path before and after, then pods started with quay.io blocked as the proof.
 5. zot stays until the drill of clause 8.

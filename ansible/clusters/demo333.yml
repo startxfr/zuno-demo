@@ -577,4 +577,9 @@ zuno_ai_gateway_agent_chain_require_for:
   - world-model
 # ADR-0611/WP-246: the gateways' okf-fetch reads the admitted OKF release from the in-cluster mirror
 # (roles/okf_mirror) first and falls back to the source registry. Plain HTTP inside the mesh (mTLS).
-zuno_okf_registry_mirror: "okf-mirror.zuno-ai-run.svc:5000/okf"
+# ADR-0612 addendum (WP-248 family a): the internal Quay, through its route (the Service certificate does not cover the Service
+# name). The pull robot's docker config comes from Vault registry/quay-pull through the quay-pull ExternalSecret. Roll back to zot
+# with the three previous values: "okf-mirror.zuno-ai-run.svc:5000/okf", plain HTTP true, no pull secret.
+zuno_okf_registry_mirror: "quay-quay-zuno-registry.apps.demo333.startx.fr/zuno"
+zuno_okf_registry_mirror_plain_http: false
+zuno_okf_registry_mirror_pull_secret: quay-pull

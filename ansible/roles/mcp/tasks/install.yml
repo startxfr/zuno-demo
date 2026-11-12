@@ -56,7 +56,8 @@
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
                                      'mirror': {'prefix': zuno_okf_registry_mirror | default(''),
-                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool},
+                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool,
+                                                'pullSecret': zuno_okf_registry_mirror_pull_secret | default('')},
                                      'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
                   recursive=True)
       }}
@@ -186,7 +187,8 @@
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
                                      'mirror': {'prefix': zuno_okf_registry_mirror | default(''),
-                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool},
+                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool,
+                                                'pullSecret': zuno_okf_registry_mirror_pull_secret | default('')},
                                      'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
                   recursive=True)
       }}
