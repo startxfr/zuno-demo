@@ -25,7 +25,10 @@ def pod(ns, name, ready="True", waiting=None, init_waiting=None):
 def healthy(args):
     key = " ".join(args)
     if key == "get nodes":
-        return {"items": [{"metadata": {"name": "n1"}, "spec": {}, "status": cond("Ready", "True")}]}
+        return {"items": [{"metadata": {"name": "n1", "labels": {}}, "spec": {}, "status": cond("Ready", "True")},
+                          {"metadata": {"name": "m1", "labels": {r.MASTER: ""}}, "spec": {}, "status": cond("Ready", "True")}]}
+    if key == "get schedulers.config.openshift.io cluster":
+        return {"spec": {"mastersSchedulable": False}}
     if key == "get machineconfigpools":
         return {"items": [{"metadata": {"name": "worker"}, "status": {**cond("Updated", "True"), "machineCount": 4,
                                                                          "readyMachineCount": 4}}]}
@@ -75,6 +78,29 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn("not Ready", out["quay"][0])
         self.assertIn("no endpoint", out["kuadrant"][0])
         self.assertIn("failed closed", out["maas"][0])
+
+    def test_layout_flags_schedulable_masters_stray_pods_and_a_short_infra_pool(self):
+        def bad(args):
+            key = " ".join(args)
+            if key == "get schedulers.config.openshift.io cluster":
+                return {"spec": {"mastersSchedulable": True}}
+            if key == "get nodes":
+                d = healthy(args)
+                d["items"].append({"metadata": {"name": "i1", "labels": {r.INFRA: ""}}, "spec": {}, "status": cond("Ready", "True")})
+                return d
+            if key == "get pods -A":
+                stray = pod("zuno-vault", "zuno-vault-0")
+                stray["spec"] = {"nodeName": "m1"}
+                pinned = pod("openshift-etcd", "etcd-m1")
+                pinned["spec"] = {"nodeName": "m1", "tolerations": [{"operator": "Exists"}]}
+                return {"items": [stray, pinned]}
+            return healthy(args)
+        out = r.run(["layout"], None, bad)["layout"]
+        self.assertEqual(len(out), 3)
+        self.assertIn("schedulable again", out[0])
+        self.assertIn("1 Ready node(s) of 3", out[1])
+        self.assertIn("zuno-vault/zuno-vault-0", out[2])
+        self.assertNotIn("etcd-m1", out[2])
 
     def test_only_runs_the_named_checks_and_no_http_skips_the_routes(self):
         out = r.run(["maas", "quay"], None, healthy)

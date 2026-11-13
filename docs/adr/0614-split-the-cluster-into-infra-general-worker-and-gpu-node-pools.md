@@ -1,6 +1,6 @@
 # ADR-0614: Split the cluster into infra, general-worker and GPU node pools
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.17
 - **Date:** 2026-11-13
 - **Decision owners:** Zuno Demo architecture team
@@ -83,3 +83,12 @@ delete-then-drain step of ADR-0101 (31-65 s outage).
 ## Work packages
 
 [WP-260](../roadmap/work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) (rollout on demo333).
+
+## Update 2026-11-13 (WP-260): rolled out on demo333
+
+Infra pool and nodes, Red Hat infra set moved onto them, gateway and MaaS replicas, CPU right-sizing of PostgreSQL and Quay,
+200 GB workers, `unifai-worker-a` retired, masters and GPU nodes emptied of other workloads; golden path 13/13 after every
+phase. Clause 1's resize did not pass its gate: the control plane alone peaks at 6.8 vCPU and 23.8 GiB on a master, so the
+masters stay m5a.4xlarge (WP-260, "P6 verdict"). a2a-gateway, maas-api and Limitador stay at one replica (in-memory state, or no
+replicas field). Open: the `startx-cluster-infra-config` Application (startxfr/helm-repository) also tracks
+`cluster-monitoring-config` and would overwrite the infra placement if its source changed.

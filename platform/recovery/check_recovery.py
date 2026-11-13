@@ -13,6 +13,7 @@ had to be recreated afterwards. This lists those layers in the order they have t
   quay       the Quay application Ready and its route answering 401 without credentials
   kuadrant   the wasm Service of the Kuadrant operator has an endpoint, Authorino is Ready
   maas       a MaaS model route answers 401 without a token (503 = the wasm-shim failed closed)
+  layout     ADR-0614 node pools: masters unschedulable, no workload pod left on a master, the infra pool at 3 Ready nodes
 
     python3 platform/recovery/check_recovery.py [--only quay,maas] [--no-http]
 
@@ -155,6 +156,47 @@ def maas(oc: Oc, http: Optional[Callable[[str], int]]) -> List[str]:
     return [f"a MaaS route answers {code} instead of 401 without a token"]
 
 
+MASTER = "node-role.kubernetes.io/master"
+INFRA = "node-role.kubernetes.io/infra"
+
+
+def tolerates_master(pod: Dict) -> bool:
+    """Pinned to a master (nodeSelector or required affinity) or tolerating the master taint: it may run there."""
+    spec = pod.get("spec", {})
+    if MASTER in (spec.get("nodeSelector") or {}) or "node-role.kubernetes.io/control-plane" in (spec.get("nodeSelector") or {}):
+        return True
+    if MASTER in json.dumps((spec.get("affinity") or {}).get("nodeAffinity", {})):
+        return True
+    return any(t.get("operator") == "Exists" and t.get("key") in (None, "", MASTER) for t in spec.get("tolerations", []) or [])
+
+
+def layout(oc: Oc) -> List[str]:
+    """ADR-0614 / WP-260: the control plane runs no workload, and the infra pool is whole."""
+    out = []
+    sched = oc(["get", "schedulers.config.openshift.io", "cluster"])
+    if (sched.get("spec") or {}).get("mastersSchedulable"):
+        out.append("the masters are schedulable again (Scheduler mastersSchedulable: true): run `make d0 install machines`, "
+                   "which sets it back to false once the general workers are up")
+    node_items = oc(["get", "nodes"])["items"]
+    masters = {n["metadata"]["name"] for n in node_items if MASTER in n["metadata"].get("labels", {})}
+    infra = [n for n in node_items if INFRA in n["metadata"].get("labels", {})]
+    if infra and sum(1 for n in infra if cond(n, "Ready") == "True") < 3:
+        out.append(f"the infra pool has {sum(1 for n in infra if cond(n, 'Ready') == 'True')} Ready node(s) of 3: router, "
+                   "registry, monitoring, GitOps and Quay lose their zone spread")
+    stray = []
+    for p in oc(["get", "pods", "-A"])["items"]:
+        if p.get("spec", {}).get("nodeName") not in masters or p["status"].get("phase") != "Running":
+            continue
+        owner = ((p["metadata"].get("ownerReferences") or [{}])[0]).get("kind")
+        if owner in ("DaemonSet", "Node") or tolerates_master(p):
+            continue
+        stray.append(f"{p['metadata']['namespace']}/{p['metadata']['name']}")
+    if stray:
+        out.append(f"{len(stray)} workload pod(s) still on a master, placed before the masters became unschedulable "
+                   f"(delete them to move them): {', '.join(stray[:5])}")
+    return out
+
+
 def http_status(url: str) -> int:
     ctx = ssl.create_default_context()
     try:
@@ -168,7 +210,7 @@ def http_status(url: str) -> int:
 def run(only: List[str], http: Optional[Callable[[str], int]], oc: Oc = oc_json) -> Dict[str, List[str]]:
     checks = {"nodes": lambda: nodes(oc), "pools": lambda: pools(oc), "operators": lambda: operators(oc),
               "pods": lambda: pods(oc), "quay": lambda: quay(oc, http), "kuadrant": lambda: kuadrant(oc),
-              "maas": lambda: maas(oc, http)}
+              "maas": lambda: maas(oc, http), "layout": lambda: layout(oc)}
     return {name: fn() for name, fn in checks.items() if not only or name in only}
 
 

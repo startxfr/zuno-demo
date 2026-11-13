@@ -224,6 +224,18 @@ Read-only (`platform/recovery/check_recovery.py`, `oc` logged in). It lists the 
 step for each: nodes Ready and uncordoned (a drain stuck on a single-replica PodDisruptionBudget passes when the pods are deleted,
 ADR-0101), MachineConfigPools Updated, ClusterOperators, stuck pods, Quay Ready (answering 401 on its route), the Service
 `kuadrant-operator-wasm` with an endpoint and Authorino Ready, and a MaaS route answering 401 without a token (503 = the Kuadrant
-wasm-shim failed closed: delete the `maas-default-gateway` pod once the operator is back). Removing a source from an
+wasm-shim failed closed: delete the `maas-default-gateway` pod once the operator is back), and the node-pool layout of
+ADR-0614 (masters unschedulable, no workload pod left on a master, the infra pool at 3 Ready nodes). Removing a source from an
 ImageDigestMirrorSet drains every node (adding one does not); run it after such a change and after any reboot.
+
+## Node pools (ADR-0614)
+
+Masters run only the control plane. Three infra nodes (`zuno-infra-a/b/c`, tainted `node-role.kubernetes.io/infra`) run the
+Red Hat infra-eligible set: default router, internal registry, platform and user-workload monitoring, OpenShift GitOps, Quay.
+Three general workers (`zuno-worker-a/b/c`, 200 GB) run everything else; Spot workers (`zuno-worker-spot-a/b/c`) start
+from zero when pods are Pending. The two GPU nodes run only model pods and are never scaled down, replaced or drained
+without the owner's double approval. To replace a worker: scale its MachineSet to 2, wait for the new node, annotate the
+old Machine `machine.openshift.io/delete-machine=true`, scale back to 1 (the Machine API drains it); delete Keycloak `zuno-0`
+or `a2a-gateway` if they are the last pods holding the drain (ADR-0101). The ai-gateway runs two replicas: read its log with
+`oc logs -l app.kubernetes.io/name=ai-gateway -c ai-gateway --tail=-1`, not `deploy/ai-gateway`.
 

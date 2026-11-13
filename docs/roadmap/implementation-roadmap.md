@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 7 | 5 | 17 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-260 |
+| v0.17 | 7 | 4 | 17 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1132,7 +1132,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 | WP-257 | [wp-257](work-packages/wp-257-publish-verify-and-roll-back-an-okf-release-documented.md) | 0577, 0578, 0580 | none | Not started | the SBOM decision (the user); a canary pin for the rollback check |
 | WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Not started | a server-side dry run on a canary operator |
 | WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Not started | none; sends the final anchors to unifai-compare |
-| WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Operator pending | one go per phase (P1-P6); masters resize only after a 7-day measurement |
+| WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Done | none; masters resize refused by its gate (P6) |
 
 ### OKF stream phases
 

@@ -1,6 +1,6 @@
 # WP-260: Roll out the infra, general and GPU node pools on demo333
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0614](../../adr/0614-split-the-cluster-into-infra-general-worker-and-gpu-node-pools.md)
 - **Depends on:** none
 - **Estimated files touched:** ~15 (machines, cert-manager, openshift-ai, namespaces, quay-registry, postgresql charts;
@@ -30,8 +30,8 @@ e2e namespace evicted platform pods.
 | P3 | ai-gateway and mcp-gateway at 2 replicas, spread over zones (bb1d86d7; ai-gateway already counts quotas in Redis on demo333); MaaS gateway (Istio deployment through `maas-gateway-config`) and Authorino at 2 (1d458f75; MaaS answered 401 throughout); maas-api stays at 1 (its owner, the MaaS `Config` CR, has no replicas field), Limitador at 1 (in-memory counters), a2a-gateway at 1 (in-memory tasks); right-sizing pushed (6804be49): PGO rolled the 3 instances, Patroni 3/3 TL 54 with s7tr as leader, Quay rolled without losing health. The golden path then read the ai-gateway log from one pod only: fixed to read every replica (74da3555). Golden path 13/13, `check_recovery.py` all ok | brief rolls | Done 2026-11-13 19:30Z |
 | P4 | `zuno-worker-a/b/c` replaced one at a time by 200 GB machines (surge to 2, mark the old Machine `delete-machine`, scale to 1: MAPI drains it); Keycloak `zuno-0` deleted twice when it was the only pod left (PDB, ADR-0101), discovery back to 200 within a minute. Both `unifai-worker-a` nodes drained and retired, MachineSet deleted (13.4 vCPU / 27 GiB of requests moved, 0.2 vCPU zone-a-pinned). A fresh node pulled the NeMo Guardrails image from registry.redhat.io in ~9 min, so the first golden path failed on guardrails; 13/13 PASS once it started. `check_recovery.py` all ok | drains | Done 2026-11-13 20:50Z |
 | P5 | Pods deleted in three waves (non-GPU pods off the GPU node; first of each pair and stateless pods off the masters; second of each pair and single stateful pods: Vault, MongoDB, the Redis instances, a2a-gateway, Limitador). Vault now auto-unseals (AWS KMS) and came back unsealed. Two pods were missed because the wave files had no final newline (`while read` skips the last line) and were deleted by hand; `unifai-rag-celery` landed back on the GPU node with "failed to prepare subPath" and was recreated. End state: masters run only control-plane pods pinned to them, DaemonSets and one RHOAI pod that tolerates the master taint (`data-science-prometheus-cluster-proxy`); GPU nodes run only the 5 model pods and DaemonSets. Golden path 13/13, `check_recovery.py` all ok | pod moves | Done 2026-11-13 21:15Z |
-| P6 | Masters to m5a.2xlarge through the ControlPlaneMachineSet, only if the 7-day peak per master is at or below 22 GiB **and** 5.5 vCPU; window of at least 2 h | control-plane roll | Not started |
-| P7 | `check_recovery.py`: infra pool and unschedulable masters; final cost table | none | Not started |
+| P6 | Measured, not done: the control-plane pods alone peak above the gate on two masters (see "P6 verdict"). The masters stay m5a.4xlarge | none | Closed, no-go 2026-11-13 |
+| P7 | `check_recovery.py` gains a `layout` layer (masters unschedulable, no workload pod on a master, infra pool at 3 Ready nodes), with a test; operations.md documents the pools and the worker replacement recipe; cost table below | none | Done 2026-11-13 |
 
 ## P2 incidents and traps (2026-11-13)
 
@@ -60,6 +60,37 @@ largest platform images into Quay (ADR-0612 family d, IDMS) would shorten every 
 With every workload off it, master ip-10-18-28-96 still used ~7.2 vCPU: kube-apiserver 3.7, kube-controller-manager
 (the elected leader) 2.1, openshift-apiserver 0.8, etcd 0.6. An m5a.2xlarge has 8 vCPU (~7.5 allocatable). P6 therefore
 also needs the 7-day CPU peak per master at or below 5.5 vCPU; otherwise the masters stay m5a.4xlarge.
+
+## P6 verdict (Prometheus, 7 days to 2026-11-13 21:30Z, control-plane namespaces only, masters)
+
+| Master | CPU p95 | CPU max | Memory max |
+|---|---|---|---|
+| ip-10-18-28-96 | 6.80 | 7.47 | 23.8 GiB |
+| ip-10-18-36-37 | 6.74 | 6.88 | 23.2 GiB |
+| ip-10-18-94-42 | 5.44 | 6.28 | 18.5 GiB |
+
+The gate is 5.5 vCPU and 22 GiB. An m5a.2xlarge has 8 vCPU and about 29 GiB allocatable, and the control plane alone (kube-apiserver
+about 14 GiB each, the elected kube-controller-manager about 2 cores) would leave no headroom. The week includes the 2026-11-13
+operator storm, but the load measured after P5 (4.4-5.5 vCPU, 18-26 GiB per master, every pod included) also misses the memory
+gate. The masters stay m5a.4xlarge; a later re-measure can reopen this.
+
+## Cost (eu-central-1, USD per hour)
+
+On-demand list prices (m5a.4xlarge 0.832, m5a.2xlarge 0.416) are the published Frankfurt prices, not fetched: the account has no
+`pricing:GetProducts`. The Spot price is from `describe-spot-price-history` on 2026-11-13 (m5a.2xlarge 0.220-0.232). GPU:
+2 x g7e.4xlarge at about 4 each (ADR-0351), unchanged throughout.
+
+| Layout | Non-GPU instances | USD/h | USD/month (730 h) |
+|---|---|---|---|
+| Morning of 2026-11-13 (masters schedulable) | 3 masters + 2 unifai-worker, all m5a.4xlarge | 4.16 | ~3,040 |
+| After the emergency fixes (same day) | 3 masters + 2 unifai-worker + 3 zuno-worker, m5a.4xlarge | 6.66 | ~4,860 |
+| ADR-0614, as rolled out | 3 masters + 3 zuno-worker (m5a.4xlarge) + 3 infra (m5a.2xlarge) | 6.24 | ~4,555 |
+| ADR-0614 plan, if P6 had passed | masters at m5a.2xlarge | 4.99 | ~3,640 |
+
+Spot workers add about 0.23 per hour each, only while the autoscaler keeps them. Compared with the morning, the layout costs about
+2.08 more per hour (+50%). That buys a control plane that no longer saturates, three zones for workers and infra, and room for
+the e2e canaries. Compared with the emergency layout it saves about 0.42 per hour. The plan's -25% assumed smaller masters, which
+P6 refused. EBS root volumes add about 1,050 GB of gp3 in total.
 
 ## Rules
 
