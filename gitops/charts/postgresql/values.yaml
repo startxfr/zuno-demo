@@ -81,9 +81,12 @@ cluster:
   storageClassName: mycluster-default-storageclass
   storageSize: 200Gi
   walStorageSize: 50Gi  # separate volume: WAL write latency matters more than DATA's
+  # ADR-0614 right-sizing: the CPU request was 2 per instance against a
+  # measured 7-day p95 of 0.24 core (2026-11-13); request = 2 x p95, rounded.
+  # The limit (4) and memory are unchanged, so a burst still has headroom.
   resources:
     requests:
-      cpu: "2"
+      cpu: 500m
       memory: 8Gi
     limits:
       cpu: "4"

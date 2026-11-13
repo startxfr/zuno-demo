@@ -22,14 +22,28 @@ spec:
       managed: true
       overrides:
         replicas: {{ .Values.registry.replicas }}
+        {{- with (.Values.registry.resources | default dict).quay }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
     - kind: clair
       managed: true
       overrides:
         replicas: {{ .Values.registry.replicas }}
+        {{- with (.Values.registry.resources | default dict).clair }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
     - kind: clairpostgres
       managed: true
+      {{- with (.Values.registry.resources | default dict).clairpostgres }}
+      overrides:
+        resources: {{- toYaml . | nindent 10 }}
+      {{- end }}
     - kind: redis
       managed: true
+      {{- with (.Values.registry.resources | default dict).redis }}
+      overrides:
+        resources: {{- toYaml . | nindent 10 }}
+      {{- end }}
     - kind: route
       managed: true
     - kind: tls
