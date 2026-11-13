@@ -13,12 +13,16 @@ image:
   # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always
 
-replicas: 1
+# ADR-0614 (WP-260 P3, 2026-11-13): two replicas spread over zones, so the loss
+# of one zone or node leaves one serving pod. # Stateless per request (POST-only /mcp, one backend MCP session per call), so
+# no affinity is needed; /admin/reload-policy acts on one pod: call it once
+# per pod or roll the Deployment.
+replicas: 2
 
 # ADR-0101 (roadmap WP-12): the HA-capable shape - a PodDisruptionBudget
 # (templates/poddisruptionbudget.yaml) and topology spread across nodes,
 # both correct and safe at any replica count including the current
-# demo-scale replicas: 1 above (a PDB with minAvailable 1 simply protects
+# replicas count above (a PDB with minAvailable 1 simply protects
 # the sole pod from voluntary eviction; whenUnsatisfiable ScheduleAnyway
 # makes the spread constraint a soft preference, never a scheduling
 # blocker on a single-node/single-zone cluster). replicas itself is left
