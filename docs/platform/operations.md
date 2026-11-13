@@ -236,6 +236,22 @@ Three general workers (`zuno-worker-a/b/c`, 200 GB) run everything else; Spot wo
 from zero when pods are Pending. The two GPU nodes run only model pods and are never scaled down, replaced or drained
 without the owner's double approval. To replace a worker: scale its MachineSet to 2, wait for the new node, annotate the
 old Machine `machine.openshift.io/delete-machine=true`, scale back to 1 (the Machine API drains it); delete Keycloak `zuno-0`
-or `a2a-gateway` if they are the last pods holding the drain (ADR-0101). The ai-gateway runs two replicas: read its log with
-`oc logs -l app.kubernetes.io/name=ai-gateway -c ai-gateway --tail=-1`, not `deploy/ai-gateway`.
+if it is the last pod holding the drain (ADR-0101). a2a-gateway and Limitador stay at one replica (owner, 2026-11-14) and
+the drain evicts them by itself: a2a-gateway's budget is `maxUnavailable: 1`, Limitador has none. Evicting a2a-gateway
+drops its open tasks and pending approvals; evicting Limitador resets the rate-limit and token counters. The ai-gateway
+runs two replicas: read its log with `oc logs -l app.kubernetes.io/name=ai-gateway -c ai-gateway --tail=-1`, not
+`deploy/ai-gateway`.
+
+## A PostgreSQL replica stuck in archive recovery
+
+Symptom: `patronictl list` (leader's `database` container, namespace `zuno-data`) shows a replica that never reaches
+`streaming`, and its log repeats `[045] duplicates found for WAL segment ... are multiple primaries archiving to this
+stanza?`. Cause: archive-push writes every WAL segment to both pgBackRest repositories (repo1, the local PVC, and repo2,
+S3), and PGO's `restore_command` (`pgbackrest --stanza=db archive-get %f "%p"`, no `--repo`) refuses a segment found in
+both. PGO owns that parameter: the CRD refuses it in `spec.config.parameters`, it ignores it under
+`spec.patroni.dynamicConfiguration`, and it puts its own value back over a `patronictl edit-config`. Seen on demo333 on
+2026-11-13, where `patronictl reinit` alone did not help: the re-cloned replica replayed from the archive and hit the
+same refusal. With the owner's go, point recovery at repo1 for as long as the replica needs it, in the leader's
+`database` container: `patronictl edit-config --force -p 'restore_command=pgbackrest --stanza=db archive-get --repo=1 %f "%p"'`.
+Nothing to revert afterwards: PGO restores its value at its next reconcile. No durable fix is decided.
 

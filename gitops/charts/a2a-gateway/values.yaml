@@ -13,11 +13,14 @@ image:
 
 replicas: 1
 
-# ADR-0101: PodDisruptionBudget and a soft spread across zones. The task store is in memory, so
-# more than one replica needs sticky sessions for tasks/get; one replica is the demo footprint.
+# ADR-0101: PodDisruptionBudget and a soft spread across zones. Tasks and pending delegation
+# approvals are in memory, so the gateway runs one replica (the owner's decision, ADR-0614 update
+# 2026-11-14). maxUnavailable: 1 lets a node drain or a MachineConfig update evict it, which is the
+# 31-65 s outage ADR-0101 accepts; minAvailable: 1 on one replica blocked every drain until someone
+# deleted the pod. At two replicas it still keeps one pod up.
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1
+  maxUnavailable: 1
 
 topologySpreadConstraints:
   enabled: true

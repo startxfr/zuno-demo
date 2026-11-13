@@ -126,4 +126,14 @@ check).
 - Infra nodes run only the Red Hat infra-eligible set and DaemonSets; masters only the control plane; GPU nodes only
   model pods and DaemonSets.
 - AZ drill (separate go): cordon the workers and infra node of zone c, delete their pods, golden path PASS, zone-c-pinned
-  pods Pending by design, then uncordon.
+  pods Pending by design, then uncordon. **Not run: the owner dropped it on 2026-11-14.**
+
+## Owner decisions after closure (2026-11-14)
+
+- No AZ drill (see Acceptance).
+- a2a-gateway and Limitador stay at one replica for good; the shared-store follow-ups are dropped. a2a-gateway's
+  PodDisruptionBudget is now `maxUnavailable: 1`, so drains no longer wait for someone to delete the pod; Limitador has
+  no budget. Keycloak `zuno-0` keeps `minAvailable: 1` and still needs the manual delete during a drain.
+- The inoperative `restore_command` block (616890dd) is removed from the PostgreSQL chart: PGO ignored it. The
+  workaround for a replica stuck on pgBackRest's "duplicates found" is in
+  [operations.md](../../platform/operations.md#a-postgresql-replica-stuck-in-archive-recovery).

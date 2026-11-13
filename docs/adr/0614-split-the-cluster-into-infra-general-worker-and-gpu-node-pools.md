@@ -92,3 +92,11 @@ phase. Clause 1's resize did not pass its gate: the control plane alone peaks at
 masters stay m5a.4xlarge (WP-260, "P6 verdict"). a2a-gateway, maas-api and Limitador stay at one replica (in-memory state, or no
 replicas field). Open: the `startx-cluster-infra-config` Application (startxfr/helm-repository) also tracks
 `cluster-monitoring-config` and would overwrite the infra placement if its source changed.
+
+## Update 2026-11-14: owner decisions after the rollout
+
+- a2a-gateway and Limitador stay at one replica; moving their state to a shared store (clause 5) is dropped, not
+  deferred. a2a-gateway's PodDisruptionBudget becomes `maxUnavailable: 1`, so a drain evicts it (ADR-0101's 31-65 s
+  outage, open tasks and pending approvals lost) instead of blocking; Limitador has no budget (the Kuadrant CR sets
+  none), and its eviction resets the counters.
+- No zone-loss drill: clause 5's sizing stays a calculation, not a measurement.
