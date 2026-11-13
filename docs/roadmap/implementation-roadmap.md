@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 6 | 4 | 16 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254 |
+| v0.17 | 7 | 5 | 17 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-260 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1132,6 +1132,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 | WP-257 | [wp-257](work-packages/wp-257-publish-verify-and-roll-back-an-okf-release-documented.md) | 0577, 0578, 0580 | none | Not started | the SBOM decision (the user); a canary pin for the rollback check |
 | WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Not started | a server-side dry run on a canary operator |
 | WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Not started | none; sends the final anchors to unifai-compare |
+| WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Operator pending | one go per phase (P1-P6); masters resize only after a 7-day measurement |
 
 ### OKF stream phases
 
@@ -1280,6 +1281,7 @@ moving.
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
 - 2026-11-13 — WP-255 to WP-259 added (Phase 54), Not started, by the user's go at the request of unifai-compare: the OKF field reference, the "add an agent" guide, publish and verify and rollback, the UnifaiAgentBundle page and the positioning of zuno-demo-agents. Documentation only, landed in that repository by pull request; no new ADR.
+- 2026-11-13 — ADR-0614 and WP-260 added (Phase 53, v0.17), Accepted / Operator pending, by the owner's go: infra, general-worker and GPU node pools on demo333, after a saturated schedulable master and a full worker disk the same day.
 - 2026-11-12 — ADR-0613 and WP-252 to WP-254 added (Phase 53, v0.17), Proposed / Not started, by the user's request: the three remaining live hardening items of ADR-0603 (M4, M2, M7), planned for mid-December 2026. Hardening in depth, not fixes of a known flaw.
 - 2026-11-12 — WP-251 added (Phase 52, v0.16), Not started: `agentChain.requireFor` with a self-name exemption, handed over by the zuno-avancement session (user's go).
 - 2026-11-11 — WP-250 added (Phase 52, v0.16), Not started: retire the shared MCP workload token by folding the caller context into the Transit-signed assertion (user's go).
