@@ -26,12 +26,29 @@ e2e namespace evicted platform pods.
 |---|---|---|---|
 | P0 | Charts and roles: infra and Spot pools (141fa03d), per-component infra switches and AppProject (4b972941), CPU right-sizing of PostgreSQL and Quay (prepared, pushed in P3), ADR-0614 and this WP | none (switches off) | Done except the gateway replica change |
 | P1 | AppProject applied (`oc apply -k ansible/roles/argocd/kustomize/appproject`, only the 4 additions in the diff), then `make d0 install machines` (rc 0): infra pool 3/3 updated, `zuno-infra-a/b/c` Ready in 1a/1b/1c with the taint and only DaemonSets on them, Spot sets at 0 with their autoscalers; GPU sets untouched (`zuno-gpu-a` 2/2, `zuno-gpu-c` still in 1b) | 3 new nodes | Done 2026-11-13 ~17:35Z |
-| P2 | Flip, one at a time with a check after each: `infraPlacement.registry`, `infraNodes.router`, `infraNodes.enabled` (monitoring), `infraPlacement.userWorkloadMonitoring`, `infraPlacement.gitops`, `infraNodes` on zuno-registry (Quay pods restart: short registry outage, no release copy during it) | rolling moves | Not started |
+| P2 | Moved, one at a time, each followed by a check: image registry (c49307d3), router (c8540cab, console 200 throughout), platform monitoring (d485ec4a + cbb91a60), UWM (81ea151e), GitOps (74b9c627 + 9afa3826), Quay (5e528e55; registry outage 18:54:50-18:58Z). Golden path 13/13 PASS and `check_recovery.py` all ok after the phase. Incidents below | rolling moves | Done 2026-11-13 19:05Z |
 | P3 | Push the right-sizing; 2 replicas + zone spread for mcp-gateway, ai-gateway (with `quotaLedger.store: redis`) and MaaS (Limitador stays at 1 unless it gets a Redis backend: its counters are in memory); a2a-gateway stays at 1 (see below) | brief rolls | Not started |
 | P4 | Roll `zuno-worker-a/b/c` to 200 GB one at a time; drain and retire both `unifai-worker-a` nodes; delete the set and its chart entry | drains | Not started |
 | P5 | Delete the non-control-plane pods left on the masters and the non-GPU pods on the GPU nodes (no change to the GPU nodes) | pod moves | Not started |
 | P6 | Masters to m5a.2xlarge through the ControlPlaneMachineSet, only if the 7-day peak per master is at or below 22 GiB **and** 5.5 vCPU; window of at least 2 h | control-plane roll | Not started |
 | P7 | `check_recovery.py`: infra pool and unschedulable masters; final cost table | none | Not started |
+
+## P2 incidents and traps (2026-11-13)
+
+- **Router served a self-signed certificate for about 70 min (17:37-18:46Z).** Two Applications render the
+  cert-manager chart (d0 and d1). The `infraNodes.router` default also made d0 render IngressController/default with
+  the placement alone; d0 took it over and its apply removed `defaultCertificate`, so the router fell back to the
+  operator's self-signed wildcard. Fixed live (certificate restored, `argocd.argoproj.io/sync-options: Prune=false` on
+  the object so d0 could never prune it) and in 5735b3dd (the placement renders only with the certificate, in d1).
+  Rule: before adding a switch to a chart, list the Applications that render it.
+- **Monitoring config webhook refused `prometheusOperatorAdmissionWebhook.tolerations`** (OCP 4.22), which blocked the
+  openshift-ai d0 sync until its retries ran out; that component stays on the workers (cbb91a60). A server dry-run of
+  the rendered ConfigMap catches this.
+- **`runOnInfra` set only the tolerations** on the openshift-gitops deployments; the explicit `nodeSelector` in the
+  GitopsService pins them (9afa3826). Then the legacy quota `openshift-gitops-quotas` (startx chart) blocked the new
+  ReplicaSets at 40/40: 33 zero-replica ReplicaSets older than 7 days were deleted.
+- `startx-cluster-infra-config` (startxfr/helm-repository, no selfHeal) also tracks `cluster-monitoring-config`; a push
+  on its source would overwrite the infra placement and `enableUserWorkload`. Open for the owner.
 
 ## P6 gate: CPU as well as memory (measured 2026-11-13 17:40Z)
 
