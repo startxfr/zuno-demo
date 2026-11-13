@@ -14,7 +14,6 @@
   ansible.builtin.assert:
     that:
       - zuno_quay_s3_bucket | length > 0
-      - _quay_registry_key_file.stat.exists
     fail_msg: >-
       Set zuno_quay_s3_bucket in ansible/clusters/<cluster>.yml and create the bucket first:
       ansible-playbook ansible/playbooks/registry_bucket.yml -e registry_bucket_apply=true (key file {{ zuno_quay_s3_key_file }}).
@@ -72,10 +71,16 @@
   retries: 60
   delay: 10
 
-- name: "quay_registry | read the bucket key (never logged)"
+# The key file on the workstation, or when it is gone the copy in Vault (bucket_key_from_vault.yml).
+- name: "quay_registry | read the bucket key from the workstation file (never logged)"
   ansible.builtin.set_fact:
     _quay_registry_s3_key: "{{ lookup('ansible.builtin.file', zuno_quay_s3_key_file) | from_json }}"
   no_log: true
+  when: _quay_registry_key_file.stat.exists
+
+- name: "quay_registry | read the bucket key from Vault (the workstation file is gone)"
+  ansible.builtin.include_tasks: bucket_key_from_vault.yml
+  when: not _quay_registry_key_file.stat.exists
 
 # The password goes in a URI: PGO passwords carry ; > ( * and the unencoded form crashed Quay's first start (WP-248 step 1).
 # Storage: proxy storage on, so clients are never redirected to a presigned S3 URL (the EgressFirewall allows few S3 addresses).

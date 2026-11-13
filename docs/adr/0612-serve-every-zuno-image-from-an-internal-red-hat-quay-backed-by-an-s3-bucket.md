@@ -1,6 +1,6 @@
 # ADR-0612: Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket
 
-- **Status:** Accepted (2026-11-11, the owner: Clair limited to the Red Hat sources)
+- **Status:** Partially implemented (accepted 2026-11-11, the owner: Clair limited to the Red Hat sources; live on demo333 2026-11-12: families (a) OKF release, (c) UnifAI images and (d) public images, zot retired; family (b) first-party images and the retirement of the ImageStream registry, clause 9, are not started and wait for the owner)
 - **Target:** v0.17
 - **Date:** 2026-11-11
 - **Decision owners:** Zuno Demo architecture team
