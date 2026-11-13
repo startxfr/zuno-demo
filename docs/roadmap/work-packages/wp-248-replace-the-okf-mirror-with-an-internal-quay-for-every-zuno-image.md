@@ -411,3 +411,13 @@ Rule for next time: batch every IDMS source removal into one change, announce a 
 
 **The workstation copy of the bucket key is gone (2026-11-13).** `~/.config/zuno/zuno-demo333-registry-key.json` was deleted with the owner's go; Vault `registry/quay-bucket` holds the copy. `roles/quay_registry` read the file to build the config bundle and refused to run without it, so it now falls back to Vault when the file is missing (`bucket_key_from_vault.yml`); proven by a `make d2 install quay-registry` run with the file moved aside (ok=130, failed=0). Creating or rotating the key still goes through `registry_bucket.yml`, which writes the file again.
 
+## Restore test of quay-db (2026-11-13, owner's go)
+
+Question: can the `quay-db` backups be restored? The pgBackRest repository is a PVC in the same cluster (`quay-db-repo1`, 5 Gi), with a full backup of 2026-11-11 and an incremental of 2026-11-12, and the WAL archive.
+
+Method: a clone `quay-db-restore-test` (`PostgresCluster`, `dataSource.postgresCluster: quay-db / repo1`, 2 Gi volumes, same namespace; PGO reads the source repository and never writes to it). Result: the restore Job finished in about 100 s, PostgreSQL recovered its timeline and shut down cleanly, the instance started (`PostgresDataInitialized=True, PGBackRestRestoreComplete`) and answered. Compared with the live database, taken within the same minute: users 4, repositories 38, manifests 275, tags 562, blobs 1022, organizations 1, robots 2, and the md5 of the repository list, of the tag list and of the user list are identical, the pushes of the previous evening included (WAL replay reached the latest archived segment). The clone and its volumes were deleted afterwards.
+
+Not proven: a restore after losing the repository PVC or the cluster. The repository is a volume of the same cluster, so this test proves the backups are readable and complete, not that they survive a cluster loss. An S3 repository (`repo2` on the registry bucket or another) is the follow-up if that matters; the `quay-db` is 40 MB.
+
+Observed while it ran: the clone waited for the PGO operator (`openshift-operators/pgo`), which was crash-looping with the other operators of the cluster after the node drains of the evening (liveness probe of 1 s, leader election lost on API timeouts, etcd applies slightly above 200 ms); it recovered by itself within the hour and the restore went through.
+
