@@ -432,5 +432,5 @@ spotWorkers:
 # nodes exist; flipped one at a time in zuno-machines-d0's values.
 infraPlacement:
   registry: true   # P2 step 1, 2026-11-13
-  userWorkloadMonitoring: false
+  userWorkloadMonitoring: true   # WP-260 P2 step 4, 2026-11-13
   gitops: false
