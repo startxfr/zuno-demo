@@ -143,4 +143,4 @@ cluster-certmanager:
 # the infra nodes (nodePlacement in templates/acme-cluster-patches.yaml).
 # false until the infra nodes exist.
 infraNodes:
-  router: false
+  router: true   # WP-260 P2 step 2, 2026-11-13
