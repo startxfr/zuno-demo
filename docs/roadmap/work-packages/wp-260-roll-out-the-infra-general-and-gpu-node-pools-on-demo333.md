@@ -25,13 +25,19 @@ e2e namespace evicted platform pods.
 | Phase | Content | Cluster effect | State |
 |---|---|---|---|
 | P0 | Charts and roles: infra and Spot pools (141fa03d), per-component infra switches and AppProject (4b972941), CPU right-sizing of PostgreSQL and Quay (prepared, pushed in P3), ADR-0614 and this WP | none (switches off) | Done except the gateway replica change |
-| P1 | `make d0 install argocd` (AppProject), then `make d0 install machines`: infra pool + `zuno-infra-a/b/c`, Spot sets at 0 | 3 new nodes | Not started |
+| P1 | AppProject applied (`oc apply -k ansible/roles/argocd/kustomize/appproject`, only the 4 additions in the diff), then `make d0 install machines` (rc 0): infra pool 3/3 updated, `zuno-infra-a/b/c` Ready in 1a/1b/1c with the taint and only DaemonSets on them, Spot sets at 0 with their autoscalers; GPU sets untouched (`zuno-gpu-a` 2/2, `zuno-gpu-c` still in 1b) | 3 new nodes | Done 2026-11-13 ~17:35Z |
 | P2 | Flip, one at a time with a check after each: `infraPlacement.registry`, `infraNodes.router`, `infraNodes.enabled` (monitoring), `infraPlacement.userWorkloadMonitoring`, `infraPlacement.gitops`, `infraNodes` on zuno-registry (Quay pods restart: short registry outage, no release copy during it) | rolling moves | Not started |
 | P3 | Push the right-sizing; 2 replicas + zone spread for mcp-gateway, ai-gateway (with `quotaLedger.store: redis`) and MaaS (Limitador stays at 1 unless it gets a Redis backend: its counters are in memory); a2a-gateway stays at 1 (see below) | brief rolls | Not started |
 | P4 | Roll `zuno-worker-a/b/c` to 200 GB one at a time; drain and retire both `unifai-worker-a` nodes; delete the set and its chart entry | drains | Not started |
 | P5 | Delete the non-control-plane pods left on the masters and the non-GPU pods on the GPU nodes (no change to the GPU nodes) | pod moves | Not started |
-| P6 | Masters to m5a.2xlarge through the ControlPlaneMachineSet, only if the 7-day peak per master is at or below 22 GiB; window of at least 2 h | control-plane roll | Not started |
+| P6 | Masters to m5a.2xlarge through the ControlPlaneMachineSet, only if the 7-day peak per master is at or below 22 GiB **and** 5.5 vCPU; window of at least 2 h | control-plane roll | Not started |
 | P7 | `check_recovery.py`: infra pool and unschedulable masters; final cost table | none | Not started |
+
+## P6 gate: CPU as well as memory (measured 2026-11-13 17:40Z)
+
+With every workload off it, master ip-10-18-28-96 still used ~7.2 vCPU: kube-apiserver 3.7, kube-controller-manager
+(the elected leader) 2.1, openshift-apiserver 0.8, etcd 0.6. An m5a.2xlarge has 8 vCPU (~7.5 allocatable). P6 therefore
+also needs the 7-day CPU peak per master at or below 5.5 vCPU; otherwise the masters stay m5a.4xlarge.
 
 ## Rules
 
