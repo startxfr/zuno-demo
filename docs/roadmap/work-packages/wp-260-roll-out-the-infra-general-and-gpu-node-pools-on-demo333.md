@@ -28,7 +28,7 @@ e2e namespace evicted platform pods.
 | P1 | AppProject applied (`oc apply -k ansible/roles/argocd/kustomize/appproject`, only the 4 additions in the diff), then `make d0 install machines` (rc 0): infra pool 3/3 updated, `zuno-infra-a/b/c` Ready in 1a/1b/1c with the taint and only DaemonSets on them, Spot sets at 0 with their autoscalers; GPU sets untouched (`zuno-gpu-a` 2/2, `zuno-gpu-c` still in 1b) | 3 new nodes | Done 2026-11-13 ~17:35Z |
 | P2 | Moved, one at a time, each followed by a check: image registry (c49307d3), router (c8540cab, console 200 throughout), platform monitoring (d485ec4a + cbb91a60), UWM (81ea151e), GitOps (74b9c627 + 9afa3826), Quay (5e528e55; registry outage 18:54:50-18:58Z). Golden path 13/13 PASS and `check_recovery.py` all ok after the phase. Incidents below | rolling moves | Done 2026-11-13 19:05Z |
 | P3 | ai-gateway and mcp-gateway at 2 replicas, spread over zones (bb1d86d7; ai-gateway already counts quotas in Redis on demo333); MaaS gateway (Istio deployment through `maas-gateway-config`) and Authorino at 2 (1d458f75; MaaS answered 401 throughout); maas-api stays at 1 (its owner, the MaaS `Config` CR, has no replicas field), Limitador at 1 (in-memory counters), a2a-gateway at 1 (in-memory tasks); right-sizing pushed (6804be49): PGO rolled the 3 instances, Patroni 3/3 TL 54 with s7tr as leader, Quay rolled without losing health. The golden path then read the ai-gateway log from one pod only: fixed to read every replica (74da3555). Golden path 13/13, `check_recovery.py` all ok | brief rolls | Done 2026-11-13 19:30Z |
-| P4 | Roll `zuno-worker-a/b/c` to 200 GB one at a time; drain and retire both `unifai-worker-a` nodes; delete the set and its chart entry | drains | Not started |
+| P4 | `zuno-worker-a/b/c` replaced one at a time by 200 GB machines (surge to 2, mark the old Machine `delete-machine`, scale to 1: MAPI drains it); Keycloak `zuno-0` deleted twice when it was the only pod left (PDB, ADR-0101), discovery back to 200 within a minute. Both `unifai-worker-a` nodes drained and retired, MachineSet deleted (13.4 vCPU / 27 GiB of requests moved, 0.2 vCPU zone-a-pinned). A fresh node pulled the NeMo Guardrails image from registry.redhat.io in ~9 min, so the first golden path failed on guardrails; 13/13 PASS once it started. `check_recovery.py` all ok | drains | Done 2026-11-13 20:50Z |
 | P5 | Delete the non-control-plane pods left on the masters and the non-GPU pods on the GPU nodes (no change to the GPU nodes) | pod moves | Not started |
 | P6 | Masters to m5a.2xlarge through the ControlPlaneMachineSet, only if the 7-day peak per master is at or below 22 GiB **and** 5.5 vCPU; window of at least 2 h | control-plane roll | Not started |
 | P7 | `check_recovery.py`: infra pool and unschedulable masters; final cost table | none | Not started |
@@ -49,6 +49,11 @@ e2e namespace evicted platform pods.
   ReplicaSets at 40/40: 33 zero-replica ReplicaSets older than 7 days were deleted.
 - `startx-cluster-infra-config` (startxfr/helm-repository, no selfHeal) also tracks `cluster-monitoring-config`; a push
   on its source would overwrite the infra placement and `enableUserWorkload`. Open for the owner.
+
+## Follow-up from P4
+
+New nodes pull large `registry.redhat.io` images slowly (NeMo Guardrails ~9 min on 2026-11-13). Mirroring the
+largest platform images into Quay (ADR-0612 family d, IDMS) would shorten every future node replacement.
 
 ## P6 gate: CPU as well as memory (measured 2026-11-13 17:40Z)
 
