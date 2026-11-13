@@ -263,7 +263,7 @@ cluster-machine:
           - ebs:
               encrypted: true
               iops: 0
-              volumeSize: 150
+              volumeSize: 200
               volumeType: gp3
         replicas: 1
       - name: zuno-worker-b
@@ -278,7 +278,7 @@ cluster-machine:
           - ebs:
               encrypted: true
               iops: 0
-              volumeSize: 150
+              volumeSize: 200
               volumeType: gp3
         replicas: 1
       - name: zuno-worker-c
@@ -293,9 +293,33 @@ cluster-machine:
           - ebs:
               encrypted: true
               iops: 0
-              volumeSize: 150
+              volumeSize: 200
               volumeType: gp3
         replicas: 1
+      # The two workers that carried UnifAI since 2026-10-15 (created by hand,
+      # now declared). Despite the name they are general workers: they also run
+      # AAP, CNV, RHOAI, monitoring and Vault pods. 75 GB root was too small:
+      # on 2026-11-13 a UnifAI e2e namespace pushed one into DiskPressure
+      # (13.7 GB free against a 12 GB eviction threshold) and the kubelet evicted
+      # aap-gateway. 200 GB since 2026-11-13; zone a because 7 zuno-unifai PVs
+      # are bound to eu-central-1a.
+      - name: unifai-worker-a
+        az: a
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 200
+              volumeType: gp3
+        replicas: 2
+        additionnalsLabels: |-
+          workload: unifai
 
   machineAutoscaler:
     enabled: false # flipped by zuno-machines-d0
