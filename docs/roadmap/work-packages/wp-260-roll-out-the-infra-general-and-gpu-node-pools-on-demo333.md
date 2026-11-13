@@ -53,7 +53,8 @@ e2e namespace evicted platform pods.
 ## Follow-up from P4
 
 New nodes pull large `registry.redhat.io` images slowly (NeMo Guardrails ~9 min on 2026-11-13). Mirroring the
-largest platform images into Quay (ADR-0612 family d, IDMS) would shorten every future node replacement.
+largest platform images into Quay would shorten every future node replacement: done as
+[WP-261](wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) (ADR-0612 family e, owner's choice of 2026-11-14).
 
 ## P6 gate: CPU as well as memory (measured 2026-11-13 17:40Z)
 

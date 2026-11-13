@@ -71,6 +71,20 @@ refuses stops the pin, with the webhook's own message. When the cluster cannot a
 - The trust root is rendered offline from `platform/okf/sigstore/trusted_root.json` (`platform/supply-chain/render_policy_trustroot.py`; CI checks it
   is up to date). After a Sigstore root rotation, regenerate it and re-run `make d1 install rhtas-config`.
 
+## Large Red Hat images in Quay (WP-261, ADR-0612 family e)
+
+The eight largest Red Hat product images the demo runs (`platform/supply-chain/mirrored-redhat-images.yaml`) are copied
+into **private** repositories of the internal Quay, `zuno/redhat/<path>`, and redirected by the ImageDigestMirrorSet
+`zuno-redhat-via-registry`; the nodes read them with the `zuno+pull` robot of the global pull secret
+(`zuno_quay_node_pull_secret`). Never make these repositories public: the route is reachable from the Internet.
+
+- **After an RHOAI, AAP or Lightspeed upgrade:** `python3 platform/supply-chain/mirror_redhat_images.py --drift` lists the
+  running digests the list misses. Add them (keep the old digests until the upgrade is over), then copy:
+  `DOCKER_CONFIG=~/.config/zuno/quay-push QUAY_API_TOKEN=<admin token> python3 platform/supply-chain/mirror_redhat_images.py --to <registry host>`.
+  Until then the new pods pull from `registry.redhat.io`, slower but working (fallback).
+- **Never remove a source from that ImageDigestMirrorSet** outside an announced drain window: removal drains every node.
+  To stop using an entry, stop copying it, or delete its repository in Quay (404, the nodes fall back).
+
 ## Rolling a UnifAI release, and taking over a roll (WP-176, WP-178)
 
 Operator and application images move in two separate steps, always in this order, each with the user's go and with the owner of any running measurement (stresstest, ranking set) agreeing that no UnifAI pod may restart.

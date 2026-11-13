@@ -14,3 +14,7 @@ zuno_quay_organization: zuno
 zuno_quay_admin_email: quayadmin@zuno.invalid  # Quay only needs a well-formed address
 zuno_quay_organization_email: registry@zuno.invalid  # must differ from the admin email
 zuno_quay_validate_certs: true
+# WP-261 family (e): put the zuno+pull robot for the registry route host in the global pull secret
+# (tasks/node_pull_secret.yml), so the nodes can read the PRIVATE Red Hat mirror repositories. Per-cluster switch, set in
+# ansible/clusters/<cluster>.yml with the owner's go; flip it before gitops redhatRedirects.enabled.
+zuno_quay_node_pull_secret: false

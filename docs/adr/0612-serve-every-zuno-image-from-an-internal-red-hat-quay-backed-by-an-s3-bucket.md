@@ -1,6 +1,6 @@
 # ADR-0612: Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket
 
-- **Status:** Partially implemented (accepted 2026-11-11, the owner: Clair limited to the Red Hat sources; live on demo333 2026-11-12: families (a) OKF release, (c) UnifAI images and (d) public images, zot retired; family (b) first-party images and the retirement of the ImageStream registry, clause 9, are not started and wait for the owner)
+- **Status:** Partially implemented (accepted 2026-11-11, the owner: Clair limited to the Red Hat sources; live on demo333 2026-11-12: families (a) OKF release, (c) UnifAI images and (d) public images, zot retired; family (b) first-party images and the retirement of the ImageStream registry, clause 9, are not started and wait for the owner; family (e) large Red Hat product images added by the addendum of 2026-11-14, repository work done, cluster steps wait for the owner's go, WP-261)
 - **Target:** v0.17
 - **Date:** 2026-11-11
 - **Decision owners:** Zuno Demo architecture team
@@ -93,7 +93,7 @@ owner's go.
 
 ## Work packages
 
-[WP-248](../roadmap/work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md).
+[WP-248](../roadmap/work-packages/wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md)., [WP-261](../roadmap/work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) (family e).
 
 ## Addendum 2026-11-12: consumer access, tag expiration and cut-over order
 
@@ -116,3 +116,27 @@ Decided by the owner after the canary and the first week of the live registry.
 - **Cut-over order** (clause 8, a golden path before and after each step, never in a freeze): (a) the OKF release read by
   the two gateways, (c) the UnifAI release images, (b) first-party images, (d) public images, each from a list that
   `platform/supply-chain/mirrored-images.yaml` names. The zot drill closes the sequence.
+
+## Addendum 2026-11-14: family (e), the large Red Hat product images
+
+Decided by the owner after WP-260: new nodes pulled the large `registry.redhat.io` images at 12-50 MB/s on 2026-11-13
+(NeMo Guardrails about 9 min), while the internal Quay served the UnifAI images at 51-103 MB/s the same night. Clause 7's
+last sentence is amended: the Red Hat product images named in `platform/supply-chain/mirrored-redhat-images.yaml` are in
+scope; the OpenShift release images and every other product image stay on the cluster pull secret.
+
+- **Scope.** A closed list, pinned by the digest the operators run: NeMo Guardrails server, OGX core, the guardrails
+  built-in detector, MLflow, the AAP execution environment, controller and hub (the owner's lot 1), and the Lightspeed
+  offline knowledge portal (lot 2). About 31 GB on a node's disk. The vLLM images are left out: the GPU nodes do not move.
+- **Private repositories.** The route is reachable from the Internet and Red Hat content is not redistributed, so the
+  mirror repositories (`zuno/redhat/<path>`) are private, unlike families (c) and (d). The copy script checks it and makes
+  a public one private. The nodes read them with the `zuno+pull` robot, which the `quay_registry` role adds to the global
+  pull secret (`zuno_quay_node_pull_secret`). A pull secret change has no node disruption (MCO action `None`).
+- **Redirect.** A third ImageDigestMirrorSet, `zuno-redhat-via-registry`, one source per repository, fallback to
+  `registry.redhat.io` (`AllowContactingSource`). A source is never removed from the live object outside a drain window,
+  because removal drains every node (WP-248); to stop using an entry, stop copying it.
+- **Upgrades.** An operator upgrade brings new digests; until they are copied the nodes fall back to `registry.redhat.io`,
+  slower but never broken. `mirror_redhat_images.py --drift` lists the running digests the list misses. Red Hat signs
+  these images on its lookaside server, not in the registry: the trust stays the digest pin (clause 5).
+- **Alternatives rejected.** oc-mirror v2 (a second toolchain beside ours for a closed list); a Quay proxy cache on
+  `registry.redhat.io` (the first pull of each new digest would go through the one Quay pod and the zuno-registry
+  EgressFirewall to the Akamai CDN that already stalls Clair, the pull that matters on a node replacement).

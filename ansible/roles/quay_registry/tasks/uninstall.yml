@@ -29,3 +29,33 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-quay-registry-d0"
+
+# WP-261: drop the registry's entry from the global pull secret (added by node_pull_secret.yml); no drain (MCO action None).
+- name: "quay_registry | read openshift-config/pull-secret"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: openshift-config
+    name: pull-secret
+  register: _quay_global_pull_secret
+  no_log: true
+
+- name: "quay_registry | remove the registry route entries from the global pull secret"
+  vars:
+    _auths_all: "{{ (_quay_global_pull_secret.resources[0].data['.dockerconfigjson'] | b64decode | from_json) }}"
+    _auths_kept: >-
+      {{ _auths_all.auths | dict2items | rejectattr('key', 'match', '^quay-quay-' ~ zuno_quay_namespace ~ '\.') | items2dict }}
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pull-secret
+        namespace: openshift-config
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: "{{ (_auths_all | combine({'auths': _auths_kept})) | to_json | b64encode }}"
+  when:
+    - _quay_global_pull_secret.resources | length == 1
+    - (_auths_kept | length) != (_auths_all.auths | length)
+  no_log: true

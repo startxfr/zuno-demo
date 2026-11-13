@@ -121,3 +121,19 @@ publicRedirects:
     - quay.io/fedora/redis-7
     - quay.io/jetstack/cert-manager-istio-csr
     - quay.io/oauth2-proxy/oauth2-proxy
+
+# WP-261 family (e), ADR-0612 addendum 2026-11-14: redirect of the large Red Hat product images (digest pins only), copied
+# into PRIVATE repositories. Keep in step with platform/supply-chain/mirrored-redhat-images.yaml (a test compares both).
+# Needs redirects.host, and the pull robot in the global pull secret first (zuno_quay_node_pull_secret), else the nodes get
+# 401 from the mirror and fall back to registry.redhat.io. Adding a source reloads CRI-O; REMOVING one drains every node.
+redhatRedirects:
+  enabled: false
+  sources:
+    - registry.redhat.io/ansible-automation-platform-27/controller-rhel9
+    - registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9
+    - registry.redhat.io/ansible-automation-platform-27/hub-rhel9
+    - registry.redhat.io/offline-knowledge-portal/rhokp-rhel9
+    - registry.redhat.io/rhoai/odh-built-in-detector-rhel9
+    - registry.redhat.io/rhoai/odh-mlflow-rhel9
+    - registry.redhat.io/rhoai/odh-ogx-core-rhel9
+    - registry.redhat.io/rhoai/odh-trustyai-nemo-guardrails-server-rhel9

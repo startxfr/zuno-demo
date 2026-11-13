@@ -38,3 +38,26 @@ spec:
       mirrorSourcePolicy: AllowContactingSource
     {{- end }}
 {{- end }}
+{{- if .Values.redhatRedirects.enabled }}
+---
+# WP-261 family (e), ADR-0612 addendum 2026-11-14: the large Red Hat product images the demo runs
+# (platform/supply-chain/mirrored-redhat-images.yaml). Source `registry.redhat.io/<path>` -> `<host>/<org>/redhat/<path>`.
+# Unlike families (c) and (d) these repositories are PRIVATE (the route is reachable from the Internet and Red Hat content
+# is not redistributed): the nodes read them with the pull robot that the quay_registry role adds to the global pull
+# secret. Fallback to registry.redhat.io. Never remove a source from the live object outside a drain window: removal
+# drains every node; to stop using an entry, stop copying it.
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: zuno-redhat-via-registry
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  imageDigestMirrors:
+    {{- range .Values.redhatRedirects.sources }}
+    - source: {{ . }}
+      mirrors:
+        - {{ required "redirects.host is required when redhatRedirects.enabled" $.Values.redirects.host }}/{{ $.Values.redirects.organization }}/redhat/{{ . | splitList "/" | rest | join "/" }}
+      mirrorSourcePolicy: AllowContactingSource
+    {{- end }}
+{{- end }}

@@ -142,3 +142,7 @@
 
 - name: "quay_registry | bootstrap the organisation, the first admin and the robot accounts"
   ansible.builtin.include_tasks: bootstrap.yml
+
+- name: "quay_registry | give the nodes the pull robot for the private Red Hat mirror repositories (WP-261)"
+  ansible.builtin.include_tasks: node_pull_secret.yml
+  when: zuno_quay_node_pull_secret | bool
