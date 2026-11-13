@@ -14,6 +14,14 @@ catch the bundle and the catalog). Images that match no policy (MongoDB, Qdrant,
 Temporal, docling, the backup Jobs) are only reported (`no-match-policy: warn`). zuno's own verifier and drift check
 (`make d2 check unifai`) stay the main guard: the admission is the second one, at the cluster.
 
+### Copy before pin (WP-248)
+
+With `zuno_unifai_signature_mirror_host` set, the admission policies read the signatures from the internal Quay. A release must be
+copied there before its pin is rolled (`python3 platform/supply-chain/mirror_unifai_images.py --to <registry>/zuno --version <x.y.z>`,
+the push robot's `DOCKER_CONFIG`, `QUAY_API_TOKEN` for public repositories). `make d2 install unifai` checks it before it applies anything
+(`platform/supply-chain/check_unifai_in_registry.py`, anonymous and read-only: each pinned digest and its `.sig` tag) and stops with the
+list of what is missing, instead of leaving the pods refused.
+
 ### Look at it
 
 ```
