@@ -103,7 +103,7 @@ Run the 5-minute version, then:
 | 6:30 | Open the agents release: [experience-clients/open-webui/tasks/code.md](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/open-webui/tasks/code.md), then [policies/model-routing/model-routing-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/model-routing/model-routing-policy.yaml) | "The owner of a task declares roles, here `code`. The corporate policy holds the ordered lists. The platform generates the table from the signed release; nobody edits it by hand." | `zuno.models.preferred: [code]` in the task. `preferred:`, `fallback:` and `local_only_for:` entries in the policy. |
 | 8:00 | Point at the `local_only_for: [C1, C2, C3]` lines | "Tekos answers from Confluence and the technical documentation. For those tasks, no external model at any level: if no local model answers, the task fails instead of sending the context out." | `local_only_for` on Tekos `answer-technical-question` and `find-relevant-docs`, Arkos `draft-architecture-testimonial` and `workshop-presentation`, Naveo. |
 | 9:00 | Open [`platform/ai-gateway/provider-routing.yaml`](../../../../platform/ai-gateway/provider-routing.yaml) | "Fourteen providers. Each local model has two entries: through MaaS first, then direct. Each declares its role, the levels it may serve, its timeout, and the model object whose readiness the gateway watches." | Roles `default`, `quality`, `reasoning`, `specialized`, `code`, `reasoning-external`, `general-external`. `inference_service:` on the 8 local entries; `timeout_seconds` 180 through MaaS, 60 direct. |
-| 10:30 | Terminal: `oc get llminferenceservice -n zuno-ai-run`, then `oc get deploy ai-gateway -n zuno-ai-run -o yaml \| grep -A1 -e MODEL_READINESS_ENABLED -e CIRCUIT_` | "The gateway reads the `Ready` condition every 10 seconds. A model that is not ready is skipped. A provider that failed by timeout, connection error or 5xx is skipped for 60 seconds, then one call tests it again." | Four models `READY True`. `MODEL_READINESS_ENABLED` `true`, `CIRCUIT_BREAKER_ENABLED` `true`, `CIRCUIT_OPEN_SECONDS` `60`. |
+| 10:30 | Terminal: `oc get llminferenceservice -n zuno-ai-run`, then `oc set env deploy/ai-gateway -n zuno-ai-run --list \| grep -e MODEL_READINESS -e CIRCUIT_` | "The gateway reads the `Ready` condition every 10 seconds. A model that is not ready is skipped. A provider that failed by timeout, connection error or 5xx is skipped for 60 seconds, then one call tests it again." | Four models `READY True`. `MODEL_READINESS_ENABLED` `true`, `CIRCUIT_BREAKER_ENABLED` `true`, `CIRCUIT_OPEN_SECONDS` `60`. |
 | 11:30 | Grafana, panel **Candidates skipped for availability (over range)** | "On 2026-11-02 the GPU nodes were down. Every MaaS candidate waited its full 180 seconds, and an Open WebUI chat reached a SaaS model after about ten minutes. Now the skip costs nothing and is counted." | Skips by client, provider and reason (`not_ready`, `circuit_open`) if a model was down in the range. An empty panel means nothing was skipped. |
 | 12:15 | Tempo search UI: service `ai-gateway`, operation `model_call`, tags `zuno.task=code zuno.client=open-webui`, last 15 minutes | "Each call is traced with the provider and whether it ran on our GPUs or outside." | The span of the 5-minute question: `zuno.provider=mistral-codestral`, `zuno.model_kind=saas`, `zuno.classification=C1`, `zuno.model=codestral-latest`. |
 | 13:00 | Show the WP-194 evidence, table T5 | "We broke Codestral on purpose on 2026-11-05. The user got a normal answer from the local model, in the same trace, about one second after the failure. The routing decision of such a call names `local-maas`, with `fallback_used: true` and `fallback_from: mistral-codestral`. UnifAI reads it from `GET /v1/routing-decisions/{request_id}`." | Two traces: `mistral-codestral` error `Invalid model` in under a second, then `local-maas` ok in 40 to 66 s. |
@@ -166,7 +166,7 @@ flowchart TB
   subgraph AI["Red Hat OpenShift AI"]
     MAAS["MaaS<br/>gateway, portal, API keys"]
     KSERVE["KServe llm-d<br/>local models on MIG GPUs"]
-    EXT["External models<br/>Mistral, OVHcloud"]
+    EXT["SaaS models<br/>Mistral, Codestral, OVHcloud"]
     PG["GenAI playground"]
     BUILD["Pipelines, MLflow,<br/>Kueue, model registry"]
     EVAL["TrustyAI, EvalHub,<br/>LMEval"]
@@ -194,7 +194,9 @@ flowchart TB
   UNIFAI & OWUI & TP & LS --> MCPGW
   LS & PG --> MAAS
   AIGW --> MAAS
-  MAAS --> KSERVE & EXT
+  MAAS --> KSERVE
+  AIGW --> EXT
+  MAAS -. published .-> EXT
   MCPGW --> MCPS --> SAAS
   BUILD --> KSERVE
   EVAL --> MAAS

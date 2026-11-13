@@ -78,12 +78,12 @@ play; it does not copy their steps.
 | Scenario | Shows | Personas | Golden-path probe | Page |
 |---|---|---|---|---|
 | [MaaS portal and API keys](scenarios/rhoai/maas-portal-api-keys.md) | A self-service key on a group subscription, token limits, revocation | ai-dev-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 0) |
-| GenAI playground | The ready-made playground, its MCP tools by group (9 vs 0) | ai-ops-01, ai-dev-01 | none (rehearse first) | planned (wave 3) |
-| Model serving with llm-d on MIG | LLMInferenceService, the llm-d router, MIG slices, hardware profiles | presenter terminal | none (rehearse first) | planned (wave 3) |
-| External models | Mistral and OVHcloud published through MaaS | presenter terminal | none (rehearse first) | planned (wave 3) |
-| Model catalog and registry | The catalog, the registry and the registered adapters | ai-dev-01 | none (rehearse first) | planned (wave 3) |
-| LoRA pipeline with MLflow and Kueue | A pipeline run, a TrainJob admitted by Kueue, MLflow tracking | ai-dev-01 | none (rehearse first) | planned (wave 3) |
-| Evaluation with TrustyAI and EvalHub | LMEval, EvalHub, the acceptance scenarios per agent | ai-dev-01 | none (rehearse first) | planned (wave 3) |
+| [GenAI playground](scenarios/rhoai/genai-playground.md) | The ready-made playground: chat on gpt-oss-20b through MaaS, a document answered with a citation, MCP tools with the user's own OpenShift token (9 tools for `ocp-ai-ops`, 0 for `ocp-ai-dev`) | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
+| [Model serving with llm-d on MIG](scenarios/rhoai/model-serving-llmd-mig.md) | Five models on MIG slices of two 96 GB cards, the GPU quota and its wedged rollouts, hardware profiles, autoscaling, the scale-from-zero training node, the failover drill | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) |
+| [External models](scenarios/rhoai/external-models.md) | Mistral Large and OVHcloud gpt-oss-120b published as ExternalModels, subscribed by the ai-gateway only, the `ipp-managed` label trap, C1/C2 eligibility, SaaS still called directly by the gateway | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) |
+| [Model catalog and registry](scenarios/rhoai/model-catalog-registry.md) | Red Hat's curated catalog, the dashboard route trap, a registry gated on the evaluation | ai-dev-01, paas-ops-01, ai-ops-01 | none (not show-ready: no model registry on demo333; the catalog part can be rehearsed) | written (wave 3) |
+| [LoRA pipeline with MLflow](scenarios/rhoai/lora-pipeline-mlflow-kueue.md) | A past pipeline run, the TrainJob on a scale-from-zero GPU node, MLflow tracking, the adapter registered and served (recorded evidence), the packed LoRA module trap | ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
+| [Evaluation with TrustyAI and EvalHub](scenarios/rhoai/evaluation-trustyai-evalhub.md) | RAGAS and Garak scores on the TrustyAI dashboard, 20 scenarios per agent at 75%, EvalHub and its RBAC, Kueue admitting the evaluation Jobs, LMEvalJobs off on 3.6 EA | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
 
 ### Foundation and trust
 
@@ -105,7 +105,7 @@ play; it does not copy their steps.
 | [One governed backend, many experiences](five-experiences.md) | UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget) | 45-55 min | written (wave 1) |
 | [Sovereign and governed AI](workshops/sovereign-governed-ai.md) | Identity, tools, sovereignty, routing, guardrails, budget, then the trace | 45 min | written (wave 2) |
 | [Agentic AI](workshops/agentic-ai.md) | UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty | 60 min | written (wave 2) |
-| RHOAI end to end | Catalog, serving, external models, MaaS key, playground, LoRA, evaluation | 60-90 min | planned (wave 3) |
+| [RHOAI end to end](workshops/rhoai-end-to-end.md) | Catalog, serving, external models, MaaS key, playground, LoRA pipeline, evaluation | 70-90 min | written (wave 3) |
 | Trusted platform and operations | GitOps, signed release and admission, Vault, mesh, observability, AAP | about 60 min | planned (wave 4) |
 
 **Two-hour combinations:**

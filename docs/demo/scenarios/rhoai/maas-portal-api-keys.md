@@ -112,9 +112,12 @@ Run the 5-minute version, then:
 - **Human subscriptions cover gpt-oss-20b only.** When that model is down, a developer key has nothing to call.
 - **Keycloak tokens are refused by the MaaS gateway.** Only `sk-oai-` keys and OpenShift tokens are accepted.
 - **A key is shown once** and lives 90 days by default. It is bound to one subscription when it is created.
-- **This scenario does not cover** the portal's **Playground** and **AI asset endpoints** (the GenAI playground
-  scenario, planned) or the classification rules (see
+- **This scenario does not cover** the portal's **Playground** and **AI asset endpoints** (the [GenAI playground
+  scenario](genai-playground.md)) or the classification rules (see
   [the sovereignty scenario](../governance/ai-gateway-sovereignty.md)).
+- **SaaS traffic does not go through MaaS yet.** The ai-gateway still calls Mistral, Codestral and OVHcloud directly
+  (`MAAS_EXTERNAL_EGRESS_ENABLED=false`, checked 2026-11-13). The ExternalModels are published for a later cutover (WP-219).
+  See [external models](external-models.md).
 - **Each new rate adds to a Kuadrant EnvoyFilter** close to the etcd object size limit (about 1.34 MB of 1.5 MiB).
   Adding subscriptions on stage is not part of this scenario.
 
@@ -145,7 +148,7 @@ flowchart TB
   subgraph AI["Red Hat OpenShift AI"]
     MAAS["MaaS<br/>gateway, portal, API keys"]
     KSERVE["KServe llm-d<br/>local models on MIG GPUs"]
-    EXT["External models<br/>Mistral, OVHcloud"]
+    EXT["SaaS models<br/>Mistral, Codestral, OVHcloud"]
     PG["GenAI playground"]
     BUILD["Pipelines, MLflow,<br/>Kueue, model registry"]
     EVAL["TrustyAI, EvalHub,<br/>LMEval"]
@@ -173,7 +176,9 @@ flowchart TB
   UNIFAI & OWUI & TP & LS --> MCPGW
   LS & PG --> MAAS
   AIGW --> MAAS
-  MAAS --> KSERVE & EXT
+  MAAS --> KSERVE
+  AIGW --> EXT
+  MAAS -. published .-> EXT
   MCPGW --> MCPS --> SAAS
   BUILD --> KSERVE
   EVAL --> MAAS
@@ -218,6 +223,6 @@ flowchart LR
   MAP -.-> AUTH
   REF -.-> GWY
   TRLP --> LLM["LLMInferenceService<br/>llm-d router + vLLM<br/>gpt-oss-20b, qwen, ..."]
-  TRLP --> EXTM["ExternalModel<br/>mistral-large, gpt-oss-120b-ovhcloud<br/>(ai-gateway subscription only)"]
+  TRLP --> EXTM["ExternalModel<br/>mistral-large, gpt-oss-120b-ovhcloud<br/>(published; the gateway still calls SaaS directly)"]
   AIGW["ai-gateway service account<br/>subscription 1M tokens per hour"] --> GWY
 ```

@@ -128,7 +128,7 @@ flowchart TB
   subgraph AI["Red Hat OpenShift AI"]
     MAAS["MaaS<br/>gateway, portal, API keys"]
     KSERVE["KServe llm-d<br/>local models on MIG GPUs"]
-    EXT["External models<br/>Mistral, OVHcloud"]
+    EXT["SaaS models<br/>Mistral, Codestral, OVHcloud"]
     PG["GenAI playground"]
     BUILD["Pipelines, MLflow,<br/>Kueue, model registry"]
     EVAL["TrustyAI, EvalHub,<br/>LMEval"]
@@ -156,7 +156,9 @@ flowchart TB
   UNIFAI & OWUI & TP & LS --> MCPGW
   LS & PG --> MAAS
   AIGW --> MAAS
-  MAAS --> KSERVE & EXT
+  MAAS --> KSERVE
+  AIGW --> EXT
+  MAAS -. published .-> EXT
   MCPGW --> MCPS --> SAAS
   BUILD --> KSERVE
   EVAL --> MAAS
