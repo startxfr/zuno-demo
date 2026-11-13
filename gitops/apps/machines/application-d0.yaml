@@ -29,6 +29,10 @@ spec:
             enabled: true
           machineAutoscaler:
             enabled: true
+          machineConfigPool:
+            enabled: true
+        spotWorkers:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api

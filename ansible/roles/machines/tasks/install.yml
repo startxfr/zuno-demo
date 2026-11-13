@@ -99,6 +99,39 @@
   loop_control:
     label: "{{ item.name }}"
 
+# ADR-0614: the Spot overflow MachineSets are rendered by the wrapper chart
+# (templates/machineset-spot.yaml), not by the subchart, and need the same
+# identity substitution. Same fail-before-build rule on a missing zone.
+- name: "machines | read the Spot MachineSet list the chart declares"
+  ansible.builtin.set_fact:
+    _machines_spot_list_raw: >-
+      {{ ((lookup('ansible.builtin.file',
+                  zuno_repo_root + '/gitops/charts/machines/values.yaml')
+           | from_yaml).get('spotWorkers', {})).get('list', []) }}
+
+- name: "machines | fail if any Spot zone has no discovered subnet"
+  ansible.builtin.fail:
+    msg: >-
+      Spot MachineSet '{{ item.name }}' wants zone
+      '{{ cluster_aws_identity.region }}{{ item.az }}', which has no installer
+      MachineSet to read a subnet from.
+  loop: "{{ _machines_spot_list_raw }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (cluster_aws_identity.region ~ item.az) not in cluster_aws_identity.subnetByAz
+
+- name: "machines | substitute the cluster identity into each Spot MachineSet"
+  ansible.builtin.set_fact:
+    _machines_spot_list: >-
+      {{ (_machines_spot_list | default([])) + [item | combine({
+           'ami': cluster_aws_identity.ami,
+           'securityGroupName': cluster_aws_identity.securityGroupName,
+           'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ item.az]
+         })] }}
+  loop: "{{ _machines_spot_list_raw }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 # Starts from application-d0.yaml's own values, exactly like cert_manager and
 # grafana: gitops_app_extra_helm_values REPLACES spec.source.helm.values
 # wholesale, and the values it replaces are the three `enabled` toggles that
@@ -116,7 +149,8 @@
         | combine({'cluster-machine': {
             'cluster': {'id': cluster_aws_identity.id,
                         'region': cluster_aws_identity.region},
-            'machineSet': {'list': _machines_set_list}}},
+            'machineSet': {'list': _machines_set_list}},
+           'spotWorkers': {'list': _machines_spot_list | default([])}},
           recursive=True)
       }}
 
@@ -126,8 +160,12 @@
       - _machines_d0_values['cluster-machine']['machineSet']['enabled'] | bool
       - _machines_d0_values['cluster-machine']['machineAutoscaler']['enabled'] | bool
       - _machines_d0_values['cluster-machine']['cluster']['autoscaler']['enabled'] | bool
+      - _machines_d0_values['cluster-machine']['machineConfigPool']['enabled'] | bool
+      - _machines_d0_values['spotWorkers']['enabled'] | bool
       - (_machines_d0_values['cluster-machine']['machineSet']['list'] | length)
         == (_machines_chart_list | length)
+      - (_machines_d0_values['spotWorkers']['list'] | length)
+        == (_machines_spot_list_raw | length)
     fail_msg: >-
       The d0 values lost an enable toggle or a MachineSet. Applying this
       would prune live GPU MachineSets. Values built:
@@ -200,6 +238,39 @@
     (_machines_general.resources | map(attribute='status.availableReplicas', default=0)
        | map('int') | sum) ==
     (_machines_general.resources | map(attribute='spec.replicas') | map('int') | sum)
+  retries: 40
+  delay: 20
+
+# ADR-0614: infra nodes (group=infra) and their MachineConfigPool must be
+# ready before any infra component is moved onto them (that move is a
+# separate, per-component switch, never done by this role).
+- name: "machines | wait for the infra MachineSets to have their nodes available"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+    label_selectors:
+      - "machine.startx.io/group=infra"
+  register: _machines_infra
+  until: >-
+    (_machines_infra.resources | default([]) | length) > 0 and
+    (_machines_infra.resources | map(attribute='status.availableReplicas', default=0)
+       | map('int') | sum) ==
+    (_machines_infra.resources | map(attribute='spec.replicas') | map('int') | sum)
+  retries: 40
+  delay: 20
+
+- name: "machines | wait for the infra MachineConfigPool to be updated"
+  kubernetes.core.k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: MachineConfigPool
+    name: infra
+  register: _machines_infra_mcp
+  until: >-
+    (_machines_infra_mcp.resources | default([]) | length) == 1 and
+    (_machines_infra_mcp.resources[0].status.conditions | default([])
+       | selectattr('type', 'equalto', 'Updated')
+       | selectattr('status', 'equalto', 'True') | list | length) == 1
   retries: 40
   delay: 20
 

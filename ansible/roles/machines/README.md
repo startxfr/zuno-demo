@@ -25,6 +25,19 @@ master ran 179 pods at 97% CPU, etcd applies took 200 ms+ and every operator los
 leader election. The role sets `mastersSchedulable: false` once these sets have their
 nodes (`zuno_masters_schedulable`, default false; only after the general sets have their nodes).
 
+## Node pools (ADR-0614, 2026-11-13)
+
+| Pool | MachineSets | Placement |
+|---|---|---|
+| infra | `zuno-infra-a/b/c` (m5a.2xlarge, 150 GB) | label + taint `node-role.kubernetes.io/infra`, `infra` MachineConfigPool; Red Hat infra-eligible components only |
+| general | `zuno-worker-a/b/c` (m5a.4xlarge, 200 GB) | no taint |
+| Spot overflow | `zuno-worker-spot-a/b/c` (m5a.2xlarge Spot, 0..1 each) | rendered by `gitops/charts/machines/templates/machineset-spot.yaml` with their MachineAutoscalers |
+| GPU | `zuno-gpu-a` (and the sets at 0) | soft taint; **never scaled down without the owner's double approval** |
+
+The role waits for the general and infra sets and the infra pool before it
+makes the masters unschedulable. Moving infra components onto the infra
+nodes is NOT done here: each component has its own switch (see ADR-0614).
+
 ## Ordering
 
 `ansible/playbooks/day0_{check,install}.yml` list `machines` before
