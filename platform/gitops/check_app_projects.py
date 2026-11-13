@@ -346,12 +346,22 @@ def check_apps(rendered: List[Rendered], projects: Dict[str, Dict[str, Any]], cl
     return used
 
 
-def check_unused_whitelist(projects: Dict[str, Dict[str, Any]], used: Dict[str, Set[str]], findings: Findings) -> None:
+def check_unused_whitelist(projects: Dict[str, Dict[str, Any]], used: Dict[str, Set[str]], findings: Findings,
+                           unproven: bool = False) -> None:
+    """A whitelist entry no Application renders is a permission nobody uses. When some chart's subcharts are not built
+    (a workstation without `helm dependency build`), the kinds those subcharts render are invisible, so an entry that looks
+    unused cannot be proven so: it is reported as a note, not a failure. CI builds the dependencies and passes
+    --strict-dependencies, where every chart is rendered whole and the entry fails."""
     for name in (PLATFORM,):
         for entry in (projects.get(name) or {}).get("clusterResourceWhitelist", []) or []:
             gk = f"{entry.get('group', '')}/{entry.get('kind', '')}"
-            findings.check(gk in used.get(name, set()) or gk in LIVE_ONLY_KINDS,
-                           f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application")
+            if gk in used.get(name, set()) or gk in LIVE_ONLY_KINDS:
+                findings.passes += 1
+            elif unproven:
+                findings.notes.append(f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application "
+                                      "that could be rendered whole (some subcharts are not built); not proven unused")
+            else:
+                findings.check(False, f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application")
 
 
 def check_root_app(findings: Findings, path: pathlib.Path = ROOT_APP) -> None:
@@ -394,7 +404,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     check_projects(projects, findings)
     check_root_app(findings)
     used = check_apps(rendered, projects, cluster_scoped, findings)
-    check_unused_whitelist(projects, used, findings)
+    check_unused_whitelist(projects, used, findings,
+                           unproven=any('not built, rendered without them' in n for n in findings.notes))
     counts: Dict[str, int] = {}
     for app in rendered:
         counts[app.project] = counts.get(app.project, 0) + 1
