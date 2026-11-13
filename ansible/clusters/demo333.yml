@@ -51,7 +51,7 @@ zuno_build_git_ref: "devel"
 # TRUE since 2026-11-08 for the 2026-11-09 demo (node and app installed and the preflight
 # green on 2026-11-08): with false, any `make d2 install all` converges the app away.
 # Set it back to false right after the demo, then uninstall as above.
-zuno_world_model_enabled: true
+zuno_world_model_enabled: false
 # g7e.4xlarge had no capacity in eu-central-1a on 2026-11-07 (InsufficientInstanceCapacity, the machine controller retried
 # ~2900 times); eu-central-1b gave the node in minutes. Both zones offer g7e for this account.
 # 2026-11-10: no g7e.4xlarge capacity in a or b for hours, so both zones are searched (one MachineSet each; zone c does not offer the type);
