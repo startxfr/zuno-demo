@@ -1,0 +1,65 @@
+{{- /*
+ADR-0614: OpenShift built-ins that run on the infra nodes and that no other
+chart owns. Each one has its own switch, flipped one at a time once the infra
+nodes are Ready (P2 of the rollout); all false by default, so pushing this
+chart moves nothing. The router (cert-manager chart), platform monitoring
+(openshift-ai chart) and Quay (namespaces chart, zuno-registry) have their
+switches in their owning charts.
+
+The image registry Config and the GitopsService are PARTIAL patches of
+operator-owned singletons, like the IngressController patch in the
+cert-manager chart: ArgoCD's apply merges only the fields declared here.
+*/}}
+{{- $sel := dict "node-role.kubernetes.io/infra" "" }}
+{{- $tol := list (dict "key" "node-role.kubernetes.io/infra" "operator" "Exists" "effect" "NoSchedule") }}
+{{- if .Values.infraPlacement.registry }}
+---
+apiVersion: imageregistry.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  nodeSelector:
+    {{- toYaml $sel | nindent 4 }}
+  tolerations:
+    {{- toYaml $tol | nindent 4 }}
+{{- end }}
+{{- if .Values.infraPlacement.userWorkloadMonitoring }}
+---
+{{- /* The cluster-monitoring-operator creates this ConfigMap empty and never
+writes its data, so owning data here does not fight the operator. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-workload-monitoring-config
+  namespace: openshift-user-workload-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  config.yaml: |
+    {{- range list "prometheusOperator" "prometheus" "thanosRuler" "alertmanager" }}
+    {{ . }}:
+      nodeSelector:
+        {{- toYaml $sel | nindent 8 }}
+      tolerations:
+        {{- toYaml $tol | nindent 8 }}
+    {{- end }}
+{{- end }}
+{{- if .Values.infraPlacement.gitops }}
+---
+{{- /* runOnInfra moves the default openshift-gitops Argo CD instance (and the
+operator's own console backend) onto infra nodes; tolerations are required
+because the infra nodes are tainted. */}}
+apiVersion: pipelines.openshift.io/v1alpha1
+kind: GitopsService
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  runOnInfra: true
+  tolerations:
+    {{- toYaml $tol | nindent 4 }}
+{{- end }}

@@ -127,6 +127,8 @@ PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
     "zuno-external-secrets-d1": {"operatorconfig": {"enabled": True}, "secretStores": {"enabled": True}},
     "zuno-postgresql-d1": {"postgresCluster": {"enabled": True}},
     "zuno-mlflow-d1": {"mlflowConfig": {"enabled": True}},
+    # ADR-0614: the per-component infra-node switches, committed off and flipped one at a time during the rollout.
+    "zuno-machines-d0": {"infraPlacement": {"registry": True, "userWorkloadMonitoring": True, "gitops": True}},
 }
 
 

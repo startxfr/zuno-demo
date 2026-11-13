@@ -446,3 +446,11 @@ spotWorkers:
       subnet_name: mycluster-infraid-subnet-private-c
       volumeSize: 200
       maxReplicas: 1
+
+# ADR-0614: OpenShift built-ins moved onto the infra nodes by
+# templates/infra-placement.yaml. One switch each, all false until the infra
+# nodes exist; flipped one at a time in zuno-machines-d0's values.
+infraPlacement:
+  registry: false
+  userWorkloadMonitoring: false
+  gitops: false

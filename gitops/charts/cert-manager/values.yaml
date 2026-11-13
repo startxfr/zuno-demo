@@ -138,3 +138,9 @@ cluster-certmanager:
       enabled: true
       name: cert-manager-operator-group
       namespace: cert-manager-operator
+
+# ADR-0614: router=true moves the default IngressController (2 replicas) onto
+# the infra nodes (nodePlacement in templates/acme-cluster-patches.yaml).
+# false until the infra nodes exist.
+infraNodes:
+  router: false

@@ -512,6 +512,24 @@ prometheusK8s:
     limits:
       memory: 8Gi
 
+# ADR-0614: put every platform monitoring component on the infra nodes
+# (nodeSelector + toleration of the infra NoSchedule taint). false until the
+# infra nodes exist; Prometheus and Alertmanager then follow their zone-a/b
+# volumes onto the infra node of the same zone.
+infraNodes:
+  enabled: false
+  components:
+    - alertmanagerMain
+    - prometheusK8s
+    - prometheusOperator
+    - prometheusOperatorAdmissionWebhook
+    - kubeStateMetrics
+    - monitoringPlugin
+    - openshiftStateMetrics
+    - telemeterClient
+    - thanosQuerier
+    - metricsServer
+
 # ADR-0322 v0.1 integration scope: stands up an OGXServer instance (the OGX
 # Operator's data-plane CR - spec.components.ogx: Managed above only
 # installs the operator/controller: `oc get svc -n redhat-ods-applications`

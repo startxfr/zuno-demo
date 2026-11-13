@@ -753,6 +753,11 @@ platformNamespaces:
     description: >-
       Internal Red Hat Quay (operator, Quay, Clair, Redis) holding the OKF release, the zuno images and a declared
       selection of public images (ADR-0612).
+    # ADR-0614: Quay is Red Hat infra-eligible. true pins every pod of this
+    # namespace to the infra nodes through the namespace annotations (the
+    # QuayRegistry CR has no tolerations field). Flipped when the infra nodes
+    # exist; the pods move at their next restart.
+    infraNodes: false
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-ai-build

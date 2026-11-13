@@ -34,9 +34,31 @@ data:
     {{- if .Values.userWorkloadMonitoring.enabled }}
     enableUserWorkload: true
     {{- end }}
+    {{- $infra := and .Values.infraNodes .Values.infraNodes.enabled }}
     {{- if .Values.prometheusK8s }}
     prometheusK8s:
       resources:
         {{- toYaml .Values.prometheusK8s.resources | nindent 8 }}
+      {{- if $infra }}
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+        - key: node-role.kubernetes.io/infra
+          operator: Exists
+          effect: NoSchedule
+      {{- end }}
+    {{- end }}
+    {{- if $infra }}
+    {{- range .Values.infraNodes.components }}
+    {{- if ne . "prometheusK8s" }}
+    {{ . }}:
+      nodeSelector:
+        node-role.kubernetes.io/infra: ""
+      tolerations:
+        - key: node-role.kubernetes.io/infra
+          operator: Exists
+          effect: NoSchedule
+    {{- end }}
+    {{- end }}
     {{- end }}
 {{- end }}
