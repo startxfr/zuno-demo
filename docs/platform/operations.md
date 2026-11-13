@@ -121,36 +121,91 @@ password policy or restore the 8 h idle timeout - clear them in the admin consol
 ## Moving a PostgreSQL role onto the shared demo password (ADR-0595, ADR-0529)
 
 A new value of `zuno_admin_*_postgresql_*_password` reaches a fresh install only. On a running cluster the Vault path already
-exists (ADR-0345 seeds only missing paths) and PGO keeps the SCRAM verifier it derived from the old password (ADR-0529). One role
-at a time, with the cluster owner's go for each:
+exists (ADR-0345 seeds only missing paths) and PGO keeps the SCRAM verifier it derived from the old password (ADR-0529). The 13
+pguser roles of `zuno-data` and the session-store Redis therefore move one at a time, in a window announced to the other sessions
+and with the cluster owner's go.
+
+Before the window:
+
+- Patroni shows 3 members, both replicas `streaming` on the leader's timeline at lag 0 (`patronictl list` in the leader's
+  `database` container). A failover during the window then lands on a replica that already holds the new verifiers.
+- PGO, External Secrets and the AAP operators have not restarted in the last 15 minutes. Under etcd load they lose leader
+  election and crash-loop (2026-11-13), and then miss the reconcile that each step waits for.
+- No node is in DiskPressure: an eviction in the middle of a phase looks like a rotation failure.
+
+For each role:
 
 1. Set the new value in `ansible/confidential.yml` (the per-component variable, or the shared `zuno_admin_mainpwd`).
-2. Overwrite the Vault path, not delete it: `vault kv put zuno/<path> username=<user> password=<value>` (the paths are the keys of
-   `_vault_generated_secrets` in `ansible/roles/vault/tasks/install.yml`; keep the existing `username`).
-3. `ansible/tasks/force_externalsecret_refresh.yml` on the ExternalSecret that reads the path.
+2. Patch the `password` of the Vault path and keep its `username`: `vault kv patch -method=rw zuno/<path> password=-`, with the
+   value on stdin and never on a command line (ADR-0603 M9; `ansible/tasks/vault_cli.yml` does the same from a playbook). The
+   paths are the keys of `_vault_generated_secrets` in `ansible/roles/vault/tasks/install.yml`. Log in as `ansible-seeder`
+   (`ansible/tasks/vault_login.yml`) and select the server pod with `-l app.kubernetes.io/name=vault,component=server`: the
+   backup and snapshot Job pods also carry `app.kubernetes.io/name=vault`.
+3. Run `ansible/tasks/force_externalsecret_refresh.yml` on `zuno-postgresql-pguser-<role>` and wait until its `password` holds
+   the new value.
 4. Remove the verifier so PGO re-derives it and issues the `ALTER ROLE`:
-   `oc patch secret zuno-postgresql-pguser-<user> -n zuno-data --type=json -p '[{"op":"remove","path":"/data/verifier"}]'`.
-5. Refresh the consumer ExternalSecret in the other namespace, then confirm the consumers reconnect and that
-   `pg_authid.rolpassword` changed once and stays put.
+   `oc patch secret zuno-postgresql-pguser-<role> -n zuno-data --type=json -p '[{"op":"remove","path":"/data/verifier"}]'`.
+   Confirm that `md5(rolpassword)` in `pg_authid` changed (compare the hashes, never print them).
+5. Test the login on the leader: `psql "host=localhost dbname=postgres user=<role> sslmode=require"`, with `PGPASSWORD` read
+   from stdin (`pg_hba` accepts only `hostssl ... scram-sha-256`). The new value must connect and the old one must be refused.
+6. Refresh the consumer ExternalSecret (table below), restart the consumer, and check its log for
+   `password authentication failed`.
 
-Done live on demo333 on 2026-11-03 (eleven roles, then Redis): `mlflow` first as the canary, then OGX, MaaS and the six AAP roles,
-then `keycloak` and `zunoapp`. Traps seen on the way:
+| Role | Consumer Secret, after `zuno-postgresql-pguser-<role>` | Restart |
+|---|---|---|
+| `mlflow` | `redhat-ods-applications/mlflow-backend-store` (`uri`) | `deploy/mlflow` |
+| `zunoapp` | none | none |
+| `ogxserver` | `redhat-ods-applications/ogx-pgvector-password` | `deploy/zuno-ogx` |
+| `kagent` | `zuno-kagent/kagent-database` (`url`) | `deploy/kagent-controller` |
+| `dify` | `zuno-dify/dify-app` (`DB_PASSWORD`) | `dify-api`, `dify-worker`, `dify-beat`, `dify-plugin-daemon` |
+| `maas` | `redhat-ods-applications/maas-db-config`, then its copy in `redhat-ai-gateway-infra` | the `make d1 reconcile openshift-ai` steps (below) |
+| `aapgateway`, `aapcontroller`, `aaphub`, `aapeda`, `metricsservice`, `msawxreadonly` | `zuno-aap/aap-{gateway,controller,hub,eda,metrics}-postgres-config` and `aap-metrics-read-config`, then the operator copies (below) | the five AAP operators, then the 14 AAP workloads |
+| `keycloak` | `zuno-auth/keycloak-postgresql-app` | `sts/zuno` (pod `zuno-0`) |
+| Redis, `zuno/redis/session-store` | `zuno-auth/zuno-redis-auth` and `zuno-ai-run/ai-gateway-redis-credentials` | `sts/zuno-redis-master`, then `deploy/ai-gateway` |
+
+The order that worked: `mlflow` as the canary; then `zunoapp`, `ogxserver`, `kagent`, `dify` and `maas`; then Redis; then the
+six AAP roles (AAP is down 5-15 minutes); `keycloak` last (SSO is down 30-65 seconds).
+
+Done live on demo333 twice:
+
+- 2026-11-03: eleven roles, then Redis: `mlflow` first as the canary, then OGX, MaaS, the six AAP roles, `keycloak` and
+  `zunoapp`.
+- 2026-11-13: all 13 roles and Redis, in the order above, about 25 minutes of phase run time. Afterwards, a scan of every Secret
+  found no key still holding the old value, the golden path passed, and `make d3 check recovery` was ok.
+
+Traps seen on the way:
 
 - Removing the verifier too early leaves it derived from the OLD password: the ExternalSecret may not have rewritten `password` yet
-  when PGO regenerates it (`aapcontroller` kept its old hash). Wait until `password` carries the new value, then remove the
+  when PGO regenerates it (`aapcontroller` kept its old hash). Wait until `password` holds the new value, then remove the
   verifier; if `pg_authid.rolpassword` did not change, remove it a second time.
 - The AAP operators keep their own copies, `aap-*-postgres-configuration` (controller, eda, eda-event-stream, hub, metrics),
   and do not refresh them when `aap-*-postgres-config` changes. Patch their `password` from the source Secret, then restart the
-  AAP workloads, or the pods fail with `password authentication failed`.
+  five AAP operators. They rebuild `aap-controller-app-credentials` (`credentials.py`) and `aap-hub-server` (`settings.py`). Wait
+  until both hold the new value before restarting the 14 AAP workloads, or the pods fail with
+  `password authentication failed`. On 2026-11-13 the files were rebuilt on the first try; on 2026-11-03 the Hub took about
+  6 minutes.
 - Keycloak reads its database Secret at start: delete `zuno-0` after the role changed. Redis (`zuno-redis-master`) and the
-  ai-gateway read theirs at start too: refresh both ExternalSecrets, restart Redis, then the ai-gateway.
+  ai-gateway read theirs at start too: refresh both ExternalSecrets, restart Redis, check `AUTH` with the new value, then restart
+  the ai-gateway.
+- The Redis volume is pinned to its zone. Since the masters stopped taking workloads (`mastersSchedulable=false`), a Redis pod
+  still on a master moves to a worker in the same zone when it restarts, and the EBS reattach adds about a minute.
 - maas-controller copies `maas-db-config` into `redhat-ai-gateway-infra` once and never updates it. Missed on 2026-11-03,
   maas-api crash-looped the next morning on `password authentication failed for user "maas"`. `make d1 check openshift-ai`
   reports the stale copy and `make d1 reconcile openshift-ai` resyncs it: it deletes the copy, restarts maas-controller (a
   delete alone is not recreated), waits for the new copy to match its source, then restarts maas-api.
+- Restart by deleting the pods. Argo CD selfHeal reverts the `restartedAt` annotation of `oc rollout restart`. Delete only the
+  pods the workload owns: the maas-api label selector also matches the pods of the `maas-api-key-cleanup` CronJob.
+- The mlflow operator rolls `deploy/mlflow` again by itself once `mlflow-backend-store` changes. A second new pod right after
+  the restart is expected.
 
-Not rotated: the MariaDB users (`mlpipeline`, `mlops`, `trillian`) live on the simulated external instance `zuno-ext-sim/ext-mariadb`
-of the frozen WP-143 pilot, whose credentials are not ours (ADR-0352); `aap/admin` is an AAP console password, not a database.
+Not rotated here:
+
+- The MariaDB users (`mlpipeline`, `mlops`, `trillian`) live on the simulated external instance `zuno-ext-sim/ext-mariadb` of
+  the frozen WP-143 pilot, whose credentials are not ours (ADR-0352).
+- `aap/admin` is an AAP console password, not a database role.
+- `aap-rhn-credentials` (`zuno/aap/rhn`) is the platform owner's Red Hat account. Change the password at Red Hat first, then
+  set `zuno_aap_rhn_password` and patch the Vault path.
+
 ## Handing out MaaS API keys: what the token limit does and does not cover (WP-220)
 
 Users create their own keys in the MaaS consumer portal, `https://rh-ai.<domain>/maas-consumer-portal` ("API keys"), on the subscription their
