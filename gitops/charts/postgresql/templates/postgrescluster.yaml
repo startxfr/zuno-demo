@@ -44,16 +44,6 @@ spec:
       shared_preload_libraries: "timescaledb"
       max_connections: "{{ .Values.config.maxConnections }}"
       log_min_duration_statement: "{{ .Values.config.logMinDurationStatement }}"
-{{- if .Values.backups.s3.enabled }}
-      # Read archived WAL from repo1 (the local PVC) only. With repo2 (S3)
-      # also enabled, both repos hold the same segments, and pgBackRest's
-      # archive-get refuses with "[045] duplicates found for WAL segment ...
-      # are multiple primaries archiving to this stanza?". Observed on demo333
-      # 2026-11-13: a re-cloned replica sat in archive recovery for hours and
-      # never caught up. archive-push is unchanged (it still writes to every
-      # repo); repo2 stays the off-cluster backup and restore source.
-      restore_command: 'pgbackrest --stanza=db archive-get --repo=1 %f "%p"'
-{{- end }}
 
 {{- if .Values.monitoring.enabled }}
   # ADR-0413: crunchy-postgres-exporter sidecar on every instance pod,
