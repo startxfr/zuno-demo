@@ -12,7 +12,8 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `openclaw`.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [three experiences](../../three-experiences.md), [five experiences](../../five-experiences.md).
+> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
+> many experiences](../../five-experiences.md).
 
 ## Introduction
 

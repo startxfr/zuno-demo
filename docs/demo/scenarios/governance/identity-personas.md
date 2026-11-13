@@ -15,7 +15,7 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > no golden-path probe. Rehearse it before showing it to an audience.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [sovereign and governed AI](../../workshops/sovereign-governed-ai.md).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md).
 
 ## Introduction
 

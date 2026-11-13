@@ -7,9 +7,11 @@
 > running. At the time of the check the local models were restarting (one of four Ready) and Grafana was down: run the
 > probe before any session.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `sovereignty` (the 15-minute version also uses `trace`).
+> yes, golden-path probe `sovereignty`. The 15-minute version also relies on Tempo, which the probe `trace` checks; run
+> it together with `unifai-tekos`, whose run it looks up.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [five experiences](../../five-experiences.md) (sovereign and agentic workshops planned).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
+> [Agentic AI](../../workshops/agentic-ai.md).
 
 ## Introduction
 

@@ -10,7 +10,7 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
 > golden-path probe. Rehearse it before showing it to an audience.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** RHOAI end to end (planned).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
 
 ## Introduction
 

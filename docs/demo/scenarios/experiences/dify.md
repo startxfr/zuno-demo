@@ -13,7 +13,7 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `dify`.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [five experiences](../../five-experiences.md).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).
 
 ## Introduction
 

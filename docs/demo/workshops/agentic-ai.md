@@ -1,6 +1,6 @@
 # Workshop: Agentic AI
 
-> **Status:** Built from six scenarios, linked in the agenda, and one inline block. Not rehearsed as a whole. Each
+> **Status:** Built from seven scenarios, linked in the agenda. Not rehearsed as a whole. Each
 > block keeps the status of its scenario page.
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
 > `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty make demo golden-path`. The live RAG
@@ -51,7 +51,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas
 | **ai-ops-01** | AI platform operator, back office. `ocp-ai-ops`. | The UnifAI contrast (Tekos with cluster tools), kagent, Grafana and Tempo |
 | **sale-01** | Salesperson, front office. `sales`. | The MCP tools contrast, the RAG isolation check |
 | **consultant-01** | Consultant and architect, front office. | The live RAG upload |
-| **paas-ops-01** | Platform operator, back office. `ocp-paas-ops` (cluster-admin). | The presenter's `oc` terminal, the inline release block |
+| **paas-ops-01** | Platform operator, back office. `ocp-paas-ops` (cluster-admin). | The presenter's `oc` terminal, the signed release block |
 
 ## Agenda
 
@@ -63,7 +63,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas
 | 0:13 | My documents | [UnifAI live RAG](../unifai-live-rag.md#5-minute-version), 5-minute version | "Now the agent needs something it cannot do itself." |
 | 0:18 | Delegation with approval | [A2A delegation with approval](../scenarios/governance/a2a-delegation-approval.md#15-minute-version), 15-minute version | "Agents can live outside UnifAI too." |
 | 0:33 | An operations agent | [kagent](../scenarios/experiences/kagent.md#5-minute-version), 5-minute version | "Where do all these agents come from?" |
-| 0:38 | Signed agents | [Where the agents come from](#where-the-agents-come-from), inline | "Last: the agent's own rules about data." |
+| 0:38 | Signed agents | [Signed agent release](../scenarios/foundation/okf-signed-agent-release.md#5-minute-version), 5-minute version | "Last: the agent's own rules about data." |
 | 0:46 | Agents carry their data rules (optional) | [Sovereignty](../scenarios/governance/ai-gateway-sovereignty.md#5-minute-version), 5-minute version | |
 | 0:51 | Close and questions | Repeat the message | |
 
@@ -81,26 +81,11 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas
 - [ ] Check that the probes listed in the status banner passed within the last hour. The delegation probe can take
   about 5 minutes when the model retries the tool.
 
-## Where the agents come from
-
-This block has no scenario page yet: the signed agent release scenario is planned for wave 4. Play it from the
-presenter's terminal (**paas-ops-01**) and a browser tab on GitHub.
-
-| Time | Do | Say | You should see |
-|---|---|---|---|
-| 0:00 | Open [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md) in the agents repository | "Agents are declared by their business owners in their own repository: purpose, tasks, tools, data classification. The platform team does not write them." | The OKF sheet of Arkos, with its tasks, its tools and `preferred_classification: C3`. |
-| 2:00 | Open [`platform/okf/agents.lock`](../../../platform/okf/agents.lock) in this repository | "The platform runs exactly one agents release, pinned by its digest. Changing it is a pull request, reviewed like code." | `# release v0.14.3` and `quay.io/zuno/okf-corp@sha256:2918e463...` |
-| 3:30 | `oc logs deploy/mcp-gateway -c okf-fetch -n zuno-ai-run \| grep VERIFIED` | "Each gateway verifies the release's signature when its pod starts. If the signature does not verify, the gateway does not start." | `VERIFIED quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/okf-corp@sha256:2918e463...: release 0.14.3 (release), 8 agent(s): ...` |
-| 5:30 | Point at the start of the reference | "The release is read from our own registry mirror, and verified against the same signature as the original." | The reference starts with `quay-quay-zuno-registry.apps.demo333.startx.fr`, not `quay.io`. |
-| 7:00 | Close the block | "Signed agents, governed tools, one gateway." | |
-
-The digest and the release number above were read on demo333 on 2026-11-13. Read them again before the session.
-
 ## If time runs short
 
 Drop blocks in this order:
 1. sovereignty;
-2. the inline release block, down to its first and third steps;
+2. the signed release block;
 3. kagent.
 
 Keep the delegation block in its 15-minute version: it is the centre of the story.

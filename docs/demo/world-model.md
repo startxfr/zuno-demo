@@ -14,7 +14,7 @@
 > **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > not show-ready: the GPU node is off.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** none yet. Moment 5 of the [2026-11-09 demonstration](demo-day-2026-11-09.md).
+> **Used in workshops:** none while it is not show-ready.
 
 ## Introduction
 

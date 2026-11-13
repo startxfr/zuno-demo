@@ -14,8 +14,7 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `lightspeed`.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** none yet. It was shown in the console during [the 2026-11-09 demonstration](../../demo-day-2026-11-09.md)
-> (moment 1).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).
 
 ## Introduction
 

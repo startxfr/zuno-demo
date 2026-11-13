@@ -15,7 +15,7 @@
 > yes, golden-path probe `delegation-approval`. The probe proves the request and a refusal, as `eval-consultant-01`.
 > The approval clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [agentic AI](../../workshops/agentic-ai.md).
+> **Used in workshops:** [Agentic AI](../../workshops/agentic-ai.md).
 
 ## Introduction
 

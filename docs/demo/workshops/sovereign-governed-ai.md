@@ -3,7 +3,8 @@
 > **Status:** Built from six scenarios, linked in the agenda, plus two steps of a seventh. Not rehearsed as a whole.
 > Each block keeps the status of its scenario page.
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=open-webui,tools,sovereignty,trace,zuno-code,guardrails make demo golden-path`. The identity and budget blocks
+> `ONLY=open-webui,tools,sovereignty,unifai-tekos,trace,zuno-code,guardrails make demo golden-path` (`trace` looks
+> up the run that `unifai-tekos` makes, so the two go together). The identity and budget blocks
 > have no probe: rehearse them the same day.
 > **Duration:** 45 minutes, presenter-led. **Audience:** decision makers, security and compliance teams, architects;
 > every block plays its 5-minute version.

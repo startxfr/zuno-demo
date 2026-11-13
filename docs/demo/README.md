@@ -43,7 +43,6 @@ play; it does not copy their steps.
 - **Not show-ready**: a named reason prevents it today (for example, the GPU node of the world model is off).
 - **Page**:
   - **written**: in the new format;
-  - **planned (wave N)**: not written yet.
 
 ## Scenarios
 
@@ -89,13 +88,13 @@ play; it does not copy their steps.
 
 | Scenario | Shows | Personas | Golden-path probe | Page |
 |---|---|---|---|---|
-| GitOps and Day 0-3 | `make dN verb component`, Argo CD, drift check, the golden path itself | presenter terminal | none (rehearse first) | planned (wave 4) |
-| Signed agent release (OKF) | An agents release signed keyless, admitted by digest, revocation | presenter terminal | none (rehearse first) | planned (wave 4) |
-| Image signing and admission | RHTAS, ClusterImagePolicy, the Quay mirror | presenter terminal | none (rehearse first) | planned (wave 4) |
-| Vault and PKI | Raft with KMS auto-unseal, ExternalSecrets, certificates | presenter terminal | none (rehearse first) | planned (wave 4) |
-| Service mesh and Kiali | mTLS, workload identity, the service graph | paas-ops-01 | none (rehearse first) | planned (wave 4) |
-| Observability and traces | The experiences dashboard, a run traced in Tempo, usage and cost | paas-ops-01 | `trace` | planned (wave 4) |
-| AAP audited operations | Job templates, audit history read by an agent | paas-ops-01 | none (rehearse first) | planned (wave 4) |
+| [GitOps and Day 0-3](scenarios/foundation/gitops-day0-3.md) | `make dN verb component` and its four days, which verbs are read-only, the Argo CD Applications on `devel`, the known-good and drift checks, the golden path, freeze and canary rules | paas-ops-01 | none (rehearse first) | written (wave 4) |
+| [Signed agent release (OKF)](scenarios/foundation/okf-signed-agent-release.md) | An agent's sheet in its own repository, one digest in `agents.lock`, `okf-fetch` VERIFIED from the internal Quay, offline admission, promotion by pull request, revocation | paas-ops-01 | none (rehearse first) | written (wave 4) |
+| [Image signing and admission](scenarios/foundation/image-signing-admission.md) | RHTAS in the cluster, image policies in enforce mode, images pinned by digest and pulled from Quay through mirror sets, the verify Job and the release ledger, the mirror-set drain trap | paas-ops-01 | none (rehearse first) | written (wave 4) |
+| [Vault and PKI](scenarios/foundation/vault-pki.md) | Vault on Raft with KMS auto-unseal and TLS, ExternalSecrets in every namespace, Let's Encrypt and Vault-issued certificates, Transit signing for the gateways | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) |
+| [Service mesh and Kiali](scenarios/foundation/service-mesh-kiali.md) | STRICT mTLS, short-lived SPIFFE identities from Vault PKI, injection versus allowlist, the MaaS gateway on the same mesh, the Kiali graph | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) |
+| [Observability and traces](scenarios/foundation/observability-trace.md) | A Tekos turn found in Tempo with its span tags, the Run Trace dashboard, usage and cost per experience, the collector pipeline, two counting traps, Perses in the console | consultant-02, ai-ops-01, paas-ops-01 | `trace` (with `unifai-tekos`) | written (wave 4) |
+| [AAP audited operations](scenarios/foundation/aap-audited-operations.md) | Job templates and workflows from Git, reader versus ops rights in the AAP UI, a check job and its pod, the agents' audit tools and their rate limit | consultant-03, consultant-02, paas-ops-01 | none (rehearse first) | written (wave 4) |
 
 ## Workshops (presenter-led)
 
@@ -106,7 +105,7 @@ play; it does not copy their steps.
 | [Sovereign and governed AI](workshops/sovereign-governed-ai.md) | Identity, tools, sovereignty, routing, guardrails, budget, then the trace | 45 min | written (wave 2) |
 | [Agentic AI](workshops/agentic-ai.md) | UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty | 60 min | written (wave 2) |
 | [RHOAI end to end](workshops/rhoai-end-to-end.md) | Catalog, serving, external models, MaaS key, playground, LoRA pipeline, evaluation | 70-90 min | written (wave 3) |
-| Trusted platform and operations | GitOps, signed release and admission, Vault, mesh, observability, AAP | about 60 min | planned (wave 4) |
+| [Trusted platform and operations](workshops/trusted-platform-ops.md) | GitOps, signed images, signed agents, Vault, mesh, observability (15-minute version), AAP | 60 min | written (wave 4) |
 
 **Two-hour combinations:**
 - sovereign and governed AI, then agentic AI;

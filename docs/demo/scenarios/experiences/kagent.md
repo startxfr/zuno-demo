@@ -14,7 +14,8 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `kagent`.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [five experiences](../../five-experiences.md) (agentic AI workshop planned).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md),
+> [Agentic AI](../../workshops/agentic-ai.md).
 
 ## Introduction
 

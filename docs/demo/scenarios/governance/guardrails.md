@@ -13,8 +13,8 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `guardrails`.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
-> [five experiences](../../five-experiences.md) (block **Same rules, one dashboard**).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One governed backend,
+> many experiences](../../five-experiences.md).
 
 ## Introduction
 

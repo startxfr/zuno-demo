@@ -13,8 +13,8 @@
 > yes, golden-path probe `unifai-tekos`. The probe proves a Tekos turn only. The cluster-tools contrast at 3:00 has no
 > probe: rehearse it the same day.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [three experiences](../../three-experiences.md) (step 2),
-> [five experiences](../../five-experiences.md) (step 8).
+> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
+> many experiences](../../five-experiences.md), [Agentic AI](../../workshops/agentic-ai.md).
 
 ## Introduction
 
@@ -132,8 +132,8 @@ Run the 5-minute version, then:
 
 ## Limits
 
-- **No delegation here.** Arkos asking Tekos, with a human approval, is the scenario "A2A delegation with approval"
-  (planned).
+- **No delegation here.** Arkos asking Tekos, with a human approval, is the scenario
+  [A2A delegation with approval](../governance/a2a-delegation-approval.md).
 - **Tekos is reached only through the team workspace `agent-tekos`.** The personal chat list has no agent selector
   ([WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md), D10).
 - **Team sessions are shared** with every member of the team, answers included. On the WP-208 screenshots, one

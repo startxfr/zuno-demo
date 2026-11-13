@@ -13,7 +13,8 @@
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > yes, golden-path probe `tools` (the 5-minute version also uses Open WebUI: run `open-webui` too).
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** [five experiences](../../five-experiences.md), [agentic AI](../../workshops/agentic-ai.md).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
+> [Agentic AI](../../workshops/agentic-ai.md), [One governed backend, many experiences](../../five-experiences.md).
 
 ## Introduction
 
