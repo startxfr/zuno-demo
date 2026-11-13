@@ -433,4 +433,4 @@ spotWorkers:
 infraPlacement:
   registry: true   # P2 step 1, 2026-11-13
   userWorkloadMonitoring: true   # WP-260 P2 step 4, 2026-11-13
-  gitops: false
+  gitops: true   # WP-260 P2 step 5, 2026-11-13
