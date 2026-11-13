@@ -388,6 +388,8 @@ dataScienceCluster:
 # comment for the full reasoning.
 maasGateway:
   enabled: false
+  # ADR-0614 (WP-260 P3): two gateway pods spread over zones.
+  replicas: 2
   # Placeholder auto-substituted with the real cluster domain by
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com

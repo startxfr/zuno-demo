@@ -248,6 +248,8 @@ project:
     requester: zuno
 
 kuadrant:
+  # ADR-0614 (WP-260 P3): Authorino pods (templates/authorino.yaml).
+  authorinoReplicas: 2
   enabled: false
   # Enables the spec.listener.tls override in templates/authorino.yaml so
   # Authorino's own listener is TLS-enabled - required for
