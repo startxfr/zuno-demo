@@ -34,6 +34,11 @@ metadata:
     app.kubernetes.io/component: nemo-guardrails
 spec:
   replicas: {{ .Values.nemoGuardrails.replicas }}
+  # The CRD defaults exposeRoute to true: the operator then publishes an edge Route to the
+  # guardrails server on the cluster's apps domain. Its only client is the ai-gateway, which calls
+  # the in-cluster Service (ai-gateway values guardrails.nemoUrl), so the Route only widens the
+  # attack surface. Set explicitly (2026-11-13).
+  exposeRoute: {{ .Values.nemoGuardrails.exposeRoute }}
   nemoConfigs:
     - name: {{ .Values.nemoGuardrails.configId }}
       default: true

@@ -85,6 +85,8 @@ guardrailsSmoke:
 nemoGuardrails:
   enabled: false
   name: zuno-guardrails
+  # No public Route to the guardrails server: the ai-gateway reaches it through the Service.
+  exposeRoute: false
   # Mounted at /app/config/<configId>; also the config_id the client
   # sends on every request.
   configId: zuno-observe
