@@ -60,6 +60,10 @@ metadata:
     zuno.io/managed-by: argocd
 spec:
   runOnInfra: true
+  {{- /* runOnInfra alone set only the tolerations on demo333 (GitOps operator,
+  2026-11-13): the explicit nodeSelector is what pins the pods. */}}
+  nodeSelector:
+    {{- toYaml $sel | nindent 4 }}
   tolerations:
     {{- toYaml $tol | nindent 4 }}
 {{- end }}
