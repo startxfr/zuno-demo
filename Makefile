@@ -115,7 +115,9 @@ DAY3_BACKUP_COMPONENTS := postgresql unifai quay-registry
 # OLSConfig operand is absent, and vice versa.
 # "operators" (2026-11-04): report-only audit of the OLM operators that can be
 # updated (platform/olm/audit_operator_updates.py, ansible/roles/operators).
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift
+# "recovery" (2026-11-12): read-only, is the cluster back after a node drain or a reboot
+# (platform/recovery/check_recovery.py, ansible/roles/recovery).
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift recovery
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
 # already-installed platform - the same tier as backup/restore, never

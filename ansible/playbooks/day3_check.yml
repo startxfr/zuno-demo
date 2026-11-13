@@ -39,6 +39,9 @@
       # ADR-0608/WP-241: what runs on the cluster that the repository does not
       # explain (platform/drift/check_drift.py); report-only until zuno_drift_strict.
       - drift
+      # WP-248 incident: nodes, pools, operators, stuck pods, Quay, the Kuadrant wasm Service and a MaaS route
+      # (platform/recovery/check_recovery.py); fails with the next step for the first layer that is not back.
+      - recovery
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

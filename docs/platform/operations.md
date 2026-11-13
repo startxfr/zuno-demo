@@ -162,3 +162,13 @@ group holds (`gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops`, 5,000,000
   Do not present the 5,000,000 figure as a ceiling for such a key. Metering that path is WP-225; blocking it is not planned (WP-220 uses it on purpose).
 - **The playground's MCP connection needs the user's own OpenShift token** (`https://oauth-openshift.<domain>/oauth/token/request`, valid 24 hours).
   Which tools the user sees depends on their group: `ocp-ai-ops` gets all nine, `ocp-ai-dev` gets none (`tool-policy.yaml`).
+
+## After a node drain or a reboot: `make d3 check recovery`
+
+Read-only (`platform/recovery/check_recovery.py`, `oc` logged in). It lists the layers in the order they have to recover and the next
+step for each: nodes Ready and uncordoned (a drain stuck on a single-replica PodDisruptionBudget passes when the pods are deleted,
+ADR-0101), MachineConfigPools Updated, ClusterOperators, stuck pods, Quay Ready (answering 401 on its route), the Service
+`kuadrant-operator-wasm` with an endpoint and Authorino Ready, and a MaaS route answering 401 without a token (503 = the Kuadrant
+wasm-shim failed closed: delete the `maas-default-gateway` pod once the operator is back). Removing a source from an
+ImageDigestMirrorSet drains every node (adding one does not); run it after such a change and after any reboot.
+
