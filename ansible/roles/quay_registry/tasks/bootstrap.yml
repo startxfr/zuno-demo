@@ -29,27 +29,28 @@
 - name: "quay_registry | log in to Vault as ansible-seeder"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
+# ADR-0603 M9: no secret on a command line. ansible/tasks/vault_cli.yml copies the token (and the payload) into the pod as files.
 - name: "quay_registry | read the admin record from Vault (rc 2 = not yet created)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/registry/quay-admin"
-  register: _quay_registry_admin_vault
-  changed_when: false
-  failed_when: false
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv get -format=json zuno/registry/quay-admin"
+    vault_cli_capture_stdout: true
+    vault_cli_fail_on_error: false
+
+- name: "quay_registry | keep the Vault read"
+  ansible.builtin.set_fact:
+    _quay_registry_admin_vault: "{{ vault_cli_result }}"
   no_log: true
 
 - name: "quay_registry | stop when the Vault read failed for another reason than a missing path"
   ansible.builtin.fail:
     msg: "Could not tell whether zuno/registry/quay-admin exists (rc={{ _quay_registry_admin_vault.rc | default('n/a') }}); not initializing."
-  when: (_quay_registry_admin_vault.rc | default(1)) not in [0, 2]
+  when: (_quay_registry_admin_vault.rc | default(1) | int) not in [0, 2]
 
 - name: "quay_registry | first start: draw the admin password once"
   ansible.builtin.set_fact:
     _quay_registry_admin_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
-  when: _quay_registry_admin_vault.rc == 2
+  when: _quay_registry_admin_vault.rc | int == 2
   no_log: true
 
 - name: "quay_registry | first start: initialize the admin user (works once, on an empty database)"
@@ -65,26 +66,24 @@
     status_code: [200]
     validate_certs: "{{ zuno_quay_validate_certs }}"
   register: _quay_registry_init
-  when: _quay_registry_admin_vault.rc == 2
+  when: _quay_registry_admin_vault.rc | int == 2
   no_log: true
 
 # Store at once: the token is shown only now.
 - name: "quay_registry | store the admin record in Vault"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/registry/quay-admin
-      username=quayadmin password={{ _quay_registry_admin_password | quote }}
-      token={{ _quay_registry_init.json.access_token | quote }}"
-  when: _quay_registry_admin_vault.rc == 2
-  no_log: true
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/registry/quay-admin @PAYLOAD"
+    vault_cli_payload:
+      username: quayadmin
+      password: "{{ _quay_registry_admin_password }}"
+      token: "{{ _quay_registry_init.json.access_token }}"
+  when: _quay_registry_admin_vault.rc | int == 2
 
 - name: "quay_registry | the admin OAuth token"
   ansible.builtin.set_fact:
     _quay_registry_token: >-
-      {{ _quay_registry_init.json.access_token if _quay_registry_admin_vault.rc == 2
+      {{ _quay_registry_init.json.access_token if _quay_registry_admin_vault.rc | int == 2
          else (_quay_registry_admin_vault.stdout | from_json).data.data.token }}
   no_log: true
 
