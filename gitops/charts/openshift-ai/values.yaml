@@ -517,7 +517,7 @@ prometheusK8s:
 # infra nodes exist; Prometheus and Alertmanager then follow their zone-a/b
 # volumes onto the infra node of the same zone.
 infraNodes:
-  enabled: false
+  enabled: true   # WP-260 P2 step 3, 2026-11-13
   components:
     - alertmanagerMain
     - prometheusK8s
