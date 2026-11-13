@@ -1,6 +1,11 @@
 {{- $routerCert := and .Values.acme.enabled .Values.acme.consumers.routerDefaultCert }}
-{{- $routerInfra := and .Values.infraNodes .Values.infraNodes.router }}
-{{- if or $routerCert $routerInfra }}
+{{- /* The placement renders ONLY where the certificate patch renders (the d1
+Application). Two Applications render this chart (d0 and d1); on
+2026-11-13 the d0 one also rendered IngressController/default with the
+placement alone, took ownership and its apply removed defaultCertificate:
+the router served the operator's self-signed certificate (WP-260). */}}
+{{- $routerInfra := and $routerCert .Values.infraNodes .Values.infraNodes.router }}
+{{- if $routerCert }}
 {{- /*
 ADR-0211 consumer patch 1 - like gitops/charts/openshift-oauth's
 cluster-trusted-ca.yaml (ADR-0347's Proxy/cluster pattern), this is a
@@ -19,10 +24,8 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
 spec:
-  {{- if $routerCert }}
   defaultCertificate:
     name: router-wildcard-tls
-  {{- end }}
   {{- if $routerInfra }}
   {{- /* ADR-0614: the default router runs on the infra nodes. This chart is the
   only owner of IngressController/default, so the placement lives here next
