@@ -757,7 +757,7 @@ platformNamespaces:
     # namespace to the infra nodes through the namespace annotations (the
     # QuayRegistry CR has no tolerations field). Flipped when the infra nodes
     # exist; the pods move at their next restart.
-    infraNodes: false
+    infraNodes: true   # WP-260 P2 step 6, 2026-11-13
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-ai-build
