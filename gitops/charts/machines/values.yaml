@@ -431,6 +431,6 @@ spotWorkers:
 # templates/infra-placement.yaml. One switch each, all false until the infra
 # nodes exist; flipped one at a time in zuno-machines-d0's values.
 infraPlacement:
-  registry: false
+  registry: true   # P2 step 1, 2026-11-13
   userWorkloadMonitoring: false
   gitops: false
