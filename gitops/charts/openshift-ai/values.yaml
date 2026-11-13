@@ -522,7 +522,10 @@ infraNodes:
     - alertmanagerMain
     - prometheusK8s
     - prometheusOperator
-    - prometheusOperatorAdmissionWebhook
+    # prometheusOperatorAdmissionWebhook is NOT listed: the monitoring config
+    # webhook refuses nodeSelector/tolerations for it ("unknown field
+    # prometheusOperatorAdmissionWebhook.tolerations", OCP 4.22), so its two
+    # small pods stay on the workers.
     - kubeStateMetrics
     - monitoringPlugin
     - openshiftStateMetrics
