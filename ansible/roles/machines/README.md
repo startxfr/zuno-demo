@@ -16,6 +16,15 @@ the GPU machinesets to have their machines available (first boot of a g7e node i
 ~8 min; the NVIDIA driver build on top of it is `nvidia_gpu`'s wait, not
 this role's).
 
+## General-purpose workers (2026-11-13)
+
+`zuno-worker-a/b/c` (m5a.4xlarge, one per zone, group `general`, no taint) give the
+platform non-GPU capacity so the three control-plane nodes can be unschedulable
+(`schedulers.config.openshift.io/cluster` `mastersSchedulable: false`). On demo333 a
+master ran 179 pods at 97% CPU, etcd applies took 200 ms+ and every operator lost its
+leader election. The role sets `mastersSchedulable: false` once these sets have their
+nodes (`zuno_masters_schedulable`, default false; only after the general sets have their nodes).
+
 ## Ordering
 
 `ansible/playbooks/day0_{check,install}.yml` list `machines` before

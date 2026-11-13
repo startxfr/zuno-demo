@@ -181,3 +181,34 @@
     (_machines_gpu.resources | map(attribute='spec.replicas') | map('int') | sum)
   retries: 40
   delay: 20
+
+# General-purpose workers (group=general): the control-plane nodes stop
+# running workloads only AFTER these have their nodes. Flipping
+# mastersSchedulable first would leave every pod that is rescheduled with no
+# non-GPU node to land on. Existing pods are NOT evicted by the flip; they
+# move when they are next deleted or rolled.
+- name: "machines | wait for the general-purpose MachineSets to have their nodes available"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+    label_selectors:
+      - "machine.startx.io/group=general"
+  register: _machines_general
+  until: >-
+    (_machines_general.resources | default([]) | length) > 0 and
+    (_machines_general.resources | map(attribute='status.availableReplicas', default=0)
+       | map('int') | sum) ==
+    (_machines_general.resources | map(attribute='spec.replicas') | map('int') | sum)
+  retries: 40
+  delay: 20
+
+- name: "machines | control-plane nodes stop being schedulable for workloads"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: config.openshift.io/v1
+    kind: Scheduler
+    name: cluster
+    definition:
+      spec:
+        mastersSchedulable: "{{ zuno_masters_schedulable | default(false) | bool }}"

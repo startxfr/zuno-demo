@@ -242,6 +242,60 @@ cluster-machine:
           - key: zuno.io/gpu-burst
             value: "true"
             effect: NoSchedule
+      # General-purpose workers, one per zone (2026-11-13). They exist so the
+      # three control-plane nodes can stop running workloads
+      # (Scheduler mastersSchedulable=false, ansible/roles/machines): on
+      # demo333 a master hit 97% CPU with 179 pods, etcd answered slowly and
+      # every operator lost its leader election. Zone-spread because EBS
+      # volumes are zone-bound: a pod leaving master N must be able to land
+      # in master N's zone. The installer's own worker sets stay at 0 (t3a).
+      # No taint, no label: any non-GPU pod may land here. Replicas are
+      # never pushed by Argo (ignoreDifferences), scale with `oc scale`.
+      - name: zuno-worker-a
+        az: a
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-worker-b
+        az: b
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-b
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-worker-c
+        az: c
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-c
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
 
   machineAutoscaler:
     enabled: false # flipped by zuno-machines-d0
