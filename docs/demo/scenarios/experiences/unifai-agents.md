@@ -67,7 +67,34 @@ Other identities:
 - the unifai-operator writes the platform's objects (built-ins, teams, templates, team examples) as **ai-ops-01**, the
   first entry of `stack.rag.sharedPublishers`. The personal starters are owned by each persona.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use unifai-agents 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/unifai-agents/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-unifai-d0`/`-d1`, the UnifaiStack `unifai`, the UnifaiTeam
+`agent-tekos`, the UnifaiAgentBundle `tekos`, the UnifaiWorkflow `tekos` and `oc get llminferenceservice -n zuno-ai-run`
+(at least one local model `Ready=True`). If one is missing or not Ready, stop and tell the platform owner: this demo
+installs nothing.
+
+### Check
+
+It runs the golden-path probe `unifai-tekos` and the browser check `unifai` (see [golden-path.md](../../golden-path.md)).
+The cluster-tools contrast at 3:00 has no probe and stays a rehearsal point: rehearse the cluster question as
+**ai-ops-01** the same day. Its answer depends on the live state of `zuno-ai-run`: when every pod is Running, Tekos
+says so, which is still an answer from the cluster. If a check fails, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. UnifAI and the Tekos agent are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file sends the probe prompt once to warm the model. What only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side. A shared browser session signs in the wrong
   account (the kagent 403 of [WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md), D4):
@@ -77,12 +104,6 @@ Other identities:
   (realm `zuno`, client `unifai`). Check the name at the top right of each profile.
 - [ ] In each profile, start your own session: **Team**, workspace `agent-tekos`, **Collaboration Hub**, **+**, workflow
   `tekos`. Sessions of a team workspace are shared by its members: never reuse a session the other persona opened.
-- [ ] Warm the model: send the probe prompt once in each profile before the audience arrives.
-- [ ] `oc get llminferenceservice -n zuno-ai-run`: at least one local model `Ready=True`.
-- [ ] Golden-path probe `unifai-tekos` passed within the last hour (`ONLY=unifai-tekos make demo golden-path`), see
-  [golden-path.md](../../golden-path.md).
-- [ ] Rehearse the cluster question as **ai-ops-01** the same day. Its answer depends on the live state of
-  `zuno-ai-run`: when every pod is Running, Tekos says so, which is still an answer from the cluster.
 - [ ] 15-minute version:
   - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01**, large font;
   - [ ] Grafana as **ai-ops-01** (OpenShift sign-in, RBAC on `zuno-monitoring`), dashboards
@@ -90,6 +111,14 @@ Other identities:
   - [ ] Tekos's sheet open at
     [agents/tekos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/tekos/agent.okf.md),
     scrolled to **Authorization matrix**.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
