@@ -232,7 +232,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | Implemented | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
 | [ADR-0536](0536-live-node-failover-drill-for-qwen-model-fallback.md) | Implemented | Live GPU-node failover drill for the qwen-normal/qwen-wesh fallback, and a reusable `make d3 scenario-failover-node` command |
 | [ADR-0544](0544-bound-every-model-call-at-both-ends.md) | Superseded in part by ADR-0561 | Bound every model call at both ends - a prompt-window clamp and a declarative max_tokens |
-| [ADR-0550](0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md) | Implemented | Demonstrate sovereign AI through classification, specialization and resilience |
+| [ADR-0550](0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md) | Superseded in part by ADR-0616 | Demonstrate sovereign AI through classification, specialization and resilience |
 
 ## v0.5
 
@@ -383,6 +383,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Implemented | Pin, gate and schedule pre-GA dependencies |
 | [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Implemented | Keep the repository the only source of cluster state |
 | [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Implemented | Rehearse on canary namespaces of demo333 |
+| [ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) | Accepted | Prepare and play every catalogue demo through one make demo lifecycle |
 
 ## v0.17
 

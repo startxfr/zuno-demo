@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
+| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-270, WP-271, WP-272, WP-273, WP-274, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
 | v0.17 | 8 | 5 | 25 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1152,6 +1152,30 @@ step waits for the owner's go. Legacy documents are refused with the unifai-oper
 | WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Done | none |
 | WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | dated 2027-01-05: the reader branch and the unifai-operator 0.2 pin together (the owner's go) |
 
+### Phase 56 — Presenter lifecycle for every demo (added 2026-11-14)
+
+ADR-0616: every demo of the catalogue `docs/demo/` (30 scenarios in a 5-minute and a 15-minute version, 6 workshops)
+is prepared and played through `make demo` only. Each action (status, check, install, start, stop, uninstall) and each
+step runs one Ansible file of the demo, then prints the matching section of its page. The webinar helpers of WP-136 are
+retired. Two pilots (guardrails, unifai-live-rag) pass an owner's gate on 2026-11-16 before the rollout by layer; every
+demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decisions of 2026-11-14 are in the ADR.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-269 | [wp-269](work-packages/wp-269-record-the-demo-lifecycle-decision-and-page-contract.md) | 0616 | none | Done | none |
+| WP-270 | [wp-270](work-packages/wp-270-build-the-make-demo-lifecycle-engine.md) | 0616 | WP-269 | Not started | planned 2026-11-14 to 2026-11-15 |
+| WP-271 | [wp-271](work-packages/wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md) | 0616 | WP-270 | Not started | planned 2026-11-15 |
+| WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Not started | planned 2026-11-15; delete the four `demo-persona-probe` leftovers in `zuno-ai-run` (the owner's named go) |
+| WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Not started | planned 2026-11-15; no cluster change |
+| WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Not started | planned 2026-11-16 morning; the owner's named go for the live start/stop; gate 2026-11-16 12:00: the owner reviews WP-273 and WP-274 and gives the go for the rollout |
+| WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-16 afternoon, after the gate; a named go per demo with a changing unit |
+| WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-16 evening, after the gate; a named go per demo with a changing unit |
+| WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; a named go per demo with a changing unit |
+| WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; a named go per demo with a changing unit |
+| WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; the world model is not rehearsed in full while no GPU capacity exists |
+| WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Not started | planned 2026-11-17 evening |
+| WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Not started | dated 2026-11-18: full rehearsal, a named go per demo with a changing unit |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1296,6 +1320,7 @@ moving.
 
 ## Change log
 
+- 2026-11-14 — ADR-0616 and WP-269 to WP-281 added (Phase 56, v0.16) by the owner's decisions of the day: one `make demo` lifecycle for every catalogue demo (status, check, install, start, step next|N, stop, uninstall, plus list, use, freeze, rehearse), one Ansible file and one page section per action and step, `## Presenter lifecycle` replacing `## Before you start`, the WP-136 webinar helpers retired (ADR-0550 superseded in part, ADR-0605 dated note). WP-269 Done (the records and the page contract); pilots guardrails and unifai-live-rag, gate 2026-11-16 12:00; full rehearsal of every demo in both versions dated 2026-11-18.
 - 2026-11-14 — WP-268 dated by the owner: legacy OKF documents are refused on 2027-01-05, together by the zuno-demo readers and unifai-operator line 0.2 (fork R-556), on the condition that no locked release contains a legacy document (true since v1.0.0). ADR-0615 clause 13 carries the date.
 - 2026-11-14 — zuno-demo-agents v1.0.1 promoted on demo333 (f33a332d, owner's go), with the golden path 13/13 before and after. The coding pair is proven from the ai-gateway spans: Tekos `write-code` → `mistral-codestral@C1`, Arkos `write-code` → `local-gpt-oss-maas@C3` on every call. The Arkos→Tekos delegation sent 5, 3 and 3 A2A messages over three runs (bound 3), reported to the fork (evidence/wp-266-prompt-evaluation-2026-11-14.md).
 - 2026-11-14 — Coding pair (user decision of the day, merged with the promotion of zuno-demo-agents v1.0.1): Arkos `write-code` runs on the local gpt-oss-20b at C3 instead of failing with 422 on its strict Codestral pin (ADR-0417 dated note); Tekos `write-code` keeps Codestral at C1, with the local gpt-oss-20b instead of the wesh model as its fallback (agents #57). Scenarios tekos 21 and arkos 22 (`chat_routing`, proven by the ai-gateway's `model_call` spans) and the routing demo's coding pair show both. No task-level classification for now.

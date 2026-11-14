@@ -11,6 +11,8 @@ How to use this template (delete this paragraph in a real page):
 - One brick, or one feature of a brick, per page. One proof per step.
 - The 5-minute version is the message and one visible proof, for any audience. The 15-minute version starts where the
   5-minute version stops and goes into the mechanism, for a technical audience. It never repeats the 5-minute steps.
+- Each timed row is one step of `make demo step next`; its time stamp is the step's id and names its file
+  `ansible/demos/<id>/steps/MM-SS.yml`. A row that adds, moves or removes a step changes its file in the same commit.
 - Every step has a "You should see" checkpoint. If you do not see it, go to "If something goes wrong".
 - Prompts are given verbatim, in the language they were tested in. A translation that was never run is marked
   *(untested translation)*.
@@ -43,14 +45,40 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 
 Other identities: &lt;service accounts, probe identities, the presenter's `oc` session&gt;.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] &lt;Account and where its password is (Vault path)&gt;
-- [ ] &lt;URL to open, in which browser profile&gt;
-- [ ] &lt;Warm-up: a first request to wake a cold model, a page to pre-load&gt;
-- [ ] &lt;Known warning on screen that is not a failure, and what to say about it&gt;
-- [ ] Golden-path probe `<name>` passed within the last hour (`ONLY=<name> make demo golden-path`), see
-  [golden-path.md](golden-path.md).
+`make demo use <id> 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/<id>/<action>.yml`) has run, and says
+what is left to the presenter. Write "Nothing to do." when the file leaves nothing; never delete a section. Credentials
+are named by their Vault path, never written.
+
+### Status
+
+&lt;What `make demo status` reads (Applications, workloads, routes, the add-on), and what to do when it reports a
+missing piece. Or: Nothing to do.&gt;
+
+### Check
+
+&lt;What `make demo check` proves: the golden-path probe `<name>`, the browser check, the demo's own assertions; what
+to do when one fails. A page without a probe says so: rehearse it the same day.&gt;
+
+### Install
+
+&lt;Only the demo's own add-on (a workstation plug-in, an on-demand node, demo documents). The shared platform is
+verified, never installed here. Or: Nothing to do.&gt;
+
+### Start
+
+&lt;What the file prepared (warm-up, demo data), then what only a person does: browser profiles, sign-ins, tabs to
+open, known warnings on screen that are not failures.&gt;
+
+### Stop
+
+&lt;What the file cleans up after the session, and what the presenter closes. Or: Nothing to do.&gt;
+
+### Uninstall
+
+&lt;Removes the demo's own add-on only; a shared component is never removed. Or: Nothing to do.&gt;
 
 ## 5-minute version
 

@@ -45,13 +45,36 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 | 0:05 | &lt;block&gt; | a link to `scenarios/<layer>/<page>.md#5-minute-version`, then "5-minute version" | &lt;sentence&gt; |
 | 0:50 | Questions | | |
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] The "Before you start" checklist of every scenario in the agenda, done once. The items they share:
-  - [ ] &lt;browser profiles, one per persona&gt;
-  - [ ] &lt;tabs to open&gt;
-  - [ ] &lt;dashboards&gt;
-- [ ] `ONLY=<probe>,<probe> make demo golden-path` passed within the last hour.
+`make demo use <workshop-id>` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. Each section says only what is the workshop's own, or
+"Nothing to do.".
+
+### Status
+
+&lt;Nothing to do, or what the workshop adds to its scenarios' status.&gt;
+
+### Check
+
+&lt;The merged probes (`<probe>,<probe>`) and browser checks; what to do when one block is red.&gt;
+
+### Install
+
+Nothing to do.
+
+### Start
+
+&lt;What the scenarios' start sections share: browser profiles, one per persona; tabs; dashboards.&gt;
+
+### Stop
+
+Nothing to do.
+
+### Uninstall
+
+Nothing to do.
 
 ## Inline blocks
 

@@ -14,7 +14,7 @@ Every scenario page has the same structure. You can open any page and find the s
 | Status banner | Date and content of the last read-only check on demo333, whether the page is show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)), workshops that use it |
 | Introduction | What the brick is, where it sits in Zuno, the message, the decisions (ADRs) |
 | Personas | Each account used or named in the scenario: who it is, what it may do there, and what the presenter does with it |
-| Before you start | Accounts (Vault paths, never passwords), URLs, warm-up, known warnings |
+| Presenter lifecycle | `### Status`, `### Check`, `### Install`, `### Start`, `### Stop`, `### Uninstall`: what is left to the presenter once `make demo <action>` has run, or "Nothing to do." Accounts are named by their Vault path, never their password. It replaces "Before you start" ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)); pages that still have "Before you start" move by 2026-11-17 (WP-273 to WP-280) |
 | 5-minute version | The message and one visible proof, for any audience: `Time / Do / Say / You should see` |
 | 15-minute version | Starts where the 5-minute version stops and shows the mechanism, for a technical audience |
 | If something goes wrong | Symptom, fallback, and the sentence to say |
@@ -25,6 +25,31 @@ Every scenario page has the same structure. You can open any page and find the s
 New pages start from [`_template-scenario.md`](_template-scenario.md) for a scenario and
 [`_template-workshop.md`](_template-workshop.md) for a workshop. A workshop links its scenarios and the version to
 play; it does not copy their steps.
+
+## Playing a demo
+
+[ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) makes `make demo` the
+only interface of a presenter. The commands are built by [WP-270](../roadmap/work-packages/wp-270-build-the-make-demo-lifecycle-engine.md)
+and every page moves to them by 2026-11-18. Until a page has its `## Presenter lifecycle` section, follow its "Before
+you start" checklist by hand.
+
+| Command | What it does |
+|---|---|
+| `make demo list` | The demos, their step counts in each version, and whether they are show-ready |
+| `make demo use <id> 5\|15` | Selects a scenario and its version for the commands below (a workshop takes no version) |
+| `make demo status` | Fast reads: is everything the demo needs installed and healthy |
+| `make demo check` | The demo's golden-path probes, its browser check and its own assertions |
+| `make demo install` | The demo's own add-on, if it has one; the shared platform is only verified |
+| `make demo start` | Prepares the session (warm-up, demo data) |
+| `make demo step next`, `make demo step <N>` | Runs the step's reads, then prints its Do, Say and You should see |
+| `make demo stop` | Cleans up what the session created |
+| `make demo uninstall` | Removes the demo's own add-on; never a shared component |
+| `make demo freeze on\|off` | Marks a freeze on this workstation: `install`, `uninstall` and `rehearse` refuse |
+| `make demo rehearse <id> 5\|15` | The whole sequence without pauses, with a report |
+| `make demo golden-path`, `make demo browser` | The catalogue-wide checks ([golden-path.md](golden-path.md)) |
+
+Each command prints the result of its Ansible file first, then the page section. An action that changes the cluster
+shows what it will change and asks you to type the demo id.
 
 ## Before any live session
 
