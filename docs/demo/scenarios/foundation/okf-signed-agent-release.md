@@ -77,28 +77,57 @@ Other identities:
   `zuno+push` fills the mirror, from Vault `zuno/registry/quay-robots`.
 - **The presenter's `oc` session**: **paas-ops-01**, which must have signed in to OpenShift once.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console (on 2026-11-13 it had not). Then log a terminal in with
-  `oc` as **paas-ops-01**, at the repository root, large font.
+`make demo use okf-signed-agent-release 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/okf-signed-agent-release/<action>.yml`) has run, and says
+what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset).
+
+### Status
+
+Nothing to do. The file reads the gateways (`oc get pods -n zuno-ai-run | grep -e mcp-gateway -e a2a-gateway` shows both
+`2/2 Running`) and the internal Quay (`oc get quayregistry -n zuno-registry` shows `AVAILABLE True`: if a gateway pod
+restarts while Quay is down, it stays in `Init`). It also checks the workstation tools: `cosign` v2 and `oras` on the
+presenter's `PATH`, needed for `make d3 admit agents` in the 15-minute version. If one is missing, install it by
+hand: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. No golden-path probe covers this page. `ONLY=unifai-tekos make demo golden-path` proves
+that Tekos, from this release, answers in UnifAI ([golden-path.md](../../golden-path.md)). Run it by hand if you want
+that proof. Re-read the lock, `tail -2 platform/okf/agents.lock`: the digest and the release number of this page were
+read on 2026-11-13; use what the file says on the day.
+
+### Install
+
+Nothing to do. The signed release is part of the shared platform: the file only verifies it.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
+  terminal in.
 - [ ] In that terminal, `echo "$OKF_MIRROR_TO"` prints an empty line. With that variable set, `make d3 admit agents`
   also writes to the internal Quay.
-- [ ] Re-read the lock: `tail -2 platform/okf/agents.lock`. The digest and the release number of this page were read on
-  2026-11-13; use what the file says on the day.
-- [ ] Check the gateways: `oc get pods -n zuno-ai-run | grep -e mcp-gateway -e a2a-gateway` shows both `2/2 Running`.
-- [ ] Check the internal Quay: `oc get quayregistry -n zuno-registry` shows `AVAILABLE True`. If a gateway pod restarts
-  while Quay is down, it stays in `Init`.
 - [ ] A browser tab on [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md),
   and one on the agents [releases](https://github.com/startxfr/zuno-demo-agents/releases).
-- [ ] 15-minute version: `cosign` v2 and `oras` on the presenter's `PATH`, and `quay.io` reachable from the
-  workstation. Run `make d3 admit agents` once before the session (about 35 s).
-- [ ] Known on screen, not a failure: `make d3 admit agents` prints 13 lines starting with `!`. They are knowledge
+- [ ] 15-minute version: `quay.io` reachable from the workstation. Run `make d3 admit agents` once before the
+  session (about 35 s).
+- Known on screen, not a failure: `make d3 admit agents` prints 13 lines starting with `!`. They are knowledge
   domains (`knowledge.project`, `knowledge.adv`, `knowledge.sales`) that no UnifAI RAG source serves yet. They are
   warnings; the result is `PASS`.
-- [ ] Known on screen, not a failure: five of the eight `UnifaiAgentBundle`s are `Pending`. Those agents are
+- Known on screen, not a failure: five of the eight `UnifaiAgentBundle`s are `Pending`. Those agents are
   `placeholder` in the release, so they are verified and not served.
-- [ ] No golden-path probe covers this page. `ONLY=unifai-tekos make demo golden-path` proves that Tekos, from this
-  release, answers in UnifAI ([golden-path.md](../../golden-path.md)).
+
+### Stop
+
+Nothing to do. Close the terminal and the two tabs.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
