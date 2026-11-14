@@ -1167,7 +1167,7 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-269 | [wp-269](work-packages/wp-269-record-the-demo-lifecycle-decision-and-page-contract.md) | 0616 | none | Done | none |
 | WP-270 | [wp-270](work-packages/wp-270-build-the-make-demo-lifecycle-engine.md) | 0616 | WP-269 | Not started | planned 2026-11-14 to 2026-11-15 |
 | WP-271 | [wp-271](work-packages/wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md) | 0616 | WP-270 | Not started | planned 2026-11-15 |
-| WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Not started | planned 2026-11-15; delete the four `demo-persona-probe` leftovers in `zuno-ai-run` (the owner's named go) |
+| WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Not started | planned 2026-11-15; the four `demo-persona-probe` leftovers in `zuno-ai-run` were deleted on 2026-11-14 with the owner's go (no Argo CD owner, label `zuno.io/managed-by=zuno-ansible`) |
 | WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Not started | planned 2026-11-15; no cluster change |
 | WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Not started | planned 2026-11-16 morning; the owner's named go for the live start/stop; gate 2026-11-16 12:00: the owner reviews WP-273 and WP-274 and gives the go for the rollout |
 | WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-16 afternoon, after the gate; a named go per demo with a changing unit |
