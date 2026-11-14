@@ -1,6 +1,6 @@
 # WP-272: Retire the webinar demo tools
 
-- **State:** Not started
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-270](wp-270-build-the-make-demo-lifecycle-engine.md)
 - **Related:** [ADR-0550](../../adr/0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md), [WP-136](wp-136-webinar-demo-orchestration.md), [ADR-0536](../../adr/0536-live-node-failover-drill-for-qwen-model-fallback.md)
@@ -37,3 +37,21 @@ verb, and the cluster holds no leftover of the webinar probe.
   nothing outside dated history (ADR bodies, evidence, change logs).
 - The catalogue test of WP-271 passes (it checks every `make demo <verb>` in `docs/`).
 - `oc get secret,cm,job -n zuno-ai-run | grep demo-persona-probe` is empty.
+
+## Result (2026-11-15)
+
+- Code (zuno-demo-reorg-coder, reviewed and merged by zuno-demo-reorg): `demo_check.yml`, `demo_reset.yml`,
+  `demo_step_1.yml` to `demo_step_5.yml`, `ansible/tasks/demo_persona_probe_job.yml`,
+  `evaluations/demo_presenter_probe.py` and its test are deleted (1 122 lines); `make d3 scenario-failover-node` is
+  untouched. Their Ready and TrainJob reads live on in `ansible/demos/_lib/cr_ready.yml` and `trainjob_evidence.yml`.
+  The operator checks of lightspeed, openclaw and image-signing-admission read a CSV by name prefix with phase
+  Succeeded, so an OLM upgrade does not fail them; `consistency.py` refuses a CSV pinned by name and warns when a
+  page's Status or Check names an object its file does not read.
+- Docs (zuno-demo-reorg-writer): `freeze-protocol.md` (`make demo freeze on|off` on every presenter workstation,
+  install/uninstall/rehearse refused while it is set, the new meaning of `make demo check`),
+  `shared-password-rotation.md`, and `gitops-day0-3.md`, which moves to its `## Presenter lifecycle` form with this WP
+  (row 14:15 shows `make demo list`).
+- Cluster (2026-11-14, owner's go, zuno-demo-reorg-demo333): the four leftovers of the webinar probe deleted from
+  `zuno-ai-run`.
+- `grep` finds no retired verb outside dated history; the syntax-check loop passes on the 32 remaining playbooks.
+

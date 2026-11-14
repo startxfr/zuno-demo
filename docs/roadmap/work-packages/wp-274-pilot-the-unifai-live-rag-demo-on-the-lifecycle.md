@@ -1,6 +1,6 @@
 # WP-274: Pilot the UnifAI live RAG demo on the lifecycle
 
-- **State:** Not started
+- **State:** Operator pending
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md)
 - **Related:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) (the other pilot), [WP-200](wp-200-show-the-unifai-rag-working-live.md) (the live RAG first shown)

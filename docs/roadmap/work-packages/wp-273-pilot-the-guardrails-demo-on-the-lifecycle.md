@@ -1,6 +1,6 @@
 # WP-273: Pilot the guardrails demo on the lifecycle
 
-- **State:** Not started
+- **State:** Operator pending
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md)
 - **Related:** [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) (the other pilot), [WP-238](wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) (the `guardrails` probe)
