@@ -61,7 +61,34 @@ Other identities:
 - The golden-path probes `dify` and `guardrails` call through the same token proxy, so they also count as
   consultant-02.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use dify 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/dify/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-dify-d1`, `zuno-dify-knowledge-d1` and `zuno-token-proxy-dify-d1`,
+the Deployments of `zuno-dify` and the route `dify.apps.demo333.startx.fr`. If one is missing or not Healthy, stop and
+tell the platform owner: this demo installs nothing. If only an application is missing from **Studio**, show the other
+two; after the session, `make d2 install dify` imports a missing example again (once per name), by hand.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probes `dify` and `tools` and the browser check `dify` (see
+[golden-path.md](../../golden-path.md)). `dify` proves the model path through the token proxy; `tools` proves that the
+Confluence MCP server answers. Neither runs the applications: run each one in **Start**. If one fails, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. Dify is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file wakes the model with one answer through Dify's token proxy, the way the probe does. That does not run the
+applications. What only a person does:
 
 - [ ] A browser profile for **consultant-02**. Open `https://dify.apps.demo333.startx.fr` and sign in twice:
   - Keycloak first, as **consultant-02** (the front door);
@@ -72,15 +99,20 @@ Other identities:
 - [ ] Run each application once before the audience arrives. It wakes the model and catches the Workflow stall (D1)
   off stage. Time the Agent turn: it took 82 s on 2026-11-06, before the experience clients moved to gpt-oss-20b first
   (2026-11-07), and it was not timed since.
-- [ ] Do not open the server card under **Integrations**, **MCP**: Dify 1.17.0 answers 500 there (upstream defect).
-  The applications are not affected.
-- [ ] Golden-path probe `dify` passed within the last hour (`ONLY=dify,tools make demo golden-path`), see
-  [golden-path.md](../../golden-path.md). `dify` proves the model path through the token proxy; `tools` proves that
-  the Confluence MCP server answers. Neither runs the applications.
 - [ ] 15-minute version:
   - a terminal logged in with `oc` as **paas-ops-01**;
   - Grafana in another profile, signed in as **ai-ops-01**, dashboard **Zuno Platform / Five experiences**, last 1
     hour, `client` = `dify`.
+- Known on screen, not a failure: do not open the server card under **Integrations**, **MCP**. Dify 1.17.0 answers
+  500 there (upstream defect). The applications are not affected.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
