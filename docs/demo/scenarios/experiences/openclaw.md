@@ -60,29 +60,57 @@ Other identities:
 - The presenter's `oc` terminal (**paas-ops-01**, cluster-admin, or `kube:admin`) for the `oc` step and the probe.
   On 2026-11-12 paas-ops-01 had never signed in to OpenShift on demo333: sign it in once before using it.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use openclaw 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/openclaw/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-openclaw-d0`/`-d1` and `oc get claw -A`: both `assistant` Claws
+must be `Ready`. If one is not, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `openclaw` and the browser check `openclaw` (see
+[golden-path.md](../../golden-path.md)). The probe calls the model from inside each assistant's pod, so the terminal
+must be allowed to `oc exec` in the persona namespaces. The browser check also covers sale-01's front door and Control
+UI. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. OpenClaw is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file reads each assistant's Control UI password from its Secret and never prints it, asks one short question per
+assistant in a **New session** (the `chat` task prefers gpt-oss-20b; the probe got an answer in 7.5 s for both personas
+on 2026-11-07) and runs `oc get claw -A`. If you need to type a password, read it off screen: Secret `openclaw-ui` in
+`zuno-claw-consultant-02` and in `zuno-claw-sale-01`. The persona password is in Vault at `keycloak/demo-personas`.
+What only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side. The front door admits one email per
   assistant: a profile whose Keycloak session belongs to another persona gets a 403.
   - profile 1: **consultant-02**;
   - profile 2: **sale-01** (15-minute version only).
-- [ ] Read each assistant's UI password before the session, off screen:
-  `oc extract secret/openclaw-ui -n zuno-claw-consultant-02 --to=-`, and the same with `-n zuno-claw-sale-01`.
-  The persona password is in Vault at `keycloak/demo-personas`.
 - [ ] Profile 1: open `https://assistant-zuno-claw-consultant-02.apps.demo333.startx.fr`, sign in with Keycloak as
   **consultant-02**, enter the UI password in the Control UI and click **Connect**. Do the same in profile 2 with
   `https://assistant-zuno-claw-sale-01.apps.demo333.startx.fr` and **sale-01**.
 - [ ] Look at the last session of each assistant. The assistant keeps its own memory on a 10Gi volume: on 2026-11-06
   consultant-02's assistant signed as "Bob" and called the user "mon lord", from an earlier session.
-- [ ] Warm the model: one short question in a **New session**. The `chat` task prefers gpt-oss-20b; the probe got an
-  answer in 7.5 s for both personas on 2026-11-07.
-- [ ] `oc get claw -A`: both `assistant` Claws `Ready`.
-- [ ] Golden-path probe `openclaw` passed within the last hour (`ONLY=openclaw make demo golden-path`, from a terminal
-  allowed to `oc exec` in the persona namespaces), see [golden-path.md](../../golden-path.md). `ONLY=openclaw make demo
-  browser` also checks sale-01's front door and Control UI.
 - [ ] 15-minute version: Grafana in a third tab, signed in as **ai-ops-01**. Dashboard **Zuno Platform / Five
   experiences**, time range last 1 hour, `client` = `openclaw-consultant-02` and `openclaw-sale-01`.
-- [ ] The Control UI language follows the browser. The captures of 2026-11-06 are in French.
+- Known on screen, not a failure: the Control UI language follows the browser. The captures of 2026-11-06 are in
+  French.
+
+### Stop
+
+Nothing to do. Close the browser profiles.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
