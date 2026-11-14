@@ -168,7 +168,13 @@ backups:
     # ADR-0547 clause-4 second step, after the Application-level pin already
     # proved the render byte-identical. /pgbackrest/repo2 is demo222's OLD
     # path, kept only as history in git blame if a rollback ever needs it.
-    path: "/postgresql"
+    #
+    # Moved again 2026-11-14 on demo333 (owner's go): /postgresql carried 13
+    # database histories, so repo2's archive id (18-13) differed from repo1's
+    # (18-1) and every archive-get without --repo failed with [045]. A fresh
+    # path starts the stanza at the same id as repo1. See "A PostgreSQL replica
+    # stuck in archive recovery" in docs/platform/operations.md.
+    path: "/postgresql-demo333"
     secretName: zuno-postgresql-backup-s3  # synced from Vault, only used when s3.enabled
 
 credentials:

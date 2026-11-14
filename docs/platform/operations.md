@@ -264,12 +264,27 @@ runs two replicas: read its log with `oc logs -l app.kubernetes.io/name=ai-gatew
 
 Symptom: `patronictl list` (leader's `database` container, namespace `zuno-data`) shows a replica that never reaches
 `streaming`, and its log repeats `[045] duplicates found for WAL segment ... are multiple primaries archiving to this
-stanza?`. Cause: archive-push writes every WAL segment to both pgBackRest repositories (repo1, the local PVC, and repo2,
-S3), and PGO's `restore_command` (`pgbackrest --stanza=db archive-get %f "%p"`, no `--repo`) refuses a segment found in
-both. PGO owns that parameter: the CRD refuses it in `spec.config.parameters`, it ignores it under
-`spec.patroni.dynamicConfiguration`, and it puts its own value back over a `patronictl edit-config`. Seen on demo333 on
-2026-11-13, where `patronictl reinit` alone did not help: the re-cloned replica replayed from the archive and hit the
-same refusal. With the owner's go, point recovery at repo1 for as long as the replica needs it, in the leader's
-`database` container: `patronictl edit-config --force -p 'restore_command=pgbackrest --stanza=db archive-get --repo=1 %f "%p"'`.
-Nothing to revert afterwards: PGO restores its value at its next reconcile. No durable fix is decided.
+stanza?`. The hint is misleading: nothing is duplicated inside a repository. Cause: archive-push writes every WAL segment
+to both pgBackRest repositories (repo1, the local PVC, and repo2, S3), and PGO's `restore_command` (`pgbackrest
+--stanza=db archive-get %f "%p"`, no `--repo`) refuses a segment it finds under two different archive ids. That happens
+when repo2's stanza has a longer database history than repo1: every database bootstrapped empty onto an existing repo2
+path adds a history entry there, while repo1 (a fresh PVC) starts at 1. Check it with `pgbackrest --stanza=db info` in
+the `zuno-postgresql-repo-host-0` pod: the `archive` lines of repo1 and repo2 must show the same id (`18-1`). Seen on
+demo333 on 2026-11-13, when repo2 (`zuno-demo222-backups/postgresql`) carried 13 histories (`18-13`).
+
+Durable fix, applied on demo333 on 2026-11-14: move repo2 to a fresh path, so its stanza starts at the same id as repo1.
+1. Set `zuno_postgresql_backup_s3_path` in `ansible/confidential.yml` (`ansible-vault edit`; it overrides the operand) and
+   run `make d0 install postgresql` (the restore gate only fires when the PostgresCluster does not exist).
+2. PGO does not create the stanza on the new path (its `repoOptionsHash` ignores `repo2-path`), so archive-push fails
+   until `pgbackrest --stanza=db stanza-create` (no `--repo`; repo1 is only re-validated) runs in the leader's `database`
+   container. Run it as soon as the leader's `/etc/pgbackrest/conf.d/pgbackrest_instance.conf` shows the new path.
+3. Take a full backup to repo2 at once (`make d3 backup postgresql`): a repo path without a backup reads as "no backup"
+   and would let a rebuild bootstrap an empty database.
+4. Prove it: `pgbackrest --stanza=db archive-get <a recent segment> /tmp/x` without `--repo` in a replica's `database`
+   container returns 0. The old path stays in the bucket until its removal gets its own go.
+
+Before that fix, or if it recurs: with the owner's go, point recovery at repo1 for as long as the replica needs it, in
+the leader's `database` container: `patronictl edit-config --force -p 'restore_command=pgbackrest --stanza=db archive-get
+--repo=1 %f "%p"'`. PGO owns that parameter: the CRD refuses it in `spec.config.parameters`, it ignores it under
+`spec.patroni.dynamicConfiguration`, and it puts its own value back at its next reconcile, so there is nothing to revert.
 
