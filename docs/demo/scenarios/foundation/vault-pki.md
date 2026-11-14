@@ -89,23 +89,54 @@ Other identities, none of which signs in on stage:
 - The recovery keys (3 shares, threshold 2) are held by the operator outside the cluster. The initial root token was
   revoked on 2026-11-07.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 it had no OpenShift user. Then log a
-  terminal in with `oc` as **paas-ops-01**, large font, at the repository root.
-- [ ] `oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version`: `zuno-vault-0` 1/1 Running,
-  `VAULT-SEALED false`, `VAULT-ACTIVE true`.
-- [ ] Optional: `make d0 check vault` *(untested)*. Its precheck reads `vault status` inside the pod and reports Vault
-  installed only when it is initialized and unsealed. It is read-only. Do not run it on stage.
-- [ ] `oc get externalsecrets -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c` prints only `SecretSynced`.
+`make demo use vault-pki 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/vault-pki/<action>.yml`) has run, and says
+what is left to the presenter.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-vault-d0`/`-d1`, `zuno-external-secrets-d0`/`-d1` and
+`zuno-cert-manager-d0`/`-d1`, and the Vault pod: `oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version`
+shows `zuno-vault-0` 1/1 Running, `VAULT-SEALED false`, `VAULT-ACTIVE true`. If one is missing, stop and tell the
+platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It reads the Vault pod labels, the ExternalSecrets (`oc get externalsecrets -A
+--no-headers | awk '{print $(NF-1)}' | sort | uniq -c` prints only `SecretSynced`), and the ClusterIssuers and
+Certificates. It reads no Secret. No golden-path probe covers this page: rehearse it the same day. Optional, by hand:
+`make d0 check vault` *(untested)*. Its precheck reads `vault status` inside the pod and reports Vault installed only
+when it is initialized and unsealed. It is read-only. Do not run it on stage.
+
+### Install
+
+Nothing to do. Vault, External Secrets and cert-manager are part of the shared platform: the file only verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, large font, at the repository root. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 it had no OpenShift user), sign in once in a browser first,
+  then log the terminal in.
 - [ ] Open the "What changed" table of the [migration runbook](../../../platform/vault-kms-raft-migration.md#what-changed).
 - [ ] There is no Vault URL to open: the UI Route is off by design.
-- [ ] Known on screen, not a failure:
+- [ ] This page shows no `vault` command. Never run one that reads a value in front of an audience.
+- Known on screen, not a failure:
   - the SecretStores show `CAPABILITIES ReadWrite`: that is the operator's view of the provider. The Vault policy
     behind each store grants `read` only (6:00);
   - two ExternalSecrets show no store and a refresh of `0` (`zuno-tool-marker-key`, `genai-pgvector-credentials`):
     they generate a value once and read nothing from Vault.
-- [ ] This page shows no `vault` command. Never run one that reads a value in front of an audience.
+
+### Stop
+
+Nothing to do. Close the terminal and the runbook tab.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
