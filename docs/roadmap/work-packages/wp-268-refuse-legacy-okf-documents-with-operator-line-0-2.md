@@ -8,8 +8,11 @@
 
 > Retargeted on 2026-11-14 by the owner. The unifai-operator 0.1 line keeps reading `v0.2` and `v0.3` documents for as
 > long as it lives, so the refusal is not in the weekly release of 2026-11-27. It ships with the operator's 0.2 line,
-> not before the 0.1 freeze of 2026-12-01 and the 0.2 promotion planned for 2026-12-15 (the fork's calendar). The
-> date is set with the owner's go and sent to the fork's maintainers; no WP-268 patch goes to the fork before it.
+> not before the 0.1 freeze of 2026-12-01 and the 0.2 promotion planned for 2026-12-15 (the fork's calendar).
+>
+> **Date: 2027-01-05** (the owner's go, 2026-11-14; fork R-556). The condition is that no locked zuno-demo-agents
+> release contains a legacy document, which holds since v1.0.0. The reader branch merges and the operator 0.2 pin
+> happen together on that date, each with the owner's go for the live step.
 
 ## Content
 

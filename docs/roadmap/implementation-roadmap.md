@@ -1140,7 +1140,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 ADR-0615: an audit of 2026-11-14 scored the OKF use of `zuno-demo-agents` 13/20. The decision aligns the documents with
 upstream OKF 0.2, freezes the Zuno profile as 1.0, migrates and cleans every bundle, and rewrites the documentation in
 each repository. Readers ship first, then the operator v0.1.71, then zuno-demo-agents v1.0.0 and its promotion; each live
-step waits for the owner's go. Legacy documents are refused with the unifai-operator 0.2 line (WP-268, amended 2026-11-14).
+step waits for the owner's go. Legacy documents are refused with the unifai-operator 0.2 line on 2027-01-05 (WP-268, amended 2026-11-14).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
@@ -1150,7 +1150,7 @@ step waits for the owner's go. Legacy documents are refused with the unifai-oper
 | WP-265 | [wp-265](work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | 0615 | WP-262 | Done | none |
 | WP-266 | [wp-266](work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | 0615 | WP-262, WP-265 | Done | none |
 | WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Done | none |
-| WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | with the unifai-operator 0.2 line, not before the 0.1 freeze of 2026-12-01 (date set with the owner) |
+| WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | dated 2027-01-05: the reader branch and the unifai-operator 0.2 pin together (the owner's go) |
 
 ### OKF stream phases
 
@@ -1296,6 +1296,7 @@ moving.
 
 ## Change log
 
+- 2026-11-14 — WP-268 dated by the owner: legacy OKF documents are refused on 2027-01-05, together by the zuno-demo readers and unifai-operator line 0.2 (fork R-556), on the condition that no locked release contains a legacy document (true since v1.0.0). ADR-0615 clause 13 carries the date.
 - 2026-11-14 — zuno-demo-agents v1.0.1 promoted on demo333 (f33a332d, owner's go), with the golden path 13/13 before and after. The coding pair is proven from the ai-gateway spans: Tekos `write-code` → `mistral-codestral@C1`, Arkos `write-code` → `local-gpt-oss-maas@C3` on every call. The Arkos→Tekos delegation sent 5, 3 and 3 A2A messages over three runs (bound 3), reported to the fork (evidence/wp-266-prompt-evaluation-2026-11-14.md).
 - 2026-11-14 — Coding pair (user decision of the day, merged with the promotion of zuno-demo-agents v1.0.1): Arkos `write-code` runs on the local gpt-oss-20b at C3 instead of failing with 422 on its strict Codestral pin (ADR-0417 dated note); Tekos `write-code` keeps Codestral at C1, with the local gpt-oss-20b instead of the wesh model as its fallback (agents #57). Scenarios tekos 21 and arkos 22 (`chat_routing`, proven by the ai-gateway's `model_call` spans) and the routing demo's coding pair show both. No task-level classification for now.
 - 2026-11-14 — WP-264 Repo work merged: the operator patch is on the fork `devel` as 5f55e4e91 (envtest green). Remaining: the canary on that operator, the manual cut of v0.1.71, the copy into Quay and the pin. The canary e2e pulls a legacy-format artifact, so it proves the non-regression of v0.2/v0.3 reading, not profile 1.0 on a cluster (that needs a signed profile 1.0 artifact, WP-267).

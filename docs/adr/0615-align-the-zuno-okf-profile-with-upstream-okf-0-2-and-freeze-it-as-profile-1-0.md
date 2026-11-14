@@ -135,9 +135,9 @@ profile ships as zuno-demo-agents v1.0.0 with unifai-operator v0.1.71 and is dep
     which keeps an OLM rollback to 0.1.69 possible.
 13. **Legacy documents are refused from the unifai-operator 0.2 line.** The operator's 0.1 line keeps reading `v0.2`
     and `v0.3` documents for as long as it lives, and so do the zuno-demo readers. The operator's 0.2 line and the
-    readers refuse them together (WP-268), not before the 0.1 freeze of 2026-12-01 and the 0.2 promotion planned for
-    2026-12-15 by the fork's calendar. The date is set with the owner's go. The readers refuse legacy documents only
-    once the lock holds a profile 1.0 release. This replaces ADR-0579 clause 6 as amended on 2026-11-05.
+    readers refuse them together (WP-268) on **2027-01-05** (the owner's date, 2026-11-14; fork R-556), after the 0.1
+    freeze of 2026-12-01 and the 0.2 promotion of 2026-12-15. The condition is that no locked zuno-demo-agents release
+    contains a legacy document, which holds since v1.0.0. This replaces ADR-0579 clause 6 as amended on 2026-11-05.
     *Amended 2026-11-14 by the owner:* the first text refused them from 2026-12-01, with the operator's weekly release
     of 2026-11-27. The owner kept the 0.1 line compatible instead.
 
