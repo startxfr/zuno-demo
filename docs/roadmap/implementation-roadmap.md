@@ -1135,7 +1135,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 | WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Done | none; masters resize refused by its gate (P6) |
 | WP-261 | [wp-261](work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) | 0612 | WP-248, WP-260 | Done | none; after an RHOAI, AAP or Lightspeed upgrade run `mirror_redhat_images.py --drift` and copy |
 | WP-282 | [wp-282](work-packages/wp-282-check-the-internal-quay-before-a-unifai-pin-is-written.md) | 0612 | WP-248 | Done | none; every UnifAI pin now refuses a digest missing from the internal Quay, `--mirror-to` copies it first |
-| WP-283 | [wp-283](work-packages/wp-283-check-that-a-pod-without-a-node-selector-schedules-for-the-unifai-canary.md) | 0614 | WP-260 | Not started | planned before 2026-12-01; the owner's go for the AAP Role and the live proof |
+| WP-283 | [wp-283](work-packages/wp-283-check-that-a-pod-without-a-node-selector-schedules-for-the-unifai-canary.md) | 0614 | WP-260 | Not started | planned before 2026-12-01; the canary's assumptions listed by unifai-main (7, four already true read-only); the owner's go for the rehearsal namespace, its AAP Role and the live proof |
 
 ### Phase 55 — Zuno OKF profile 1.0, aligned with upstream OKF 0.2 (added 2026-11-14)
 
