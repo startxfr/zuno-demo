@@ -97,7 +97,9 @@ scenarios:
     expect_status: 404
 
   - id: 12
-    title: MCP Gateway denies a live Salesforce capability - Finage never declares it, provably not inheriting Comage's capabilities
+    # Two finage tasks declare salesforce.opportunity.read (project_required), but tool-policy.yaml grants it to sales
+    # and board only: ADR-0528 (2026-08-29) kept finance out of allowed_groups. Revisit with WP-101.
+    title: MCP Gateway denies a live Salesforce capability - the tool policy grants it to sales and board, not to finance, so Finage does not inherit Comage's capabilities
     type: mcp_gateway_denied
     persona: finance-01
     tool: salesforce.opportunity.read
