@@ -79,8 +79,46 @@ Other identities:
   and the evaluations;
 - the HTPasswd provider `startx-htpasswd_auth`, kept as the break-glass sign-in to OpenShift. It is not a persona.
 
-## Before you start
+## Presenter lifecycle
 
+`make demo use identity-personas 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/identity-personas/<action>.yml`) has run,
+and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-keycloak-d0`/`-d1`, `zuno-openshift-oauth-d0`/`-d1`,
+`zuno-openshift-rbac-groups-d0`/`-d1`, `zuno-open-webui-d1` and `zuno-unifai-d0`/`-d1`, the Keycloak CR `zuno` and its
+pod `zuno-0`, and the Deployments `zuno-token-proxy` (in `zuno-dify` and `zuno-kagent`), Open WebUI and UnifAI. If
+one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. This page has no golden-path probe: rehearse it the same day, and rehearse the sale-01
+workspace step (1:30) in particular, which is not in a recorded run. The file runs the demo's own reads instead:
+
+- the Keycloak CR `zuno` and the KeycloakRealmImport `zuno-realm` (`Done`);
+- the Jobs `zuno-keycloak-client-reconcile` and `zuno-keycloak-eval-personas` (`Complete`);
+- the OAuth `cluster` provider `openshift` (issuer `https://keycloak.apps.demo333.startx.fr/realms/zuno`,
+  `mappingMethod: add`, claim `groups`);
+- the RoleBindings `zuno-personas-view`, `zuno-ocp-ai-dev-edit` and `zuno-ocp-ai-ops-admin`, and the
+  ClusterRoleBindings for `ocp-paas-ops` and `ocp-paas-dev`.
+
+If one fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. Keycloak, the OpenShift identity provider and the RBAC groups are part of the shared platform: the file
+only verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A first sign-in to the OpenShift console creates the OpenShift user and its group, so the file cannot do it.
+  If `status` or `check` reported that a group is missing, sign that persona in once through the identity provider
+  `openshift` (not `startx-htpasswd_auth`) before the session. On 2026-11-13 **paas-ops-01** had never signed in, so
+  `ocp-paas-ops` did not exist. Do not sign **sale-01** in: the 5:00 row expects no `sales` group.
 - [ ] Two browser profiles, so two personas stay signed in side by side. A shared browser session signs in the wrong
   account:
   - profile 1: **consultant-02**;
@@ -89,16 +127,21 @@ Other identities:
 - [ ] In each profile, sign in to UnifAI (`https://unifai-ui-zuno-unifai.apps.demo333.startx.fr`) and to Open WebUI
   (`https://open-webui.apps.demo333.startx.fr`, **Continue with Keycloak**). Check the name in each application.
 - [ ] In Open WebUI, start a **new chat** in each profile. Chats created before 2026-11-03 keep their tool switch off.
-- [ ] Rehearse the sale-01 workspace step (1:30) the same day. It is not in a recorded run.
 - [ ] 15-minute version:
-  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01**. On 2026-11-13 paas-ops-01 had never
-    signed in to OpenShift: sign it in once through the identity provider `openshift` (not `startx-htpasswd_auth`)
-    before the session;
+  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01** (see the first item);
   - [ ] in profile 1, the OpenShift console `https://console-openshift-console.apps.demo333.startx.fr`, signed in as
     **consultant-02** through the provider `openshift`;
   - [ ] the tool policy open at
     [policies/tools/tool-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/tools/tool-policy.yaml),
     entry `search_confluence`.
+
+### Stop
+
+Nothing to do. Close the two browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
