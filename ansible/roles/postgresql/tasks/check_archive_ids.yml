@@ -76,6 +76,8 @@
         kind: Job
         name: zuno-postgresql-check-archive-ids
         namespace: zuno-data
+        delete_options:
+          propagationPolicy: Background
         wait: true
 
     - name: "postgresql | run the archive-id check Job"

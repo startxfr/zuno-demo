@@ -125,6 +125,9 @@
         kind: Job
         name: "{{ _image_signing_job_name }}"
         namespace: zuno-ai-build
+        # Without a policy the API orphans the old Job's pods (they were piling up in zuno-ai-build).
+        delete_options:
+          propagationPolicy: Background
         wait: true
 
     - name: "image-signing | run the image signing Job for {{ sign_image_name }}"

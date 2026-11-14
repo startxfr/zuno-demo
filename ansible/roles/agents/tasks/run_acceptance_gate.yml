@@ -155,6 +155,9 @@
     kind: Job
     name: "zuno-acceptance-gate-{{ _gate_agent }}"
     namespace: zuno-ai-run
+    # Without a policy the API orphans the old Job's pods (they were piling up in zuno-ai-run).
+    delete_options:
+      propagationPolicy: Background
     wait: true
 
 - name: "acceptance-gate | ensure the acceptance-gate ServiceAccount exists"
