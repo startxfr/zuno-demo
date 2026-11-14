@@ -162,19 +162,33 @@ def step_header(page: Page, version: str, step: Step, total: int) -> str:
 
 
 def step_body(step: Step) -> List[str]:
+    """Do, Say and You should see; an empty cell is left out with its label (a bare "-" read like a glitch)."""
     out: List[str] = []
     for label, value in (("Do", step.do), ("Say", step.say), ("You should see", step.see)):
+        text = inline(value).strip()
+        if not text:
+            continue
         out.append(f"{label}:")
-        out.extend(_wrap(inline(value) or "-", "  ", "  "))
+        out.extend(_wrap(text, "  ", "  "))
     return out
+
+
+def plain(text: str) -> str:
+    """One line of plain text: inline markup removed, then backticks and *emphasis* (the pages use asterisks only;
+    underscores stay, `snake_case` and `__init__` included), whitespace collapsed."""
+    text = inline(text).replace("`", "")
+    text = re.sub(r"(?<![\w*])\*{1,2}(?=\S)|(?<=\S)\*{1,2}(?![\w*])", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+NEXT_PREVIEW = 70
 
 
 def next_line(steps: List[Step], step: Step) -> str:
     if step.number >= len(steps):
         return "Last step done: make demo stop"
     nxt = steps[step.number]
-    do = inline(nxt.do)
-    do = do if len(do) <= 70 else do[:67].rstrip() + "..."
+    do = textwrap.shorten(plain(nxt.do), width=NEXT_PREVIEW, placeholder="...")
     return f"Next: {nxt.number}/{len(steps)} · {nxt.time} · {do}"
 
 

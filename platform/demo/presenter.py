@@ -356,7 +356,8 @@ def cmd_rehearse(args: List[str]) -> int:
         return 1
     manifest = load_manifest(demo_dir)
     to_run, decided = rehearse.plan_units(page, version, demo_dir, manifest)
-    confirmed = guard.confirm(entry.id, guard.changing_units(manifest, [u.name for u in to_run]))
+    changing = guard.changing_units(manifest, [u.name for u in to_run])
+    confirmed = guard.confirm(entry.id, changing)
     refusal = cluster_ready(manifest)
     if refusal and to_run:
         raise guard.Refused(refusal)
@@ -364,7 +365,7 @@ def cmd_rehearse(args: List[str]) -> int:
         f"{sum(1 for d in decided if d.status == 'skipped')} skipped, {sum(1 for d in decided if d.failed)} missing.")
     run = run_units(entry.id, demo_dir, to_run, confirmed=confirmed, label=f"rehearse-{version}") if to_run else None
     results = rehearse.merge(page, version, run, decided)
-    text, passed = rehearse.report(page, version, results, run)
+    text, passed = rehearse.report(page, version, results, run, changing=changing, confirmed=confirmed)
     path = rehearse.write_report(page, version, text)
     out(text.rstrip("\n"))
     out(f"Report: {path}")

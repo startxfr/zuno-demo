@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import guard
 import session
@@ -55,14 +55,25 @@ def merge(page: Page, version: str, run: Optional[RunResult], decided: List[Unit
     return [by_name.get(name, UnitResult(name, "failed", error="no result")) for name in sequence(page, version)]
 
 
-def report(page: Page, version: str, results: List[UnitResult], run: Optional[RunResult]) -> Tuple[str, bool]:
+def report(page: Page, version: str, results: List[UnitResult], run: Optional[RunResult],
+           changing: Optional[Dict[str, object]] = None, confirmed: str = "") -> Tuple[str, bool]:
+    """The rehearsal report. `changing`: the units the manifest declares changing that this rehearsal ran, with what
+    they change; `confirmed`: the demo id that confirmed them (typed or DEMO_CONFIRM)."""
     passed = not any(r.failed for r in results) and not (run and run.error)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    skipped = [r.name for r in results if r.status == "skipped"]
+    if changing:
+        units = "; ".join(f"{unit} ({guard.mutation_summary(value)})" for unit, value in changing.items())
+        changes = f"- Changing units, confirmed by `{confirmed or '?'}`: {units}"
+    else:
+        changes = "- Changing units: none (every action is a read or has nothing to run)"
     lines = [
         f"# Rehearsal: {page.id}, {VERSION_LABEL[version]} version",
         "",
         f"- Date: {stamp}",
         f"- Page: `{page.path.name}`",
+        changes,
+        f"- Steps not run (declared mutating): {', '.join(skipped)}" if skipped else "- Steps not run: none",
         f"- Log: `{run.log_path}`" if run and run.log_path else "- Log: none (nothing ran)",
         "",
         "| Unit | Result | Seconds | Detail |",
