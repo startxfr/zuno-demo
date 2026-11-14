@@ -13,7 +13,9 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
 - only the world-model directory names a MachineSet outside a read command, and nothing names `zuno-gpu-a` there;
 - a ClusterServiceVersion is read by `name_prefix`, never by its versioned name;
 - a page that has moved has `## Presenter lifecycle` with exactly `### Status` ... `### Uninstall`, none empty;
-- every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile). ADRs and roadmap records
+- every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile).
+Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
+not read (warnings()). ADRs and roadmap records
   are history and are not read; a demo page that has not moved yet is not read; a retired verb may be named on a
   line that says it is retired.
 """
@@ -263,6 +265,58 @@ def docs_problems(root: pathlib.Path, verbs: Set[str], unmoved: Set[pathlib.Path
     return problems
 
 
+OBJECT_NAME_RE = re.compile(r"`([a-z0-9][a-z0-9.]*-[a-z0-9.-]*[a-z0-9])`")
+
+
+def _data_strings(node) -> Iterable[str]:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield str(key)
+            yield from _data_strings(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _data_strings(value)
+    elif node is not None:
+        yield str(node)
+
+
+def section_warnings(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
+    """The backticked object names (Kubernetes-style, with a hyphen) of a moved page's `### Status` and `### Check`
+    that appear in no value of its status.yml or check.yml: the page says the file reads them, the file does not."""
+    page = catalogue.load(entry)
+    if page.section(catalogue.LIFECYCLE_SECTION) is None:
+        return []
+    found = []
+    for action in ("status", "check"):
+        text, _ = page.lifecycle_text(action)
+        path = catalogue.demo_dir(entry.id, root) / f"{action}.yml"
+        if not text or not path.is_file():
+            continue
+        try:
+            data = " ".join(_data_strings(load_yaml(path)))
+        except yaml.YAMLError:
+            continue
+        for name in dict.fromkeys(OBJECT_NAME_RE.findall(text)):
+            if name not in data:
+                found.append(f"ansible/demos/{entry.id}/{action}.yml: the page's `### {action.capitalize()}` names "
+                             f"`{name}`, which the file does not read")
+    return found
+
+
+def warnings(root: Optional[pathlib.Path] = None, only: Optional[List[str]] = None) -> List[str]:
+    """Not failures: what a reviewer should look at (WP-275 to WP-279 review each demo against its page)."""
+    root = root or catalogue.repo_root()
+    found: List[str] = []
+    for entry in catalogue.discover(root):
+        if only and entry.id not in only:
+            continue
+        try:
+            found += section_warnings(entry, root)
+        except catalogue.ParseError:
+            continue
+    return found
+
+
 def problems(root: Optional[pathlib.Path] = None, only: Optional[List[str]] = None, docs: bool = True) -> List[str]:
     root = root or catalogue.repo_root()
     entries = [e for e in catalogue.discover(root) if not only or e.id in only]
@@ -295,7 +349,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     found = problems(only=args.only or None)
     for line in found:
         print(line)
-    print(f"{len(found)} problem(s)")
+    warned = warnings(only=args.only or None)
+    for line in warned:
+        print(f"warning: {line}")
+    print(f"{len(found)} problem(s), {len(warned)} warning(s)")
     return 1 if found else 0
 
 

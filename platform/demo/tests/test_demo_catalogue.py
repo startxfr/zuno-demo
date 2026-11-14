@@ -62,8 +62,8 @@ class Repository(unittest.TestCase):
         self.assertNotIn("reset", verbs)
 
 
-class Negative(unittest.TestCase):
-    """Each case breaks a copy of the fixture catalogue and expects one named problem."""
+class FixtureCopy(unittest.TestCase):
+    """A writable copy of the fixture catalogue."""
 
     def setUp(self):
         self.root = pathlib.Path(tempfile.mkdtemp(prefix="zuno-catalogue-"))
@@ -77,6 +77,10 @@ class Negative(unittest.TestCase):
 
     def found(self):
         return consistency.problems(self.root, only=["fixture-demo"], docs=False)
+
+
+class Negative(FixtureCopy):
+    """Each case breaks a copy of the fixture catalogue and expects one named problem."""
 
     def test_fixture_is_clean(self):
         self.assertEqual(self.found(), [])
@@ -148,6 +152,24 @@ class Negative(unittest.TestCase):
         self.page.write_text(text.replace("### Uninstall\n\nThe file removes the fixture add-on marker.",
                                           "### Stop\n\n### Uninstall\n\nThe file removes the fixture add-on marker."))
         self.assertTrue(any("`### Stop` is empty" in p for p in self.found()))
+
+
+class SectionWarnings(FixtureCopy):
+    def test_an_object_the_page_names_but_the_file_does_not_read(self):
+        text = self.page.read_text().replace(
+            "### Status\n\nNothing to do.", "### Status\n\nThe file reads the Deployment `fixture-api` and `fixture-db`.")
+        self.page.write_text(text)
+        self.assertEqual(self.found(), [], "a warning is never a problem")
+        warned = consistency.warnings(self.root, only=["fixture-demo"])
+        self.assertEqual(len(warned), 2)
+        self.assertIn("names `fixture-api`, which the file does not read", warned[0])
+        status = self.demo / "status.yml"
+        status.write_text(status.read_text().replace('- "git log -1 --format=%h"',
+                                                     '- "git log -1 --format=%h"\n      - "oc get deploy fixture-api fixture-db -n x"'))
+        self.assertEqual(consistency.warnings(self.root, only=["fixture-demo"]), [])
+
+    def test_unmoved_page_gives_no_warning(self):
+        self.assertEqual(consistency.warnings(self.root, only=["fixture-unscaffolded"]), [])
 
 
 class DocsVerbs(unittest.TestCase):
