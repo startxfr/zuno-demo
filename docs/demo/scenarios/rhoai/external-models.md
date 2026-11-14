@@ -68,24 +68,56 @@ Other identities:
   hour each, priority 100);
 - `payload-processing` in `openshift-ingress`, the RHOAI component that injects the provider key into a MaaS call.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 it had not. Then log a terminal in
-  with `oc` as **paas-ops-01**, at the repository root, large font.
-- [ ] Check the objects: `oc get externalmodels.maas.opendatahub.io,maasmodelrefs -n zuno-ai-run`. Expect `Migrated`
-  for the two ExternalModels and `Ready` for the six model refs.
-- [ ] Check the controller that was crash-looping on 2026-11-13:
-  `oc get pods -n redhat-ods-applications | grep maas-controller`.
+`make demo use external-models 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/external-models/<action>.yml`) has run,
+and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-models-d0`, `zuno-models-d1` and `zuno-llm-d1`, the `maas-controller`
+pod in `redhat-ods-applications` (it was crash-looping on 2026-11-13: check it with
+`oc get pods -n redhat-ods-applications | grep maas-controller`), `payload-processing` in `openshift-ingress` and the
+Deployment `ai-gateway`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
+nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the two
+ExternalModels (`oc get externalmodels.maas.opendatahub.io,maasmodelrefs -n zuno-ai-run`: phase `Migrated` for the two
+ExternalModels and `Ready` for the six model refs), the MaaSModelRefs, the MaaSSubscriptions and the MaaSAuthPolicies.
+If a model ref is not `Ready` or a subscription not `Active`, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The SaaS models are part of the shared platform: the file only verifies them.
+
+### Start
+
+The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) from the MaaS route, ending in
+`/zuno-ai-run`. The presenter no longer exports it. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
+  terminal in.
 - [ ] Open [`platform/ai-gateway/provider-routing.yaml`](../../../../platform/ai-gateway/provider-routing.yaml) in an
   editor, at the SaaS entries (`- name: openai` and below).
-- [ ] 15-minute version: set `export MAAS=https://maas.apps.demo333.startx.fr/zuno-ai-run` in the terminal.
 - [ ] 15-minute version: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr` as **ai-ops-01**,
   dashboard **AI models & serving**, last 24 hours.
 - [ ] 15-minute version: open [WP-125](../../../roadmap/work-packages/wp-125-external-models-through-maas.md) at
   "Live verification (2026-11-07, demo333, RHOAI 3.6.0-ea.2)" and the
   [WP-194 evidence](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md) at section T5.
-- [ ] Known on screen, not a failure: the two ExternalModels show phase `Migrated`. RHOAI 3.6 converted each one to
-  its new API group (`inference.opendatahub.io`) and keeps ours as the owner.
+- Known on screen, not a failure: the two ExternalModels show phase `Migrated`. RHOAI 3.6 converted each one to its
+  new API group (`inference.opendatahub.io`) and keeps ours as the owner.
+
+### Stop
+
+Nothing to do. Close the terminal, the editor and the browser tabs.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
@@ -105,7 +137,7 @@ Run the 5-minute version, then:
 |---|---|---|---|
 | 5:00 | `oc get externalproviders -n zuno-ai-run`, then `oc get externalprovider mistral-large -n zuno-ai-run -o jsonpath='{.spec.auth}'` | "RHOAI 3.6 split our object into its new API: an ExternalProvider holds the endpoint and the key reference, an ExternalModel the route. Ours stays the owner, so Git still drives both." | Both providers `Ready`. `{"secretRef":{"name":"llm-provider-mistral-maas"},"type":"apikey"}`. |
 | 6:15 | `oc get externalsecret llm-provider-mistral-maas -n zuno-ai-run -o jsonpath='{.spec.target.template.metadata.labels}'` | "The key comes from Vault, `providers/mistral`, the same value the router uses. One trap: the RHOAI component that injects the key only loads Secrets that carry this label. Without it, every call answered 500 'credentials not found'." | `{"inference.llm-d.ai/ipp-managed":"true","zuno.io/managed-by":"argocd"}`. |
-| 7:30 | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(oc whoami -t)" $MAAS/gpt-oss-20b/v1/models`, then the same on `$MAAS/mistral-large/v1/models` *(untested commands)* | "My own token, a platform administrator. MaaS lets me reach a model on our GPUs on my group's subscription. The SaaS model refuses me: I am not the router." | `200`, then a refusal (`403` expected). |
+| 7:30 | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(oc whoami -t)" $MAAS/gpt-oss-20b/v1/models`, then the same on `$MAAS/mistral-large/v1/models` (`$MAAS` is set by the step file from the MaaS route) *(untested commands)* | "My own token, a platform administrator. MaaS lets me reach a model on our GPUs on my group's subscription. The SaaS model refuses me: I am not the router." | `200`, then a refusal (`403` expected). |
 | 9:00 | Show WP-125, "Live verification (2026-11-07)" | "On 2026-11-07 both SaaS models answered through MaaS, with the router's own token. Before the label: 500. Then our Mistral account refused `mistral-large-latest`, so both paths moved to `mistral-large-4`." | The table: `gpt-oss-120b-ovhcloud` 500 then 200; `mistral-large` 500, then 403 `tier_not_allowed`, then 200. |
 | 10:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="MAAS_EXTERNAL_EGRESS_ENABLED")].value}'` | "The switch that sends the router's SaaS calls through MaaS is off. When it is on, MaaS will hold the only copy of the keys and count the SaaS tokens too." | `false`. |
 | 11:30 | Grafana **AI models & serving**, panel **Model calls (rate, by provider/model/outcome)** | "What the router actually sent out, provider by provider, next to the local models." | The SaaS providers that served calls in the range, for example `mistral-codestral`, next to the local `-maas` providers. An empty SaaS series means no task used a SaaS model in the range. |
