@@ -82,6 +82,8 @@ into **private** repositories of the internal Quay, `zuno/redhat/<path>`, and re
   running digests the list misses. Add them (keep the old digests until the upgrade is over), then copy:
   `DOCKER_CONFIG=~/.config/zuno/quay-push QUAY_API_TOKEN=<admin token> python3 platform/supply-chain/mirror_redhat_images.py --to <registry host>`.
   Until then the new pods pull from `registry.redhat.io`, slower but working (fallback).
+  The copy takes every architecture of an index and sends one layer at a time (a PUT of several GB from the workstation
+  was cut after about ten minutes when layers went in parallel): count about 2 h for the full list at 9 MB/s.
 - **Never remove a source from that ImageDigestMirrorSet** outside an announced drain window: removal drains every node.
   To stop using an entry, stop copying it, or delete its repository in Quay (404, the nodes fall back).
 

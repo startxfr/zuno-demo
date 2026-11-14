@@ -73,7 +73,7 @@ class CopyTests(unittest.TestCase):
 
         self.assertEqual(m.copy_one(item(), "h.example", "/tmp/auth.json", run=run), f"h.example/zuno/redhat/rhoai/odh-mlflow-rhel9@{D}")
         cp = calls[0]
-        self.assertEqual(cp[1:4], ["cp", "--from-registry-config", "/tmp/auth.json"])
+        self.assertEqual(cp[1:6], ["cp", "--concurrency", "1", "--from-registry-config", "/tmp/auth.json"])
         self.assertNotIn("-r", cp)
         self.assertEqual(cp[-2:], [f"{SRC}@{D}", "h.example/zuno/redhat/rhoai/odh-mlflow-rhel9:d-aaaaaaaaaaaa"])
 

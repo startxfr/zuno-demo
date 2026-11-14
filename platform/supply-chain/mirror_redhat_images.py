@@ -86,14 +86,20 @@ def copy_one(item: dict, host: str, source_auth: str, run: Callable[..., str] = 
     digest = item["digest"]
     target = mirror_target(item["source"], host)
     tag = f"d-{digest.split(':')[1][:12]}"
-    for attempt in (1, 2, 3):  # large layers over the CDN: retry a dropped connection
+    # Large layers (up to 2.7 GB) go up in one PUT each. From a workstation link, a PUT that lasts more
+    # than about ten minutes was cut ("unexpected EOF") and oras then cancelled the parallel ones, which
+    # Quay logs as PUT 400 / BlobDigestMismatchException (demo333, 2026-11-14, three attempts lost).
+    # One blob at a time keeps each PUT short at the full link rate; a retry skips the blobs already there.
+    attempts = 5
+    for attempt in range(1, attempts + 1):
         try:
-            run([admit.require("oras"), "cp", "--from-registry-config", source_auth,
+            run([admit.require("oras"), "cp", "--concurrency", "1", "--from-registry-config", source_auth,
                  f"{item['source']}@{digest}", f"{target}:{tag}"])
             break
-        except admit.AdmissionError:
-            if attempt == 3:
+        except admit.AdmissionError as exc:
+            if attempt == attempts:
                 raise
+            print(f"RETRY {attempt}/{attempts - 1} {item['source']}: {exc}", file=sys.stderr, flush=True)
             time.sleep(15)
     got = run([admit.require("oras"), "resolve", f"{target}:{tag}"]).strip()
     if got != digest:

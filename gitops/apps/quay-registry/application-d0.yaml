@@ -25,6 +25,9 @@ spec:
           host: quay-quay-zuno-registry.apps.mycluster.example.com
         publicRedirects:
           enabled: true
+        # Family (e), WP-261 S3: flipped on 2026-11-14 with the owner's go, after the copy (S1) and the node pull secret (S2).
+        redhatRedirects:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-registry

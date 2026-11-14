@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 7 | 4 | 18 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-261 |
+| v0.17 | 7 | 4 | 18 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1133,7 +1133,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 | WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Not started | a server-side dry run on a canary operator |
 | WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Not started | none; sends the final anchors to unifai-compare |
 | WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Done | none; masters resize refused by its gate (P6) |
-| WP-261 | [wp-261](work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) | 0612 | WP-248, WP-260 | Operator pending | copy into Quay (S1), node pull secret (S2), ImageDigestMirrorSet (S3), each with the owner's go |
+| WP-261 | [wp-261](work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) | 0612 | WP-248, WP-260 | Done | none; after an RHOAI, AAP or Lightspeed upgrade run `mirror_redhat_images.py --drift` and copy |
 
 ### OKF stream phases
 

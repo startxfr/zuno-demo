@@ -1,6 +1,6 @@
 # WP-261: Mirror the large Red Hat product images into the internal Quay
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (addendum 2026-11-14, family e)
 - **Depends on:** [WP-248](wp-248-replace-the-okf-mirror-with-an-internal-quay-for-every-zuno-image.md) (the live Quay and
   the family (c) and (d) redirects), [WP-260](wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) (the
@@ -51,10 +51,10 @@ mirrored by family (d).
 | Step | Content | Cluster effect | State |
 |---|---|---|---|
 | S0 | List, script and tests (14 tests, live `--drift`: none), chart block and role task, both switched off; this brief and the ADR-0612 addendum | none (renders unchanged with the live values) | Done 2026-11-14 |
-| S1 | Copy: `DOCKER_CONFIG=~/.config/zuno/quay-push QUAY_API_TOKEN=<admin token, Vault registry/quay-admin> python3 platform/supply-chain/mirror_redhat_images.py --to quay-quay-zuno-registry.apps.demo333.startx.fr`, from the workstation; check that every repository is private | Quay and its bucket receive about 31 GB of image data through the route; no node effect | Waits for the owner's go |
-| S2 | `zuno_quay_node_pull_secret: true` in `ansible/clusters/demo333.yml`, then `make d2 install quay-registry`; wait for the pools to be Updated | the global pull secret gains the registry host entry; pools roll without drain or reboot | Waits for the owner's go |
-| S3 | `redhatRedirects.enabled: true` in `gitops/apps/quay-registry/application-d0.yaml`, then `make d2 install quay-registry` (the role re-applies d0 from the manifest); golden path before and after | new ImageDigestMirrorSet; CRI-O reloads on every node, no drain | Waits for the owner's go |
-| S4 | Proof: a pod of a listed image starts on a node without the image, Quay's repository log shows the pull by `zuno+pull`; golden path 13/13, `make d3 check recovery` | none | Not started |
+| S1 | Copy: `DOCKER_CONFIG=~/.config/zuno/quay-push python3 platform/supply-chain/mirror_redhat_images.py --to quay-quay-zuno-registry.apps.demo333.startx.fr`, from the workstation, in parallel with a UnifAI canary (owner's go). The images are multi-arch indexes (2 to 4 architectures): **53.3 GB compressed** were copied, not the 18.6 GB of amd64 alone, to keep the index digest that the redirect serves. The first run lost three attempts: parallel PUTs of 2-5.6 GB layers were cut after 10-13 min (`unexpected EOF`, Quay `BlobDigestMismatchException` on the truncated bodies); the second run, one blob at a time (`--concurrency 1`, now the script default) at about 9 MB/s, copied the 8 images in 1 h 47. Every repository answers 401 anonymously (a public one answers 200) and lists its tag for `zuno+pull` | Quay and its bucket received 53 GB through the route; no node effect; canary green, no pull failure | Done 2026-11-14 02:39Z |
+| S2 | The `zuno+pull` entry for the route host merged into `openshift-config/pull-secret` (the entry `node_pull_secret.yml` writes), `zuno_quay_node_pull_secret: true` in `ansible/clusters/demo333.yml` (f8488e99) | pools Updated in about 2 min, MCO action `None`: no cordon, no drain, 11/11 Ready | Done 2026-11-14 00:13Z |
+| S3 | `redhatRedirects.enabled: true` in `gitops/apps/quay-registry/application-d0.yaml` and in the live d0 Application values (the same merge the role does); golden path PASS 13/13 before (02:20Z) and after (02:50Z) | ImageDigestMirrorSet `zuno-redhat-via-registry` (8 sources), rendered `registries.conf` with `pull-from-mirror = "digest-only"`; pools Updated in 2 min 30, CRI-O reload only: no cordon, no drain | Done 2026-11-14 02:43Z |
+| S4 | A pod of `odh-mlflow-rhel9` on worker ip-10-18-25-232, which did not hold it: Quay logged the node's GET of the index manifest, the amd64 manifest and the layers (200, private repository); pulled in 24 s for 1.2 GB (53 s from `registry.redhat.io` on 2026-11-13). `make d3 check recovery` all ok; the proof namespace is deleted | none | Done 2026-11-14 02:44Z |
 
 ## Rollback
 

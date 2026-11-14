@@ -1,6 +1,6 @@
 # ADR-0612: Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket
 
-- **Status:** Partially implemented (accepted 2026-11-11, the owner: Clair limited to the Red Hat sources; live on demo333 2026-11-12: families (a) OKF release, (c) UnifAI images and (d) public images, zot retired; family (b) first-party images and the retirement of the ImageStream registry, clause 9, are not started and wait for the owner; family (e) large Red Hat product images added by the addendum of 2026-11-14, repository work done, cluster steps wait for the owner's go, WP-261)
+- **Status:** Partially implemented (accepted 2026-11-11, the owner: Clair limited to the Red Hat sources; live on demo333 2026-11-12: families (a) OKF release, (c) UnifAI images and (d) public images, zot retired; family (b) first-party images and the retirement of the ImageStream registry, clause 9, are not started and wait for the owner; family (e) large Red Hat product images added by the addendum of 2026-11-14 and live on demo333 the same night, WP-261)
 - **Target:** v0.17
 - **Date:** 2026-11-11
 - **Decision owners:** Zuno Demo architecture team
@@ -126,7 +126,8 @@ scope; the OpenShift release images and every other product image stay on the cl
 
 - **Scope.** A closed list, pinned by the digest the operators run: NeMo Guardrails server, OGX core, the guardrails
   built-in detector, MLflow, the AAP execution environment, controller and hub (the owner's lot 1), and the Lightspeed
-  offline knowledge portal (lot 2). About 31 GB on a node's disk. The vLLM images are left out: the GPU nodes do not move.
+  offline knowledge portal (lot 2). About 31 GB on a node's disk; 53 GB copied, because the indexes carry two to four
+  architectures and the redirect serves the index digest. The vLLM images are left out: the GPU nodes do not move.
 - **Private repositories.** The route is reachable from the Internet and Red Hat content is not redistributed, so the
   mirror repositories (`zuno/redhat/<path>`) are private, unlike families (c) and (d). The copy script checks it and makes
   a public one private. The nodes read them with the `zuno+pull` robot, which the `quay_registry` role adds to the global
