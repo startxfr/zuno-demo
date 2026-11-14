@@ -78,9 +78,12 @@ and no search returns anything.
 
 ### Check
 
-There is no golden-path probe. The file runs the same reads as `status`, then asks one question to the retriever
-`consultant-01-documents`. A pass is not a rehearsal: run the whole scenario the same day, with `make demo rehearse`
-or by hand.
+There is no golden-path probe. The file runs the same reads as `status` (the stack, `docling-serve`, the RAG server and
+worker, Qdrant, the embedding model, the workflows and the retrievers) and the browser check `unifai` (sign-in through
+Keycloak, first screen). It asks no question to a retriever: `check` runs before `start`, when the library may be empty
+or stale, so an answer would prove nothing. The RAG pipeline itself (docling, embeddings, Qdrant) is proven end to end
+by `make demo start`, which uploads the two files and waits until both are **Done**. A pass is not a rehearsal: run the
+whole scenario the same day, with `make demo rehearse` or by hand.
 
 ### Install
 
