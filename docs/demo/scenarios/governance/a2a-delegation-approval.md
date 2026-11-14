@@ -73,21 +73,46 @@ Other identities:
 - The a2a-gateway holds no credential of its own. Its signature on the agent chain comes from the Vault Transit key
   `agent-chain`.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use a2a-delegation-approval 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/a2a-delegation-approval/<action>.yml`)
+has run, and says what is left to the presenter. No action of this demo changes the cluster: the AAP job is launched by
+you, in the step, when you click **Approve**.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-a2a-gateway-d0`/`-d1`, `zuno-unifai-d0`/`-d1` and
+`zuno-mcp-aap-d0`/`-d1`, the Deployments `a2a-gateway` and `aap-mcp`, the UnifaiAgentBundles `arkos` and `tekos`, the
+`LLMInferenceService` models in `zuno-ai-run` and the pods `tempo-tempo-0` and Grafana. If one is missing or not
+Healthy, stop and tell the platform owner: this demo installs nothing. At least one local model must be `Ready=True`:
+Arkos is floored at C3, so it answers on local models only.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `delegation-approval` (see
+[golden-path.md](../../golden-path.md)), as `eval-consultant-01`. The probe proves the request and a refusal: nothing
+runs. It usually takes 25 to 70 s, and about 326 s when Arkos asks a second time and nobody answers. The approval
+clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day. If it fails, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The a2a-gateway, UnifAI, the mcp-gateway and AAP are part of the shared platform: the file only
+verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
 
 - [ ] A browser profile for **consultant-02** (password in Vault, `keycloak/demo-personas`). Open
   `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` and sign in through Keycloak (realm `zuno`). Check the name at
   the top right.
-- [ ] Golden-path probe `delegation-approval` passed within the last hour
-  (`ONLY=delegation-approval make demo golden-path`), see [golden-path.md](../../golden-path.md). It usually takes 25 to
-  70 s. It takes about 326 s when Arkos asks a second time and nobody answers.
 - [ ] Rehearse the 5-minute version once the same day as consultant-02 and click **Reject**: nothing runs. Arkos
   answers without delegating on some turns (one in four in the WP-174 runs), so rehearsal tells you whether the prompt
   delegates today.
 - [ ] The AAP launch limit is 2 per caller in 15 minutes. If you rehearse with **Approve**, do it at least 15 minutes
   before the session.
-- [ ] `oc get llminferenceservice -n zuno-ai-run`: at least one local model `Ready=True`. Arkos is floored at C3, so it
-  answers on local models only.
 - [ ] Budget: a delegating turn costs tens of thousands of tokens on consultant-02's quota (about 65,000 measured on
   2026-11-03). The `dify`, `openclaw` and `guardrails` probes spend the same persona's budget.
 - [ ] 15-minute version:
@@ -100,6 +125,15 @@ Other identities:
     [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md) and
     the corp limits at
     [policies/limits/limits-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/limits/limits-policy.yaml).
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal. The AAP job `zuno-day0-check` is read-only and ends by
+itself in about six minutes.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
