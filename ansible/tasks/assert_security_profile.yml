@@ -17,7 +17,7 @@
     that:
       - zuno_security_profile | default('demo') in ['demo', 'hardened']
     fail_msg: >-
-      zuno_security_profile is '{{ zuno_security_profile }}'; expected 'demo' or
+      zuno_security_profile is '{{ zuno_security_profile | default('demo') }}'; expected 'demo' or
       'hardened' (ADR-0602 clause 3). Fix it in
       ansible/inventories/demo/group_vars/all/main.yml,
       ansible/clusters/<cluster>.yml or ansible/confidential.yml.
