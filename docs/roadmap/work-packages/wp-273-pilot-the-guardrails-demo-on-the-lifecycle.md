@@ -1,6 +1,6 @@
 # WP-273: Pilot the guardrails demo on the lifecycle
 
-- **State:** Operator pending
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md)
 - **Related:** [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) (the other pilot), [WP-238](wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) (the `guardrails` probe)
@@ -43,3 +43,9 @@ what is left to the presenter.
 - Both rehearsals end with `RESULT: PASS`.
 - The catalogue test passes with `guardrails` counted as moved.
 - The owner reviews the evidence at the gate of 2026-11-16.
+
+## Result (2026-11-15)
+
+`start` wakes the model with the golden-path moment `dify` (one answer through Dify's token proxy, no injection); `status` reads the Applications, the workloads, the NemoGuardrails phase, the two dashboards and the gateway's `GUARDRAILS_` environment, as the page says. Rehearsed live on demo333 by zuno-demo-reorg-demo333 with the owner's go: 5-minute `RESULT: PASS` (11 units, 53 s), 15-minute `RESULT: PASS` (20 units, 59 s; check 5/5 with the `guardrails` probe and the `dify` browser check). A presenter walk-through confirmed the order RESULT, page section, Next; two display details it found (an empty cell shown as `-`, the Next preview cut inside a backtick) are fixed in `render.py`. Evidence: [wp-273-guardrails-rehearsal-2026-11-15.md](../evidence/wp-273-guardrails-rehearsal-2026-11-15.md). The owner passed the gate on 2026-11-15 and gave the go for the rollout
+(WP-275 to WP-281).
+

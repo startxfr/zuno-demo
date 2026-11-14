@@ -1,6 +1,6 @@
 # WP-274: Pilot the UnifAI live RAG demo on the lifecycle
 
-- **State:** Operator pending
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md)
 - **Related:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) (the other pilot), [WP-200](wp-200-show-the-unifai-rag-working-live.md) (the live RAG first shown)
@@ -49,3 +49,9 @@ by `start` and `stop`, and its page rewritten to match.
 - Both rehearsals end with `RESULT: PASS`; the optional rows show `SKIPPED (mutating)`.
 - After `stop`, consultant-01's library holds none of the three named files.
 - The owner reviews the evidence at the gate of 2026-11-16, 12:00, and gives or refuses the go for the rollout.
+
+## Result (2026-11-15)
+
+The spike mapped the UnifAI RAG API behind the UI route (upload as base64 JSON then an embed PUT, delete by source id, DONE as the source status; sign in as the persona itself, not its eval twin). `evaluations/unifai_rag_library.py` (list, delete, upload with wait, warm; 8 tests) drives `start` and `stop`, both declared changing. The page moved: row 0:30 shows the loaded library, Appendix C moved into Start, rows 9:30 and 12:45 are the optional resync (9:30 mutating, never run by a step), and Check runs the status reads and the browser check (a retriever question before `start` would prove nothing). Rehearsed live with the owner's named go: 5-minute `RESULT: PASS` (11 units, 91 s; start 35 s), 15-minute `RESULT: PASS` (20 units, 105 s, 9:30 SKIPPED as mutating). After `stop`, consultant-01's library holds none of the three named files. Evidence: [wp-274-unifai-live-rag-rehearsal-2026-11-15.md](../evidence/wp-274-unifai-live-rag-rehearsal-2026-11-15.md). The owner passed the gate on 2026-11-15 and gave the go for the rollout
+(WP-275 to WP-281).
+

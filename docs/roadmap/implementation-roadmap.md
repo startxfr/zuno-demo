@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-273, WP-274, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
+| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1168,13 +1168,13 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-270 | [wp-270](work-packages/wp-270-build-the-make-demo-lifecycle-engine.md) | 0616 | WP-269 | Done | none |
 | WP-271 | [wp-271](work-packages/wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md) | 0616 | WP-270 | Done | none |
 | WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Done | none |
-| WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Operator pending | the owner's gate: review the rehearsal evidence (both versions PASS on 2026-11-15) |
-| WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Operator pending | the owner's gate: review the rehearsal evidence (both versions PASS on 2026-11-15) |
-| WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-16 afternoon, after the gate; a named go per demo with a changing unit |
-| WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-16 evening, after the gate; a named go per demo with a changing unit |
-| WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; a named go per demo with a changing unit |
-| WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; a named go per demo with a changing unit |
-| WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | planned 2026-11-17; the world model is not rehearsed in full while no GPU capacity exists |
+| WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
+| WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
+| WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | the pages are on devel since 2026-11-15; the files are aligned with them and every demo is rehearsed in both versions, with the owner's named go in the demo333 session for each demo with a changing unit |
+| WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | the pages are on devel since 2026-11-15; the files are aligned with them and every demo is rehearsed in both versions, with the owner's named go in the demo333 session for each demo with a changing unit |
+| WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | the pages are on devel since 2026-11-15; the files are aligned with them and every demo is rehearsed in both versions, with the owner's named go in the demo333 session for each demo with a changing unit |
+| WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | the pages are on devel since 2026-11-15; the files are aligned with them and every demo is rehearsed in both versions, with the owner's named go in the demo333 session for each demo with a changing unit |
+| WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Not started | the pages are on devel since 2026-11-15; the files are aligned with them and every demo is rehearsed in both versions, with the owner's named go in the demo333 session for each demo with a changing unit |
 | WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Not started | planned 2026-11-17 evening |
 | WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Not started | dated 2026-11-18: full rehearsal, a named go per demo with a changing unit |
 
@@ -1322,6 +1322,7 @@ moving.
 
 ## Change log
 
+- 2026-11-15 — The owner's gate is passed: WP-273 and WP-274 Done (both pilots rehearsed live in both versions, evidence in docs/roadmap/evidence/), go for the rollout. The 28 other scenario pages and the 6 workshops land on devel in their `## Presenter lifecycle` form; `consistency.py` lists 62 page-versus-file warnings, the review list of WP-275 to WP-279.
 - 2026-11-15 — WP-272 Done: the WP-136 webinar tools are deleted (seven playbooks, the persona probe and its task file), the operations pages name the `make demo` lifecycle, gitops-day0-3 moves to its lifecycle form, operator checks read a CSV by name prefix. WP-273 and WP-274 Operator pending: the guardrails and unifai-live-rag pilots are automated as their pages say and were rehearsed live on demo333 in both versions, all four `RESULT: PASS` (unifai-live-rag 9:30 SKIPPED as a mutating optional row); the owner's gate reviews the evidence.
 - 2026-11-15 — WP-271 Done: every catalogue demo has its directory under `ansible/demos/` (36 directories, 684 files, 432 step files), generated by `platform/demo/scaffold.py` from the pages, with status and check files pre-filled from a live inventory of demo333; `platform/demo/consistency.py` and its CI test keep pages and files together. The allowlist now reads quotes like a shell and resolves a step's `$variables`. The 30 status files pass live.
 - 2026-11-14 — WP-270 Done: the `make demo` lifecycle engine (platform/demo, demo_run.yml, ansible/demos/_lib, Makefile grammar, 68 tests) is on devel with the two pilot pages (guardrails, unifai-live-rag) in their `## Presenter lifecycle` form and `evaluations/unifai_rag_library.py` for the RAG pilot. The 28 other scenario pages and the 6 workshops are migrated on a local branch and land after the owner's gate of 2026-11-16. The four webinar probe leftovers were deleted from `zuno-ai-run` on 2026-11-14 (owner's go). The DSC reads Ready=False because the parked GuardrailsOrchestrator `zuno-guardrails-smoke` is stuck in phase Error since 2026-11-07; the owner chose not to restart the TrustyAI operator now; the guardrails probe passes.
