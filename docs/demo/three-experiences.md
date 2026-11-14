@@ -51,16 +51,52 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 | 0:17 | Same rules | [One platform behind the three](#one-platform-behind-the-three), inline | |
 | 0:25 | Close and questions | Repeat the message | |
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Run once the "Before you start" checklist of the three scenarios. The items they share:
-  - [ ] Have one browser profile per persona, signed in before the session: **consultant-02**, **sale-01** and
-    **ai-ops-01**.
-  - [ ] Read OpenClaw's own UI passwords before the session, from the Secret `openclaw-ui` of each persona namespace.
-    Never show them on screen.
-  - [ ] Open Grafana as **ai-ops-01** on the dashboard **Zuno Platform / Five experiences**, last 1 hour,
-    `client` = All.
-- [ ] Check that the probes listed in the status banner passed within the last hour.
+`make demo use three-experiences` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
+version its agenda row names. One typed guard, `DEMO_CONFIRM=three-experiences`, covers the workshop. Each section below says
+only what is the workshop's own, or "Nothing to do.".
+
+### Status
+
+Nothing to do. The scenarios' statuses are those of [UnifAI agents](scenarios/experiences/unifai-agents.md#presenter-lifecycle), [Open WebUI](scenarios/experiences/open-webui.md#presenter-lifecycle) and [OpenClaw](scenarios/experiences/openclaw.md#presenter-lifecycle), in that order. The inline block "One platform behind the three" reads no cluster state.
+
+### Check
+
+The merged probes are `ONLY=unifai-tekos,open-webui,zuno-code,openclaw make demo golden-path`. The merged browser run
+covers `unifai`, `open-webui` and `openclaw`. All of them must have passed within the last hour. The inline block has
+no probe: rehearse it the same day, after the three experiences, so that the Grafana series have data. When one block
+is red, skip that block and say what it would have shown, as
+[If something goes wrong](#if-something-goes-wrong) says.
+
+### Install
+
+Nothing to do.
+
+### Start
+
+The scenarios' Start sections already warm the models and say how to sign in to each product. Only what they share is
+the workshop's own:
+
+- [ ] One browser profile per persona, signed in before the session: **consultant-02**, **sale-01** and
+  **ai-ops-01**.
+- [ ] OpenClaw's own UI passwords are read before the session, from the Secret `openclaw-ui` of each persona
+  namespace. Never show them on screen.
+- [ ] Grafana is open as **ai-ops-01** on the dashboard **Zuno Platform / Five experiences**, last 1 hour,
+  `client` = All.
+- Every block plays its 5-minute version: skip the "15-minute version" items of the scenarios.
+- None of the three scenarios has a changing unit in its Start or Stop. If one gets one, the single guard
+  `DEMO_CONFIRM=three-experiences` covers the workshop.
+
+### Stop
+
+Nothing to do. The scenarios' Stop sections close their browser profiles; close the Grafana profile too.
+
+### Uninstall
+
+Nothing to do.
 
 ## One platform behind the three
 
