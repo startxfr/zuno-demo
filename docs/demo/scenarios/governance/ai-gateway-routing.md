@@ -134,8 +134,8 @@ Run the 5-minute version, then:
   model compiles its kernels on the first requests).
 - **The routing decision lives 120 seconds** in Redis and names the serving provider and the first candidate. It does
   not list the skipped candidates: those are only on the counter `zuno_model_candidates_skipped`.
-- **`strict` fails visibly.** Arkos `write-code` lists Codestral only, and Arkos is floored at C3, where Codestral is
-  not eligible. That call probably fails (not verified). Do not ask Arkos for code on stage.
+- **Arkos writes code on local models.** Arkos is floored at C3, where Codestral is not eligible. Since agents v1.0.1
+  its `write-code` task runs on the local models only, the quality model first. Codestral serves Tekos and "Zuno Code".
 - **The skip of a down model is told, not shown.** Showing it live needs a model taken down. It was proven on demo333
   on 2026-11-03 (WP-188): models skipped while not ready, served again without a gateway restart.
 
