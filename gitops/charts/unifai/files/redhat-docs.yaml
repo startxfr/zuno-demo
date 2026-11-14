@@ -2,9 +2,11 @@
 # Maintained here since rag-ingestion, whose catalogue it was generated from, was retired; edit it by hand.
 # Scoped 2026-10-25 (user decisions): latest version of each product only; every docs.redhat.com source
 # keeps its own product/version in the /en/ URL form (include), and a book with its own source is
-# excluded from the broader one. The crawler (crawl: redhat-docs) follows any /html/ or /html-single/
-# link of the host, so unscoped sources pulled other versions, other products and the /documentation/
-# (no /en/) copy of the same pages, which filled the retriever slots with duplicates (tekos scenario #11).
+# excluded from the broader one. The sources use crawl: site with explicit html and html-single includes and
+# the /documentation/ to /en/documentation/ rewrite (R-556: the redhat-docs mode is removed in 0.2). Before, the crawler
+# (crawl: redhat-docs) followed any /html/ or /html-single/ link of the host, so unscoped sources pulled other versions,
+# other products and the /documentation/ (no /en/) copy of the same pages, which filled the retriever slots with
+# duplicates (tekos scenario #11).
 sources:
 - name: rh-argocd-upstream-stable
   tags:
@@ -46,7 +48,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Migration Toolkit for Applications
@@ -55,7 +57,10 @@ sources:
       family: redhat-mta
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2/*
+    - https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2/html/*
+    - https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-migration-toolkit-for-containers-4-22
   tags:
   - knowledge.tech
@@ -64,7 +69,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migrating_from_version_3_to_4/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Migration Toolkit for Containers
@@ -74,6 +79,8 @@ sources:
       language: en
     include:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migrating_from_version_3_to_4/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-migration-toolkit-for-virtualization-2-11
   tags:
   - knowledge.tech
@@ -82,7 +89,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Migration Toolkit for Virtualization
@@ -91,7 +98,10 @@ sources:
       family: redhat-mtv
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11/*
+    - https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11/html/*
+    - https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-openshift-container-platform-4-22
   tags:
   - knowledge.tech
@@ -137,7 +147,7 @@ sources:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/distributed_tracing/index
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/logging/index
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/monitoring/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenShift Container Platform
@@ -149,6 +159,8 @@ sources:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/*
     exclude:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migrating_from_version_3_to_4/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-openshift-virtualization-4-22
   tags:
   - knowledge.tech
@@ -157,7 +169,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       book_format: html-single
@@ -168,6 +180,8 @@ sources:
       language: en
     include:
     - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-advanced-cluster-management-2-17
   tags:
   - knowledge.tech
@@ -176,7 +190,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Advanced Cluster Management for Kubernetes
@@ -185,7 +199,10 @@ sources:
       family: redhat-acm
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/*
+    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-advanced-cluster-security-4-11
   tags:
   - knowledge.tech
@@ -194,7 +211,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Advanced Cluster Security for Kubernetes
@@ -203,7 +220,10 @@ sources:
       family: redhat-acs
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/*
+    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-ansible-automation-platform-2-7
   tags:
   - knowledge.tech
@@ -212,7 +232,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Ansible Automation Platform
@@ -221,7 +241,10 @@ sources:
       family: redhat-aap
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7/*
+    - https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-build-of-keycloak-26-6
   tags:
   - knowledge.tech
@@ -230,7 +253,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/release_notes/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat build of Keycloak
@@ -240,6 +263,8 @@ sources:
       language: en
     include:
     - https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-connectivity-link-1-4
   tags:
   - knowledge.tech
@@ -248,7 +273,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Connectivity Link
@@ -257,7 +282,10 @@ sources:
       family: redhat-connectivity-link
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4/*
+    - https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-enterprise-linux-10
   tags:
   - knowledge.tech
@@ -266,7 +294,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Enterprise Linux
@@ -275,9 +303,12 @@ sources:
       family: redhat-rhel
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/*
+    - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/*
     exclude:
     - '*identity_management*'
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-identity-management-10
   tags:
   - knowledge.tech
@@ -286,7 +317,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/planning_identity_management/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Identity Management
@@ -299,6 +330,8 @@ sources:
     - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/*identity_management*
     exclude:
     - https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-openshift-ai-self-managed-3-5
   tags:
   - knowledge.tech
@@ -307,7 +340,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenShift AI
@@ -316,7 +349,10 @@ sources:
       family: redhat-openshift-ai
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/*
+    - https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-openshift-data-foundation-4-22
   tags:
   - knowledge.tech
@@ -325,7 +361,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenShift Data Foundation
@@ -334,7 +370,10 @@ sources:
       family: redhat-odf
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22/*
+    - https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-openshift-gitops-1-17
   tags:
   - knowledge.tech
@@ -343,7 +382,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenShift GitOps
@@ -353,6 +392,8 @@ sources:
       language: en
     include:
     - https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-openstack-platform-17-1
   tags:
   - knowledge.tech
@@ -361,7 +402,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenStack Platform
@@ -370,7 +411,10 @@ sources:
       family: redhat-openstack
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1/*
+    - https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-openstack-services-on-openshift-18-0
   tags:
   - knowledge.tech
@@ -379,7 +423,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat OpenStack Services on OpenShift
@@ -388,7 +432,10 @@ sources:
       family: redhat-openstack
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/*
+    - https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-quay-3-17
   tags:
   - knowledge.tech
@@ -418,7 +465,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_satellite/6.17
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Satellite
@@ -427,4 +474,7 @@ sources:
       family: redhat-satellite
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_satellite/6.17/*
+    - https://docs.redhat.com/en/documentation/red_hat_satellite/6.17/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_satellite/6.17/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
