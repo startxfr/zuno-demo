@@ -13,7 +13,7 @@
       - {"api_version": "claw.sandbox.redhat.com/v1alpha1", "kind": "Claw", "name": "assistant", "namespace": "zuno-claw-sale-01", "condition": "Ready"}
       - {"api_version": "external-secrets.io/v1beta1", "kind": "ExternalSecret", "name": "openclaw-client", "namespace": "zuno-claw-sale-01", "condition": "Ready"}
       - {"api_version": "external-secrets.io/v1beta1", "kind": "ExternalSecret", "name": "openclaw-ui", "namespace": "zuno-claw-sale-01", "condition": "Ready"}
-      - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name": "claw-operator.v0.0.227-commit-f5aa592", "namespace": "zuno-claw-consultant-02", "phase": "Succeeded"}
+      - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name_prefix": "claw-operator.v", "namespace": "zuno-claw-consultant-02", "phase": "Succeeded"}
 - name: "openclaw check | queue the golden-path probes"
   ansible.builtin.include_tasks: "{{ demo_lib }}/queue_probes.yml"
   vars:

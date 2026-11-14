@@ -11,6 +11,7 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
 - every backticked `oc`, `make`, `curl` or `git` command of a Do cell is covered by a `cmd`, a `page_text` or a
   `not_run` entry of its step file;
 - only the world-model directory names a MachineSet outside a read command, and nothing names `zuno-gpu-a` there;
+- a ClusterServiceVersion is read by `name_prefix`, never by its versioned name;
 - a page that has moved has `## Presenter lifecycle` with exactly `### Status` ... `### Uninstall`, none empty;
 - every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile). ADRs and roadmap records
   are history and are not read; a demo page that has not moved yet is not read; a retired verb may be named on a
@@ -143,6 +144,11 @@ def unit_problems(rel: str, tasks, changing: bool, variables: Dict[str, str], de
         ok, reason = readonly.check(cmd, names)
         if not ok:
             problems.append(f"{rel}: `{cmd}` is refused by readonly.py: {reason}")
+    for task in walk_tasks(tasks):
+        for entry in ((task.get("vars") or {}).get("cr_ready") or []) if isinstance(task.get("vars"), dict) else []:
+            if isinstance(entry, dict) and entry.get("kind") == "ClusterServiceVersion" and "name" in entry:
+                problems.append(f"{rel}: ClusterServiceVersion {entry['name']} is pinned by name: use `name_prefix` "
+                                "(an OLM upgrade renames it)")
     strings = list(_strings_outside_commands(tasks))
     if demo_id != "world-model" and any("machineset" in s.lower() for s in strings):
         problems.append(f"{rel}: names a MachineSet outside a read command (only world-model may)")

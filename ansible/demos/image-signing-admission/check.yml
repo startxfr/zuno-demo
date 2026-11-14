@@ -15,6 +15,6 @@
       - {"api_version": "batch/v1", "kind": "Job", "name": "supply-chain-verify-images", "namespace": "zuno-ai-build", "condition": "Complete"}
       - {"api_version": "config.openshift.io/v1", "kind": "ImageDigestMirrorSet", "name": "zuno-unifai-via-registry", "exists": true}
       - {"api_version": "config.openshift.io/v1", "kind": "ImageDigestMirrorSet", "name": "zuno-public-via-registry", "exists": true}
-      - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name": "rhtas-operator.v1.5.1", "namespace": "openshift-operators", "phase": "Succeeded"}
+      - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name_prefix": "rhtas-operator.v", "namespace": "openshift-operators", "phase": "Succeeded"}
 - name: "image-signing-admission check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

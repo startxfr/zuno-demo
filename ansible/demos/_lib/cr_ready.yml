@@ -7,16 +7,19 @@
 #   parents: <type>    - every parent that reports the condition reports it True, and one does (HTTPRoute:
 #                        Accepted; the Kuadrant policy controller adds a parent entry without it);
 #   exists: true       - the resource exists (GrafanaDashboard, OAuth, HardwareProfile...).
-# Vars: cr_ready ([{api_version, kind, name, namespace (omit when cluster-scoped), <mode>}]).
+# Vars: cr_ready ([{api_version, kind, name, namespace (omit when cluster-scoped), <mode>}]). `name_prefix` instead
+# of `name` matches every object whose name starts with it, and passes when one of them is in the expected state: a
+# ClusterServiceVersion is named after its version (rhtas-operator.v1.5.1), and an OLM upgrade renames it, leaving
+# the old one Replacing for a while.
 - name: "demo | read the custom resources"
   kubernetes.core.k8s_info:
     api_version: "{{ item.api_version }}"
     kind: "{{ item.kind }}"
     namespace: "{{ item.namespace | default(omit) }}"
-    name: "{{ item.name }}"
+    name: "{{ item.name | default(omit) }}"
   loop: "{{ cr_ready | default([]) }}"
   loop_control:
-    label: "{{ item.kind }} {{ item.namespace | default('-') }}/{{ item.name }}"
+    label: "{{ item.kind }} {{ item.namespace | default('-') }}/{{ item.name if item.name is defined else (item.name_prefix ~ '*') }}"
   register: _demo_crs
   failed_when: false
 
@@ -25,9 +28,17 @@
     demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
   loop: "{{ _demo_crs.results | default([]) }}"
   loop_control:
-    label: "{{ item.item.kind }} {{ item.item.namespace | default('-') }}/{{ item.item.name }}"
+    label: "{{ item.item.kind }} {{ item.item.namespace | default('-') }}/{{ _demo_label }}"
   vars:
-    _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_label: "{{ item.item.name if item.item.name is defined else (item.item.name_prefix ~ '*') }}"
+    _demo_candidates: >-
+      {{ (item.resources | default([])) if item.item.name is defined
+         else (item.resources | default([]) | selectattr('metadata.name', 'match', '^' ~ (item.item.name_prefix
+               | regex_escape)) | list) }}
+    _demo_in_phase: >-
+      {{ _demo_candidates | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto',
+         item.item.phase) | list if item.item.phase is defined else [] }}
+    _demo_obj: "{{ (_demo_in_phase + _demo_candidates) | first | default({}, true) }}"
     _demo_condition: "{{ item.item.condition | default('Ready') }}"
     _demo_expect: "{{ item.item.expect | default('True') | string }}"
     _demo_cond_status: >-
@@ -58,8 +69,10 @@
     _demo_row:
       agent: "{{ demo_id }}"
       layer: "{{ demo_unit.name }}"
-      id: "{{ item.item.kind | lower }}/{{ item.item.namespace | default('-') }}/{{ item.item.name }}"
+      id: "{{ item.item.kind | lower }}/{{ item.item.namespace | default('-') }}/{{ _demo_label }}"
       category: custom-resource
       passed: "{{ (_demo_obj | length > 0) and (_demo_ok | bool) }}"
-      detail: "{{ _demo_detail if _demo_obj else 'not found' }}"
+      detail: >-
+        {{ (((_demo_obj.metadata.name ~ ': ') if item.item.name is not defined else '') ~ _demo_detail)
+           if _demo_obj else 'not found' }}
       duration_ms: 0

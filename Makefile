@@ -143,8 +143,8 @@ DAY3_VERBS := test stresstest backup restore check admit run release scenario-fa
 # (ansible/demos/<id>/) through ansible/playbooks/demo_run.yml, then prints
 # the page section. golden-path and browser are the catalogue-wide checks
 # of ADR-0605/ADR-0606, dispatched here exactly as before. The WP-136
-# webinar verbs (check as a preflight, all-check, reset, step-1..5) are
-# gone from this list; WP-272 deletes their playbooks.
+# webinar verbs and their playbooks were retired by WP-272 (ADR-0616
+# clause 13); the GPU failover drill stays `make d3 scenario-failover-node`.
 DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse golden-path browser
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
@@ -797,8 +797,8 @@ d3: $(if $(DAY_VERB),credentials-check)
 
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
 # day1/d1/day2/d2/day3/d3/demo recipes read MAKECMDGOALS words 2 and 3
-# directly, so e.g. `make d0 check postgresql` or `make demo step-1`
-# needs "check"/"postgresql"/"step-1" to resolve to *something* as Make
+# directly, so e.g. `make d0 check postgresql` or `make demo step next`
+# needs "check"/"postgresql"/"next" to resolve to *something* as Make
 # goals without erroring as unknown targets.
 NOOP_WORDS := $(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS))
 $(NOOP_WORDS):

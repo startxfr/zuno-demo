@@ -327,6 +327,9 @@ def ready_entry(demo_id: str, r: dict) -> Tuple[Optional[str], Optional[str]]:
     if r.get("expected") and condition not in ("phase", "state") and r.get("now") is False:
         return None, f"{kind} {r['name']} {condition}: {r['expected']} on demo333, expected; not asserted"
     item: Dict[str, object] = {"api_version": r["api_version"], "kind": kind, "name": r["name"]}
+    csv_prefix = re.match(r"^(.*?\.v)\d", r["name"]) if kind == "ClusterServiceVersion" else None
+    if csv_prefix:
+        item = {"api_version": r["api_version"], "kind": kind, "name_prefix": csv_prefix.group(1)}
     if r.get("ns"):
         item["namespace"] = r["ns"]
     if condition is None:

@@ -46,6 +46,16 @@ class Repository(unittest.TestCase):
             for rel in scaffold.plan_demo(entry, ROOT, {}, {}, readme, scaffold.probe_names(ROOT)):
                 self.assertTrue((catalogue.demo_dir(entry.id, ROOT) / rel).exists(), f"{entry.id}/{rel}")
 
+    def test_scaffolder_reads_a_csv_by_prefix(self):
+        item, why = scaffold.ready_entry("x", {"api_version": "operators.coreos.com/v1alpha1",
+                                               "kind": "ClusterServiceVersion", "ns": "openshift-operators",
+                                               "name": "claw-operator.v0.0.227-commit-f5aa592",
+                                               "condition": "Succeeded", "now": True})
+        self.assertIsNone(why)
+        self.assertIn('"name_prefix": "claw-operator.v"', item)
+        self.assertIn('"phase": "Succeeded"', item)
+        self.assertNotIn('"name":', item)
+
     def test_demo_verbs_come_from_the_makefile(self):
         verbs = consistency.demo_verbs(ROOT)
         self.assertIn("rehearse", verbs)
@@ -123,6 +133,13 @@ class Negative(unittest.TestCase):
         found = self.found()
         self.assertTrue(any("names a MachineSet" in p for p in found))
         self.assertTrue(any("names zuno-gpu-a" in p for p in found))
+
+    def test_csv_pinned_by_name(self):
+        (self.demo / "check.yml").write_text(
+            '- ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"\n  vars:\n    cr_ready:\n'
+            '      - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", '
+            '"name": "x-operator.v1.2.3", "namespace": "y", "phase": "Succeeded"}\n')
+        self.assertTrue(any("pinned by name: use `name_prefix`" in p for p in self.found()))
 
     def test_lifecycle_sections(self):
         text = self.page.read_text().replace("### Stop\n\nNothing to do.\n\n", "")
