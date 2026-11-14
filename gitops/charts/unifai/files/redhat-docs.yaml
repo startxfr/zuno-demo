@@ -397,7 +397,7 @@ sources:
   web:
     urls:
     - https://docs.redhat.com/en/documentation/red_hat_quay/3.17
-    crawl: redhat-docs
+    crawl: site
     maxPages: 50
     metadata:
       product: Red Hat Quay
@@ -406,7 +406,10 @@ sources:
       family: redhat-quay
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/red_hat_quay/3.17/*
+    - https://docs.redhat.com/en/documentation/red_hat_quay/3.17/html/*
+    - https://docs.redhat.com/en/documentation/red_hat_quay/3.17/html-single/*
+    rewrites:
+    - {match: '^(https://docs\.redhat\.com)/documentation/', replace: '\1/en/documentation/'}
 - name: rh-red-hat-satellite-6-17
   tags:
   - knowledge.tech
