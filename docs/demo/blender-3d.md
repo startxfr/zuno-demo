@@ -56,27 +56,139 @@ Other identities: `eval-ai-dev-01`, an evaluation copy with the groups `/ocp-ai-
 golden-path probe `blender` signs it in by the device flow with no human
 ([`evaluations/blender/device_login.py`](../../evaluations/blender/device_login.py)). It never signs in on stage.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] The add-on is installed on the presenter's laptop and the preflight is done: see
-  [Appendix C - Setup](#appendix-c---setup).
-- [ ] **ai-dev-01**, password in Vault at `keycloak/demo-personas`. Use one browser profile for the device sign-in and
-  sign out of any other Keycloak session in it first:
+`make demo use blender-3d 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/blender-3d/<action>.yml`) has run, and
+says what is left to the presenter. The platform side is already live on demo333: the only thing this demo installs is
+the add-on on the presenter's workstation. Credentials are named by their Vault path, never written.
+
+### Status
+
+Nothing to do when it passes. The file reads, without changing anything: the Route
+`zuno-agent-gateway-workstation-ai-gateway` (namespace `openshift-ingress`), the HTTPRoute `ai-gateway-workstation`, the
+AuthPolicy `ai-gateway-workstation-jwt` and the RateLimitPolicy `ai-gateway-workstation` (all Accepted and Enforced),
+the Deployment `ai-gateway`, the models `gpt-oss-20b` and `qwen35-9b` (Ready), and the Applications
+`zuno-connectivity-link-d1` and `zuno-ai-gateway-d1`. If one is missing, stop and tell the platform owner: this demo
+never installs the entry. By hand, the same reads:
+
+```bash
+oc get llminferenceservice -n zuno-ai-run                                       # gpt-oss-20b and qwen35-9b Ready
+oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   # Accepted and Enforced
+```
+
+What the platform entry is made of (WP-244, all delivered by commits and Argo CD, nothing applied by hand,
+[ADR-0608](../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md)):
+
+| Change | Where | Applied by |
+|---|---|---|
+| Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper (audience `zuno-admin-api`) | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
+| `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
+| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for `zuno-agent-gateway` | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
+| Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group `ocp-ai-dev`), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, turned on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
+| Experience client `blender`, task `bpy`, `models.preferred: [reasoning, default]` (`gpt-oss-20b` first), no tools, C3 | [`experience-clients/blender/`](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/client.okf.md) in zuno-demo-agents | the agents release and its promotion |
+
+The ai-gateway's per-persona token budgets apply on top of the entry's request rate.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `blender`
+(`ONLY=blender make demo golden-path`, see [golden-path.md](golden-path.md)). The probe signs in as `eval-ai-dev-01` by
+the device flow with no human, so it never uses the stage account. It proves the entry, the token, the C3 floor and a
+local answer, not the add-on on the laptop. Run it within the hour before the session. If it fails, see
+[If something goes wrong](#if-something-goes-wrong) and tell the platform owner.
+
+### Install
+
+The platform entry is only verified here (see Status), never installed. What the presenter installs is the add-on, on
+their own workstation, once (about 10 minutes). Nothing is installed on the cluster.
+
+Prerequisites on the workstation:
+
+- Blender 4.2 LTS or newer (4.0 works). It ships Python with `certifi`, which the add-on uses for TLS. Measured
+  headless on 4.2.3; run by the presenter on 5.2.0 LTS on 2026-11-07.
+- HTTPS reach to `https://ai-gateway.apps.<cluster-domain>` and to Keycloak `https://keycloak.apps.<cluster-domain>`.
+- A `zuno` account in an admitted group (demo333: `ocp-ai-dev`); for the demo, the persona **ai-dev-01**, password in
+  Vault at `keycloak/demo-personas`.
+- Only on a cluster whose routes do not serve the Let's Encrypt wildcard
+  ([ADR-0211](../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md)): the cluster's CA
+  certificate as a PEM file, set in **CA file**. Never disable certificate verification instead. demo333 needs none.
+
+Install or update the add-on by hand, from the repository root:
+
+```bash
+bash evaluations/blender/install_addon.sh --dry-run   # copies nothing, prints what it would do
+bash evaluations/blender/install_addon.sh
+```
+
+The script fetches `origin/devel`, copies [zuno_3d_generator.py](../../evaluations/blender/zuno_3d_generator.py) into
+the Blender user folder and prints its version and checksum. Then close Blender completely and reopen it. If the
+add-on is not listed, use **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, and tick
+**Zuno 3D generator (demo)**. In the 3D Viewport press **N**, tab **Zuno 3D**: **Cluster domain** is already
+`apps.demo333.startx.fr`. Leave **Gateway override** and **Issuer override** empty (tick **Advanced** to see them).
+Keycloak runs in internal mode on demo333 since 2026-11-09, so the defaults are right. The overrides live in the
+scene, not in the preferences. Details, tests and the measurement:
+[evaluations/blender/README.md](../../evaluations/blender/README.md).
+
+### Start
+
+Nothing is warmed by the file: the add-on signs in as a person. The preflight takes about 3 minutes, before the
+session. What only a person does:
+
+- [ ] In the browser profile used for the device sign-in, sign out of any Keycloak session:
   `https://keycloak.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout`. The device sign-in reuses an
   open session, and a session of a user outside `ocp-ai-dev` gets 403.
-- [ ] Starting state: Blender full screen, Layout workspace, empty scene, **Material Preview** shading, tab **Zuno 3D**
-  open and **Signed in**, prompt 1 in the prompt field (it is the add-on's default text).
-- [ ] The model is warm: the preflight generated prompt 1 once. `gpt-oss-20b` is Ready:
+- [ ] Blender, tab **Zuno 3D**: **Sign in**, **Open sign-in page**, sign in as **ai-dev-01** (password in Vault at
+  `keycloak/demo-personas`), accept the grant page. The panel shows **Signed in**. The session holds for the morning:
+  the add-on refreshes the access token.
+- [ ] Warm the model: generate the first stage prompt once, **Run script**, then **Ctrl+Z** and clear the text. The
+  scene is empty again and the add-on stays signed in. `gpt-oss-20b` must be Ready:
   `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`.
-- [ ] Known on screen: an F12 render comes out dark. The scripts add no light. Stay in the viewport.
-- [ ] Golden-path probe `blender` passed within the last hour (`ONLY=blender make demo golden-path`), see
-  [golden-path.md](golden-path.md).
+- [ ] Set the 3D Viewport's shading to **Material Preview** (Z, then Material Preview): the generated materials show
+  their colours there.
+- [ ] Starting state: Blender full screen, Layout workspace, empty scene, **Material Preview** shading, tab **Zuno 3D**
+  open and **Signed in**, prompt 1 in the prompt field (it is the add-on's default text), the **Scripting** workspace
+  one click away.
+- [ ] Known on screen, not a failure: an F12 render comes out dark. The scripts add no light. Do not render, stay in
+  the viewport.
 - [ ] 15-minute version:
   - [ ] a second browser profile with Grafana, signed in as **ai-ops-01**, dashboard **Zuno Platform / Five
     experiences**, time range last 1 hour, `client` = `blender`;
   - [ ] a terminal logged in with `oc` as **paas-ops-01**, large font;
   - [ ] the task sheet opened at
     [experience-clients/blender/tasks/bpy.md](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/tasks/bpy.md).
+
+Monitoring during a session:
+
+- Grafana, dashboard **Zuno Platform / Five experiences**, `client` = `blender`: calls, tokens, errors per persona.
+- Tempo: `model_call` spans of the session, with `zuno.client`, `zuno.classification`, `zuno.provider`.
+- ai-gateway logs with a time window, not a line count:
+  `oc logs -n zuno-ai-run deploy/ai-gateway -c ai-gateway --since=30m`.
+
+### Stop
+
+Nothing is cleaned on the cluster. In Blender, click **Sign out** in the add-on (it drops the tokens from memory), then
+close Blender without saving. Tokens are never written to the `.blend` file. Close the Grafana profile and the
+terminal. To sign out of Keycloak, use the logout URL of Start.
+
+### Uninstall
+
+Removes the add-on from the workstation only:
+
+```bash
+bash evaluations/blender/install_addon.sh --remove
+```
+
+The platform entry stays: it is shared and never removed by this demo.
+
+**Owner action, never run by the lifecycle.** Closing the platform entry is a platform change. Set
+`workstationEntry.enabled: false` in `gitops/apps/connectivity-link/application-d1.yaml`, push it, then run
+`make d1 install connectivity-link` (the role applies that Application, so a push alone does nothing). Argo CD prunes
+the four entry objects and the edge answers 503. Back with `true` and the same command. Each way takes 2 to 3 minutes,
+tested on 2026-11-12 ([WP-249 evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md)). The
+Keycloak client `blender` stays: without the entry it reaches nothing from outside the cluster. Do not `oc delete`
+the objects: Argo CD would recreate them, or the repository and the cluster would drift. See
+[rollback.md](rollback.md) and [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md).
 
 ## 5-minute version
 
@@ -131,7 +243,7 @@ Run the 5-minute version, then:
 | The panel says "session expired: sign in again" or "Signed out" | **Sign in** again: the code shows in the panel, about 20 s in the browser. Then retry. | |
 | "Script failed, nothing kept" | Nothing is left in the scene. Switch to the mug. | "The model wrote an API call that does not exist. The add-on refused to keep half an object." |
 | "Refused: ..." | Show that line, then switch to a backup prompt. | "The check stopped the script before it ran: this is the safety the demonstration is about." |
-| 403 after signing in | The device sign-in reused a browser session of a persona outside `ocp-ai-dev`. Not fixable on stage: show the scene built at the preflight. Afterwards, sign out of Keycloak (URL in "Before you start") and sign in again as **ai-dev-01**. | "The door admits AI developers only. I signed in with the wrong account." |
+| 403 after signing in | The device sign-in reused a browser session of a persona outside `ocp-ai-dev`. Not fixable on stage: show the scene built at the preflight. Afterwards, sign out of Keycloak (URL in [Start](#start)) and sign in again as **ai-dev-01**. | "The door admits AI developers only. I signed in with the wrong account." |
 | The device sign-in or the workstation network fails | Sign in during the preflight, not on stage. Fallback: the scene built at the preflight. | |
 | 429 | The entry's limit of 60 requests per user per 5 minutes is reached. Wait, or show the scene built at the preflight. | "That is the rate limit at the door." |
 | 503 from `ai-gateway.apps.demo333.startx.fr` | The workstation entry is switched off (rollback). Check `oc get httproute ai-gateway-workstation -n zuno-ai-run`. Not fixable on stage. | |
@@ -256,90 +368,3 @@ flowchart LR
   OKF["Agents release<br/>experience client blender, task bpy<br/>no tools, external roles forbidden"] -.-> AIGW
   AIGW -->|"3. bpy script, streamed"| CHECK --> RUN
 ```
-
-## Appendix C - Setup
-
-Installation and preflight on the presenter's side. The platform side is already live on demo333.
-
-### Platform changes (WP-244, through GitOps)
-
-Everything below lands as commits and is synced by Argo CD
-([ADR-0608](../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md)). Nothing is applied by hand.
-
-| Change | Where | Applied by |
-|---|---|---|
-| Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper (audience `zuno-admin-api`) | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
-| `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
-| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for `zuno-agent-gateway` | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
-| Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group `ocp-ai-dev`), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, turned on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
-| Experience client `blender`, task `bpy`, `models.preferred: [reasoning, default]` (`gpt-oss-20b` first), no tools, C3 | [`experience-clients/blender/`](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/client.okf.md) in zuno-demo-agents | the agents release and its promotion |
-
-The ai-gateway's per-persona token budgets apply on top of the entry's request rate.
-
-Read-only checks once synced:
-
-```bash
-oc get llminferenceservice -n zuno-ai-run                       # gpt-oss-20b and qwen35-9b Ready
-oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   # Accepted and Enforced
-```
-
-### Workstation prerequisites
-
-- Blender 4.2 LTS or newer (4.0 works). It ships Python with `certifi`, which the add-on uses for TLS. Measured
-  headless on 4.2.3; run by the presenter on 5.2.0 LTS on 2026-11-07.
-- HTTPS reach to `https://ai-gateway.apps.<cluster-domain>` and to Keycloak `https://keycloak.apps.<cluster-domain>`.
-- A `zuno` account in an admitted group (demo333: `ocp-ai-dev`); for the demo, the persona **ai-dev-01**.
-- Only on a cluster whose routes do not serve the Let's Encrypt wildcard
-  ([ADR-0211](../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md)): the cluster's CA
-  certificate as a PEM file, set in **CA file**. Never disable certificate verification instead. demo333 needs none.
-
-### Install the add-on (once, about 10 minutes)
-
-The presenter prepares their own laptop. Nothing is installed on the cluster for this step.
-
-1. Install Blender (see above).
-2. Download the add-on [evaluations/blender/zuno_3d_generator.py](../../evaluations/blender/zuno_3d_generator.py) (on
-   GitHub, branch `devel`: open the file, **Raw**, save it).
-3. Blender: **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, pick the file, tick
-   **Zuno 3D generator (demo)**.
-4. In the 3D Viewport press **N**, tab **Zuno 3D**. **Cluster domain** is already `apps.demo333.startx.fr`.
-5. Keep the add-on current: `bash evaluations/blender/install_addon.sh` fetches `origin/devel`, copies the add-on into
-   the Blender user folder and prints its version and checksum (`--dry-run` copies nothing). Then close Blender
-   completely and reopen it.
-6. Leave **Gateway override** and **Issuer override** empty (tick **Advanced** to see them). Keycloak runs in internal
-   mode on demo333 since 2026-11-09, so the defaults are right. The overrides live in the scene, not in the
-   preferences.
-
-Details, tests and the measurement: [evaluations/blender/README.md](../../evaluations/blender/README.md).
-
-### Preflight (about 3 minutes, before the session)
-
-1. In the browser profile used for the device sign-in, sign out of any Keycloak session:
-   `https://keycloak.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout`. The device sign-in reuses an
-   open session, and a session of a user outside `ocp-ai-dev` gets 403.
-2. Blender, tab **Zuno 3D**: **Sign in**, **Open sign-in page**, sign in as **ai-dev-01**, accept the grant page. The
-   panel shows **Signed in**. The session holds for the morning: the add-on refreshes the access token.
-3. Generate the first stage prompt once (it warms the model), **Run script**, then **Ctrl+Z** and clear the text. The
-   scene is empty again and the add-on stays signed in.
-4. Set the 3D Viewport's shading to **Material Preview** (Z, then Material Preview): the generated materials show
-   their colours there. Do not render (F12): the scripts add no light, so a render comes out dark.
-5. Leave Blender open on the 3D Viewport with the **Zuno 3D** tab, and the **Scripting** workspace one click away.
-
-### Monitoring during a session
-
-- Grafana, dashboard **Zuno Platform / Five experiences**, `client` = `blender`: calls, tokens, errors per persona.
-- Tempo: `model_call` spans of the session, with `zuno.client`, `zuno.classification`, `zuno.provider`.
-- ai-gateway logs with a time window, not a line count:
-  `oc logs -n zuno-ai-run deploy/ai-gateway -c ai-gateway --since=30m`.
-
-### Rollback and decommissioning
-
-- **Platform side:** set `workstationEntry.enabled: false` in `gitops/apps/connectivity-link/application-d1.yaml` and
-  run `make d1 install connectivity-link`. The role applies that Application, so a push alone does nothing. Argo CD
-  prunes the four entry objects and the edge answers 503. Back with `true` and the same command. Each way takes 2 to 3
-  minutes, tested on 2026-11-12 ([WP-249 evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md)).
-  The Keycloak client `blender` stays: without the entry it reaches nothing from outside the cluster. See
-  [rollback.md](rollback.md) and [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md).
-- Do not `oc delete` the objects: Argo CD would recreate them, or the repository and the cluster would drift.
-- **Workstation:** click **Sign out** (drops the tokens from memory), then remove the add-on (**Edit > Preferences >
-  Add-ons**) or close Blender without saving. Tokens are never written to the `.blend` file.
