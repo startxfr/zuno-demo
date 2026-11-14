@@ -37,7 +37,7 @@ For each demo below, in the order given:
 - `external-models`: the `export MAAS=...` of the page becomes a variable resolved by the step file from the route; Check = the ExternalModels, MaaSModelRefs, subscriptions and auth policies.
 - `genai-playground`: Start = two browser windows (human); Check = the OGXServer, `genai-pgvector`, the MCP server entry, the DSC conditions.
 - `lora-pipeline-mlflow-kueue`: Check = the DSPA (its `Ready=False` of 2026-11-13 is a known failure the page names), `trainjob_evidence`, MLflow; the day-before `make d3 run mlops` is a changing unit, run only with the owner's go.
-- `maas-portal-api-keys`: Start creates the presenter's key (changing unit; the key is never printed), Stop revokes it; Check = MaaS conditions and `gpt-oss-20b` Ready.
+- `maas-portal-api-keys`: the live key creation at 1:00 is the demo's proof, so Start creates no key (corrected 2026-11-14 against the page: the page is the source of truth); the paste into `MAAS_API_KEY` stays manual; Stop tells the presenter to revoke by hand the key created live; Check = MaaS conditions and `gpt-oss-20b` Ready.
 - `model-catalog-registry`: Check = the catalog reads; the registry part stays "not show-ready" while no `ModelRegistry` exists.
 - `model-serving-llmd-mig`: every step is a read; `make d2 reconcile models` is owner-only and never on stage (`not_run`).
 
