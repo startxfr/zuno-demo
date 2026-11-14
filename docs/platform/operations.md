@@ -269,7 +269,8 @@ to both pgBackRest repositories (repo1, the local PVC, and repo2, S3), and PGO's
 --stanza=db archive-get %f "%p"`, no `--repo`) refuses a segment it finds under two different archive ids. That happens
 when repo2's stanza has a longer database history than repo1: every database bootstrapped empty onto an existing repo2
 path adds a history entry there, while repo1 (a fresh PVC) starts at 1. Check it with `pgbackrest --stanza=db info` in
-the `zuno-postgresql-repo-host-0` pod: the `archive` lines of repo1 and repo2 must show the same id (`18-1`). Seen on
+the `zuno-postgresql-repo-host-0` pod: the `archive` lines of repo1 and repo2 must show the same id (`18-1`).
+`make d3 check postgresql` compares them and fails when they differ. Seen on
 demo333 on 2026-11-13, when repo2 (`zuno-demo222-backups/postgresql`) carried 13 histories (`18-13`).
 
 Durable fix, applied on demo333 on 2026-11-14: move repo2 to a fresh path, so its stanza starts at the same id as repo1.

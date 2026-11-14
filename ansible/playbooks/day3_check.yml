@@ -90,6 +90,22 @@
         label: "{{ _precheck_component }}"
       when: (selected_precheck_components | length) > 0
 
+    # The two pgBackRest repositories must give the database the same archive
+    # id, or PGO's restore_command fails with [045] on every WAL segment
+    # (docs/platform/operations.md). Kept out of the role's precheck.yml,
+    # which only detects state and never fails, and which day0_check also runs.
+    - name: Check the PostgreSQL archive ids
+      when: target_component | default('all') in ['postgresql', 'all']
+      block:
+        - name: "day3-check | pgBackRest repo1 and repo2 archive ids"
+          ansible.builtin.include_role:
+            name: postgresql
+            tasks_from: check_archive_ids
+      rescue:
+        - name: "day3-check | record the archive-id check as failed"
+          ansible.builtin.set_fact:
+            _precheck_failed_components: "{{ (_precheck_failed_components | default([])) + ['postgresql'] }}"
+
     # ADR-0568/WP-149: UnifAI's backups are checked in S3 (a recent MongoDB
     # archive and Qdrant run). Kept out of day3_precheck_components because its
     # role precheck.yml also runs outside a Day 3 check.

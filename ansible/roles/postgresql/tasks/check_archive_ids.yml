@@ -1,0 +1,251 @@
+---
+# The two pgBackRest repositories must give the current database the same
+# archive id (repo1 the local PVC, repo2 S3). When they do not, PGO's
+# restore_command (`pgbackrest --stanza=db archive-get %f "%p"`, no --repo)
+# refuses every WAL segment it finds under both ids with "[045] duplicates
+# found", and a replica that has to replay the archive never catches up.
+# It stays silent until that moment: the archive, the backups and the
+# streaming replicas all look healthy. Seen on demo333 on 2026-11-13, where
+# repo2 carried 13 database histories (18-13) and repo1 one (18-1); fixed on
+# 2026-11-14 by moving repo2 to a fresh path. The cause and the procedure
+# are in "A PostgreSQL replica stuck in archive recovery",
+# docs/platform/operations.md.
+#
+# Called from `make d3 check postgresql` (ansible/playbooks/day3_check.yml).
+# Fails only on a proven mismatch. Anything that prevents reading both
+# repositories is reported as "couldn't tell" and does not fail.
+#
+# No pods/exec: the check identity (aap-day0-check) cannot exec into
+# zuno-data. A throwaway Job reads both repositories the way PGO's own backup
+# Jobs do: the operator-generated pgbackrest_instance.conf (repo1 through the
+# repo host's TLS server on 8432, which the sidecar does not intercept; repo2
+# on S3) with PGO's client certificate.
+#
+# Counter-test, to tell a working check from a dead one: point repo2 at a
+# path with another history, which must FAIL. Until the old path is deleted
+# (2026-11-15):
+#   make d3 check postgresql EXTRA_VARS='-e zuno_postgresql_archive_check_repo2_path=/postgresql'
+
+- name: "postgresql | look up the PostgresCluster for the archive-id check"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _pg_archive_cluster
+
+- name: "postgresql | decide whether there are two repositories to compare"
+  ansible.builtin.set_fact:
+    _pg_archive_has_repo2: >-
+      {{
+        (_pg_archive_cluster.resources | default([]) | length) > 0
+        and ((_pg_archive_cluster.resources[0].spec.backups.pgbackrest.repos | default([]))
+             | selectattr('name', 'equalto', 'repo2') | list | length) > 0
+      }}
+    _pg_archive_ids: {}
+    _pg_archive_check_ran: false
+
+- name: "postgresql | report that there is nothing to compare"
+  ansible.builtin.debug:
+    msg: >-
+      pgBackRest archive ids: not compared - {{ 'no zuno-postgresql PostgresCluster'
+      if (_pg_archive_cluster.resources | default([]) | length) == 0
+      else 'repo1 is the only repository (no repo2)' }}.
+  when: not (_pg_archive_has_repo2 | bool)
+
+- name: "postgresql | read both repositories' archive ids"
+  when: _pg_archive_has_repo2 | bool
+  block:
+    - name: "postgresql | read the repo host's pgBackRest image"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-data
+        name: zuno-postgresql-repo-host-0
+      register: _pg_archive_repo_host
+
+    - name: "postgresql | pick the same pgBackRest image as the repo host"
+      ansible.builtin.set_fact:
+        _pg_archive_image: >-
+          {{ (_pg_archive_repo_host.resources[0].spec.containers
+              | selectattr('name', 'equalto', 'pgbackrest') | list | first).image }}
+
+    - name: "postgresql | delete any previous archive-id check Job"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: zuno-postgresql-check-archive-ids
+        namespace: zuno-data
+        wait: true
+
+    - name: "postgresql | run the archive-id check Job"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: zuno-postgresql-check-archive-ids
+            namespace: zuno-data
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          spec:
+            backoffLimit: 1
+            activeDeadlineSeconds: 180
+            template:
+              metadata:
+                annotations:
+                  sidecar.istio.io/inject: "false"
+              spec:
+                restartPolicy: Never
+                priorityClassName: zuno-platform-weak
+                containers:
+                  - name: pgbackrest-info
+                    image: "{{ _pg_archive_image }}"
+                    command:
+                      - pgbackrest
+                    args: >-
+                      {{
+                        ['info', '--stanza=db', '--output=json',
+                         '--log-level-console=off', '--log-level-stderr=error', '--log-level-file=off']
+                        + (['--repo2-path=' ~ zuno_postgresql_archive_check_repo2_path]
+                           if (zuno_postgresql_archive_check_repo2_path | default('')) | length > 0 else [])
+                      }}
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop: ["ALL"]
+                      runAsNonRoot: true
+                      readOnlyRootFilesystem: true
+                    volumeMounts:
+                      - name: pgbackrest-config
+                        mountPath: /etc/pgbackrest/conf.d
+                        readOnly: true
+                      - name: tmp
+                        mountPath: /tmp
+                volumes:
+                  # The same three sources as PGO's backup Job, with the
+                  # instance config (repo1 through the repo host) instead of
+                  # the cloud one (repo2 only).
+                  - name: pgbackrest-config
+                    projected:
+                      sources:
+                        - secret:
+                            name: zuno-postgresql-backup-s3
+                        - configMap:
+                            name: zuno-postgresql-pgbackrest-config
+                            items:
+                              - key: pgbackrest_instance.conf
+                                path: pgbackrest_instance.conf
+                        - secret:
+                            name: zuno-postgresql-pgbackrest
+                            items:
+                              - key: pgbackrest.ca-roots
+                                path: "~postgres-operator/tls-ca.crt"
+                              - key: pgbackrest-client.crt
+                                path: "~postgres-operator/client-tls.crt"
+                              - key: pgbackrest-client.key
+                                path: "~postgres-operator/client-tls.key"
+                                mode: 384
+                  - name: tmp
+                    emptyDir:
+                      sizeLimit: 16Mi
+
+    - name: "postgresql | wait for the archive-id check Job to reach a terminal state"
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-data
+        name: zuno-postgresql-check-archive-ids
+      register: _pg_archive_job
+      until: >-
+        (_pg_archive_job.resources[0].status.succeeded | default(0)) > 0 or
+        (_pg_archive_job.resources[0].status.conditions | default([])
+          | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
+      # Longer than the Job's own activeDeadlineSeconds (180 s).
+      retries: 24
+      delay: 10
+
+    - name: "postgresql | find the archive-id check pod"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-data
+        label_selectors:
+          - "job-name=zuno-postgresql-check-archive-ids"
+      register: _pg_archive_pods
+
+    - name: "postgresql | read the archive-id check output"
+      kubernetes.core.k8s_log:
+        namespace: zuno-data
+        name: "{{ (_pg_archive_pods.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}"
+        container: pgbackrest-info
+      register: _pg_archive_log
+      when:
+        - (_pg_archive_job.resources[0].status.succeeded | default(0)) > 0
+        - (_pg_archive_pods.resources | default([]) | length) > 0
+
+    # The current archive id of a repository is <PostgreSQL version>-<its
+    # highest db history id>: `stanza-upgrade` adds a history entry to every
+    # repository at once, so two repositories serving the same database
+    # agree unless one of them carries histories the other does not.
+    - name: "postgresql | compute each repository's current archive id"
+      ansible.builtin.set_fact:
+        _pg_archive_ids: >-
+          {% set st = (_pg_archive_log.log | from_json) | first -%}
+          {% set out = {} -%}
+          {% for key in st.db | map(attribute='repo-key') | unique -%}
+          {%   set cur = st.db | selectattr('repo-key', 'equalto', key) | sort(attribute='id') | last -%}
+          {%   set _ = out.update({'repo' ~ key: cur.version ~ '-' ~ cur.id ~ ' (system-id ' ~ cur['system-id'] ~ ')'}) -%}
+          {% endfor -%}
+          {{ out }}
+        _pg_archive_check_ran: true
+      when: _pg_archive_log.log is defined
+
+  rescue:
+    - name: "postgresql | report that the archive ids could not be read"
+      ansible.builtin.debug:
+        msg: >-
+          pgBackRest archive ids: COULD NOT READ both repositories (Job,
+          permissions or connectivity - see the task output above). This is
+          "couldn't tell", not a pass.
+
+  always:
+    - name: "postgresql | delete the archive-id check Job (throwaway, not GitOps-tracked)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: zuno-postgresql-check-archive-ids
+        namespace: zuno-data
+        delete_options:
+          propagationPolicy: Background
+        wait: false
+      failed_when: false
+
+- name: "postgresql | report the repositories' archive ids"
+  ansible.builtin.debug:
+    msg: >-
+      {% if not (_pg_archive_check_ran | bool) -%}
+      pgBackRest archive ids: not compared (see above).
+      {%- elif (_pg_archive_ids.values() | map('regex_replace', ' .*$', '') | unique | list | length) == 1
+               and (_pg_archive_ids | length) >= 2 -%}
+      pgBackRest archive ids agree: {{ _pg_archive_ids }} - archive-get without --repo works.
+      {%- else -%}
+      pgBackRest archive ids DIFFER: {{ _pg_archive_ids }} - PGO's restore_command
+      fails with [045] on every segment. Fix: "A PostgreSQL replica stuck in
+      archive recovery" in docs/platform/operations.md.
+      {%- endif %}
+  when: _pg_archive_has_repo2 | bool
+
+- name: "postgresql | fail when the repositories' archive ids differ"
+  ansible.builtin.fail:
+    msg: >-
+      pgBackRest repo1 and repo2 give the current database different archive
+      ids ({{ _pg_archive_ids }}): a replica or restore that reads the archive
+      will fail with [045]. See "A PostgreSQL replica stuck in archive recovery"
+      in docs/platform/operations.md.
+  when:
+    - _pg_archive_has_repo2 | bool
+    - _pg_archive_check_ran | bool
+    - (_pg_archive_ids | length) < 2
+      or (_pg_archive_ids.values() | map('regex_replace', ' .*$', '') | unique | list | length) > 1
