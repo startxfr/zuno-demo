@@ -1,6 +1,6 @@
 # WP-271: Scaffold every demo directory and the catalogue check
 
-- **State:** Not started
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-270](wp-270-build-the-make-demo-lifecycle-engine.md)
 - **Related:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md), [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md)
@@ -44,3 +44,27 @@ and CI fails as soon as a page and its files disagree.
 
 - 36 directories exist; the test passes; removing one step file or adding one timed row to a page makes it fail.
 - `make demo list` shows the 36 demos with their step counts.
+
+## Result (2026-11-15)
+
+Built by zuno-demo-reorg-coder, reviewed and merged by zuno-demo-reorg.
+
+- First commit, the four review findings of WP-270: the `$(`/`${`/backtick check reads quotes like a shell (vault-pki
+  1:00 `awk '{print $(NF-1)}'` runs), `strip_watch_flags` never raises, any `<...>` holding letters, digits or colons
+  is a placeholder, and `$NAME` arguments come from the manifest's `env:`, the step's `demo_env` or a command's
+  `env:` (passed in the environment, one argv element each, masked when the name holds KEY, TOKEN, PASSWORD or
+  SECRET), else the read is refused. 149 of the 152 live-proven Do commands pass; the other three are resolved in
+  their step files.
+- `platform/demo/scaffold.py` (idempotent, never overwrites) generated 36 directories, 684 files: for each of the 30
+  scenarios a manifest, six action files and one step file per timed row (432 steps); for each of the 6 workshops a
+  manifest (`agenda: []`, WP-280) and six `nothing_to_run` actions. Status and check files are pre-filled from the
+  demo333 session's live inventory of 2026-11-14 (Applications, workloads, Routes, Ready conditions with the `phase`,
+  `state`, `parents` and `exists` modes, probes, browser checks); the DataScienceCluster's overall Ready and
+  TrustyAIReady are never asserted (the parked `zuno-guardrails-smoke`). Step files carry the dry-run verdict of each
+  read.
+- `platform/demo/consistency.py` and `test_demo_catalogue.py` (18 tests, in CI) keep pages and files together: 0
+  problems on devel and on the writer's migrated tree.
+- Live, read-only: the 30 status files pass on demo333; `make demo rehearse service-mesh-kiali 5` ended `RESULT: PASS`.
+- Follow-up carried by WP-272: the three operator CSV checks pin an exact version name; they move to a name-prefix
+  check so an OLM upgrade does not fail them.
+
