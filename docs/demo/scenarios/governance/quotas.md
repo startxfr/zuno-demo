@@ -75,22 +75,64 @@ Other identities:
 - The Keycloak client `zuno-stresstest` is the only trusted platform client on demo333: only it may pick a class with
   the `X-Zuno-Quota-Class` header.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] No golden-path probe covers this scenario: rehearse it the same day.
+`make demo use quotas 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/quotas/<action>.yml`) has run, and says
+what is left to the presenter. Only `start` changes anything, and it changes a unit the manifest declares: it spends
+a persona's token budget (see Start).
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1`, the Deployment
+`ai-gateway` and its quota environment (`QUOTA_LEDGER_STORE=redis`, `QUOTA_FAIL_MODES_ENFORCED=true`,
+`QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `PERSONA_CLAIM_CLIENTS`, and no
+`QUOTA_STRESSTEST_GROUP`), the StatefulSet `zuno-redis-master` with its volume, the MaaS subscription
+`gpt-oss-20b-ai-gateway`, Grafana, Tempo and the local models. If one is missing or not Healthy, stop and tell the
+platform owner: this demo installs nothing. If `QUOTA_STRESSTEST_GROUP` is set, an old replay was not reverted: tell
+the platform owner before the session.
+
+### Check
+
+Nothing to do when it passes. This page has no golden-path probe: rehearse it the same day. The file runs reads only,
+the same as the 6:30 row of the 15-minute version. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The quota ledger is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file spends **sale-01**'s token budget, a few hours before the session: one question in Open WebUI and one through
+its OpenClaw assistant ([OpenClaw scenario](../experiences/openclaw.md)), so the Grafana panel and the trace have
+something to show. This is a changing unit, declared in the manifest. The command shows it and asks you to type the
+demo id `quotas`. Run it hours before the session, not on stage: the spend is not undone, and the 24-hour window of
+the budget restarts at 00:00 UTC. What only a person does:
+
 - [ ] Grafana in a browser profile signed in as **ai-ops-01** (OpenShift sign-in), dashboard **Zuno Platform / Five
   experiences**, time range last 24 hours, `client` = All.
-- [ ] A few hours before the session, use **sale-01** once in Open WebUI and once through its OpenClaw assistant
-  ([OpenClaw scenario](../experiences/openclaw.md)), so the panel and the trace have something to show.
 - [ ] Keep the 2026-11-03 evidence open: [WP-190 proof](../../../roadmap/evidence/wp-190-persona-quota-proof.md).
 - [ ] 15-minute version:
-  - [ ] a terminal logged in with `oc` as **paas-ops-01**;
+  - [ ] a terminal logged in with `oc` as **paas-ops-01**. If `status` reported that the group `ocp-paas-ops` is
+    missing, sign **paas-ops-01** in once to the OpenShift console first;
   - [ ] the quota policy open in the agents release:
     [`policies/quotas/quota-policy.yaml`](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/quotas/quota-policy.yaml);
   - [ ] the Tempo search UI `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr`, signed in as
     **ai-ops-01**.
-- [ ] Known on screen: the budget panel counts by Keycloak group, not by person. A persona with three groups appears on
-  three rows. Say so before anyone asks.
+- Known on screen, not a failure: the budget panel counts by Keycloak group, not by person. A persona with three
+  groups appears on three rows. Say so before anyone asks.
+- The "Optional replay of the 2026-11-03 proof" of the 15-minute version is not a step. It is an owner action: the
+  lifecycle prints it and never runs it. It changes the cluster, so it needs the platform owner's go and never runs
+  during a freeze.
+
+### Stop
+
+Nothing to do. Close the browser profile and the terminal. The budget spent by `start` stays spent until the window
+restarts.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
