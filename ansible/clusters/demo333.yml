@@ -586,3 +586,6 @@ zuno_okf_registry_mirror: "quay-quay-zuno-registry.apps.demo333.startx.fr/zuno"
 zuno_unifai_signature_mirror_host: "quay-quay-zuno-registry.apps.demo333.startx.fr"
 zuno_okf_registry_mirror_plain_http: false
 zuno_okf_registry_mirror_pull_secret: quay-pull
+# WP-261 family (e) S2, owner's go 2026-11-14: the zuno+pull robot for the route host is in the global pull secret, so the
+# nodes can read the PRIVATE Red Hat mirror repositories (roles/quay_registry/tasks/node_pull_secret.yml; no drain).
+zuno_quay_node_pull_secret: true
