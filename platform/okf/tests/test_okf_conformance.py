@@ -58,7 +58,7 @@ class ConformanceCases(unittest.TestCase):
 class DelegationNarrowing(unittest.TestCase):
     """The admission narrowing rule (platform/supply-chain/okf_narrowing.py) on the `delegation` section
     of the cases: valid cases pass, `narrowing-` cases raise the expected finding. The ceiling comes from a
-    temporary corp policy, because the pinned release may predate `max_delegation_depth`."""
+    temporary corp policy (the delegation depth and max_steps ceilings of the corp policy), because the pinned release may predate them."""
 
     def test_narrowing_findings_match_the_cases(self):
         if CASES is None:
@@ -68,7 +68,7 @@ class DelegationNarrowing(unittest.TestCase):
 
         policies = pathlib.Path(tempfile.mkdtemp())
         (policies / "limits").mkdir()
-        (policies / "limits" / "limits-policy.yaml").write_text("max_delegation_depth: 2\n")
+        (policies / "limits" / "limits-policy.yaml").write_text("max_delegation_depth: 2\nmax_steps: 30\n")
         corp = okf_narrowing.Corp(policies)
         for case in _case_dirs():
             section = json.loads((case / "expected.json").read_text()).get("delegation")

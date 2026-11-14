@@ -164,10 +164,24 @@ def check_bundle(bundle: pathlib.Path, corp: Corp, root: pathlib.Path) -> List[s
     except ValueError as exc:
         # Fail closed: without a known version this rule cannot tell which checks apply.
         return [f"{label}/agent.okf.md: {exc}"]
-    if not at_least_v03(version):
-        if z.get("delegation") or (z.get("limits") or {}).get("delegation"):
-            return [f"{label}/agent.okf.md: delegation is an OKF v0.3 field (profile 1.0 included); this bundle "
-                    f"declares okf_version {agent.get('okf_version')!r}"]
+    # delegation lives in the agent document: it needs the AGENT to be at v0.3 or above.
+    if not at_least_v03(version) and (z.get("delegation") or (z.get("limits") or {}).get("delegation")):
+        return [f"{label}/agent.okf.md: delegation is an OKF v0.3 field (profile 1.0 included); this bundle "
+                f"declares okf_version {agent.get('okf_version')!r}"]
+    # The rules apply when ANY document of the bundle is at v0.3 or above: a legacy v0.2 agent whose tasks are
+    # profile 1.0 is narrowed too, since readers accept mixed bundles (ADR-0615 clause 5).
+    effective = version
+    for task in z.get("tasks") or []:
+        task_path = bundle / "tasks" / f"{task}.md"
+        if not task_path.is_file():
+            continue
+        try:
+            task_version = okf_document_version(frontmatter(task_path))
+        except ValueError:
+            continue  # the readers refuse it with a named error
+        if at_least_v03(task_version) and not at_least_v03(effective):
+            effective = task_version
+    if not at_least_v03(effective):
         return []
     classification = (z.get("model") or {}).get("preferred_classification", "")
     findings: List[str] = []
