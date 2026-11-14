@@ -54,20 +54,57 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 Other identities: the ai-gateway's service account holds its own subscription (1,000,000 tokens per hour, and the only
 one on the SaaS models). It carries the traffic of every chat experience.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] `gpt-oss-20b` is Ready: `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`. The three human subscriptions
-  cover this model only.
+`make demo use maas-portal-api-keys 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/maas-portal-api-keys/<action>.yml`) has
+run, and says what is left to the presenter. `start` and `stop` are changing units: each shows what it will change and
+asks you to type the demo id `maas-portal-api-keys`.
+
+### Status
+
+Nothing to do. The file reads the DSC conditions `ModelsAsAServiceReady` and `MaaSConsumerPortalAvailable`, the
+deployments `maas-api`, `maas-ui`, `maas-consumer-portal` and `kube-auth-proxy`, and the Gateway
+`maas-default-gateway`. If one is missing or not ready, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the MaaS
+conditions of the DSC, the MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` (Active), the
+AuthPolicy `maas-gateway-auth` (Enforced), and `gpt-oss-20b` Ready
+(`oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`). The three human subscriptions cover this model only: when
+it is not Ready, a key has nothing to call (on 2026-11-12 it was not Ready). See
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. MaaS is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file creates the presenter's key. It is a changing unit: it needs the typed demo id, and the key is never printed
+or written to a file. What only a person does:
+
 - [ ] **ai-dev-01** has signed in to OpenShift once before the session. Its OpenShift group is created at first
   sign-in.
 - [ ] A browser profile on `https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal/`. The sign-in is the
-  **OpenShift** sign-in (Keycloak behind it), not a Keycloak client of the portal.
+  **OpenShift** sign-in (Keycloak behind it), not a Keycloak client of the portal. Password: Vault
+  `keycloak/demo-personas`.
 - [ ] A terminal with `curl`, large font. Paste the key into a variable without showing it:
   `read -rs MAAS_API_KEY && export MAAS_API_KEY`.
 - [ ] Set the endpoint: `export MAAS=https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b`.
-- [ ] Plan to **revoke the key at the end** of the session (15-minute version, or right after the 5-minute one).
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, and Grafana as **ai-ops-01**, dashboard
   **Mesh & gateway** (the Authorino and Limitador panels).
+
+### Stop
+
+The file revokes the presenter's key. It is a changing unit: it needs the typed demo id. What only a person does:
+revoke by hand in the portal, **API keys**, any key created live at row 1:00 (15-minute version: row 12:00 does it;
+5-minute version: right after the close), then close the browser profile and the terminals, and unset `MAAS_API_KEY`.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
