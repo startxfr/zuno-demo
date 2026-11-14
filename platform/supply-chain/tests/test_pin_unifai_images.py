@@ -91,6 +91,24 @@ class Pin(unittest.TestCase):
         p.pin("devel-ffb64e335", self.path, True, resolver=resolver, verifier=ok, admission=lambda refs: [])
         self.assertIn("# devel-ffb64e335", self.path.read_text(encoding="utf-8"))
 
+    def test_an_image_missing_from_the_internal_registry_changes_nothing_and_is_named(self):
+        """WP-282: checked before the write and before the webhook, which would refuse it with less to say."""
+        admitted = []
+
+        def registry(refs):
+            return [{"reference": r, "ok": "unifai-rag" not in r, "reason": "is not in the registry"} for r in refs]
+
+        with self.assertRaises(p.PinError) as ctx:
+            p.pin("v1.2.0", self.path, False, resolver=resolver, verifier=ok, registry=registry,
+                  admission=lambda refs: admitted.extend(refs) or [])
+        self.assertIn("quay.io/zuno/unifai-rag@", str(ctx.exception))
+        self.assertIn("--mirror-to", str(ctx.exception))
+        self.assertEqual(admitted, [])
+        self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)
+        p.pin("v1.2.0", self.path, False, resolver=resolver, verifier=ok,
+              registry=lambda refs: [{"reference": r, "ok": True, "reason": ""} for r in refs])
+        self.assertIn("  # v1.2.0", self.path.read_text(encoding="utf-8"))
+
     def test_dry_run_writes_nothing(self):
         p.pin("devel-ffb64e335", self.path, True, dry_run=True, resolver=resolver, verifier=ok)
         self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)

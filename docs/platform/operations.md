@@ -22,6 +22,18 @@ the push robot's `DOCKER_CONFIG`, `QUAY_API_TOKEN` for public repositories). `ma
 (`platform/supply-chain/check_unifai_in_registry.py`, anonymous and read-only: each pinned digest and its `.sig` tag) and stops with the
 list of what is missing, instead of leaving the pods refused.
 
+Since WP-282 the pin scripts run the same check before they write, on every digest they pin. `pin_operator_catalog.py` checks
+the catalog, the operator and the bundle; the install step never saw the operator and the bundle. `pin_unifai_images.py`
+checks the five application images.
+
+- **When something is missing:** the script lists it and writes nothing. A dry run therefore lists what the release still
+  needs to copy.
+- **`--mirror-to <registry>/zuno`:** copies what is missing, with its signatures, then checks again. It needs the push
+  robot's `DOCKER_CONFIG`.
+  - This is how a new catalog gets copied: `mirror_unifai_images.py` only copies the catalog that is already pinned.
+  - `pin_unifai_images.py --mirror-to` used to copy after the write; it now copies before.
+- **A cluster whose `zuno_unifai_signature_mirror_host` is empty** reads quay.io: there is no check, only a notice.
+
 ### Look at it
 
 ```
@@ -91,7 +103,7 @@ into **private** repositories of the internal Quay, `zuno/redhat/<path>`, and re
 
 Operator and application images move in two separate steps, always in this order, each with the user's go and with the owner of any running measurement (stresstest, ranking set) agreeing that no UnifAI pod may restart.
 
-1. **Operator.** The release owner publishes the operator, bundle and catalog digests once its CI and canary are green. From a detached worktree on `origin/devel` with `ansible/confidential.yml` copied in: `python3 platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z --dry-run` (signatures with the release identity, then the admission preflight), the same without `--dry-run`, commit and push only that commit, then `make d2 install unifai` and `make d2 check unifai`. Only the operator controller restarts. Rolled so far on demo333: 0.1.42 to 0.1.45 and 0.1.47 (0.1.46 was never released).
+1. **Operator.** The release owner publishes the operator, bundle and catalog digests once its CI and canary are green. From a detached worktree on `origin/devel` with `ansible/confidential.yml` copied in: `python3 platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z --dry-run` (signatures with the release identity, then the internal Quay, WP-282, then the admission preflight; the dry run of a release not yet copied lists the three digests to copy), the same without `--dry-run` and with `--mirror-to <registry>/zuno` (push robot's `DOCKER_CONFIG`; the user's go for the copy), commit and push only that commit, then `make d2 install unifai` and `make d2 check unifai`. Only the operator controller restarts. Rolled so far on demo333: 0.1.42 to 0.1.45 and 0.1.47 (0.1.46 was never released).
 2. **Application images, one roll.** `python3 platform/supply-chain/pin_unifai_images.py devel-<sha> --accept-dev --dry-run`, then the real pin, then a single `make d2 install unifai`: this restarts the UnifAI pods, so batch every stack change (chart values, CR fields) into the same roll. Settings that a release adds but a measurement owner switches on one by one (ranking `spec.rag.search`, `spec.rag.reranker`, `resyncToken`) stay unset in that roll.
 3. **Check.** `make d2 check unifai`, the webhook log (`policy-controller-operator`) for refusals, and the release owner's read-only proofs (digests, environment of the pods).
    **Catalog tags (found 2026-10-31).** A catalog digest that carries only the moving tag `latest` is garbage-collected by quay, signature tags included, as soon as `latest` moves to the next release: the CatalogSource pod can then no longer be rescheduled, a rollback is impossible and `make d2 check unifai` fails on the signature of the pinned catalog. Since the fork's fix (devel 8d492f981) each release also pushes `unifai-operator-catalog:v<VERSION>`, which keeps its digest. A catalog released before that fix (0.1.48) needs the tag `v<VERSION>` pushed on its digest by someone with quay write rights before the next release; until then bump to the newest catalog quickly after a release.

@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-270, WP-271, WP-272, WP-273, WP-274, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
-| v0.17 | 8 | 5 | 25 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268 |
+| v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1134,6 +1134,8 @@ release scripts or the operator types. No new ADR: the records that govern the r
 | WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Repo work merged | none; sends the final anchors to unifai-compare |
 | WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Done | none; masters resize refused by its gate (P6) |
 | WP-261 | [wp-261](work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) | 0612 | WP-248, WP-260 | Done | none; after an RHOAI, AAP or Lightspeed upgrade run `mirror_redhat_images.py --drift` and copy |
+| WP-282 | [wp-282](work-packages/wp-282-check-the-internal-quay-before-a-unifai-pin-is-written.md) | 0612 | WP-248 | Done | none; every UnifAI pin now refuses a digest missing from the internal Quay, `--mirror-to` copies it first |
+| WP-283 | [wp-283](work-packages/wp-283-check-that-a-pod-without-a-node-selector-schedules-for-the-unifai-canary.md) | 0614 | WP-260 | Not started | planned before 2026-12-01; the owner's go for the AAP Role and the live proof |
 
 ### Phase 55 — Zuno OKF profile 1.0, aligned with upstream OKF 0.2 (added 2026-11-14)
 
@@ -1320,6 +1322,7 @@ moving.
 
 ## Change log
 
+- 2026-11-14 — WP-282 (Done) and WP-283 (Not started) added to Phase 54 (v0.17), drift points 3 and 4 of the UnifAI review the owner validated with unifai-compare. WP-282: both pin scripts check that every digest they write is in the internal Quay, the operator and bundle included, before the admission preflight and the write; `--mirror-to` copies what is missing first (proven read-only on 0.1.71 and 0.1.72). WP-283 plans `make d2 check canary-ready` and the runbook of what the fork's canary assumes of the cluster. UnifAI 0.1.72 (tests and docs only) is not pinned, by the owner's choice.
 - 2026-11-14 — ADR-0616 and WP-269 to WP-281 added (Phase 56, v0.16) by the owner's decisions of the day: one `make demo` lifecycle for every catalogue demo (status, check, install, start, step next|N, stop, uninstall, plus list, use, freeze, rehearse), one Ansible file and one page section per action and step, `## Presenter lifecycle` replacing `## Before you start`, the WP-136 webinar helpers retired (ADR-0550 superseded in part, ADR-0605 dated note). WP-269 Done (the records and the page contract); pilots guardrails and unifai-live-rag, gate 2026-11-16 12:00; full rehearsal of every demo in both versions dated 2026-11-18.
 - 2026-11-14 — WP-268 dated by the owner: legacy OKF documents are refused on 2027-01-05, together by the zuno-demo readers and unifai-operator line 0.2 (fork R-556), on the condition that no locked release contains a legacy document (true since v1.0.0). ADR-0615 clause 13 carries the date.
 - 2026-11-14 — zuno-demo-agents v1.0.1 promoted on demo333 (f33a332d, owner's go), with the golden path 13/13 before and after. The coding pair is proven from the ai-gateway spans: Tekos `write-code` → `mistral-codestral@C1`, Arkos `write-code` → `local-gpt-oss-maas@C3` on every call. The Arkos→Tekos delegation sent 5, 3 and 3 A2A messages over three runs (bound 3), reported to the fork (evidence/wp-266-prompt-evaluation-2026-11-14.md).
