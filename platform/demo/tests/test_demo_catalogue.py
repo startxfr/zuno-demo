@@ -168,6 +168,17 @@ class SectionWarnings(FixtureCopy):
                                                      '- "git log -1 --format=%h"\n      - "oc get deploy fixture-api fixture-db -n x"'))
         self.assertEqual(consistency.warnings(self.root, only=["fixture-demo"]), [])
 
+    def test_a_route_host_read_portably_counts(self):
+        text = self.page.read_text().replace(
+            "### Status\n\nNothing to do.", "### Status\n\nThe file reads the route `fixture-ui.apps.demo999.example.com`.")
+        self.page.write_text(text)
+        self.assertEqual(len(consistency.warnings(self.root, only=["fixture-demo"])), 1)
+        status = self.demo / "status.yml"
+        status.write_text(status.read_text() + (
+            '- ansible.builtin.include_tasks: "{{ demo_lib }}/routes.yml"\n  vars:\n    routes:\n'
+            '      - {"namespace": "x", "name": "fixture-ui", "host": "fixture-ui.{{ cluster_base_domain }}"}\n'))
+        self.assertEqual(consistency.warnings(self.root, only=["fixture-demo"]), [])
+
     def test_unmoved_page_gives_no_warning(self):
         self.assertEqual(consistency.warnings(self.root, only=["fixture-unscaffolded"]), [])
 

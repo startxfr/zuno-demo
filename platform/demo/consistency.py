@@ -266,6 +266,8 @@ def docs_problems(root: pathlib.Path, verbs: Set[str], unmoved: Set[pathlib.Path
 
 
 OBJECT_NAME_RE = re.compile(r"`([a-z0-9][a-z0-9.]*-[a-z0-9.-]*[a-z0-9])`")
+# A page names a route by its full host; the file reads it portably, as `<name>.{{ cluster_base_domain }}`.
+APPS_HOST_RE = re.compile(r"^([a-z0-9-]+)\.apps\.[a-z0-9.-]+$")
 
 
 def _data_strings(node) -> Iterable[str]:
@@ -297,6 +299,9 @@ def section_warnings(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
         except yaml.YAMLError:
             continue
         for name in dict.fromkeys(OBJECT_NAME_RE.findall(text)):
+            host = APPS_HOST_RE.match(name)
+            if host and f"{host.group(1)}.{{{{ cluster_base_domain }}}}" in data:
+                continue
             if name not in data:
                 found.append(f"ansible/demos/{entry.id}/{action}.yml: the page's `### {action.capitalize()}` names "
                              f"`{name}`, which the file does not read")
