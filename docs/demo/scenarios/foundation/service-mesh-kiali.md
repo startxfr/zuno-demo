@@ -76,25 +76,55 @@ Other identities, none of which signs in on stage:
   Vault as its own ServiceAccount `cert-manager`, role `istio-issuer`.
 - Kiali queries the cluster with the signed-in user's token. It has no RBAC of its own to maintain.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 it had no OpenShift user. Then log a
-  terminal in with `oc` as **paas-ops-01**, large font, at the repository root.
-- [ ] `oc get istio,istiocni,deploy -n zuno-mesh`: `Healthy` twice, every Deployment ready.
-- [ ] `oc get pods -n zuno-mesh`: read the `RESTARTS` of `cert-manager-istio-csr`. On 2026-11-13 they were 20 and 10
-  and still growing. If they grow in the hour before the session, see
-  [If something goes wrong](#if-something-goes-wrong).
+`make demo use service-mesh-kiali 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/service-mesh-kiali/<action>.yml`) has run, and says
+what is left to the presenter. Start runs `make demo golden-path` to create traffic.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-service-mesh-d0`/`-d1`, `zuno-kiali-d0`/`-d1`,
+`zuno-mesh-monitoring-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1`. If one is missing or not
+Healthy, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It reads Istio, IstioCNI and the Deployments of `zuno-mesh` (`oc get istio,istiocni,deploy
+-n zuno-mesh`: `Healthy` twice, every Deployment ready), the PeerAuthentications and Kiali. No golden-path probe covers
+this page. Read the `RESTARTS` of `cert-manager-istio-csr` (`oc get pods -n zuno-mesh`): on 2026-11-13 they were 20 and
+10 and still growing. If they grow in the hour before the session, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The mesh is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file runs `make demo golden-path` to create traffic for the Kiali graph ([golden-path.md](../../golden-path.md)):
+it calls the gateways and the models. Run it in the hour before the session. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, large font, at the repository root. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 it had no OpenShift user), sign in once in a browser first,
+  then log the terminal in.
 - [ ] Browser profile **ai-ops-01**: Kiali `https://kiali-zuno-mesh.apps.demo333.startx.fr`, **Log In With
   OpenShift**, then the identity provider `openshift` (Keycloak), not `startx-htpasswd_auth`. The Kiali sign-in as
   ai-ops-01 was not tried on 2026-11-13: do it the day before.
 - [ ] Same profile: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, dashboard **Zuno Platform /
   Mesh & gateway**, last 1 hour, row **Mesh traffic & control plane** open.
-- [ ] Create traffic in the hour before: `make demo golden-path` calls the gateways and the models
-  ([golden-path.md](../../golden-path.md)).
-- [ ] Known, not a failure: every sidecar logs a repeating SDS error about a missing `service-ca.crt`. It is benign
+- Known, not a failure: every sidecar logs a repeating SDS error about a missing `service-ca.crt`. It is benign
   and never wired to a real certificate
   ([ADR-0411](../../../adr/0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) follow-ups,
   [WP-124](../../../roadmap/work-packages/wp-124-ai-gateway-external-saas-mesh-egress.md)). This page shows no logs.
+
+### Stop
+
+Nothing to do. The traffic stays in the mesh metrics. Close the browser profile and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
