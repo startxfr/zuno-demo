@@ -74,24 +74,57 @@ Other identities:
 - `ragas-eval` asks UnifAI's RAG as **eval-consultant-01**.
 - EvalHub's evaluation pods run as the instance's job ServiceAccount, not as the user who launched them.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console. On 2026-11-13 it had not: its group `ocp-paas-ops`
-  did not exist. Then log a terminal in with `oc` as **paas-ops-01**, at the repository root.
-- [ ] `oc get deploy -n redhat-ods-applications trustyai-service-operator-controller-manager` is 1/1, and
-  `oc get evalhub zuno-evalhub -n zuno-ai-run` is `Ready`. On 2026-11-13 the operator was 0/1 and the instance Ready.
+`make demo use evaluation-trustyai-evalhub 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/evaluation-trustyai-evalhub/<action>.yml`)
+has run, and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads read-only: the `EvalHub` `zuno-evalhub` in `zuno-ai-run` (`Ready`), the deployment
+`trustyai-service-operator-controller-manager` in `redhat-ods-applications` (1/1 expected; on 2026-11-13 it was 0/1
+and the instance Ready), and the GrafanaDashboard `trustyai`. If one is missing, stop and tell the platform owner:
+this demo installs nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the EvalHub
+`Ready`, its route `zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr` and the RoleBinding `zuno-evalhub-user`, and the
+last `Complete` Jobs `garak-smoke`, `garak-security`, `ragas-eval` and `zuno-acceptance-gate-tekos`. It also expects
+0 LMEvalJobs: they are off on RHOAI 3.6 EA (see [Limits](#limits)). If the DSC or `TrustyAIReady` is False, see
+[If something goes wrong](#if-something-goes-wrong). Do not start an evaluation to make a check pass.
+
+### Install
+
+Nothing to do. TrustyAI and EvalHub are part of the shared platform: the file only verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
 - [ ] Browser profile **ai-ops-01**: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, dashboard
   **Zuno Platform / TrustyAI evaluation & guardrails**, last 7 days. Check that the panels **RAGAS scores (real
   UnifAI retrievals)** and **Garak attack success rate (jailbreak probes)** have rows. They keep the last value for 30
   days; the last runs were on 2026-11-09.
-- [ ] Browser profile **ai-dev-01**: `https://rh-ai.apps.demo333.startx.fr`, **Develop & train > Evaluations**,
-  project `zuno-ai-run`. A stale page fails with `ChunkLoadError`: hard refresh (Ctrl+Shift+R). Rehearse the
-  navigation: the menu names of RHOAI 3.6.0-ea.2 were not checked in a browser for this page.
+- [ ] Browser profile **ai-dev-01** (15-minute version): `https://rh-ai.apps.demo333.startx.fr`, **Develop & train >
+  Evaluations**, project `zuno-ai-run`. A stale page fails with `ChunkLoadError`: hard refresh (Ctrl+Shift+R).
+  Rehearse the navigation: the menu names of RHOAI 3.6.0-ea.2 were not checked in a browser for this page.
 - [ ] An editor or a GitHub tab on [`evaluations/tekos/scenarios.yaml`](../../../../evaluations/tekos/scenarios.yaml)
   and [`evaluations/tekos/gate_config.yaml`](../../../../evaluations/tekos/gate_config.yaml).
-- [ ] Do not start an evaluation on stage: no EvalHub run, no LMEvalJob, no re-run of the Garak, RAGAS or gate Jobs.
+- [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If **paas-ops-01**
+  has never signed in to the OpenShift console (on 2026-11-13 it had not: its group `ocp-paas-ops` did not exist),
+  sign in once in a browser first, then log the terminal in.
+- Do not start an evaluation on stage: no EvalHub run, no LMEvalJob, no re-run of the Garak, RAGAS or gate Jobs.
   Each is a cluster change: rehearse only, never during a freeze.
-- [ ] No golden-path probe covers this scenario.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
