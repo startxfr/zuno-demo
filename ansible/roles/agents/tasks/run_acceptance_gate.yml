@@ -304,6 +304,13 @@
                     value: "agent-{{ _gate_agent }}"
                   - name: UNIFAI_VERIFY_TLS
                     value: "1"
+                  # The scenarios that prove what a turn did from its trace read Tempo: the retrieval of a
+                  # retrieve_first node (rag.search spans), the delegation (A2A spans), and which model served a task
+                  # (`chat_routing`, the ai-gateway's model_call spans: tekos 21, arkos 22). Without it they are
+                  # skipped, never passed. Same in-cluster URL as the stresstest Job (zuno-monitoring admits
+                  # zuno-ai-run).
+                  - name: TEMPO_URL
+                    value: "{{ agents_gate_tempo_url | default('http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200') }}"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:
