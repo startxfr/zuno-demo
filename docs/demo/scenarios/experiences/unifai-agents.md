@@ -77,7 +77,7 @@ says what is left to the presenter. No action of this demo installs or removes a
 
 Nothing to do. The file reads the Applications `zuno-unifai-d0`/`-d1`, the UnifaiStack `unifai`, the UnifaiTeam
 `agent-tekos`, the UnifaiAgentBundle `tekos`, the UnifaiWorkflow `tekos` and `oc get llminferenceservice -n zuno-ai-run`
-(at least one local model `Ready=True`). If one is missing or not Ready, stop and tell the platform owner: this demo
+(at least one local model `Ready=True`), and the Deployments `ai-gateway` and `mcp-gateway` in `zuno-ai-run`. If one is missing or not Ready, stop and tell the platform owner: this demo
 installs nothing.
 
 ### Check

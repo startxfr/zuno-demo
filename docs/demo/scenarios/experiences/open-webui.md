@@ -56,7 +56,7 @@ says what is left to the presenter. No action of this demo installs or removes a
 ### Status
 
 Nothing to do. The file reads the Application `zuno-open-webui-d1`, the Deployment `open-webui`, the route
-`open-webui.apps.demo333.startx.fr` and its two ExternalSecrets. If one is missing or not Healthy, stop and tell the
+`open-webui.apps.demo333.startx.fr` and its two ExternalSecrets `open-webui-app` and `open-webui-oidc`. If one is missing or not Healthy, stop and tell the
 platform owner: this demo installs nothing.
 
 ### Check

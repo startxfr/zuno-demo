@@ -71,7 +71,8 @@ says what is left to the presenter. No action of this demo installs or removes a
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-kagent-d0`, `zuno-kagent-d1`, `zuno-token-proxy-kagent-d1`,
-`zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1`, the Deployments of `zuno-kagent`, the Agent `zuno-sre`, the RemoteMCPServer
+`zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1`, the Deployments of `zuno-kagent` (`kagent-controller`, `kagent-ui`, `kagent-front-door`, `zuno-sre`, `zuno-token-proxy`)
+and `k8s-mcp` in `zuno-ai-run`, the Agent `zuno-sre` (`Accepted` and `Ready`), the RemoteMCPServer
 `zuno-mcp-gateway` and the route `kagent.apps.demo333.startx.fr`. If one is missing or not Healthy, stop and tell the
 platform owner: this demo installs nothing.
 
@@ -79,8 +80,8 @@ platform owner: this demo installs nothing.
 
 Nothing to do when it passes. It runs the golden-path probe `kagent` and the browser check `kagent` (see
 [golden-path.md](../../golden-path.md)). The probe proves the model path through the token proxy. The browser check
-proves the front door and the UI. By hand, `make d2 check kagent` proves that the controller discovered the governed
-tools and accepted `zuno-sre`; run it too. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+proves the front door and the UI. The file also reads that the Agent `zuno-sre` is `Accepted`. By hand, `make d2 check kagent` proves the rest: that the
+controller discovered the governed tools; run it too. If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
@@ -88,7 +89,8 @@ Nothing to do. kagent is part of the shared platform: the file only verifies it.
 
 ### Start
 
-The file asks the 5-minute question once, to wake the model. What only a person does:
+The file sends one short question through kagent's token proxy (the golden-path moment `kagent`) to wake the model. It
+does not ask the 5-minute question: that one is the presenter's, in the UI. What only a person does:
 
 - [ ] A browser profile used by **ai-ops-01** only. A Keycloak session of another persona in the same browser gets a
   403 from the front door ([WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md) D4).

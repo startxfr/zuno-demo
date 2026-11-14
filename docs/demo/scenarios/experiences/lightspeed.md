@@ -69,7 +69,9 @@ required one is missing, stop and tell the platform owner: this demo installs no
 
 ### Check
 
-Nothing to do when it passes. It runs the golden-path probe `lightspeed` (see [golden-path.md](../../golden-path.md)).
+Nothing to do when it passes. It reads that the `OLSConfig` conditions `MCPServerReady` and `RHOKPReady` are `True`, that the `lightspeed-operator`
+ClusterServiceVersion has succeeded, that `gpt-oss-20b` is `Ready` and that the MaaSSubscription
+`gpt-oss-20b-lightspeed` is `Ready`. It runs the golden-path probe `lightspeed` (see [golden-path.md](../../golden-path.md)).
 The probe needs an `oc` session with a token (`oc whoami -t`); with a certificate login it prints `MANUAL`. There is no
 automated question in the console: ask it by hand, within the budget below. If it fails, see
 [If something goes wrong](#if-something-goes-wrong).

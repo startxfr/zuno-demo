@@ -69,12 +69,14 @@ says what is left to the presenter. No action of this demo installs or removes a
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-openclaw-d0`/`-d1` and `oc get claw -A`: both `assistant` Claws
-must be `Ready`. If one is not, stop and tell the platform owner: this demo installs nothing.
+(in `zuno-claw-consultant-02` and `zuno-claw-sale-01`) must be `Ready`. It also reads their Deployments `assistant`,
+`assistant-proxy` and `front-door`, and the two front-door routes `assistant-zuno-claw-<persona>`. If one is not, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
 
-Nothing to do when it passes. It runs the golden-path probe `openclaw` and the browser check `openclaw` (see
-[golden-path.md](../../golden-path.md)). The probe calls the model from inside each assistant's pod, so the terminal
+Nothing to do when it passes. It reads that the ExternalSecrets `openclaw-client` and `openclaw-ui` are `Ready` in both namespaces and that the
+`claw-operator` ClusterServiceVersion has succeeded. It runs the golden-path probe `openclaw` and the browser check
+`openclaw` (see [golden-path.md](../../golden-path.md)). The probe calls the model from inside each assistant's pod, so the terminal
 must be allowed to `oc exec` in the persona namespaces. The browser check also covers sale-01's front door and Control
 UI. If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
@@ -84,10 +86,12 @@ Nothing to do. OpenClaw is part of the shared platform: the file only verifies i
 
 ### Start
 
-The file reads each assistant's Control UI password from its Secret and never prints it, asks one short question per
-assistant in a **New session** (the `chat` task prefers gpt-oss-20b; the probe got an answer in 7.5 s for both personas
-on 2026-11-07) and runs `oc get claw -A`. If you need to type a password, read it off screen: Secret `openclaw-ui` in
-`zuno-claw-consultant-02` and in `zuno-claw-sale-01`. The persona password is in Vault at `keycloak/demo-personas`.
+The file never reads the Control UI password. It only proves that each Secret `openclaw-ui` exists, in
+`zuno-claw-consultant-02` and in `zuno-claw-sale-01` (`oc get secret openclaw-ui -n <namespace> -o name`, which prints a
+name and no value). It then asks one short question per assistant (the golden-path moment `openclaw`; the `chat` task
+prefers gpt-oss-20b; the probe got an answer in 7.5 s for both personas on 2026-11-07) and runs `oc get claw -A`. To type
+the password, read it yourself, off screen:
+`oc extract secret/openclaw-ui -n <namespace> --keys=password --to=-`. The persona password is in Vault at `keycloak/demo-personas`.
 What only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side. The front door admits one email per

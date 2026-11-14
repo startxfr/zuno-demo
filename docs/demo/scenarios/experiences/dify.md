@@ -70,13 +70,16 @@ says what is left to the presenter. No action of this demo installs or removes a
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-dify-d1`, `zuno-dify-knowledge-d1` and `zuno-token-proxy-dify-d1`,
-the Deployments of `zuno-dify` and the route `dify.apps.demo333.startx.fr`. If one is missing or not Healthy, stop and
+the Deployments of `zuno-dify` (`dify-api`, `dify-worker`, `dify-beat`, `dify-web`, `dify-plugin-daemon`, `dify-nginx`,
+`dify-front-door`, `zuno-token-proxy`, `zuno-dify-knowledge` and the StatefulSet `dify-redis-master`) and the route `dify.apps.demo333.startx.fr`. If one is missing or not Healthy, stop and
 tell the platform owner: this demo installs nothing. If only an application is missing from **Studio**, show the other
 two; after the session, `make d2 install dify` imports a missing example again (once per name), by hand.
 
 ### Check
 
-Nothing to do when it passes. It runs the golden-path probes `dify` and `tools` and the browser check `dify` (see
+Nothing to do when it passes. It reads that the five ExternalSecrets of `zuno-dify` are `Ready`: `dify-app`, `dify-front-door`, `dify-redis`,
+`zuno-dify-knowledge` and `zuno-token-proxy`. A missing token-proxy secret breaks the demo. It runs the golden-path
+probes `dify` and `tools` and the browser check `dify` (see
 [golden-path.md](../../golden-path.md)). `dify` proves the model path through the token proxy; `tools` proves that the
 Confluence MCP server answers. Neither runs the applications: run each one in **Start**. If one fails, see
 [If something goes wrong](#if-something-goes-wrong).
