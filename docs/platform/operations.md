@@ -134,6 +134,8 @@ fresh-install choice, or a per-path rotation with the runbook below. The Keycloa
 `make d0 install keycloak` (the client-reconcile Job merges `realm-settings.json`); going back to `demo` does not remove the
 password policy or restore the 8 h idle timeout - clear them in the admin console if needed.
 
+The shared personas and admin values (Keycloak, Dify, Vault copies) have their own runbook: [Rotating the shared demo password](shared-password-rotation.md).
+
 ## Moving a PostgreSQL role onto the shared demo password (ADR-0595, ADR-0529)
 
 A new value of `zuno_admin_*_postgresql_*_password` reaches a fresh install only. On a running cluster the Vault path already

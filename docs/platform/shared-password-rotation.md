@@ -85,7 +85,7 @@ the Keycloak Jobs cannot sign in. They retry past the 30-failure limit and lock 
    `app.kubernetes.io/name=vault,component=server`: backup Job pods carry the first label too. Send the token and the value on stdin.
 4. Force the ExternalSecrets to refresh (`ansible/tasks/force_externalsecret_refresh.yml`) instead of waiting up to
    one hour, and wait until the Secret holds the new value.
-5. Update the local `ansible/confidential.yml` (`zuno_personas_mainpwd`, `zuno_admin_mainpwd`). Until it holds the new
+5. Update the local `ansible/confidential.yml` (`zuno_personas_mainpwd`, `zuno_admin_mainpwd`) with `ansible-vault edit`: the file is encrypted ([ansible/README.md](../../ansible/README.md), ADR-0603 M22), so `grep` and `sed` do not work on it. Until it holds the new
    values, no Vault or Keycloak seeding playbook may run: it would put the old value back.
 
 ## Phase 3: copies and derived passwords
