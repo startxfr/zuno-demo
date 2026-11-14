@@ -155,7 +155,11 @@ DEMO_VERBS := check all-check golden-path browser reset step-1 step-2 step-3 ste
 # resolve_aap_mode() reads ansible/confidential.yml directly: the Makefile
 # has no other way to reach an Ansible-sourced variable before deciding
 # whether to invoke ansible-playbook at all, and this decision must happen
-# here, in the shell, before any playbook runs. Never fails even if the
+# here, in the shell, before any playbook runs. When the file is
+# ansible-vault encrypted it is read through `ansible-vault view` (the
+# passphrase comes from ansible.cfg vault_password_file); a failed decrypt is
+# reported as "undecryptable" and aap_route refuses to run, because guessing
+# local or remote would be worse than stopping. Never fails even if the
 # file, PyYAML, or the key itself is missing - defaults to "auto"
 # throughout, matching this repo's existing "graceful if confidential.yml
 # is absent" convention (see ansible/roles/aap/tasks/install.yml).
@@ -183,8 +187,13 @@ define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
   local mode="auto"; \
   if [[ -f ansible/confidential.yml ]]; then \
-    local val; \
-    val="$$(python3 -c "import yaml; d=yaml.safe_load(open('ansible/confidential.yml')) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
+    local val txt; \
+    if head -n 1 ansible/confidential.yml | grep -q '^[$$]ANSIBLE_VAULT;'; then \
+      txt="$$(ansible-vault view ansible/confidential.yml 2>/dev/null)" || { echo "Cannot decrypt ansible/confidential.yml (ansible.cfg vault_password_file, see ansible/README.md)" >&2; echo "undecryptable"; return 0; }; \
+    else \
+      txt="$$(cat ansible/confidential.yml)"; \
+    fi; \
+    val="$$(printf '%s' "$$txt" | python3 -c "import sys, yaml; d=yaml.safe_load(sys.stdin) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
     [[ -n "$$val" ]] && mode="$$val"; \
   fi; \
   case "$$mode" in \
@@ -204,6 +213,7 @@ aap_route() { \
         return 99; \
       fi ;; \
     remote) ;; \
+    *) echo "zuno_make_aap_mode could not be resolved ('$$mode'): refusing to guess between local and remote" >&2; return 2 ;; \
   esac; \
   $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "{\"aap_launch_type\": \"$$kind\", \"aap_launch_template\": \"$$template\", \"aap_launch_extra_vars\": $$extra_vars_json}" $(EXTRA_VARS); \
 };
