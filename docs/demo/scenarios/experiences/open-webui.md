@@ -47,7 +47,32 @@ Other identities:
 - the presenter's `oc` session (**paas-ops-01**, cluster-admin) for the optional `oc get` step;
 - `eval-consultant-01`, an evaluation copy of consultant-01, used only by the golden-path probes, never on stage.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use open-webui 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/open-webui/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Application `zuno-open-webui-d1`, the Deployment `open-webui`, the route
+`open-webui.apps.demo333.startx.fr` and its two ExternalSecrets. If one is missing or not Healthy, stop and tell the
+platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probes `open-webui` and `zuno-code` and the browser check
+`open-webui` (see [golden-path.md](../../golden-path.md)). If one fails, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. Open WebUI is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file sends one question to warm the model: "Zuno" is served by gpt-oss-20b and answers in about 2 s when warm.
+What only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side:
   - profile 1: **sale-01**;
@@ -56,14 +81,19 @@ Other identities:
   There is no local login form, by design.
 - [ ] Start a **new chat** after signing in. Chats created before 2026-11-03 keep their tool switch off
   ([WP-193 evidence](../../../roadmap/evidence/wp-193-open-webui-user-experience.md)).
-- [ ] Warm the model: send one question in profile 1 before the audience arrives. "Zuno" is served by gpt-oss-20b and
-  answers in about 2 s when warm.
 - [ ] 15-minute version: Grafana in a third tab, signed in as **ai-ops-01**. Grafana sits behind the OpenShift
   sign-in and admits accounts with RBAC on `zuno-monitoring`. Open the dashboard **Zuno Platform / Five experiences**,
   time range last 1 hour, `client` = `open-webui`.
-- [ ] Golden-path probes `open-webui` and `zuno-code` passed within the last hour
-  (`ONLY=open-webui,zuno-code make demo golden-path`), see [golden-path.md](../../golden-path.md).
-- [ ] The UI language follows the browser. Set the browser to English or French before the session, not on stage.
+- Known on screen, not a failure: the UI language follows the browser. Set the browser to English or French before
+  the session, not on stage.
+
+### Stop
+
+Nothing to do. Close the browser profiles.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
