@@ -61,32 +61,91 @@ Other identities:
 - the presenter's own Atlassian account, to edit a page before the optional resync. The personas have no Atlassian
   account.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use unifai-live-rag 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/unifai-live-rag/<action>.yml`) has run,
+and says what is left to the presenter. Unlike most demos, `start` and `stop` change shared state: they act on
+**consultant-01**'s Personal documents.
+
+### Status
+
+Nothing to do. The file reads the UnifaiStack `unifai`, `docling-serve`, `unifai-rag-server`, `unifai-rag-celery`,
+`qdrant`, the InferenceService `embeddings`, the workflows `consultant-01-my-documents`, `sale-01-my-documents` and
+`consultant-rag`, and the retrievers `consultant-01-documents` and `sale-01-documents`. If one is missing or not Ready,
+stop and tell the platform owner: this demo installs nothing. Without the embedding model, no upload reaches **Done**
+and no search returns anything.
+
+### Check
+
+There is no golden-path probe. The file runs the same reads as `status`, then asks one question to the retriever
+`consultant-01-documents`. A pass is not a rehearsal: run the whole scenario the same day, with `make demo rehearse`
+or by hand.
+
+### Install
+
+Nothing to do. UnifAI and its RAG are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file does the preparation that used to be a checklist ([WP-274](../roadmap/work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md)).
+It signs in as **consultant-01**, then:
+
+- deletes only three files from **Personal**, **Documents**: `travel-and-expense-policy.md`,
+  `on-call-rota-handbook.md` and `questions.md`. Nothing else is deleted;
+- uploads the two demo files of [unifai-rag-upload/](unifai-rag-upload/), `travel-and-expense-policy.md` and
+  `on-call-rota-handbook.md`, and waits until both show **Done**. It never uploads `questions.md`: it holds the
+  expected answers, so the RAG would answer from it;
+- warms the model with the workflow `consultant-01-my-assistant`.
+
+So the library is already loaded when the session begins: the 5-minute version shows it, it does not upload live. What
+only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side:
   - profile 1: **consultant-01**;
   - profile 2: **sale-01** (15-minute version only).
-- [ ] Open `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` and sign in through Keycloak. Check the name at the
-  top right.
-- [ ] The two files of [unifai-rag-upload/](unifai-rag-upload/) on the presenter's laptop:
-  `travel-and-expense-policy.md` and `on-call-rota-handbook.md`. **Never upload `questions.md`**: it holds the
-  expected answers, so the RAG would answer from it.
-- [ ] A clean library: profile 1, **Personal**, **Documents**. If these files or `questions.md` are already listed
-  (all three were uploaded on 2026-11-05), delete them, so the audience sees a real upload.
-- [ ] Warm the model: profile 1, **Agentic Chats**, **+**, workflow `consultant-01-my-assistant`, ask
-  `In one short sentence, say what you can help me with.`
-- [ ] `oc get llminferenceservice -n zuno-ai-run` (at least one `Ready=True`) and
-  `oc get inferenceservice embeddings -n zuno-ai-run` (`Ready=True`). Without the embedding model, no upload reaches
-  **Done** and no search returns anything.
-- [ ] Known screen that is not a failure: **RAG Overview** counts only the Slack and Document source types (upstream
-  UI). Confluence and web content is indexed but not counted there, so a 0 is not an outage.
-- [ ] No golden-path probe: rehearse the whole scenario the same day with the same files, then delete the uploads
-  again.
+- [ ] Open `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` in each profile and sign in through Keycloak. Check
+  the name at the top right.
 - [ ] 15-minute version:
   - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01**;
   - [ ] Grafana as **ai-ops-01**, dashboard **Zuno Platform / Agents, tools & RAG**, last 30 minutes, row **RAG**
-    expanded (it is collapsed by default);
-  - [ ] the optional Confluence resync only outside a freeze, prepared as in [Appendix C](#appendix-c---setup).
+    expanded (it is collapsed by default).
+- Known screen that is not a failure: **RAG Overview** counts only the Slack and Document source types (upstream
+  UI). Confluence and web content is indexed but not counted there, so a 0 is not an outage.
+
+**Optional Confluence resync (rows 9:30 and 12:45 of the 15-minute version).** The step never runs it: it prints the
+commands and the presenter runs them by hand. **Never during a freeze**: the push and `make d2 install unifai` change
+the cluster ([freeze protocol](freeze-protocol.md)). Prepare it before the session:
+
+1. **Edit a page** under `Technologie : Satellite` in the Confluence space SXSI, with your own Atlassian account. Note
+   a word that only the new version contains. `startxfr.atlassian.net` is a real company site: change a page you may
+   change, and revert the edit after the session (the next scheduled sync picks the revert up). The personas have no
+   Atlassian account.
+2. **Prepare the commit, without pushing it.** In `ansible/clusters/demo333.yml`, under
+   `zuno_unifai_values.ragSources`, set a new `resyncToken` on the source whose tree holds the page:
+
+   ```yaml
+   - name: tekos-satellite
+     resyncToken: demo-2026-11-05-1   # any new value queues a sync at once
+   ```
+
+   The value above is the one of the 2026-11-05 run; use a new one. Never `oc patch` the object instead: Argo CD
+   selfHeal reverts the change, which changes the hash again and queues a second sync.
+3. **On stage** (row 9:30): push the commit, then run `make d2 install unifai`. The Confluence technical identity
+   (Vault `confluence/technical`, ExternalSecret `unifai-confluence`) reads the pages at sync time.
+4. **Expected timing** (2026-11-05): after `make d2 install unifai`, `tekos-openshift` reported
+   `411 pages (1 changed, 0 deleted at the last sync)` within a minute.
+
+### Stop
+
+The file deletes the three named files (`travel-and-expense-policy.md`, `on-call-rota-handbook.md` and
+`questions.md`) from **consultant-01**'s **Personal** documents, and nothing else. What only a person does: close the
+two browser profiles and the terminal. After an optional resync, revert the Confluence edit, and revert or drop the
+`resyncToken` commit as the owner decides.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
@@ -94,8 +153,8 @@ Profile 1, **consultant-01**, **Personal** workspace.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | **Documents** in the sidebar | "I add two documents of my own: a travel policy and an on-call handbook. Both are fictional." | The **Document Library** without the two files, and the **Upload Document** button. |
-| 0:30 | **Upload Document**: `travel-and-expense-policy.md` and `on-call-rota-handbook.md` | "The platform converts them with docling, embeds them with a model on our own GPU and stores them in Qdrant. Nothing leaves the cluster to do this." | Both rows, uploaded by `consultant-01`, status moving to **Done** (one chunk each on 2026-11-05, [screenshot](../assets/img/unifai-rag-documents-done.png)). |
+| 0:00 | **Documents** in the sidebar | "I have two documents of my own in my library: a travel policy and an on-call handbook. Both are fictional." | The **Document Library** with the two files, uploaded by `consultant-01`. |
+| 0:30 | Point at the two rows and their status | "They were converted with docling, embedded with a model on our own GPU and stored in Qdrant. Nothing leaves the cluster to do this." | Both rows with the status **Done** (one chunk each on 2026-11-05, [screenshot](../assets/img/unifai-rag-documents-done.png)). The upload itself was done by `make demo start`, before the session. |
 | 2:00 | **Agentic Chats**, **+**, workflow `consultant-01-my-documents`. Ask: `Which code goes on a rental car booking?` | "This workflow runs as me. It searches my uploads and the Confluence pages my groups may read." | `ZN-CAR-7`, citing `travel-and-expense-policy.md`. The **Live workflow** panel shows the retriever `consultant-01-documents`. |
 | 3:15 | Ask: `What is the hotel ceiling in Madrid?` | "It answers only from what it found, and says so when it found nothing." | An answer that the documents do not say. The policy gives Paris, Lyon, other French cities, London and Brussels only. |
 | 4:15 | Close | "A document you upload is answered from a minute later, with its source. It stays yours: neither a colleague's assistant nor your team's sees it." | |
@@ -110,11 +169,11 @@ Run the 5-minute version, then:
 | 6:15 | **Team**, workspace `consultant`, **Collaboration Hub**, **+**, workflow `consultant-rag`. Ask `Which code goes on a rental car booking?` | "Now my team's RAG workflow. A team workflow runs as the team: it reads the Confluence pages of my groups, never my personal uploads." | An answer that the documents hold no rental car code; the passages it found are Confluence pages on other topics ([screenshot](../assets/img/unifai-rag-team-workflow-no-personal-upload.png)). |
 | 7:30 | Profile 2, **sale-01**: **Personal**, **Agentic Chats**, **+**, workflow `sale-01-my-documents`. Ask `Which code goes on a rental car booking?` | "Another person, the same question. consultant-01's uploads are private to consultant-01." | No `ZN-CAR-7`: the documents do not say. This step is not in the 2026-11-05 live record: rehearse it. |
 | 8:30 | Profile 1, `consultant-01-my-documents`. Ask: `donne moi la page confluence qui parle de kubevirt et openshift virtualisation dans la meme page` | "The same workflow also searches Confluence, with my rights. These pages are open to the consultant Confluence groups only. And the question can be in French." | The page **O3 : Openshift - Kubevirt**, with its link ([screenshot](../assets/img/unifai-rag-personal-confluence-answer.png), 2026-11-05). |
-| 9:30 | **Optional, outside a freeze only.** Terminal: push the commit prepared in [Appendix C](#appendix-c---setup), then run `make d2 install unifai` | "A Confluence source syncs every 6 hours. I can also ask for a sync now: a new token in Git, applied by Argo CD." | `make` exits 0 after a few minutes. Carry on with the next rows meanwhile. During a freeze, skip this row and the row at 12:45. |
+| 9:30 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** Terminal: push the commit prepared in [Presenter lifecycle, Start](#start), then run `make d2 install unifai` | "A Confluence source syncs every 6 hours. I can also ask for a sync now: a new token in Git, applied by Argo CD." | `make` exits 0 after a few minutes. Carry on with the next rows meanwhile. During a freeze, skip this row and the row at 12:45. |
 | 10:00 | `oc get unifairagsources tekos-satellite tekos-openshift -n zuno-unifai -o custom-columns=NAME:.metadata.name,PHASE:.status.phase,MSG:.status.message,ACL:.spec.aclGroups` | "Each shared source names the Keycloak groups that may search it. sale-01 is in none of them." | `tekos-satellite` with `90 pages (...)` and `tekos-openshift` with `411 pages (...)`, each with three `consultant/confluence-*` groups. |
 | 11:00 | `oc get unifairetriever consultant-01-documents -n zuno-unifai -o jsonpath='{.spec.config}'` | "My personal retriever: my uploads plus Confluence, with my token, the five best passages above a score of 0.3." | `source_type` `DOCUMENT`, `extra_source_types` `["CONFLUENCE"]`, `forward_user_token` true, `top_k_results` 5, `threshold` 0.3. |
 | 11:45 | Grafana **Agents, tools & RAG**, row **RAG**, panels **RAG searches (rate, by outcome/source type)** and **RAG search latency (p50/p95, seconds)** | "Every search is measured, by outcome and by source type, with its latency." | The searches of the last minutes. |
-| 12:45 | Optional, after 9:30: `oc get unifairagsource tekos-satellite -n zuno-unifai -w -o custom-columns=PHASE:.status.phase,PIPELINE:.status.pipelineStatus,MSG:.status.message`. When one page has changed, ask `consultant-01-my-documents` about the word you noted, in your own words (no tested prompt) | "Only the changed page is embedded again. The answer quotes the new version." | `90 pages (1 changed, 0 deleted at the last sync)`, then an answer that quotes the edited page, with its link. |
+| 12:45 | Optional cluster change, after 9:30, by hand. The step only reads: `oc get unifairagsource tekos-satellite -n zuno-unifai -w -o custom-columns=PHASE:.status.phase,PIPELINE:.status.pipelineStatus,MSG:.status.message`. When one page has changed, ask `consultant-01-my-documents` about the word you noted, in your own words (no tested prompt) | "Only the changed page is embedded again. The answer quotes the new version." | `90 pages (1 changed, 0 deleted at the last sync)`, then an answer that quotes the edited page, with its link. |
 | 14:00 | Close | Repeat the message. | |
 
 ## If something goes wrong
@@ -260,25 +319,3 @@ flowchart LR
   SRC -.-> OPR
   CEL -->|"incremental sync, technical identity<br/>Vault confluence/technical"| CONF[("Confluence<br/>startxfr.atlassian.net")]
 ```
-
-## Appendix C - Setup
-
-The optional Confluence resync of the 15-minute version (rows 9:30 and 12:45). **Never during a freeze**: the push
-and `make d2 install unifai` change the cluster ([freeze protocol](freeze-protocol.md)).
-
-1. **Edit a page** under `Technologie : Satellite` in the Confluence space SXSI, with your own Atlassian account. Note
-   a word that only the new version contains. `startxfr.atlassian.net` is a real company site: change a page you may
-   change, and revert the edit after the session (the next scheduled sync picks the revert up).
-2. **Prepare the commit, without pushing it.** In `ansible/clusters/demo333.yml`, under
-   `zuno_unifai_values.ragSources`, set a new `resyncToken` on the source whose tree holds the page:
-
-   ```yaml
-   - name: tekos-satellite
-     resyncToken: demo-2026-11-05-1   # any new value queues a sync at once
-   ```
-
-   The value above is the one of the 2026-11-05 run; use a new one. Never `oc patch` the object instead: Argo CD
-   selfHeal reverts the change, which changes the hash again and queues a second sync.
-3. **On stage** (row 9:30): push the commit, then run `make d2 install unifai`.
-4. **Expected timing** (2026-11-05): after `make d2 install unifai`, `tekos-openshift` reported
-   `411 pages (1 changed, 0 deleted at the last sync)` within a minute.
