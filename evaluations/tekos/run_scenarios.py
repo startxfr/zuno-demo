@@ -117,7 +117,10 @@ class ScenarioResult:
     skipped: bool = False
 
 
-_token_cache: Dict[str, str] = {}
+# persona -> (access token, time.monotonic() after which a fresh one is fetched)
+_token_cache: Dict[str, tuple] = {}
+# Re-mint this long before the token's own expiry, so a call never carries a token that expires on the way.
+TOKEN_REFRESH_MARGIN_SECONDS = 30
 
 
 def _login_name(persona: str) -> str:
@@ -133,9 +136,16 @@ def get_token(persona: str) -> str:
     the UnifAI UI's own browser OIDC flow, see unifai_target.py). The token
     is for the platform services called directly below (MCP gateway,
     ai-gateway); UnifAI itself is driven through a session cookie.
+
+    The token is cached per persona until shortly before its `expires_in`: a
+    long run (the Arkos gate with its trace-proven scenarios takes longer than
+    the realm's access-token lifespan) otherwise sends an expired token to the
+    last checks, which then fail on 401 "Signature has expired" instead of
+    testing what they test.
     """
-    if persona in _token_cache:
-        return _token_cache[persona]
+    cached = _token_cache.get(persona)
+    if cached and time.monotonic() < cached[1]:
+        return cached[0]
     if not TOKEN_CLIENT_SECRET:
         raise RuntimeError("EVAL_CLIENT_SECRET (zuno-evaluations) is required to obtain persona tokens")
     if not DEMO_PASSWORD:
@@ -154,8 +164,10 @@ def get_token(persona: str) -> str:
         timeout=10,
     )
     resp.raise_for_status()
-    token = resp.json()["access_token"]
-    _token_cache[persona] = token
+    body = resp.json()
+    token = body["access_token"]
+    lifetime = int(body.get("expires_in") or 60)
+    _token_cache[persona] = (token, time.monotonic() + max(lifetime - TOKEN_REFRESH_MARGIN_SECONDS, 0))
     return token
 
 

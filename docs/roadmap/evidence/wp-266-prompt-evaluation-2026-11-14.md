@@ -120,3 +120,30 @@ Both halves of the coding pair are proven. The repeated delegation shows in abou
   v1.0.0 were a one-off.
 - The repetition belongs to the operator's delegation loop, and it was reported to the fork maintainers. It is not
   caused by the prompts.
+
+## The Arkos acceptance gate with Tempo, 2026-11-14 16:45-17:50 UTC
+
+The gate Job now has `TEMPO_URL` (ba9302d9), so the trace-proven scenarios run instead of being skipped. It ran twice for
+Arkos, through `day2_check.yml -e agent_name=arkos`. The default `make d2 check agents` gates Tekos only.
+
+| Check | Run 1 | Run 2 |
+|---|---|---|
+| Scenarios | 19/20 | 17/20 (threshold 75%) |
+| 22, code at C3 on gpt-oss-20b | pass | pass |
+| 21, delegation to Tekos | pass (3 A2A messages at most) | fail: the model did not delegate |
+| 10, DAT cites live Confluence | fail: the model read Git instead | fail |
+| 11, RAG citation | pass | fail |
+| `unifai_forwards_identity_to_the_gateways` | pass | fail: the model called no tool |
+| `a2a_gateway_denies_unentitled_callers_like_unknown_agents`, `tekos_retriever_finds_red_hat_docs…` | **fail: 401 "Signature has expired"** | pass |
+
+Run 1 exposed a harness defect: `get_token` cached each persona's token for the whole run. Since the gate runs the
+trace-proven scenarios, it lasts longer than the realm's access-token lifespan, so the last checks sent expired tokens.
+The fix re-mints a token 30 s before its `expires_in`, with a unit test. Run 2 has no 401.
+
+The remaining failures depend on the model's choices on a given turn:
+- gpt-oss-20b at C3 sometimes reads Git instead of Confluence;
+- it does not always delegate;
+- it does not always call the tool a check needs.
+
+They vary from run to run, so they are not regressions of the bundles. The Arkos gate is not part of the regular
+`make d2 check agents`.

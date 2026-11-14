@@ -111,15 +111,21 @@ Run the 5-minute version, then:
 
 ### The coding pair: C1 and C3
 
-Optional, 3 minutes, once agents v1.0.1 is promoted. The same code request goes to two agents. The level belongs to
-the task, and the level decides the model: Tekos works on C1 data, Arkos on C3 customer architecture. Not rehearsed
-yet; scenarios tekos 21 and arkos 22 (`chat_routing`) prove the same thing in the acceptance gate.
+Optional, 3 minutes, since agents v1.0.1 (promoted on demo333 on 2026-11-14). The same code request goes to two
+agents. The level belongs to the task, and the level decides the model: Tekos works on C1 data, Arkos on C3 customer
+architecture.
+
+Dry-run on 2026-11-14:
+- **API and Tempo, not the UI.** Tekos answered in 1.8 s and Arkos in 23 s. The Tempo search below returned exactly the
+  values in the last column.
+- **Personas.** `consultant-01` holds both `agent_tekos` and `agent_arkos`.
+- **Acceptance gate.** Scenarios tekos 21 and arkos 22 (`chat_routing`) prove the same thing there.
 
 | Do | Say | You should see |
 |---|---|---|
 | UnifAI as **consultant-01**, workspace `agent-tekos`, workflow `tekos-write-code`, ask: `Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.` | "Tekos works on public and internal data, C1. A code request goes to the best code model, Mistral Codestral." | A NetworkPolicy manifest in a few seconds. |
 | Workspace `agent-arkos`, workflow `arkos-write-code`, same request | "Arkos works on our customers' architecture, C3. The same request never leaves our GPUs: gpt-oss-20b answers." | The same kind of manifest, a little slower (plan, draft and write stages). |
-| Tempo search UI: service `ai-gateway`, operation `model_call`, tag `zuno.task=write-code`, last 15 minutes | "Same request, two levels, two models. Nobody chose the model: the level of the task did." | Tekos: `zuno.provider=mistral-codestral`, `zuno.model_kind=saas`, `zuno.classification=C1`. Arkos: `zuno.provider=local-gpt-oss-maas`, `zuno.model=gpt-oss-20b`, `zuno.model_kind=local`, `zuno.classification=C3`. |
+| Tempo search UI: service `ai-gateway`, operation `model_call`, tag `zuno.task=write-code`, last 15 minutes | "Same request, two levels, two models. Nobody chose the model: the level of the task did." | Tekos: `zuno.provider=mistral-codestral`, `zuno.model=codestral-latest`, `zuno.model_kind=saas`, `zuno.classification=C1`. Arkos: `zuno.provider=local-gpt-oss-maas`, `zuno.model=gpt-oss-20b`, `zuno.model_kind=local`, `zuno.classification=C3`. |
 
 ## If something goes wrong
 

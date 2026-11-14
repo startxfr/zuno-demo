@@ -889,3 +889,34 @@ def test_chat_routing_uses_the_routing_decision_without_a_trace_backend_and_fail
 def test_chat_routing_is_skipped_not_passed_without_any_evidence():
     out = _chat_routing("tekos", "", "None", "RuntimeError('must not be called')", '["mistral-codestral"]', "C1")
     assert out.startswith("False True") and "TEMPO_URL" in out, out
+
+
+# --- persona tokens are re-minted before they expire (a long gate run outlives the realm's token lifespan) ---------
+
+
+def test_get_token_is_cached_until_shortly_before_expiry_then_reminted():
+    out = _probe(
+        "tekos",
+        """
+        import run_scenarios as rs
+        rs.TOKEN_CLIENT_SECRET, rs.DEMO_PASSWORD = "s", "pw"
+        clock = {"now": 1000.0}
+        rs.time.monotonic = lambda: clock["now"]
+        minted = []
+        class Resp:
+            def __init__(self, n): self.n = n
+            def raise_for_status(self): pass
+            def json(self): return {"access_token": f"t{self.n}", "expires_in": 300}
+        def post(*a, **k):
+            minted.append(1)
+            return Resp(len(minted))
+        rs.httpx.post = post
+        first = rs.get_token("consultant-01")
+        clock["now"] += 200            # still fresh: cached
+        second = rs.get_token("consultant-01")
+        clock["now"] += 80             # 280 s after minting: inside the 30 s margin of a 300 s token
+        third = rs.get_token("consultant-01")
+        print(first, second, third, len(minted))
+        """,
+    )
+    assert out.endswith("t1 t1 t2 2"), out
