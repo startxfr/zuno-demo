@@ -238,15 +238,20 @@ preferences:
   - local
 - agent: arkos
   task: write-code
-  prefer:
-  - mistral-codestral
-  strict: true
+  preferred:
+  - local-gpt-oss-maas
+  - local-gpt-oss
+  fallback:
+  - local-maas
+  - local
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: tekos
   task: write-code
   prefer:
   - mistral-codestral
-  - local-wesh-maas
-  - local-wesh
   - local-gpt-oss-maas
   - local-gpt-oss
   - local-maas
