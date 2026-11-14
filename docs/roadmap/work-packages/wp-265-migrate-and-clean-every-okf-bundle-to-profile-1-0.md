@@ -1,6 +1,6 @@
 # WP-265: Migrate and clean every OKF bundle to profile 1.0
 
-- **State:** Repo work merged (2026-11-14: zuno-demo-agents PR #52 merged; 8 of 8 bundles on profile 1.0, no authorization field changed)
+- **State:** Done (2026-11-14: zuno-demo-agents PR #52, released in v1.0.0 and live on demo333: 8 of 8 bundles on profile 1.0, no authorization field changed)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 2 to 4, 10)
 - **Depends on:** WP-262
 - **Related:** [WP-266](wp-266-complete-tool-and-rag-notes-and-task-prompts.md), [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md)

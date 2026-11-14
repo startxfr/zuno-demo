@@ -1,6 +1,6 @@
 # WP-267: Release and promote zuno-demo-agents v1.0.0, platform integration page
 
-- **State:** Not started
+- **State:** Done (2026-11-14: release PR #54, v1.0.0 published 07:59 UTC (corp d2e1ae52); copied into the internal Quay; promoted at ed681c6f with the owner's go; `make d2 install mcp` and `unifai`, ai-gateway and mlops rebuilt and signed; golden path 13/13 before and after)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 11, 12), [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md), [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md)
 - **Depends on:** WP-263, WP-264, WP-265 (WP-266 or its cut line)
 - **Related:** [WP-268](wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md)

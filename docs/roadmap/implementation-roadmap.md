@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 8 | 5 | 25 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-262, WP-263, WP-264, WP-265, WP-266, WP-267, WP-268 |
+| v0.17 | 8 | 5 | 25 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1144,12 +1144,12 @@ step waits for the owner's go. Legacy documents are refused with the unifai-oper
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-262 | [wp-262](work-packages/wp-262-okf-profile-1-0-schemas-tooling-and-agents-docs.md) | 0615 | none | Repo work merged | none until the v1.0.0 release (WP-267) |
-| WP-263 | [wp-263](work-packages/wp-263-zuno-demo-okf-readers-accept-profile-1-0.md) | 0615 | WP-262 | Operator pending | `make d2 check agents` once the mirror holds the locked release (WP-267 mirror step) |
-| WP-264 | [wp-264](work-packages/wp-264-unifai-operator-reads-okf-profile-1-0.md) | 0615 | WP-262 | Repo work merged | canary on the operator of the fork head, manual cut-release v0.1.71, copy into Quay, pin |
-| WP-265 | [wp-265](work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | 0615 | WP-262 | Repo work merged | none until the v1.0.0 release (WP-267) |
-| WP-266 | [wp-266](work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | 0615 | WP-262, WP-265 | Operator pending | evaluate the new prompts of tekos, arkos and comage on a canary or through the acceptance gate |
-| WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Not started | release pull request approval, promotion merge, mirror, `make d2 install mcp` and `unifai` (the owner's go for each) |
+| WP-262 | [wp-262](work-packages/wp-262-okf-profile-1-0-schemas-tooling-and-agents-docs.md) | 0615 | none | Done | none |
+| WP-263 | [wp-263](work-packages/wp-263-zuno-demo-okf-readers-accept-profile-1-0.md) | 0615 | WP-262 | Done | none |
+| WP-264 | [wp-264](work-packages/wp-264-unifai-operator-reads-okf-profile-1-0.md) | 0615 | WP-262 | Done | none |
+| WP-265 | [wp-265](work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | 0615 | WP-262 | Done | none |
+| WP-266 | [wp-266](work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | 0615 | WP-262, WP-265 | Done | none |
+| WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Done | none |
 | WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | with the unifai-operator 0.2 line, not before the 0.1 freeze of 2026-12-01 (date set with the owner) |
 
 ### OKF stream phases
@@ -1297,6 +1297,7 @@ moving.
 ## Change log
 
 - 2026-11-14 — WP-264 Repo work merged: the operator patch is on the fork `devel` as 5f55e4e91 (envtest green). Remaining: the canary on that operator, the manual cut of v0.1.71, the copy into Quay and the pin. The canary e2e pulls a legacy-format artifact, so it proves the non-regression of v0.2/v0.3 reading, not profile 1.0 on a cluster (that needs a signed profile 1.0 artifact, WP-267).
+- 2026-11-14 — ADR-0615: WP-262 to WP-267 Done. zuno-demo-agents v1.0.0 (Zuno OKF profile 1.0) is released and promoted on demo333 (ed681c6f) with unifai-operator v0.1.71 (ea1420b0), each step with the owner's go; golden path 13/13 before and after; `make d2 check agents` OVERALL PASS; the six new prompts evaluated before and after (evidence/wp-266-prompt-evaluation-2026-11-14.md). WP-268 stays open (operator 0.2 line).
 - 2026-11-14 — ADR-0615 clause 13 amended by the owner: the unifai-operator 0.1 line keeps reading legacy v0.2/v0.3 OKF documents; WP-268 (renamed, was "from 2026-12-01") refuses them with the operator's 0.2 line, not before the 0.1 freeze of 2026-12-01, at a date set with the owner. The zuno-demo-agents docs say the same (PR #55).
 - 2026-11-14 — ADR-0615 progress: WP-262 and WP-265 Repo work merged (zuno-demo-agents PRs #51 and #52), WP-263 Operator pending (readers pushed, five images rebuilt and rolled with the owner's go, golden path 13/13 before and after; `make d2 check agents` is blocked by a pre-existing gap, the locked v0.14.4 was never copied into the internal Quay), WP-264 Repo work in review (operator patch handed to the fork owner), WP-266 Operator pending (prompt evaluation).
 - 2026-11-14 — ADR-0615 and WP-262 to WP-268 added (Phase 55, v0.17), Accepted / Not started, by the user's decisions of the day: the Zuno OKF profile 1.0 aligned with upstream OKF 0.2 (Google Cloud), frozen, every bundle migrated and cleaned, documentation per repository, zuno-demo-agents v1.0.0 with unifai-operator v0.1.71, legacy documents refused from 2026-12-01. ADR-0038, ADR-0513 and ADR-0579 are superseded in part. WP-255 to WP-259 move to Repo work merged: their pages shipped in zuno-demo-agents v0.14.4 (commits c7e4ba2, e7170d0, ef03a67, 21c821e, f908eb3); their canary and unifai-compare proofs remain.

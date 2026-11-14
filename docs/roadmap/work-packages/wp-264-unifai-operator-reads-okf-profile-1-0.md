@@ -1,6 +1,6 @@
 # WP-264: unifai-operator reads OKF profile 1.0 (v0.1.71)
 
-- **State:** Repo work merged (2026-11-14: applied on the fork `devel` as 5f55e4e91; envtest green; waits for the canary, the manual cut of v0.1.71, the copy into Quay and the pin)
+- **State:** Done (2026-11-14: fork devel 5f55e4e91 and 86591ce1d; canary green on demo333; v0.1.71 cut manually and pinned (ea1420b0); tekos, arkos and comage Ready on profile 1.0, Valid "OKF 0.2, profile 1.0", display.maintainer read from zuno.maintainer)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 4, 5, 7, 11, 12), [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md)
 - **Depends on:** WP-262 (the frozen schemas)
 - **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md), [WP-268](wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md)
