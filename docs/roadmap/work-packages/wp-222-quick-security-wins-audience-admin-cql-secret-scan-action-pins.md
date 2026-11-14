@@ -1,9 +1,11 @@
 # WP-222: Quick security wins: audience flag, admin authentication, CQL escaping, secret scan, action pins (delivers ADR-0602, ADR-0603)
 
-- **State:** Done (2026-11-07, user decision). The repo work is merged into `devel` locally (not pushed). Named
-  exception: the live checks of the rollout (audience refusal, admin routes, Confluence CQL) are not run; the user
-  closed the package without them. The push, the in-cluster build of both gateways and the ArgoCD sync still wait for
-  the user's go.
+- **State:** Done (2026-11-07, user decision). The repo work is on `devel` (merge cfd22f0e, 2026-11-07) and live: on
+  2026-11-14 both gateways run with `JWT_AUDIENCE=zuno-admin-api` and `JWT_AUDIENCE_REQUIRED=true`. Named exception:
+  the live checks of the rollout (audience refusal, admin routes, Confluence CQL) are not run; the user closed the
+  package without them. The zuno-demo-agents part, never pushed from `wp-222-action-pins`, was replayed onto the
+  agents' current `devel` and opened as PR startxfr/zuno-demo-agents#60 on 2026-11-14 (CI green); it reaches a release
+  with the next agents release, which needs the user's go.
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** none
 - **Blocks:** WP-227
@@ -27,7 +29,8 @@ ADR-0602 clauses 6 and 7; ADR-0603 clause 1 (M10, M11, M19, M21).
   tokens are refused. No Keycloak change: `job-client-reconcile.yaml` already applies the realm's clients live. OpenShift
   opaque tokens on the `/mcp` front door go through TokenReview, not JWT validation, and are unaffected.
 - **Admin routes: `enforce` by default**, groups `ocp-paas-ops,ocp-ai-ops`; `ADMIN_AUTH_MODE=off` is the visible opt-out.
-- **Same pinning and secret scan in zuno-demo-agents** (branch `wp-222-action-pins`, local commit, not pushed).
+- **Same pinning and secret scan in zuno-demo-agents** (branch `wp-222-action-pins`, local commit, not pushed; now
+  PR #60, see State).
 
 ## Repo changes
 
