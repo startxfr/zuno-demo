@@ -71,17 +71,53 @@ The scenario pages name a few more accounts; their Personas sections say which.
 | 0:33 | The proof | [Sovereignty, 15-minute version](../scenarios/governance/ai-gateway-sovereignty.md#15-minute-version), only its Tempo step (10:30) and its skipped-candidates step (12:30) | |
 | 0:38 | Close and questions | Repeat the message | |
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Run once the "Before you start" checklist of every scenario in the agenda. The items they share:
-  - [ ] One browser profile per persona, signed in before the session: **sale-01**, **consultant-02** and
-    **finance-01**.
-  - [ ] Grafana and the Tempo search UI, signed in as **ai-ops-01**.
-  - [ ] A terminal at the repository root, logged in with `oc` as **paas-ops-01**. The persona must have signed in to
-    OpenShift once.
-- [ ] Check that the probes listed in the status banner passed within the last hour.
-- [ ] Check that the local models are Ready: `oc get llminferenceservice -n zuno-ai-run`. Sovereignty needs at least
-  one.
+`make demo use sovereign-governed-ai` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
+version its agenda row names. One typed guard, `DEMO_CONFIRM=sovereign-governed-ai`, covers the workshop. Each section below says
+only what is the workshop's own, or "Nothing to do.".
+
+### Status
+
+The local models must be Ready: `oc get llminferenceservice -n zuno-ai-run`. Sovereignty needs at least one. The
+scenarios' statuses are those of [Identity and personas](../scenarios/governance/identity-personas.md#presenter-lifecycle), [MCP tools by group](../scenarios/governance/mcp-tools-by-group.md#presenter-lifecycle), [Sovereignty](../scenarios/governance/ai-gateway-sovereignty.md#presenter-lifecycle), [Model routing](../scenarios/governance/ai-gateway-routing.md#presenter-lifecycle), [Guardrails](../scenarios/governance/guardrails.md#presenter-lifecycle), [One budget per persona](../scenarios/governance/quotas.md#presenter-lifecycle), in that order. The proof block plays two steps of the sovereignty scenario again.
+
+### Check
+
+The merged probes are `ONLY=tools,open-webui,sovereignty,unifai-tekos,trace,zuno-code,guardrails make demo golden-path`
+(`trace` looks up the run that `unifai-tekos` makes, so the two go together). The merged browser run covers `dify`
+(guardrails). All of them must have passed within the last hour. The identity and budget blocks have no probe:
+rehearse them the same day. When one block is red, skip that block and say what it would have shown, as
+[If something goes wrong](#if-something-goes-wrong) says.
+
+### Install
+
+Nothing to do.
+
+### Start
+
+The scenarios' Start sections already say how to sign in to each product. Only what they share is the workshop's own:
+
+- [ ] One browser profile per persona, signed in before the session: **sale-01**, **consultant-02** and
+  **finance-01**.
+- [ ] Grafana and the Tempo search UI, signed in as **ai-ops-01**.
+- [ ] A terminal at the repository root, logged in with `oc` as **paas-ops-01**. The persona must have signed in to
+  OpenShift once.
+- Every block plays its 5-minute version: skip the "15-minute version" items of the scenarios.
+- Changing unit: Start of the [one-budget scenario](../scenarios/governance/quotas.md#presenter-lifecycle) spends **sale-01**'s token budget. Run it
+  hours before the session, not on stage: the spend is not undone. The single typed guard
+  `DEMO_CONFIRM=sovereign-governed-ai` covers the workshop, quotas included.
+
+### Stop
+
+Nothing to do. The scenarios' Stop sections close their browser profiles and terminals. The budget spent by the quotas
+Start stays spent until the 24-hour window restarts at 00:00 UTC.
+
+### Uninstall
+
+Nothing to do.
 
 ## If time runs short
 
