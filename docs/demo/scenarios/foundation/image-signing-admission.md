@@ -72,23 +72,52 @@ Other identities:
   administrator record is at `zuno/registry/quay-admin`. Not used on stage.
 - **The presenter's `oc` session**: **paas-ops-01**, which must have signed in to OpenShift once.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console (on 2026-11-13 it had not). Then log a terminal in with
-  `oc` as **paas-ops-01**, at the repository root, large font.
-- [ ] `oc get mcp`: both pools `UPDATED True`, `UPDATING False`. No `ImageDigestMirrorSet` change may be planned that
-  day: removing a source drains every node (see [Limits](#limits)).
-- [ ] `oc get securesign -n zuno-rhtas` shows `Ready`, and `oc get quayregistry -n zuno-registry` shows
-  `AVAILABLE True`.
-- [ ] `make d2 check supply-chain` writes a ConfigMap and a Job in `zuno-ai-build`. Run it before the session only with
-  the owner's go (rehearsal only). On stage, show the last Job instead.
+`make demo use image-signing-admission 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/image-signing-admission/<action>.yml`) has run, and says
+what is left to the presenter. `make d2 check supply-chain` writes a Job, so it is a changing unit and no step runs it.
+
+### Status
+
+Nothing to do. The file reads the two machine config pools (`oc get mcp`: both `UPDATED True`, `UPDATING False`), the
+`Securesign` `zuno-securesign` in `zuno-rhtas` and the `QuayRegistry` `quay` in `zuno-registry` (`AVAILABLE True`). If
+one is not as expected, stop and tell the platform owner: this demo installs nothing. No `ImageDigestMirrorSet`
+change may be planned that day: removing a source drains every node (see [Limits](#limits)).
+
+### Check
+
+Nothing to do when it passes. It reads the Securesign, the policy controller, the `ClusterImagePolicies` and Quay. No
+golden-path probe covers this page. `make d2 check supply-chain` is not part of Check and not run by any step: it
+writes a ConfigMap and a Job in `zuno-ai-build`. Run it by hand before the session only with the owner's go
+(rehearsal only). On stage, show the last Job instead (row 10:30 of the 15-minute version).
+
+### Install
+
+Nothing to do. RHTAS, the policy controller and Quay are part of the shared platform: the file only verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
+  terminal in.
 - [ ] 15-minute version: open [WP-178](../../../roadmap/work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md)
   at step 4 of its Steps, and [`platform/supply-chain/pinned-releases.yaml`](../../../../platform/supply-chain/pinned-releases.yaml)
   at its last entry.
-- [ ] Known on screen, not a failure: `oc get clusterimagepolicy` alone lists only `openshift`, OpenShift's own
+- Known on screen, not a failure: `oc get clusterimagepolicy` alone lists only `openshift`, OpenShift's own
   resource of the same name. Always type `clusterimagepolicies.policy.sigstore.dev`.
-- [ ] Known on screen, not a failure: `zuno-first-party-images` is in `enforce`, but no opted-in namespace runs a
+- Known on screen, not a failure: `zuno-first-party-images` is in `enforce`, but no opted-in namespace runs a
   first-party image yet. Say so if asked.
+
+### Stop
+
+Nothing to do. Close the terminal and the tabs.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
