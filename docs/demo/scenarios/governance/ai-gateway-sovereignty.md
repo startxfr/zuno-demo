@@ -57,14 +57,39 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana and the Tempo search UI. | Shows the trace of the call and the skipped candidates in the 15-minute version. |
 | **consultant-01**, **consultant-02** | Consultants and architects, front office. Entitled to Arkos. | Use Arkos in UnifAI to draft architecture documents (DAT) for clients. | Named only: they are the real users whose client data the C3 floor protects. Not signed in during this scenario. |
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use ai-gateway-sovereignty 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/ai-gateway-sovereignty/<action>.yml`)
+has run, and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1`, the Deployment `ai-gateway`, the ConfigMap
+`ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), the gateway environment
+(`CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`), Tempo and the
+`LLMInferenceService` models in `zuno-ai-run`. If one is missing or not Healthy, stop and tell the platform owner:
+this demo installs nothing. At least one local model must be `Ready=True` for a C3 answer. On 2026-11-12 the local
+models were restarting (one of four Ready) and Grafana was down: read this section before any session.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probes `sovereignty` and `trace` (see
+[golden-path.md](../../golden-path.md)). The probe `trace` looks up the run of `unifai-tekos`, so the file runs them
+together; the 15-minute version relies on Tempo, which `trace` checks. Both must print `PASS`. If `sovereignty` fails,
+read [If something goes wrong](#if-something-goes-wrong) now, not on stage.
+
+### Install
+
+Nothing to do. The classification is part of the shared platform: the file only verifies it.
+
+### Start
+
+Nothing is prepared by the file. The 1:00 row runs `ONLY=sovereignty make demo golden-path` itself, a read the step
+is allowed to run. What only a person does:
 
 - [ ] A terminal at the repository root, logged in to demo333 with `oc` as **paas-ops-01** (or `kube:admin`): the
   probe calls the gateway from inside its pod. Large font, dark background.
-- [ ] Run `ONLY=sovereignty make demo golden-path` once before the session. It must print `PASS` for `sovereignty`.
-  If it fails, read "If something goes wrong" now, not on stage.
-- [ ] Check the local models: `oc get llminferenceservice -n zuno-ai-run`. At least one must be `Ready=True` for a C3
-  answer.
 - [ ] 15-minute version:
   - [ ] the Tempo search UI `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr`, signed in as
     **ai-ops-01** (OpenShift sign-in);
@@ -73,6 +98,14 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
     [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md).
 - [ ] Optional contrast: the [Open WebUI scenario](../experiences/open-webui.md) already shown, with its **Zuno Code**
   answer served by Codestral.
+
+### Stop
+
+Nothing to do. Close the terminal and the browser profiles.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
