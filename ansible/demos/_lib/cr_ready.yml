@@ -1,0 +1,41 @@
+---
+# Check reads (salvaged from the retired demo_check.yml: the Keycloak CR, the LLMInferenceServices): each custom
+# resource has its condition True, or its status.phase equal to the expected one.
+# Vars: cr_ready ([{api_version, kind, name, namespace, condition (default Ready) | phase}]).
+- name: "demo | read the custom resources"
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.api_version }}"
+    kind: "{{ item.kind }}"
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  loop: "{{ cr_ready | default([]) }}"
+  loop_control:
+    label: "{{ item.kind }} {{ item.namespace }}/{{ item.name }}"
+  register: _demo_crs
+  failed_when: false
+
+- name: "demo | record the custom resources"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ _demo_crs.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.kind }} {{ item.item.namespace }}/{{ item.item.name }}"
+  vars:
+    _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_condition: "{{ item.item.condition | default('Ready') }}"
+    _demo_cond_status: >-
+      {{ _demo_obj.status.conditions | default([]) | selectattr('type', 'equalto', _demo_condition)
+         | map(attribute='status') | first | default('absent') }}
+    _demo_phase: "{{ _demo_obj.status.phase | default('absent') }}"
+    _demo_ok: >-
+      {{ (_demo_phase == item.item.phase) if item.item.phase is defined else (_demo_cond_status == 'True') }}
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "{{ item.item.kind | lower }}/{{ item.item.namespace }}/{{ item.item.name }}"
+      category: custom-resource
+      passed: "{{ (_demo_obj | length > 0) and (_demo_ok | bool) }}"
+      detail: >-
+        {{ 'not found' if not _demo_obj else (('phase ' ~ _demo_phase) if item.item.phase is defined
+           else (_demo_condition ~ '=' ~ _demo_cond_status)) }}
+      duration_ms: 0

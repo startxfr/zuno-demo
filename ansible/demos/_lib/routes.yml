@@ -1,0 +1,31 @@
+---
+# Status reads: each Route exists; its host is recorded.
+# Vars: routes ([{name, namespace}]).
+- name: "demo | read the Routes"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  loop: "{{ routes | default([]) }}"
+  loop_control:
+    label: "{{ item.namespace }}/{{ item.name }}"
+  register: _demo_routes
+  failed_when: false
+
+- name: "demo | record the Routes"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ _demo_routes.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.namespace }}/{{ item.item.name }}"
+  vars:
+    _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "route/{{ item.item.namespace }}/{{ item.item.name }}"
+      category: route
+      passed: "{{ _demo_obj | length > 0 }}"
+      detail: "{{ ('https://' ~ _demo_obj.spec.host) if _demo_obj else 'not found' }}"
+      duration_ms: 0

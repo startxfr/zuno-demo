@@ -1,0 +1,7 @@
+---
+# 6:00 - Terminal: `git show zuno-fixture-no-such-ref` (fails on purpose: the failure path).
+- name: "fixture | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "git show zuno-fixture-no-such-ref"

@@ -84,6 +84,17 @@ jobs:
       # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
       - name: Markdown link and anchor tests (doc_links)
         run: python3 platform/docs/tests/test_doc_links.py
+      # ADR-0616 (WP-270): the demo pages parse into steps, the read-only allowlist of the steps, the guards and the
+      # session. The end-to-end cases on the fixture skip here (no ansible-playbook in this job); they run in the
+      # ansible job below. The smoke test lists the catalogue and selects a demo from an empty HOME.
+      - name: Demo lifecycle engine tests (ADR-0616)
+        run: |
+          python3 platform/demo/tests/test_catalogue_parser.py
+          python3 platform/demo/tests/test_readonly.py
+          python3 platform/demo/tests/test_guard_session.py
+          home="$(mktemp -d)"
+          HOME="$home" make demo list
+          HOME="$home" make demo use guardrails 15
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).
@@ -540,6 +551,11 @@ jobs:
           for playbook in ansible/playbooks/*.yml; do
             ansible-playbook -i ansible/inventories/demo/hosts.yml "$playbook" --syntax-check
           done
+      # ADR-0616 (WP-270): action -> demo_run.yml -> results -> page section, on the fixture demo, which needs no
+      # cluster. The tests run with a temporary HOME and pass PYTHONUSERBASE on, so an Ansible installed in the user
+      # site stays importable.
+      - name: Demo lifecycle runner end to end on the fixture (ADR-0616)
+        run: python3 platform/demo/tests/test_guard_session.py
 
   # ADR-0580/WP-160: the agents release this platform pins is re-verified on
   # every change, offline against the committed Sigstore trust root, and

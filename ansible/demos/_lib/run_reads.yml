@@ -1,0 +1,42 @@
+---
+# Run a step's or an action's read-only commands without a shell (ADR-0616 clause 5), through
+# platform/demo/readonly.py, which refuses anything outside the allowlist and masks the `$(oc whoami -t)` token.
+#
+# Vars:
+#   run_reads: commands as written on the page, each a string or {cmd, page_text}. `page_text` is the cell's command
+#     when `cmd` differs from it (a watch flag removed: the read runs once). A command holding `{{` must be tagged
+#     !unsafe, or Ansible would template it.
+#   not_run: [{page_text, reason}] - commands of the Do cell the file deliberately does not run.
+- name: "demo | run the reads without a shell (platform/demo/readonly.py)"
+  ansible.builtin.command:
+    argv: ["python3", "{{ demo_readonly }}", "run", "--json", "{{ item.cmd if item is mapping else item }}"]
+    chdir: "{{ zuno_repo_root }}"
+  loop: "{{ run_reads | default([]) }}"
+  loop_control:
+    label: "{{ item.cmd if item is mapping else item }}"
+  register: _demo_reads
+  changed_when: false
+  failed_when: false
+
+- name: "demo | record the reads"
+  ansible.builtin.set_fact:
+    demo_unit_commands: "{{ demo_unit_commands + [_demo_read] }}"
+  loop: "{{ _demo_reads.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.cmd if item.item is mapping else item.item }}"
+  vars:
+    _demo_cmd: "{{ item.item.cmd if item.item is mapping else item.item }}"
+    _demo_parsed: >-
+      {{ (item.stdout | from_json) if (item.stdout | default('') | trim).startswith('{')
+         else {'cmd': _demo_cmd, 'rc': item.rc | default(1), 'output': item.stderr | default('readonly.py failed'),
+               'truncated': false, 'refused': false} }}
+    _demo_read: >-
+      {{ _demo_parsed | combine({'page_text': item.item.page_text})
+         if (item.item is mapping and item.item.page_text is defined) else _demo_parsed }}
+
+- name: "demo | record the commands not run"
+  ansible.builtin.set_fact:
+    demo_unit_messages: "{{ demo_unit_messages + ['Not run: ' ~ item.page_text ~ ' (' ~ item.reason ~ ')'] }}"
+  loop: "{{ not_run | default([]) }}"
+  loop_control:
+    label: "{{ item.page_text }}"

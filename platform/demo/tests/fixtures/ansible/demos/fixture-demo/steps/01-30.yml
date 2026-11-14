@@ -1,0 +1,4 @@
+---
+# 1:30 - declared mutating in demo.yml: never run by `step`, SKIPPED (mutating) by `rehearse`.
+- name: "fixture | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"

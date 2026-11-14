@@ -1,0 +1,51 @@
+---
+# Run the queued checks once each (ADR-0616 clause 9): one `golden_path_probe.py --only` run and one
+# `browser/run.sh` with ONLY=, both read-only and allowed during a freeze; then empty the queues.
+- name: "demo | run the queued golden-path probes ({{ demo_queued_probes | join(',') }})"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/evaluations/golden_path_probe.py", "--only", "{{ demo_queued_probes | join(',') }}"]
+    chdir: "{{ zuno_repo_root }}"
+  register: _demo_golden
+  changed_when: false
+  failed_when: false
+  timeout: 1800
+  when: demo_queued_probes | length > 0
+
+- name: "demo | run the queued browser checks ({{ demo_queued_browser | join(',') }})"
+  ansible.builtin.command:
+    argv: ["{{ zuno_repo_root }}/evaluations/browser/run.sh"]
+    chdir: "{{ zuno_repo_root }}"
+  environment:
+    ONLY: "{{ demo_queued_browser | join(',') }}"
+  register: _demo_browser
+  changed_when: false
+  failed_when: false
+  timeout: 900
+  when: demo_queued_browser | length > 0
+
+- name: "demo | record the checks"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + _demo_rows }}"
+    demo_unit_commands: "{{ demo_unit_commands + _demo_cmds }}"
+    demo_queued_probes: []
+    demo_queued_browser: []
+  vars:
+    _demo_nl: "\n"
+    _demo_golden_ran: "{{ _demo_golden is defined and _demo_golden.rc is defined }}"
+    _demo_browser_ran: "{{ _demo_browser is defined and _demo_browser.rc is defined }}"
+    _demo_golden_rows: >-
+      {{ [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'golden-path/' ~ (demo_queued_probes | join(',')),
+           'category': 'golden-path', 'passed': _demo_golden.rc == 0,
+           'detail': 'exit ' ~ _demo_golden.rc, 'duration_ms': 0}] if _demo_golden_ran else [] }}
+    _demo_browser_rows: >-
+      {{ [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'browser/' ~ (demo_queued_browser | join(',')),
+           'category': 'browser', 'passed': _demo_browser.rc == 0,
+           'detail': 'exit ' ~ _demo_browser.rc, 'duration_ms': 0}] if _demo_browser_ran else [] }}
+    _demo_rows: "{{ _demo_golden_rows + _demo_browser_rows }}"
+    _demo_cmds: >-
+      {{ ([{'cmd': 'python3 evaluations/golden_path_probe.py --only ' ~ (demo_queued_probes | join(',')),
+            'rc': _demo_golden.rc, 'output': (_demo_golden.stdout_lines | default([]))[-40:] | join(_demo_nl), 'truncated': false}]
+          if _demo_golden_ran else [])
+         + ([{'cmd': 'ONLY=' ~ (demo_queued_browser | join(',')) ~ ' evaluations/browser/run.sh',
+              'rc': _demo_browser.rc, 'output': (_demo_browser.stdout_lines | default([]))[-40:] | join(_demo_nl), 'truncated': false}]
+            if _demo_browser_ran else []) }}

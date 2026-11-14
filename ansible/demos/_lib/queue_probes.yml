@@ -1,0 +1,6 @@
+---
+# Queue golden-path probes for one merged run by flush_checks.yml (a workshop runs each probe once).
+# Vars: queue_probes (names of evaluations/golden_path_probe.py PROBES).
+- name: "demo | queue golden-path probes"
+  ansible.builtin.set_fact:
+    demo_queued_probes: "{{ (demo_queued_probes + (queue_probes | default([]))) | unique }}"

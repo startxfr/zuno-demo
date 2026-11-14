@@ -1,0 +1,33 @@
+---
+# Status reads: each workload has all its desired replicas ready.
+# Vars: workloads ([{name, namespace, kind (default Deployment)}]).
+- name: "demo | read the workloads"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: "{{ item.kind | default('Deployment') }}"
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  loop: "{{ workloads | default([]) }}"
+  loop_control:
+    label: "{{ item.namespace }}/{{ item.name }}"
+  register: _demo_workloads
+  failed_when: false
+
+- name: "demo | record the workloads"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ _demo_workloads.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.namespace }}/{{ item.item.name }}"
+  vars:
+    _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_desired: "{{ _demo_obj.spec.replicas | default(1) | int if _demo_obj else 0 }}"
+    _demo_ready: "{{ _demo_obj.status.readyReplicas | default(0) | int if _demo_obj else 0 }}"
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "{{ (item.item.kind | default('Deployment')) | lower }}/{{ item.item.namespace }}/{{ item.item.name }}"
+      category: workload
+      passed: "{{ (_demo_obj | length > 0) and (_demo_desired | int > 0) and (_demo_ready | int >= _demo_desired | int) }}"
+      detail: "{{ (_demo_ready ~ '/' ~ _demo_desired ~ ' ready') if _demo_obj else 'not found' }}"
+      duration_ms: 0

@@ -1,0 +1,6 @@
+---
+# Uninstall (declared changing in demo.yml): removes the fixture add-on marker.
+- name: "fixture | remove the add-on marker"
+  ansible.builtin.file:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.cache/zuno/demo/fixture-demo.installed"
+    state: absent

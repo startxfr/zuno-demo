@@ -1,0 +1,4 @@
+---
+# Check: nothing to automate (page section "### Check").
+- name: "fixture | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"

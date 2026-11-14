@@ -1,0 +1,9 @@
+---
+# Print the unit's checks as one report (platform/testing/day2_report.py, through day2_render_and_fail.yml) and fail
+# the unit when one did not pass. Optional: the unit's status is failed anyway when a check failed.
+- name: "demo | render the checks"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+  vars:
+    _day2_render_results: "{{ demo_unit_checks }}"
+    day2_render_component: "{{ demo_id }}"
+  when: demo_unit_checks | length > 0

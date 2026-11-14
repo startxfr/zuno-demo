@@ -1,0 +1,31 @@
+---
+# Status reads: each Argo CD Application is Synced and Healthy.
+# Vars: argo_apps (names), argo_namespace (default openshift-gitops).
+- name: "demo | read the Argo CD Applications"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: "{{ argo_namespace | default('openshift-gitops') }}"
+    name: "{{ item }}"
+  loop: "{{ argo_apps | default([]) }}"
+  register: _demo_argo
+  failed_when: false
+
+- name: "demo | record the Applications"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ _demo_argo.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  vars:
+    _demo_app: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_sync: "{{ _demo_app.status.sync.status | default('absent') }}"
+    _demo_health: "{{ _demo_app.status.health.status | default('absent') }}"
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "argo/{{ item.item }}"
+      category: argo
+      passed: "{{ _demo_sync == 'Synced' and _demo_health == 'Healthy' }}"
+      detail: "{{ _demo_sync }}/{{ _demo_health }}"
+      duration_ms: 0

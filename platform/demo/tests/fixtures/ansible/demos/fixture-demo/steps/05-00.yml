@@ -1,0 +1,10 @@
+---
+# 5:00 - Terminal: `git log -2 --oneline | head -1`; plus a watch-stripped pairing (cmd + page_text).
+- name: "fixture | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "git log -2 --oneline | head -1"
+    not_run:
+      - page_text: "oc get pods -w"
+        reason: "a watch; the page runs it by hand"
