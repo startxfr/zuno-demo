@@ -62,22 +62,54 @@ Other identities:
 - The dashboard's ServiceAccount `rhods-dashboard` reads the catalog for the dashboard pages.
 - The pipeline's `push-registry` step calls the registry with its pod's ServiceAccount token, in `zuno-mlops`.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use model-catalog-registry 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/model-catalog-registry/<action>.yml`)
+has run, and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the deployments `model-catalog` and `model-catalog-postgres` in `rhoai-model-registries`
+(both 1/1) and the registry: `oc get modelregistries.modelregistry.opendatahub.io -A`. On 2026-11-13 it answered
+`No resources found`. The demo is **not show-ready** while no `ModelRegistry` exists: the registry part can only be
+told. If a registry exists by then, this page is out of date: check it again before the session.
+
+### Check
+
+There is no golden-path probe for the catalog part: rehearse it the same day. The file runs reads only: the `Catalog`
+`catalog` (Available), the Route `model-catalog-https`, the ConfigMaps `default-catalog-sources` and
+`model-catalog-sources`, the RoleBinding `model-catalog-authenticated` and the HTTPRoute `zuno-portal-dashboard`. The
+registry part has nothing to prove and stays "not show-ready" until a `ModelRegistry` exists. The dashboard must load
+at `/`, not as an empty 404: that is the host-name route trap (see
+[If something goes wrong](#if-something-goes-wrong)).
+
+### Install
+
+Nothing to do. The catalog and the registry component are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file prepares nothing. What only a person does:
 
 - [ ] Browser profile **ai-dev-01** on `https://rh-ai.apps.demo333.startx.fr/`. The sign-in is the OpenShift sign-in
-  (Keycloak behind it).
-- [ ] The dashboard loads at `/`, not as an empty 404. A 404 there is the host-name route trap (see
-  [If something goes wrong](#if-something-goes-wrong)).
+  (Keycloak behind it). Password: Vault `keycloak/demo-personas`.
 - [ ] Find the model catalog in the dashboard's left menu and open one card before the audience arrives. The
   navigation of the 3.6.0-ea.2 dashboard was not checked.
-- [ ] `oc get deploy model-catalog model-catalog-postgres -n rhoai-model-registries`: both 1/1.
-- [ ] Registry: `oc get modelregistries.modelregistry.opendatahub.io -A`. On 2026-11-13: `No resources found`. Play
-  the registry steps of the 15-minute version as told, with the evidence. If a registry exists by then, this page is
-  out of date: check it again before the session.
-- [ ] 15-minute version: **paas-ops-01** has signed in once to the OpenShift console (on 2026-11-13 its group
-  `ocp-paas-ops` did not exist yet), then a terminal logged in with `oc` as **paas-ops-01**.
-- [ ] Open [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md) at its State line, and
+- [ ] Play the registry steps of the 15-minute version as told, with the evidence: open
+  [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md) at its State line, and
   `components/mlops/src/mlops.py` at the function `stage_push_registry`.
+- [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If **paas-ops-01**
+  has never signed in to the OpenShift console (on 2026-11-13 its group `ocp-paas-ops` did not exist yet), sign in once
+  in a browser first, then log the terminal in.
+
+### Stop
+
+Nothing to do. Close the browser profile and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
