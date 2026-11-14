@@ -1,6 +1,6 @@
 # WP-255: Write a readable OKF field reference in zuno-demo-agents
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-13, shipped in zuno-demo-agents v0.14.4; the proofs that need a canary or unifai-compare remain)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md),
   [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) (the v0.3 fields)
 - **Depends on:** none

@@ -1,6 +1,6 @@
 # WP-256: Add a generic "add an agent" guide and the bundle file list to zuno-demo-agents
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-13, shipped in zuno-demo-agents v0.14.4; the proofs that need a canary or unifai-compare remain)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
 - **Depends on:** [WP-255](wp-255-okf-field-reference-in-the-agents-repository.md) (the guide links to the field reference)
 - **Related:** [WP-258](wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md)

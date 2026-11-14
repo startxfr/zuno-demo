@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 10 | 3 | 29 | WP-224, WP-227, WP-237 |
-| v0.17 | 7 | 4 | 18 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254 |
+| v0.17 | 8 | 5 | 25 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-262, WP-263, WP-264, WP-265, WP-266, WP-267, WP-268 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1127,13 +1127,30 @@ release scripts or the operator types. No new ADR: the records that govern the r
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-255 | [wp-255](work-packages/wp-255-okf-field-reference-in-the-agents-repository.md) | 0576, 0579 | none | Not started | none (repo work, then a pull request) |
-| WP-256 | [wp-256](work-packages/wp-256-add-an-agent-guide-and-bundle-file-list-to-the-agents-repository.md) | 0576 | WP-255 | Not started | none |
-| WP-257 | [wp-257](work-packages/wp-257-publish-verify-and-roll-back-an-okf-release-documented.md) | 0577, 0578, 0580 | none | Not started | the SBOM decision (the user); a canary pin for the rollback check |
-| WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Not started | a server-side dry run on a canary operator |
-| WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Not started | none; sends the final anchors to unifai-compare |
+| WP-255 | [wp-255](work-packages/wp-255-okf-field-reference-in-the-agents-repository.md) | 0576, 0579 | none | Repo work merged | none (repo work, then a pull request) |
+| WP-256 | [wp-256](work-packages/wp-256-add-an-agent-guide-and-bundle-file-list-to-the-agents-repository.md) | 0576 | WP-255 | Repo work merged | none |
+| WP-257 | [wp-257](work-packages/wp-257-publish-verify-and-roll-back-an-okf-release-documented.md) | 0577, 0578, 0580 | none | Repo work merged | the SBOM decision (the user); a canary pin for the rollback check |
+| WP-258 | [wp-258](work-packages/wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md) | 0576, 0578 | none | Repo work merged | a server-side dry run on a canary operator |
+| WP-259 | [wp-259](work-packages/wp-259-position-the-agents-repository-as-a-reusable-reference.md) | 0576 | WP-255, WP-256, WP-257, WP-258 | Repo work merged | none; sends the final anchors to unifai-compare |
 | WP-260 | [wp-260](work-packages/wp-260-roll-out-the-infra-general-and-gpu-node-pools-on-demo333.md) | 0614 | none | Done | none; masters resize refused by its gate (P6) |
 | WP-261 | [wp-261](work-packages/wp-261-mirror-the-large-red-hat-product-images-into-the-internal-quay.md) | 0612 | WP-248, WP-260 | Done | none; after an RHOAI, AAP or Lightspeed upgrade run `mirror_redhat_images.py --drift` and copy |
+
+### Phase 55 — Zuno OKF profile 1.0, aligned with upstream OKF 0.2 (added 2026-11-14)
+
+ADR-0615: an audit of 2026-11-14 scored the OKF use of `zuno-demo-agents` 13/20. The decision aligns the documents with
+upstream OKF 0.2, freezes the Zuno profile as 1.0, migrates and cleans every bundle, and rewrites the documentation in
+each repository. Readers ship first, then the operator v0.1.71, then zuno-demo-agents v1.0.0 and its promotion; each live
+step waits for the owner's go. Legacy documents are refused from 2026-12-01 (WP-268).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-262 | [wp-262](work-packages/wp-262-okf-profile-1-0-schemas-tooling-and-agents-docs.md) | 0615 | none | Not started | none (agents repo work, then a pull request) |
+| WP-263 | [wp-263](work-packages/wp-263-zuno-demo-okf-readers-accept-profile-1-0.md) | 0615 | WP-262 | Not started | image rebuilds of mcp-gateway, a2a-gateway, mlops, ai-gateway, supply-chain-signer (the owner's go) |
+| WP-264 | [wp-264](work-packages/wp-264-unifai-operator-reads-okf-profile-1-0.md) | 0615 | WP-262 | Not started | patch applied by the fork owner session, canary, manual cut of v0.1.71, copy into Quay, pin (the owner's go for each) |
+| WP-265 | [wp-265](work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | 0615 | WP-262 | Not started | none (agents repo work, then a pull request) |
+| WP-266 | [wp-266](work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | 0615 | WP-262, WP-265 | Not started | evaluation of the new prompts of tekos, arkos and comage |
+| WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Not started | release pull request approval, promotion merge, mirror, `make d2 install mcp` and `unifai` (the owner's go for each) |
+| WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-from-2026-12-01.md) | 0615 | WP-267 | Not started | dated: operator change before the weekly release of 2026-11-27, pin on 2026-12-01 (the owner's go) |
 
 ### OKF stream phases
 
@@ -1279,6 +1296,7 @@ moving.
 
 ## Change log
 
+- 2026-11-14 — ADR-0615 and WP-262 to WP-268 added (Phase 55, v0.17), Accepted / Not started, by the user's decisions of the day: the Zuno OKF profile 1.0 aligned with upstream OKF 0.2 (Google Cloud), frozen, every bundle migrated and cleaned, documentation per repository, zuno-demo-agents v1.0.0 with unifai-operator v0.1.71, legacy documents refused from 2026-12-01. ADR-0038, ADR-0513 and ADR-0579 are superseded in part. WP-255 to WP-259 move to Repo work merged: their pages shipped in zuno-demo-agents v0.14.4 (commits c7e4ba2, e7170d0, ef03a67, 21c821e, f908eb3); their canary and unifai-compare proofs remain.
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.
 - 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
 - 2026-11-13 — WP-255 to WP-259 added (Phase 54), Not started, by the user's go at the request of unifai-compare: the OKF field reference, the "add an agent" guide, publish and verify and rollback, the UnifaiAgentBundle page and the positioning of zuno-demo-agents. Documentation only, landed in that repository by pull request; no new ADR.

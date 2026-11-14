@@ -1,6 +1,6 @@
 # ADR-0513: Give OKF rag/, tools/ and policies/ directories a real schema
 
-- **Status:** Implemented - see `platform/okf/schema/zuno-okf-{rag,tool,policy}-v0.2.schema.json`, `platform/supply-chain/validate_okf_bundle.py` and `agents/tekos/{rag,tools,policies}/` (WP-56, 2026-08-19)
+- **Status:** Superseded in part by [ADR-0615](0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (2026-11-14: the closed `capability` list of tool notes and the one-direction `used_by_tasks` check; the rag, tools and policies notes stay in force) - implemented, see `platform/okf/schema/zuno-okf-{rag,tool,policy}-v0.2.schema.json`, `platform/supply-chain/validate_okf_bundle.py` and `agents/tekos/{rag,tools,policies}/` (WP-56, 2026-08-19)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-19
 - **Decision owners:** Zuno Demo architecture team

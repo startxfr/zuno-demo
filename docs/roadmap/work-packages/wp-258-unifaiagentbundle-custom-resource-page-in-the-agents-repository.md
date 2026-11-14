@@ -1,6 +1,6 @@
 # WP-258: Write the UnifaiAgentBundle custom resource page in zuno-demo-agents
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-13, shipped in zuno-demo-agents v0.14.4; the proofs that need a canary or unifai-compare remain)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md),
   [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
 - **Depends on:** none (the operator documentation stays on disk until UnifAI moves it)

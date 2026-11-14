@@ -1,6 +1,6 @@
 # WP-257: Document how to publish, verify and roll back an OKF release safely
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-13, shipped in zuno-demo-agents v0.14.4; the proofs that need a canary or unifai-compare remain)
 - **ADRs:** [ADR-0577](../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md),
   [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md),
   [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)

@@ -1,6 +1,6 @@
 # WP-259: Position zuno-demo-agents as a reference others can copy, and publish stable links
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-13, shipped in zuno-demo-agents v0.14.4; the proofs that need a canary or unifai-compare remain)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
 - **Depends on:** [WP-255](wp-255-okf-field-reference-in-the-agents-repository.md), [WP-256](wp-256-add-an-agent-guide-and-bundle-file-list-to-the-agents-repository.md),
   [WP-257](wp-257-publish-verify-and-roll-back-an-okf-release-documented.md), [WP-258](wp-258-unifaiagentbundle-custom-resource-page-in-the-agents-repository.md)

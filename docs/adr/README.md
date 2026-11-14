@@ -122,7 +122,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md) | Implemented | Prevent restricted internal context from reaching external models |
 | [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | Implemented | Enforce the complete MCP authorization intersection in the gateway |
 | [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | Implemented | Protect MCP servers with network and workload identity boundaries |
-| [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | Implemented | Use standards-compliant OKF v0.2 Markdown bundles |
+| [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | Superseded in part by ADR-0615 | Use standards-compliant OKF v0.2 Markdown bundles |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | Implemented | Separate agent entitlement from business role authorization |
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | Implemented | Remove nominative demo identities and static passwords from Git |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | Superseded in part by ADR-0317 | Manage the complete OpenShift AI prerequisite lifecycle |
@@ -332,7 +332,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) | Implemented | Extract agent definitions and corp policies into the zuno-demo-agents repository |
 | [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Implemented | Publish OKF as per-agent artifacts plus a corp index artifact |
 | [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Implemented | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
-| [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Implemented | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
+| [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Superseded in part by ADR-0615 | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
 | [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Implemented | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Implemented | Serve a per-agent entry and descriptive sheet from the admitted bundle |
@@ -395,6 +395,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) | Partially implemented | Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket |
 | [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md) | Proposed | Close the three remaining live hardening items of ADR-0603 (M4, M2, M7) in mid-December |
 | [ADR-0614](0614-split-the-cluster-into-infra-general-worker-and-gpu-node-pools.md) | Implemented | Split the cluster into infra, general-worker and GPU node pools |
+| [ADR-0615](0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) | Accepted | Align the Zuno OKF profile with upstream OKF 0.2 and freeze it as profile 1.0 |
 
 ## OKF v0.1
 
@@ -404,7 +405,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | Implemented | Define the agent tests directory structure and promotion gate |
-| [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
+| [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | Superseded in part by ADR-0615 | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 
 ## Retired
