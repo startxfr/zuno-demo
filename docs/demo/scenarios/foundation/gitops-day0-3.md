@@ -92,7 +92,7 @@ Other identities:
 
 `make demo use gitops-day0-3 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/gitops-day0-3/<action>.yml`) has run, and says
-what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo` (14:15) through their local playbooks.
+what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo list` (14:15) through their local playbooks.
 
 ### Status
 
