@@ -67,19 +67,59 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas
 | 0:46 | Agents carry their data rules (optional) | [Sovereignty](../scenarios/governance/ai-gateway-sovereignty.md#5-minute-version), 5-minute version | |
 | 0:51 | Close and questions | Repeat the message | |
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Run once the "Before you start" checklist of every scenario in the agenda. The items they share:
-  - [ ] Sign in one browser profile per persona before the session: **consultant-02**, **ai-ops-01**, **sale-01** and
-    **consultant-01**.
-  - [ ] In UnifAI, start a separate session per persona in a team workspace. A team session is shared, so
-    **consultant-02** could read **ai-ops-01**'s cluster answers.
-  - [ ] Log in a terminal with `oc` as **paas-ops-01**, which must have signed in to OpenShift once.
-  - [ ] Open Grafana and the Tempo search UI as **ai-ops-01**.
-  - [ ] Open the agents release in a browser tab:
-    [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md).
-- [ ] Check that the probes listed in the status banner passed within the last hour. The delegation probe can take
-  about 5 minutes when the model retries the tool.
+`make demo use agentic-ai` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
+version its agenda row names. One typed guard, `DEMO_CONFIRM=agentic-ai`, covers the workshop. Each section below says
+only what is the workshop's own, or "Nothing to do.".
+
+### Status
+
+Nothing to do. The scenarios' statuses are those of [UnifAI agents](../scenarios/experiences/unifai-agents.md#presenter-lifecycle), [MCP tools by group](../scenarios/governance/mcp-tools-by-group.md#presenter-lifecycle), [UnifAI live RAG](../unifai-live-rag.md#presenter-lifecycle), [A2A delegation with approval](../scenarios/governance/a2a-delegation-approval.md#presenter-lifecycle), [kagent](../scenarios/experiences/kagent.md#presenter-lifecycle), [Signed agent release](../scenarios/foundation/okf-signed-agent-release.md#presenter-lifecycle), [Sovereignty](../scenarios/governance/ai-gateway-sovereignty.md#presenter-lifecycle), in that order.
+
+### Check
+
+The merged probes are `ONLY=unifai-tekos,tools,open-webui,delegation-approval,kagent,sovereignty,trace make demo golden-path`.
+The delegation probe can take about 5 minutes when the model retries the tool. The merged browser run covers `unifai`
+and `kagent`. All of them must have passed within the last hour. The live RAG and signed release blocks have no probe:
+rehearse them the same day. When one block is red, skip that block and say what it would have shown, as
+[If something goes wrong](#if-something-goes-wrong) says.
+
+### Install
+
+Nothing to do.
+
+### Start
+
+The scenarios' Start sections already say how to sign in to each product. Only what they share is the workshop's own:
+
+- [ ] One browser profile per persona, signed in before the session: **consultant-02**, **ai-ops-01**, **sale-01** and
+  **consultant-01**.
+- [ ] In UnifAI, start a separate session per persona in a team workspace. A team session is shared, so
+  **consultant-02** could read **ai-ops-01**'s cluster answers.
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, which must have signed in to OpenShift once.
+- [ ] Grafana and the Tempo search UI, open as **ai-ops-01**.
+- [ ] The agents release open in a browser tab:
+  [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md).
+- Every block plays its 5-minute version, except delegation (15-minute version): skip the other "15-minute version"
+  items.
+- Changing unit: Start of [UnifAI live RAG](../unifai-live-rag.md#presenter-lifecycle) deletes three files from **consultant-01**'s Personal documents and
+  uploads two demo files. Run it before the session, not on stage. The single typed guard `DEMO_CONFIRM=agentic-ai`
+  covers the workshop, live RAG included.
+- The AAP job of the delegation block is launched by you when you click **Approve**. It is read-only and ends by
+  itself, as its scenario says.
+
+### Stop
+
+Nothing to do. The scenarios' Stop sections close their browser profiles and terminals. Stop of UnifAI live RAG
+deletes the three named files from **consultant-01**'s Personal documents. After its optional Confluence resync, revert
+the edit as that page says.
+
+### Uninstall
+
+Nothing to do.
 
 ## If time runs short
 
