@@ -54,26 +54,52 @@ Other identities:
 - Named only: **ai-ops-01**, **ai-dev-01** and **paas-dev-01** have no cluster-level binding to the query role, so
   the chat should answer "Not authorized" for them (read from the RBAC, not tested).
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] The Lightspeed API is up:
-  `oc get olsconfig cluster -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}'`.
-  `ApiReady` and `ConsolePluginReady` must be `True`. `AgenticConsolePluginReady` and `AlertsAdapterReady` are `False`
-  with `UnsupportedOCPVersion`: expected, those features are not shown here.
-- [ ] `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` is Ready. Lightspeed has no other model.
-- [ ] Golden-path probe `lightspeed` passed within the last hour (`ONLY=lightspeed make demo golden-path`), see
-  [golden-path.md](../../golden-path.md). It needs an `oc` session with a token (`oc whoami -t`); with a certificate
-  login it prints `MANUAL`, and you ask its question in the console instead.
+`make demo use lightspeed 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/lightspeed/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-lightspeed-d0`/`-d1` and `zuno-lightspeed-config-d0`/`-d1`, and
+the `OLSConfig` conditions: `ApiReady` and `ConsolePluginReady` must be `True`. `AgenticConsolePluginReady` and
+`AlertsAdapterReady` are `False` with `UnsupportedOCPVersion`: expected, those features are not shown here. If a
+required one is missing, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `lightspeed` (see [golden-path.md](../../golden-path.md)).
+The probe needs an `oc` session with a token (`oc whoami -t`); with a certificate login it prints `MANUAL`. There is no
+automated question in the console: ask it by hand, within the budget below. If it fails, see
+[If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. Lightspeed is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file checks that `gpt-oss-20b` is Ready in `zuno-ai-run`. Lightspeed has no other model. What only a person does:
+
 - [ ] Profile 1: open `https://console-openshift-console.apps.demo333.startx.fr` and log in with **openshift** (the
   Keycloak provider), not `startx-htpasswd_auth`, as **consultant-02**. Open the Lightspeed chat icon at the bottom
   right and clear the previous conversation.
 - [ ] 15-minute version: profile 2 signed in the same way as **sale-01**. Its first sign-in creates its OpenShift user
   and the `sales` group, which opens the chat to it. Do it before the session, not on stage.
+- [ ] 15-minute version: a terminal logged in as **paas-ops-01** or `kube:admin`, large font.
 - [ ] Budget: 200,000 tokens per hour on one subscription, for every console user and the probe together. Ask at
   most two or three rehearsal questions in the hour before the session.
-- [ ] Known warning: "Lightspeed stopped the operation because a tool result failed the safety inspection". About 3
+- Known warning: "Lightspeed stopped the operation because a tool result failed the safety inspection". About 3
   documentation questions in 10 end like this on this model (measured on 2026-10-25). Ask again in other words.
-- [ ] 15-minute version: a terminal logged in as **paas-ops-01** or `kube:admin`, large font.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
