@@ -53,23 +53,104 @@ Other identities:
 - an internal token between the web tier and the GPU runtime, from Vault through an ExternalSecret;
 - the golden-path probe `world-model` creates a world as `GOLDEN_WORLD_PERSONA` (ai-ops-01) from inside the web pod.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] The GPU node and the application are up, at least **40 minutes** before the session: see
-  [Appendix C - Setup](#appendix-c---setup). AWS may have no g7e capacity: start earlier, and keep the recording ready.
-- [ ] **ai-ops-01**, password in Vault at `keycloak/demo-personas`.
-- [ ] **Chrome or Edge**: the video is H.264 decoded by WebCodecs. Open `https://world-model.apps.demo333.startx.fr`
-  and sign in as **ai-ops-01**.
+`make demo use world-model 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/world-model/<action>.yml`) has run, and
+says what is left to the presenter. The GPU node is created on demand and bills by the hour. Lead time: about **40
+minutes** from the switch to a warm page (15 minutes for the node, 10 for the application, then the checks and a dry
+run), when AWS has capacity for the world-model GPU MachineSets. Without capacity there is no node at all: start
+earlier and prepare the recording. Credentials are named by their Vault path, never written.
+
+### Status
+
+Nothing to do when it reports the demo is off: that is its normal state today. The file reads, without changing
+anything: the flag `zuno_world_model_enabled` in `ansible/clusters/demo333.yml`, the namespace `zuno-world-model`, the
+node labelled `zuno.io/gpu-workload=world-model`, and the world-model Application. While the flag is false there is no
+node and no Application, and the page is not show-ready. When the flag is true and a piece is missing, run Install.
+By hand, the same reads:
+
+```bash
+oc get nodes -l zuno.io/gpu-workload=world-model
+oc get pods -n zuno-world-model
+```
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `world-model`
+(`ONLY=world-model make demo golden-path`, see [golden-path.md](golden-path.md)). It creates a world as
+`GOLDEN_WORLD_PERSONA` (**ai-ops-01**) from inside the web pod and must print `PASS`. While the application is not
+installed it reports `roadmap`: do not present the demo as live, use the recording (see Start). Run it within the
+hour before the session. After Install, `make d2 check world-model` is the deeper preflight: GPU node, runtime engine
+`waypoint-1.5-1b`, image model `flux2-klein-4b`, encoder `nvenc` (or `x264`), Keycloak 200, ai-gateway reached, no
+other egress, Route up. It must be green.
+
+### Install
+
+The file refuses to install while `zuno_world_model_enabled` is not `true` on `origin/devel`
+(`ansible/clusters/demo333.yml`). It creates a GPU node, which is cluster infrastructure: it needs the platform
+owner's **double approval** for the GPU node, given before anything runs. The owner does the following by hand, never
+the step:
+
+1. Set `zuno_world_model_enabled: true` in `ansible/clusters/demo333.yml`, commit and push. The Day-2 install runs
+   through AAP, which reads the repository, not your workstation.
+2. `make d0 install world-model-gpu`, run locally (the AAP credential has no Machine API rights). It scales each
+   world-model GPU MachineSet named in `zuno_world_model_gpu_sets` to one Machine and waits until one node is Ready
+   with a whole GPU: about 15 minutes. When one node has joined, scale the other world-model MachineSets to 0
+   (`oc scale machineset <name> -n openshift-machine-api --replicas=0`): the role expects exactly one node. A Machine
+   stuck in `Provisioning` with `InsufficientInstanceCapacity` (`oc describe machine -n openshift-machine-api <name>`)
+   means AWS has no capacity in that zone for now.
+3. The node is ready when exactly one node is labelled `zuno.io/gpu-workload=world-model` with
+   `mig.config.state=success` and 1 GPU allocatable.
+4. `make d2 install world-model`: applies the chart. The runtime copies about 20 GB of weights from S3 (about 2.5
+   minutes, measured) and loads two models: about 10 more minutes. The Route is
+   `https://world-model.apps.demo333.startx.fr`.
+5. `make d2 check world-model`: the preflight of Check. It must be green.
+
+`make d0 check world-model-gpu` reports whether the node and the switch agree.
+
+### Start
+
+The file prepares nothing a person can skip. What only a person does, at least **40 minutes** after the Install
+began, and earlier when AWS may have no capacity:
+
+- [ ] **Chrome or Edge** (the video is H.264 decoded by WebCodecs). Open `https://world-model.apps.demo333.startx.fr`
+  and sign in as **ai-ops-01**, password in Vault at `keycloak/demo-personas`. The persona must be in
+  `zuno-world-model-users`, `ocp-ai-ops` or `ocp-paas-ops`.
 - [ ] Warm-up: one dry-run world, then **End session**, so the first image in front of the audience is not a cold
   start.
-- [ ] Golden-path probe `world-model` passed within the last hour (`ONLY=world-model make demo golden-path`), see
-  [golden-path.md](golden-path.md). It must print `PASS`, not `roadmap`.
-- [ ] The recorded fallback `world-model-recorded-2026-11-08.mp4` is on the presenting laptop, open in a video player
-  (see [Appendix C](#the-recorded-fallback)).
-- [ ] Known on screen: the banner **Stabilizing the world** about every 2 s of walking, with about 0.6 s of frozen
-  picture and a small jump of the view. It is the drift fix, not a failure.
-- [ ] 15-minute version: Grafana as **ai-ops-01**, dashboard **Zuno Platform / World model**, last 1 hour; a second
-  browser profile signed in to the page as **paas-ops-01**; a terminal with `oc` as **paas-ops-01**.
+- [ ] Grafana `zuno-monitoring`, dashboard **Zuno Platform / World model**, last 1 hour. It is empty while the demo is
+  off. The alert `ZunoWorldModelGpuNodeUpTooLong` fires when a world-model Machine has existed for more than 8 hours. A
+  Perses copy of the dashboard is deferred (ADR-0604, phase 2).
+- [ ] The recorded fallback `world-model-recorded-2026-11-08.mp4` is on the presenting laptop, open in a video player.
+  It is 24 s, 1280x720, a real run of this runtime on 2026-11-08 with the red-sky edit, with the label "RECORDED"
+  burnt in. It is not in git (7 MB): it is kept at `/home/cl/demo-fallback/` on the operator's workstation. Show it
+  labelled as recorded, never as live. It predates the re-anchor, so it shows no **Stabilizing the world** banner.
+- [ ] Known on screen, not a failure: the banner **Stabilizing the world** about every 2 s of walking, with about 0.6 s
+  of frozen picture and a small jump of the view. It is the drift fix.
+- [ ] 15-minute version: a second browser profile signed in to the page as **paas-ops-01**, and a terminal with `oc`
+  as **paas-ops-01**.
+
+### Stop
+
+After the session, in the page, **Sign out** (top right, next to your name). It frees the GPU if you hold it, ends the
+oauth2-proxy cookie, then ends your Keycloak single sign-on session and brings you back to the site. The next visit
+asks for a login, so another person can sign in on the same browser. Keycloak may show one "Do you want to log out?"
+confirmation first (no ID token is passed to it, by design). The client `world-model` must list
+`https://world-model.<domain>/*` in its post-logout redirect URIs (set in the realm file, applied to a live realm by
+the client-reconcile Job). Close the Grafana profile and the terminal. The GPU node keeps billing until Uninstall.
+
+### Uninstall
+
+Nothing in this demo removes the node by itself. The owner does it by hand after the session, never the step:
+
+1. `make d2 uninstall world-model` removes the application.
+2. Set `zuno_world_model_enabled: false` in `ansible/clusters/demo333.yml`, commit and push. Otherwise the next
+   `make d0 install` creates the node again.
+3. `make d0 uninstall world-model-gpu` terminates the GPU node and removes the world-model MachineSets. It refuses
+   while the application exists, and it never touches `zuno-gpu-a`.
+
+`make d0 check world-model-gpu` reports whether the node and the switch agree.
 
 ## 5-minute version
 
@@ -121,7 +202,7 @@ Run the 5-minute version, then:
 | "This browser cannot decode the video" | Use Chrome or Edge. | |
 | A slow first image | The first FLUX call after a cold start compiles kernels. The dry run avoids it. | "The first call warms the GPU up." |
 | A refusal for the hourly limit | 12 worlds per user per hour. Continue as **paas-ops-01**. | |
-| A forgotten node | The alert `ZunoWorldModelGpuNodeUpTooLong` fires after 8 hours. Switch off as in Appendix C. | |
+| A forgotten node | The alert `ZunoWorldModelGpuNodeUpTooLong` fires after 8 hours. Run Stop and Uninstall of the [Presenter lifecycle](#presenter-lifecycle). | |
 
 ## Limits
 
@@ -250,59 +331,3 @@ flowchart LR
   NODE["MachineSets zuno-gpu-world-model-*<br/>taint zuno.io/gpu-world-model,<br/>switch zuno_world_model_enabled"] -.-> GPU
   WEB & ENC -.->|"ServiceMonitors"| PROM["Prometheus, Grafana<br/>World model dashboard"]
 ```
-
-## Appendix C - Setup
-
-The GPU node is created on demand and bills by the hour. Lead time: about **40 minutes** from the switch to a warm
-page (15 minutes for the node, 10 for the application, then the checks and a dry run), when AWS has g7e capacity.
-Without capacity there is no node at all: start earlier and prepare the recording.
-
-### Switch on
-
-1. In `ansible/clusters/demo333.yml` set `zuno_world_model_enabled: true`, commit and push it. The Day-2 install runs
-   through AAP, which reads the repository, not your workstation.
-2. `make d0 install world-model-gpu`, run locally (the AAP credential has no Machine API rights). It scales each
-   MachineSet named in `zuno_world_model_gpu_sets` to one Machine (six on demo333: g7e.4xlarge, g7e.2xlarge and
-   g7e.8xlarge in zones a and b) and waits until one node is Ready with a whole GPU: about 15 minutes. When one node
-   has joined, scale the other world-model MachineSets to 0
-   (`oc scale machineset <name> -n openshift-machine-api --replicas=0`): the role expects exactly one node. A Machine
-   stuck in `Provisioning` with `InsufficientInstanceCapacity` (`oc describe machine -n openshift-machine-api <name>`)
-   means AWS has no capacity in that zone for now.
-3. `make d2 install world-model`: applies the chart. The runtime copies about 20 GB of weights from S3 (about 2.5
-   minutes, measured) and loads two models: about 10 more minutes. The Route is
-   `https://world-model.apps.demo333.startx.fr`.
-4. `make d2 check world-model`: the preflight. It must be green: GPU node, runtime engine `waypoint-1.5-1b`, image
-   model `flux2-klein-4b`, encoder `nvenc` (or `x264`), Keycloak 200, ai-gateway reached, no other egress, Route up.
-5. Sign in once as the presenter in the browser you will use: **Chrome or Edge**. The persona must be in
-   `zuno-world-model-users`, `ocp-ai-ops` or `ocp-paas-ops` (for instance **ai-ops-01**).
-6. Open Grafana, dashboard **Zuno Platform / World model** (last 1 hour).
-7. Do one dry run of a scene, then **End session**, so the first frame in front of the audience is not a cold start.
-8. Run `ONLY=world-model make demo golden-path`: it must print `PASS`.
-
-### Switch off (after the session)
-
-1. In the page, **Sign out** (top right, next to your name) frees the GPU if you hold it, ends the oauth2-proxy cookie,
-   then ends your Keycloak single sign-on session and brings you back to the site. The next visit asks for a login, so
-   another person can sign in on the same browser. Keycloak may show one "Do you want to log out?" confirmation first
-   (no ID token is passed to it, by design). The client `world-model` must list `https://world-model.<domain>/*` in its
-   post-logout redirect URIs (set in the realm file, applied to a live realm by the client-reconcile Job).
-2. `make d2 uninstall world-model` removes the application.
-3. `make d0 uninstall world-model-gpu` terminates the GPU node and removes the world-model MachineSets. It refuses while
-   the application exists.
-4. Set `zuno_world_model_enabled: false` in `ansible/clusters/demo333.yml`, commit and push. Otherwise the next
-   `make d0 install` creates the node again. `make d0 check world-model-gpu` reports whether the node and the switch
-   agree.
-
-### Where the dashboards are
-
-- **Grafana** (`zuno-monitoring`): **Zuno Platform / World model**, the demo dashboard. Empty while the demo is off.
-- **Alert**: `ZunoWorldModelGpuNodeUpTooLong` in the platform Prometheus, when a world-model Machine has existed for
-  more than 8 hours.
-- A Perses copy of the dashboard is deferred (ADR-0604, phase 2).
-
-### The recorded fallback
-
-`world-model-recorded-2026-11-08.mp4`: 24 s, 1280x720, a real run of this runtime on 2026-11-08 with the red-sky
-edit, with the label "RECORDED" burnt in. It is not in git (7 MB): it
-is kept at `/home/cl/demo-fallback/` on the operator's workstation. Copy it to the presenting laptop beforehand. Show
-it labelled as recorded, never as live. It predates the re-anchor, so it shows no **Stabilizing the world** banner.
