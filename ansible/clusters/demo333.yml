@@ -35,6 +35,10 @@ zuno_mariadb_backup_s3_bucket: "zuno-demo333-backups"
 zuno_mariadb_backup_s3_prefix: "mariadb"
 zuno_mariadb_backup_s3_endpoint: "s3.eu-central-1.amazonaws.com"
 zuno_mariadb_backup_s3_region: "eu-central-1"
+# The backups bucket's database identity (ansible/playbooks/backups_bucket.yml): PostgreSQL repo2 and the UnifAI
+# backups, prefixes postgresql/ and unifai/ (moved from zuno-demo222-backups, eu-west-2, on 2026-11-14).
+zuno_backups_s3_bucket: "zuno-demo333-backups"
+zuno_backups_s3_region: "eu-central-1"
 
 # Images on demo333 are built from the devel branch (the single working
 # branch since 2026-10-23, when demo222 and demo333 were merged into it), not

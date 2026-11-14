@@ -1,0 +1,101 @@
+---
+# Runs from the operator's workstation with the operator's AWS credentials; no cluster access. Same shape as
+# ansible/roles/registry_bucket (aws CLI, read-only plan by default), except that the bucket must already exist and the
+# identity is limited to some prefixes of it, because MariaDB shares the bucket.
+- name: "backups_bucket | require the bucket name"
+  ansible.builtin.assert:
+    that: zuno_backups_s3_bucket | length > 0
+    fail_msg: "Set zuno_backups_s3_bucket in ansible/clusters/<cluster>.yml (ADR-0547)."
+    quiet: true
+
+- name: "backups_bucket | read the current state (read-only)"
+  ansible.builtin.shell: |
+    set -u
+    A="aws --profile {{ zuno_backups_aws_profile }} --region {{ zuno_backups_s3_region }}"
+    b=no; $A s3api head-bucket --bucket {{ zuno_backups_s3_bucket }} >/dev/null 2>&1 && b=yes
+    u=no; $A iam get-user --user-name {{ zuno_backups_s3_iam_user }} >/dev/null 2>&1 && u=yes
+    k=0; [ "$u" = yes ] && k=$($A iam list-access-keys --user-name {{ zuno_backups_s3_iam_user }} --query 'length(AccessKeyMetadata)' --output text)
+    echo "$b $u $k"
+  args:
+    executable: /bin/bash
+  register: _bb_state
+  changed_when: false
+
+- name: "backups_bucket | plan"
+  ansible.builtin.set_fact:
+    _bb_bucket: "{{ _bb_state.stdout.split()[0] }}"
+    _bb_user: "{{ _bb_state.stdout.split()[1] }}"
+    _bb_keys: "{{ _bb_state.stdout.split()[2] | int }}"
+
+- name: "backups_bucket | show the plan"
+  ansible.builtin.debug:
+    msg:
+      - "bucket {{ zuno_backups_s3_bucket }} ({{ zuno_backups_s3_region }}) exists: {{ _bb_bucket }}"
+      - "IAM user {{ zuno_backups_s3_iam_user }} exists: {{ _bb_user }}, access keys: {{ _bb_keys }}"
+      - "prefixes: {{ zuno_backups_s3_prefixes | join(', ') }}"
+      - "apply: {{ backups_bucket_apply }} (set -e backups_bucket_apply=true to write to AWS)"
+
+- name: "backups_bucket | stop when the bucket does not exist"
+  ansible.builtin.fail:
+    msg: >-
+      Bucket {{ zuno_backups_s3_bucket }} not found in {{ zuno_backups_s3_region }} with profile
+      {{ zuno_backups_aws_profile }}. This role does not create it: the backups bucket is shared with MariaDB.
+  when: _bb_bucket != 'yes'
+
+# ListBucket is limited by prefix so this identity cannot even list MariaDB's backups; GetBucketLocation and
+# ListBucketMultipartUploads carry no data. The object rights cover only the prefixes.
+- name: "backups_bucket | build the IAM policy"
+  ansible.builtin.set_fact:
+    _bb_policy:
+      Version: "2012-10-17"
+      Statement:
+        - Effect: Allow
+          Action: ["s3:GetBucketLocation", "s3:ListBucketMultipartUploads"]
+          Resource: "arn:aws:s3:::{{ zuno_backups_s3_bucket }}"
+        - Effect: Allow
+          Action: ["s3:ListBucket"]
+          Resource: "arn:aws:s3:::{{ zuno_backups_s3_bucket }}"
+          Condition:
+            StringLike:
+              "s3:prefix": "{{ zuno_backups_s3_prefixes | product(['', '/*']) | map('join') | list }}"
+        - Effect: Allow
+          Action: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload",
+                   "s3:ListMultipartUploadParts"]
+          Resource: "{{ zuno_backups_s3_prefixes | map('regex_replace', '^(.*)$', 'arn:aws:s3:::' ~ zuno_backups_s3_bucket ~ '/\\1/*') | list }}"
+
+- name: "backups_bucket | create the IAM user and scope it to the prefixes"
+  ansible.builtin.shell: |
+    set -eu
+    A="aws --profile {{ zuno_backups_aws_profile }} --region {{ zuno_backups_s3_region }}"
+    {% if _bb_user == 'no' %}
+    $A iam create-user --user-name {{ zuno_backups_s3_iam_user }}
+    {% endif %}
+    $A iam put-user-policy --user-name {{ zuno_backups_s3_iam_user }} --policy-name backups-bucket \
+      --policy-document {{ _bb_policy | to_json | quote }}
+  args:
+    executable: /bin/bash
+  changed_when: _bb_user == 'no'
+  when: backups_bucket_apply | bool
+
+# An access key secret is readable only at creation: create it once, keep it 0600 outside the repository.
+- name: "backups_bucket | create the access key once"
+  ansible.builtin.shell: |
+    set -eu
+    umask 077
+    mkdir -p "$(dirname {{ backups_bucket_key_file | quote }})"
+    aws --profile {{ zuno_backups_aws_profile }} iam create-access-key --user-name {{ zuno_backups_s3_iam_user }} \
+      --query AccessKey --output json > {{ backups_bucket_key_file | quote }}
+  args:
+    executable: /bin/bash
+  no_log: true
+  changed_when: true
+  when:
+    - backups_bucket_apply | bool
+    - _bb_keys | int == 0
+
+- name: "backups_bucket | where the key is"
+  ansible.builtin.debug:
+    msg: >-
+      Access key file: {{ backups_bucket_key_file }} (0600). It goes into the PostgreSQL backup S3 key fields of
+      ansible/confidential.yml and into Vault postgresql/backup-s3; it is never committed.
+  when: backups_bucket_apply | bool and _bb_keys | int == 0

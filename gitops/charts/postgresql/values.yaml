@@ -174,7 +174,13 @@ backups:
     # (18-1) and every archive-get without --repo failed with [045]. A fresh
     # path starts the stanza at the same id as repo1. See "A PostgreSQL replica
     # stuck in archive recovery" in docs/platform/operations.md.
-    path: "/postgresql-demo333"
+    #
+    # Moved to the per-cluster bucket the same day (owner's go 2026-11-14):
+    # zuno-demo333-backups (eu-central-1, ADR-0546), a fresh /postgresql prefix,
+    # next to MariaDB's mariadb/. The bucket, region and key come from
+    # ansible/confidential.yml (zuno_postgresql_backup_s3_*); the key is the
+    # backups bucket's database identity (ansible/playbooks/backups_bucket.yml).
+    path: "/postgresql"
     secretName: zuno-postgresql-backup-s3  # synced from Vault, only used when s3.enabled
 
 credentials:

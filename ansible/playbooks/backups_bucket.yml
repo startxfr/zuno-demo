@@ -1,0 +1,11 @@
+---
+# Workstation only; writes to AWS only with -e backups_bucket_apply=true. Creates the IAM identity that writes the
+# PostgreSQL repo2 and the UnifAI backups into the cluster's backups bucket (see ansible/roles/backups_bucket).
+- name: "Provision the backups bucket's database identity"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../clusters/{{ zuno_cluster | default('demo333') }}.yml"
+  roles:
+    - backups_bucket
