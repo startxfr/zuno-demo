@@ -163,7 +163,7 @@ Monitoring during a session:
 - Grafana, dashboard **Zuno Platform / Five experiences**, `client` = `blender`: calls, tokens, errors per persona.
 - Tempo: `model_call` spans of the session, with `zuno.client`, `zuno.classification`, `zuno.provider`.
 - ai-gateway logs with a time window, not a line count:
-  `oc logs -n zuno-ai-run deploy/ai-gateway -c ai-gateway --since=30m`.
+  `oc logs -n zuno-ai-run -l app.kubernetes.io/name=ai-gateway -c ai-gateway --since=30m --tail=-1 --prefix` (the gateway runs 2 pods: a label reads both).
 
 ### Stop
 
@@ -230,7 +230,7 @@ Run the 5-minute version, then:
 | 8:00 | Terminal: `oc get route zuno-agent-gateway-workstation-ai-gateway -n openshift-ingress` then `oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run \| grep workstation` | "The ai-gateway has one door for workstations, built with Red Hat Connectivity Link. It opens two paths: list the models and ask for a completion. Everything else answers 404." | Route on `ai-gateway.apps.demo333.startx.fr`; HTTPRoute `ai-gateway-workstation`, AuthPolicy `ai-gateway-workstation-jwt`, RateLimitPolicy `ai-gateway-workstation`. |
 | 9:00 | `oc get authpolicy ai-gateway-workstation-jwt -n zuno-ai-run -o yaml` | "Kuadrant checks the token before the gateway sees it: our Keycloak, the platform audience, the client blender, the group of AI developers. An operator outside that group got 403 in our test. Each user gets 60 requests per 5 minutes." | `issuerUrl: https://keycloak.apps.demo333.startx.fr/realms/zuno`, `azp` `blender`, `groups` `/ocp-ai-dev`. |
 | 10:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="CLASSIFICATION_CLIENT_FLOORS")].value}'` | "Behind the door the ai-gateway checks the token again and puts a floor on the client: everything from blender is C3. C3 means local models only, whatever the routing table gains later." | `blender=C3` |
-| 11:30 | `oc logs -n zuno-ai-run deploy/ai-gateway -c ai-gateway --since=15m \| grep 'client=blender'` | "Each call leaves the proof: raised from C1 to C3 because of the client." | `classification raised by floor: C1 -> C3 agent=blender task=bpy client=blender`, one line per generation. |
+| 11:30 | `oc logs -n zuno-ai-run -l app.kubernetes.io/name=ai-gateway -c ai-gateway --since=15m --tail=-1 --prefix \| grep 'client=blender'` | "Each call leaves the proof: raised from C1 to C3 because of the client." | `classification raised by floor: C1 -> C3 agent=blender task=bpy client=blender`, one line per generation. |
 | 12:30 | Grafana (profile 2, **ai-ops-01**), row **Same models, same routing**, panel **Which provider served each experience (over range)** | "On the platform side, Blender is one more experience: same quotas, same telemetry, same rules as the chat and the agents." | `blender` served by a local provider (`local-...`) only. |
 | 13:30 | Open the task sheet `experience-clients/blender/tasks/bpy.md` in the agents release | "The model choice is declared in the signed agents release: gpt-oss-20b first, qwen3.5-9b after it, every external model role forbidden, no tools." | `allowed_tools: []`, `preferred: [reasoning, default]`, `forbidden: [general-external, reasoning-external, code]`. |
 | 14:30 | Close | Repeat the message. | |
