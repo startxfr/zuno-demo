@@ -300,6 +300,17 @@ class Runner(unittest.TestCase):
         self.assertIn("header=Bearer ***", result.output)
         self.assertIn("$(oc whoami -t)", result.cmd)
 
+    def test_may_be_empty_only_forgives_a_final_grep_with_no_match(self):
+        plain = r.run("git log -1 --format=%h | grep zuno-no-such-line", cwd=ROOT)
+        self.assertEqual(plain.rc, 1)
+        forgiven = r.run("git log -1 --format=%h | grep zuno-no-such-line", cwd=ROOT, may_be_empty=True)
+        self.assertEqual(forgiven.rc, 0)
+        self.assertIn("no line matched yet", forgiven.output)
+        upstream_failure = r.run("git show zuno-no-such-ref-for-tests | grep x", cwd=ROOT, may_be_empty=True)
+        self.assertNotEqual(upstream_failure.rc, 0)
+        not_grep = r.run("git show zuno-no-such-ref-for-tests", cwd=ROOT, may_be_empty=True)
+        self.assertNotEqual(not_grep.rc, 0)
+
     def test_missing_program(self):
         plan = r.Plan("x", [["zuno-no-such-program-for-tests"]])
         self.assertEqual(r.run_plan(plan).rc, 127)

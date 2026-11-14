@@ -84,14 +84,17 @@ jobs:
       # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
       - name: Markdown link and anchor tests (doc_links)
         run: python3 platform/docs/tests/test_doc_links.py
-      # ADR-0616 (WP-270): the demo pages parse into steps, the read-only allowlist of the steps, the guards and the
-      # session. The end-to-end cases on the fixture skip here (no ansible-playbook in this job); they run in the
-      # ansible job below. The smoke test lists the catalogue and selects a demo from an empty HOME.
+      # ADR-0616 (WP-270, WP-271): the demo pages parse into steps, the read-only allowlist of the steps, the guards
+      # and the session, and the pages agree with ansible/demos/ (every row its step file, every Do command covered,
+      # no read-only unit changing anything, no stale `make demo` verb in the docs). The end-to-end cases on the
+      # fixture skip here (no ansible-playbook in this job); they run in the ansible job below. The smoke test lists
+      # the catalogue and selects a demo from an empty HOME.
       - name: Demo lifecycle engine tests (ADR-0616)
         run: |
           python3 platform/demo/tests/test_catalogue_parser.py
           python3 platform/demo/tests/test_readonly.py
           python3 platform/demo/tests/test_guard_session.py
+          python3 platform/demo/tests/test_demo_catalogue.py
           home="$(mktemp -d)"
           HOME="$home" make demo list
           HOME="$home" make demo use guardrails 15

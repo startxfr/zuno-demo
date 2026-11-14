@@ -64,6 +64,7 @@ class Plan:
     timeout: int = READ_TIMEOUT
     needs_token: bool = False
     secrets: List[str] = field(default_factory=list)      # variable values masked in everything printed
+    may_be_empty: bool = False      # a final grep matching nothing is not a failure (the line comes from a live action)
 
 
 @dataclass
@@ -548,9 +549,15 @@ def run_plan(p: Plan, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LI
         if code != 0:
             rc = code if code > 0 else 128 - code
             break
+    empty_grep = (p.may_be_empty and rc == 1 and procs[-1].returncode == 1 and p.pipeline[-1][0] == "grep"
+                  and all(proc.returncode == 0 for proc in procs[:-1]))
+    if empty_grep:
+        rc = 0
     text = out.decode("utf-8", "replace")
     if stderr_text.strip():
         text = (text.rstrip("\n") + "\n" if text.strip() else "") + stderr_text
+    if empty_grep and not text.strip():
+        text = "(no line matched yet: it appears after the live action of the session)\n"
     text = _mask(text, token)
     for secret in p.secrets:
         text = _mask(text, secret)
@@ -561,11 +568,12 @@ def run_plan(p: Plan, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LI
 
 
 def run(command: str, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LINES,
-        variables: Optional[Dict[str, str]] = None) -> Result:
+        variables: Optional[Dict[str, str]] = None, may_be_empty: bool = False) -> Result:
     try:
         p = plan(command, variables=variables)
     except Denied as exc:
         return Result(command.strip().strip("`"), 2, f"REFUSED: {exc}", refused=True)
+    p.may_be_empty = may_be_empty
     return run_plan(p, cwd=cwd, lines=lines)
 
 
@@ -592,6 +600,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     r.add_argument("--json", action="store_true", help="print one JSON object (used by ansible/demos/_lib)")
     r.add_argument("--lines", type=int, default=OUTPUT_LINES)
     r.add_argument("--var", action="append", default=[], metavar="NAME=VALUE")
+    r.add_argument("--may-be-empty", action="store_true", help="a final grep matching nothing is not a failure")
     r.add_argument("command")
     args = parser.parse_args(argv)
     variables = env_variables()
@@ -600,7 +609,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         ok, reason = check(args.command, variables)
         print("allowed" if ok else f"REFUSED: {reason}")
         return 0 if ok else 2
-    result = run(args.command, lines=args.lines, variables=variables)
+    result = run(args.command, lines=args.lines, variables=variables, may_be_empty=args.may_be_empty)
     if args.json:
         print(json.dumps(result.to_dict()))
         return 0

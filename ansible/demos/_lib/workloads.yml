@@ -1,15 +1,16 @@
 ---
-# Status reads: each workload has all its desired replicas ready.
+# Status reads: each workload is ready. A Deployment or StatefulSet has all its desired replicas ready; a Pod is
+# Ready (the Tempo monolith runs as the bare pod tempo-tempo-0).
 # Vars: workloads ([{name, namespace, kind (default Deployment)}]).
 - name: "demo | read the workloads"
   kubernetes.core.k8s_info:
-    api_version: apps/v1
+    api_version: "{{ 'v1' if (item.kind | default('Deployment')) == 'Pod' else 'apps/v1' }}"
     kind: "{{ item.kind | default('Deployment') }}"
     namespace: "{{ item.namespace }}"
     name: "{{ item.name }}"
   loop: "{{ workloads | default([]) }}"
   loop_control:
-    label: "{{ item.namespace }}/{{ item.name }}"
+    label: "{{ item.kind | default('Deployment') }} {{ item.namespace }}/{{ item.name }}"
   register: _demo_workloads
   failed_when: false
 
@@ -18,16 +19,25 @@
     demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
   loop: "{{ _demo_workloads.results | default([]) }}"
   loop_control:
-    label: "{{ item.item.namespace }}/{{ item.item.name }}"
+    label: "{{ item.item.kind | default('Deployment') }} {{ item.item.namespace }}/{{ item.item.name }}"
   vars:
+    _demo_kind: "{{ item.item.kind | default('Deployment') }}"
     _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_pod_ready: >-
+      {{ _demo_obj.status.conditions | default([]) | selectattr('type', 'equalto', 'Ready')
+         | map(attribute='status') | first | default('absent') }}
     _demo_desired: "{{ _demo_obj.spec.replicas | default(1) | int if _demo_obj else 0 }}"
     _demo_ready: "{{ _demo_obj.status.readyReplicas | default(0) | int if _demo_obj else 0 }}"
+    _demo_ok: >-
+      {{ (_demo_pod_ready == 'True') if _demo_kind == 'Pod'
+         else ((_demo_desired | int > 0) and (_demo_ready | int >= _demo_desired | int)) }}
     _demo_row:
       agent: "{{ demo_id }}"
       layer: "{{ demo_unit.name }}"
-      id: "{{ (item.item.kind | default('Deployment')) | lower }}/{{ item.item.namespace }}/{{ item.item.name }}"
+      id: "{{ _demo_kind | lower }}/{{ item.item.namespace }}/{{ item.item.name }}"
       category: workload
-      passed: "{{ (_demo_obj | length > 0) and (_demo_desired | int > 0) and (_demo_ready | int >= _demo_desired | int) }}"
-      detail: "{{ (_demo_ready ~ '/' ~ _demo_desired ~ ' ready') if _demo_obj else 'not found' }}"
+      passed: "{{ (_demo_obj | length > 0) and (_demo_ok | bool) }}"
+      detail: >-
+        {{ 'not found' if not _demo_obj else (('Ready=' ~ _demo_pod_ready) if _demo_kind == 'Pod'
+           else (_demo_ready ~ '/' ~ _demo_desired ~ ' ready')) }}
       duration_ms: 0

@@ -14,7 +14,7 @@ from typing import List, Optional, Tuple
 import guard
 import session
 from catalogue import Page
-from runner import RunResult, Unit, UnitResult, run_units
+from runner import RunResult, Unit, UnitResult
 
 VERSION_LABEL = {"5": "5-minute", "15": "15-minute"}
 

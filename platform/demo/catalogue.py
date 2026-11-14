@@ -297,6 +297,14 @@ def parse_version(page: Page, version: str) -> List[Step]:
     return steps
 
 
+COMMAND_RE = re.compile(r"`((?:ONLY=\S+ )?(?:oc|make|curl|git) [^`]+)`")
+
+
+def do_commands(do_cell: str) -> List[str]:
+    """The backticked `oc`, `make`, `curl` and `git` commands of a Do cell, in order (ADR-0616 clause 14)."""
+    return [c.strip() for c in COMMAND_RE.findall(do_cell)]
+
+
 def seconds(time: str) -> int:
     minutes, secs = time.split(":")
     return int(minutes) * 60 + int(secs)

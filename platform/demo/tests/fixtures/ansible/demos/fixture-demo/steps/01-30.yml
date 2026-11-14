@@ -2,3 +2,10 @@
 # 1:30 - declared mutating in demo.yml: never run by `step`, SKIPPED (mutating) by `rehearse`.
 - name: "fixture | nothing to run"
   ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"
+- name: "fixture | the command the presenter runs by hand"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads: []
+    not_run:
+      - page_text: "oc delete pod fixture -n fixture"
+        reason: "it changes the cluster: the presenter runs it"

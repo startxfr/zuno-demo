@@ -12,7 +12,6 @@ import os
 import pathlib
 import sys
 import tempfile
-import textwrap
 import unittest
 
 HERE = pathlib.Path(__file__).resolve().parent

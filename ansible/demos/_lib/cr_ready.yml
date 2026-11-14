@@ -1,16 +1,22 @@
 ---
-# Check reads (salvaged from the retired demo_check.yml: the Keycloak CR, the LLMInferenceServices): each custom
-# resource has its condition True, or its status.phase equal to the expected one.
-# Vars: cr_ready ([{api_version, kind, name, namespace, condition (default Ready) | phase}]).
+# Check reads (ADR-0616 clause 9; salvaged from the retired demo_check.yml and extended from demo333's live inventory
+# of 2026-11-14): each resource is in the state the demo needs. One mode per entry:
+#   condition: <type>  (default Ready) - status.conditions[type] has status `expect` (default "True");
+#   phase: <value>     - status.phase equals it (ExternalModel: Migrated, NemoGuardrails: Ready);
+#   state: <value>     - status.state equals it (Istio, IstioCNI: Healthy);
+#   parents: <type>    - every parent that reports the condition reports it True, and one does (HTTPRoute:
+#                        Accepted; the Kuadrant policy controller adds a parent entry without it);
+#   exists: true       - the resource exists (GrafanaDashboard, OAuth, HardwareProfile...).
+# Vars: cr_ready ([{api_version, kind, name, namespace (omit when cluster-scoped), <mode>}]).
 - name: "demo | read the custom resources"
   kubernetes.core.k8s_info:
     api_version: "{{ item.api_version }}"
     kind: "{{ item.kind }}"
-    namespace: "{{ item.namespace }}"
+    namespace: "{{ item.namespace | default(omit) }}"
     name: "{{ item.name }}"
   loop: "{{ cr_ready | default([]) }}"
   loop_control:
-    label: "{{ item.kind }} {{ item.namespace }}/{{ item.name }}"
+    label: "{{ item.kind }} {{ item.namespace | default('-') }}/{{ item.name }}"
   register: _demo_crs
   failed_when: false
 
@@ -19,23 +25,41 @@
     demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
   loop: "{{ _demo_crs.results | default([]) }}"
   loop_control:
-    label: "{{ item.item.kind }} {{ item.item.namespace }}/{{ item.item.name }}"
+    label: "{{ item.item.kind }} {{ item.item.namespace | default('-') }}/{{ item.item.name }}"
   vars:
     _demo_obj: "{{ item.resources | default([]) | first | default({}, true) }}"
     _demo_condition: "{{ item.item.condition | default('Ready') }}"
+    _demo_expect: "{{ item.item.expect | default('True') | string }}"
     _demo_cond_status: >-
       {{ _demo_obj.status.conditions | default([]) | selectattr('type', 'equalto', _demo_condition)
          | map(attribute='status') | first | default('absent') }}
-    _demo_phase: "{{ _demo_obj.status.phase | default('absent') }}"
+    _demo_parent_status: >-
+      {{ _demo_obj.status.parents | default([]) | map(attribute='conditions') | map('default', [])
+         | map('selectattr', 'type', 'equalto', item.item.parents | default('Accepted'))
+         | map('map', attribute='status') | map('list') | map('first') | map('default', 'absent') | list }}
+    _demo_mode: >-
+      {{ 'exists' if item.item.exists | default(false) else ('phase' if item.item.phase is defined
+         else ('state' if item.item.state is defined else ('parents' if item.item.parents is defined
+         else 'condition'))) }}
     _demo_ok: >-
-      {{ (_demo_phase == item.item.phase) if item.item.phase is defined else (_demo_cond_status == 'True') }}
+      {{ true if _demo_mode == 'exists'
+         else ((_demo_obj.status.phase | default('absent')) == item.item.phase) if _demo_mode == 'phase'
+         else ((_demo_obj.status.state | default('absent')) == item.item.state) if _demo_mode == 'state'
+         else ((_demo_parent_status | reject('equalto', 'absent') | list | length > 0)
+               and (_demo_parent_status | reject('equalto', 'absent') | reject('equalto', 'True') | list
+               | length == 0)) if _demo_mode == 'parents'
+         else (_demo_cond_status == _demo_expect) }}
+    _demo_detail: >-
+      {{ 'exists' if _demo_mode == 'exists'
+         else ('phase ' ~ (_demo_obj.status.phase | default('absent'))) if _demo_mode == 'phase'
+         else ('state ' ~ (_demo_obj.status.state | default('absent'))) if _demo_mode == 'state'
+         else ((item.item.parents | default('Accepted')) ~ ' ' ~ (_demo_parent_status | join(','))) if _demo_mode == 'parents'
+         else (_demo_condition ~ '=' ~ _demo_cond_status) }}
     _demo_row:
       agent: "{{ demo_id }}"
       layer: "{{ demo_unit.name }}"
-      id: "{{ item.item.kind | lower }}/{{ item.item.namespace }}/{{ item.item.name }}"
+      id: "{{ item.item.kind | lower }}/{{ item.item.namespace | default('-') }}/{{ item.item.name }}"
       category: custom-resource
       passed: "{{ (_demo_obj | length > 0) and (_demo_ok | bool) }}"
-      detail: >-
-        {{ 'not found' if not _demo_obj else (('phase ' ~ _demo_phase) if item.item.phase is defined
-           else (_demo_condition ~ '=' ~ _demo_cond_status)) }}
+      detail: "{{ _demo_detail if _demo_obj else 'not found' }}"
       duration_ms: 0
