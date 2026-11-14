@@ -7,10 +7,58 @@
 # which also installs a2a-gateway): the promotion workflow runs on GitHub and cannot reach the registry, so the roll is
 # the one point where "mirror before roll" can be enforced. Feed it with `OKF_MIRROR_TO=<route>/zuno make d3 admit agents`.
 # Needs zuno_okf_registry_mirror: the caller loads ansible/tasks/load_cluster_vars.yml first.
+#
+# Where the pull config comes from: the workstation file ~/.config/zuno/quay-pull (roles/quay_registry). An AAP
+# execution environment has no such file (job 1428, 2026-11-14: "missing /home/runner/.config/zuno/quay-pull"), so it
+# reads the gateways' own pull config instead, the `config.json` key of the zuno-ai-run Secret
+# zuno_okf_registry_mirror_pull_secret (ExternalSecret from Vault registry/quay-pull). Both AAP identities can read it:
+# the check one through the zuno-day2-check-agents-gate RoleBinding in zuno-ai-run, the installer one cluster-wide.
+- name: "okf mirror | look for the workstation pull docker config"
+  ansible.builtin.stat:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/quay-pull/config.json"
+  register: _okf_mirror_workstation_config
+  when: (zuno_okf_registry_mirror | default('')) | length > 0
+
+- name: "okf mirror | without a workstation config (AAP), use the gateways' pull config"
+  when:
+    - (zuno_okf_registry_mirror | default('')) | length > 0
+    - not _okf_mirror_workstation_config.stat.exists
+  block:
+    - name: "okf mirror | read the gateways' pull Secret"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: zuno-ai-run
+        name: "{{ zuno_okf_registry_mirror_pull_secret | default('quay-pull', true) }}"
+      register: _okf_mirror_pull_secret
+      no_log: true
+
+    - name: "okf mirror | fail when the gateways' pull Secret has no config.json"
+      ansible.builtin.fail:
+        msg: >-
+          No pull docker config: neither ~/.config/zuno/quay-pull/config.json (run make d2 install quay-registry) nor
+          the config.json key of the Secret zuno-ai-run/{{ zuno_okf_registry_mirror_pull_secret | default('quay-pull', true) }}.
+      when: >-
+        (_okf_mirror_pull_secret.resources | length == 0)
+        or ('config.json' not in (_okf_mirror_pull_secret.resources[0].data | default({})))
+
+    - name: "okf mirror | create a private directory for the pull config"
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: okf-mirror-pull
+      register: _okf_mirror_tmp
+
+    - name: "okf mirror | write the pull config (0600)"
+      ansible.builtin.copy:
+        dest: "{{ _okf_mirror_tmp.path }}/config.json"
+        content: "{{ _okf_mirror_pull_secret.resources[0].data['config.json'] | b64decode }}"
+        mode: "0600"
+      no_log: true
+
 - name: "okf mirror | verify that the internal registry holds the locked release (ADR-0611, ADR-0612)"
   ansible.builtin.shell: |
     set -u
-    export DOCKER_CONFIG="${HOME}/.config/zuno/quay-pull"
+    export DOCKER_CONFIG="{{ _okf_mirror_tmp.path | default(lookup('ansible.builtin.env', 'HOME') ~ '/.config/zuno/quay-pull') }}"
     [ -f "$DOCKER_CONFIG/config.json" ] || { echo "missing $DOCKER_CONFIG/config.json: run make d2 install quay-registry" >&2; exit 1; }
     prefix="{{ zuno_okf_registry_mirror }}"
     lock="$(grep -v '^#' platform/okf/agents.lock | grep .)"
@@ -23,6 +71,12 @@
   changed_when: false
   failed_when: false
   when: (zuno_okf_registry_mirror | default('')) | length > 0
+
+- name: "okf mirror | remove the pull config written for this run"
+  ansible.builtin.file:
+    path: "{{ _okf_mirror_tmp.path }}"
+    state: absent
+  when: _okf_mirror_tmp.path is defined
 
 - name: "okf mirror | fail when the mirror does not hold the locked release"
   ansible.builtin.fail:
