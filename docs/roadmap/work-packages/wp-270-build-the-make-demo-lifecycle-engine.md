@@ -1,6 +1,6 @@
 # WP-270: Build the make demo lifecycle engine
 
-- **State:** Not started
+- **State:** Done (2026-11-14)
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-269](wp-269-record-the-demo-lifecycle-decision-and-page-contract.md)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md), [WP-238](wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md), [WP-243](wp-243-browser-tests-for-every-experience.md)
@@ -78,3 +78,23 @@ freeze marker of ADR-0616.
 - With one hand-made demo directory (from WP-271 or a fixture), `make demo use <id> 15`, `make demo status` and
   `make demo step next` print a result and the right section.
 - `DEMO_CONFIRM=<other id>` does not unlock a demo; the freeze marker refuses `install`.
+
+## Result (2026-11-14)
+
+Built by the coder session (zuno-demo-18) under zuno-demo-reorg's coordination, reviewed and merged by
+zuno-demo-reorg: `platform/demo/` (catalogue, session, guard, readonly, runner, render, rehearse, presenter),
+`ansible/playbooks/demo_run.yml`, twelve `ansible/demos/_lib/` task files, the Makefile grammar (golden-path and
+browser unchanged), completion and help, three test files (68 cases, Python 3.9 and 3.11) with a fixture demo, and the
+CI wiring (docs job; the end-to-end fixture cases in the ansible job).
+
+- The parser reads the 30 scenario pages into 157 steps (5-minute) and 275 (15-minute), the four excluded blocks, and
+  the six workshops; `make demo list` shows the 36 demos.
+- Review: the 152 `oc` commands of the Do cells, all run live by the demo333 session on 2026-11-14 (140 with output,
+  11 empty as their pages expect, none failing), pass the allowlist except two; 55 hostile or borderline commands
+  (Secret reads in every form, writes, redirects, chaining, `tee`, `xargs`, non-GET `curl`, awk `system`, jq `env`,
+  `oc config view --raw`) are refused.
+- Carried by WP-271 as its first commit: the `$(`/`${` check must ignore single-quoted text (it refuses vault-pki 1:00,
+  `awk '{print $(NF-1)}'`); `strip_watch_flags` must return a refusal instead of raising; a placeholder with `:` or
+  digits (`<a node of the 1:00 step>`) must be reported as a placeholder, not a redirect; `$NAME` arguments must be
+  resolved from the step's variables or refused (the `curl $MAAS/...` rows of two RHOAI pages).
+

@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-270, WP-271, WP-272, WP-273, WP-274, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
+| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-271, WP-272, WP-273, WP-274, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1165,7 +1165,7 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-269 | [wp-269](work-packages/wp-269-record-the-demo-lifecycle-decision-and-page-contract.md) | 0616 | none | Done | none |
-| WP-270 | [wp-270](work-packages/wp-270-build-the-make-demo-lifecycle-engine.md) | 0616 | WP-269 | Not started | planned 2026-11-14 to 2026-11-15 |
+| WP-270 | [wp-270](work-packages/wp-270-build-the-make-demo-lifecycle-engine.md) | 0616 | WP-269 | Done | none |
 | WP-271 | [wp-271](work-packages/wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md) | 0616 | WP-270 | Not started | planned 2026-11-15 |
 | WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Not started | planned 2026-11-15; the four `demo-persona-probe` leftovers in `zuno-ai-run` were deleted on 2026-11-14 with the owner's go (no Argo CD owner, label `zuno.io/managed-by=zuno-ansible`) |
 | WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Not started | planned 2026-11-15; no cluster change |
@@ -1322,6 +1322,7 @@ moving.
 
 ## Change log
 
+- 2026-11-14 — WP-270 Done: the `make demo` lifecycle engine (platform/demo, demo_run.yml, ansible/demos/_lib, Makefile grammar, 68 tests) is on devel with the two pilot pages (guardrails, unifai-live-rag) in their `## Presenter lifecycle` form and `evaluations/unifai_rag_library.py` for the RAG pilot. The 28 other scenario pages and the 6 workshops are migrated on a local branch and land after the owner's gate of 2026-11-16. The four webinar probe leftovers were deleted from `zuno-ai-run` on 2026-11-14 (owner's go). The DSC reads Ready=False because the parked GuardrailsOrchestrator `zuno-guardrails-smoke` is stuck in phase Error since 2026-11-07; the owner chose not to restart the TrustyAI operator now; the guardrails probe passes.
 - 2026-11-14 — WP-282 (Done) and WP-283 (Not started) added to Phase 54 (v0.17), drift points 3 and 4 of the UnifAI review the owner validated with unifai-compare. WP-282: both pin scripts check that every digest they write is in the internal Quay, the operator and bundle included, before the admission preflight and the write; `--mirror-to` copies what is missing first (proven read-only on 0.1.71 and 0.1.72). WP-283 plans `make d2 check canary-ready` and the runbook of what the fork's canary assumes of the cluster. UnifAI 0.1.72 (tests and docs only) is not pinned, by the owner's choice.
 - 2026-11-14 — ADR-0616 and WP-269 to WP-281 added (Phase 56, v0.16) by the owner's decisions of the day: one `make demo` lifecycle for every catalogue demo (status, check, install, start, step next|N, stop, uninstall, plus list, use, freeze, rehearse), one Ansible file and one page section per action and step, `## Presenter lifecycle` replacing `## Before you start`, the WP-136 webinar helpers retired (ADR-0550 superseded in part, ADR-0605 dated note). WP-269 Done (the records and the page contract); pilots guardrails and unifai-live-rag, gate 2026-11-16 12:00; full rehearsal of every demo in both versions dated 2026-11-18.
 - 2026-11-14 — WP-268 dated by the owner: legacy OKF documents are refused on 2027-01-05, together by the zuno-demo readers and unifai-operator line 0.2 (fork R-556), on the condition that no locked release contains a legacy document (true since v1.0.0). ADR-0615 clause 13 carries the date.
