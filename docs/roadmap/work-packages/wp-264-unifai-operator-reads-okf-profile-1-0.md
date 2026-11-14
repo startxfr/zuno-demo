@@ -1,6 +1,6 @@
 # WP-264: unifai-operator reads OKF profile 1.0 (v0.1.71)
 
-- **State:** Not started
+- **State:** Repo work in review (2026-11-14: patch /home/cl/ClaudeCode/startx-unifai-wp264.patch handed to the fork owner session; envtest green; waits for the owner's go, the canary and the manual cut of v0.1.71)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 4, 5, 7, 11, 12), [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md)
 - **Depends on:** WP-262 (the frozen schemas)
 - **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md), [WP-268](wp-268-refuse-legacy-okf-documents-from-2026-12-01.md)

@@ -1,6 +1,6 @@
 # WP-266: Complete the tool and rag notes and the task prompts
 
-- **State:** Not started
+- **State:** Operator pending (2026-11-14: notes and the 12 prompts merged in zuno-demo-agents PR #52; the evaluation of the 6 new prompts of the active agents remains)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 9, 10)
 - **Depends on:** WP-262, WP-265
 - **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md)

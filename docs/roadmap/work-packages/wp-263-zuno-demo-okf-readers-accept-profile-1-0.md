@@ -1,6 +1,6 @@
 # WP-263: zuno-demo OKF readers accept profile 1.0
 
-- **State:** Not started
+- **State:** Operator pending (2026-11-14: readers c75e8e4d and 0166cd5c on devel; supply-chain-signer, mcp-gateway, a2a-gateway, ai-gateway and mlops rebuilt and rolled with the owner's go, golden path 13/13 before and after, okf-fetch VERIFIED; `make d2 check agents` fails on a pre-existing gap: the locked v0.14.4 was never copied into the internal Quay)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 5, 6, 12), [ADR-0508](../../adr/0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md)
 - **Depends on:** WP-262 (the conformance cases)
 - **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md)

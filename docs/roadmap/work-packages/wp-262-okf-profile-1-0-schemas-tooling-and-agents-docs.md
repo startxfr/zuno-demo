@@ -1,6 +1,6 @@
 # WP-262: OKF profile 1.0 schemas, tooling and the agents-repo documentation
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-14: zuno-demo-agents PRs #51 and #52 merged into devel; ships in v1.0.0)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 1 to 9, 11)
 - **Depends on:** none
 - **Related:** [WP-263](wp-263-zuno-demo-okf-readers-accept-profile-1-0.md), [WP-264](wp-264-unifai-operator-reads-okf-profile-1-0.md), [WP-265](wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md)
