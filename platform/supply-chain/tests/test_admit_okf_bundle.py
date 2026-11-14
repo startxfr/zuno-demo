@@ -152,6 +152,82 @@ class ValidateTest(AdmitTestCase):
                             "  model: {preferred_classification: C1}\n  delegation: {targets: [{agent: demo, task: ask}]}\n"))
         self.assertIn("delegation is an OKF v0.3 field", admit.validate(self.release)[0][0])
 
+    # ADR-0615 clauses 5 and 6: profile 1.0 (okf_version "0.2" + zuno.profile "1.0").
+
+    def _profile10_demo(self, extra: str = "") -> None:
+        write(self.release / "agents/demo/agent.okf.md",
+              AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                   .replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n')
+                   .replace("  model: {preferred_classification: C1}\n",
+                            "  model: {preferred_classification: C1}\n" + extra))
+        write(self.release / "agents/demo/tasks/ask.md",
+              TASK.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                  .replace("  allowed_tools:", '  profile: "1.0"\n  allowed_tools:'))
+        # The bundle-root index.md of profile bundles: okf_version only, no type, no zuno.profile.
+        # No reader opens it; were one to, the dispatch rule would refuse it.
+        write(self.release / "agents/demo/index.md", '---\nokf_version: "0.2"\n---\n\n# Demo\n')
+
+    def test_a_profile10_release_is_admitted(self) -> None:
+        self._profile10_demo()
+        self.assertEqual(admit.validate(self.release)[0], [])
+        self.assertEqual(admit.agents_view(self.release)["demo"]["tasks"],
+                         {"ask": {"tools": ["search_docs"], "knowledge": ["knowledge.tech"], "quota_class": "standard"}})
+
+    def test_a_profile10_widening_is_refused_at_admission(self) -> None:
+        # ADR-0615 clause 6 (F11): the v0.3 rules apply from v0.3 up, profile 1.0 included.
+        # A gate testing `okf_version == "v0.3"` would skip this bundle in silence.
+        self._profile10_demo("  limits: {max_tokens: 99999, delegation: {max_depth: 3}}\n")
+        write(self.release / "policies/limits/limits-policy.yaml", "max_tokens: 8192\nmax_delegation_depth: 2\n")
+        errors = admit.validate(self.release)[0]
+        self.assertEqual(len(errors), 2, errors)
+        self.assertIn("max_tokens 99999 exceeds the corp ceiling 8192", errors[0])
+        self.assertIn("delegation max_depth 3 exceeds the corp ceiling 2", errors[1])
+
+    def test_a_profile10_skill_the_task_does_not_cover_is_refused(self) -> None:
+        self._profile10_demo()
+        write(self.release / "agents/demo/tasks/ask.md",
+              TASK.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                  .replace("  allowed_tools:", '  profile: "1.0"\n  skills: [cite]\n  allowed_tools:'))
+        write(self.release / "agents/demo/skills/cite.md",
+              '---\nokf_version: "0.2"\ntype: skill\nzuno:\n  profile: "1.0"\n  allowed_tools: [send_email]\n---\n')
+        self.assertIn("skill 'cite' needs tool 'send_email'", admit.validate(self.release)[0][0])
+
+    def test_the_narrowing_level_orders_the_versions(self) -> None:
+        import okf_narrowing
+
+        self.assertEqual([okf_narrowing.at_least_v03(v) for v in ("v0.2", "v0.3", "1.0")], [False, True, True])
+        self.assertFalse(okf_narrowing.at_least_v03("v0.9"))
+
+    def test_the_narrowing_rule_fails_closed_on_an_unsupported_version(self) -> None:
+        import okf_narrowing
+
+        for front, needle in (('okf_version: "0.2"', "unsupported zuno.profile None"),
+                              ("okf_version: 0.2", "unsupported okf_version 0.2"),
+                              ("okf_version: v0.9", "unsupported okf_version 'v0.9'")):
+            with self.subTest(front=front):
+                write(self.release / "agents/demo/agent.okf.md", AGENT.replace("okf_version: v0.2", front))
+                findings = okf_narrowing.check_release(self.release)
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn(needle, findings[0])
+
+    def test_profile_and_version_refusals_are_named(self) -> None:
+        for agent, needle in (
+                (AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"'), "unsupported zuno.profile None"),
+                (AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                      .replace("  name: demo\n", '  profile: "2.0"\n  name: demo\n'),
+                 "unsupported zuno.profile '2.0'"),
+                (AGENT.replace("okf_version: v0.2", "okf_version: 0.2")
+                      .replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n'),
+                 "unsupported okf_version 0.2"),
+                (AGENT.replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n'),
+                 'zuno.profile is only valid with okf_version "0.2"')):
+            with self.subTest(needle=needle):
+                write(self.release / "agents/demo/agent.okf.md", agent)
+                with self.assertRaises(ValueError) as caught:
+                    admit.validate(self.release)
+                self.assertIn(needle, str(caught.exception))
+                self.assertIn("agents/demo/agent.okf.md", str(caught.exception))
+
     def test_unserved_knowledge_domain_is_a_warning(self) -> None:
         # WP-168: nothing serves the domain (no UnifAI source tagged with it).
         # Allowing it grants no access, so the release stays servable.

@@ -72,20 +72,51 @@ class ConformanceCases(unittest.TestCase):
 
 
 class VersionCheck(unittest.TestCase):
-    def _bundle(self, agent_version, task_version="v0.2"):
+    """ADR-0615 clause 5: legacy v0.2/v0.3 without zuno.profile, or okf_version "0.2" with zuno.profile "1.0"."""
+
+    def _bundle(self, agent_version, task_version="v0.2", agent_profile=None, task_profile=None):
         root = pathlib.Path(tempfile.mkdtemp())
         (root / "alpha" / "tasks").mkdir(parents=True)
         head = f"okf_version: {agent_version}\n" if agent_version else ""
+        profile = f"  profile: {agent_profile}\n" if agent_profile else ""
         (root / "alpha" / "agent.okf.md").write_text(
-            f"---\n{head}type: agent\nzuno:\n  status: active\n  tasks: [ask]\n---\nx\n")
+            f"---\n{head}type: agent\nzuno:\n{profile}  status: active\n  tasks: [ask]\n---\nx\n")
+        task_head = f"  profile: {task_profile}\n" if task_profile else ""
         (root / "alpha" / "tasks" / "ask.md").write_text(
-            f"---\nokf_version: {task_version}\ntype: task\nzuno:\n  allowed_tools: [t]\n---\nx\n")
+            f"---\nokf_version: {task_version}\ntype: task\nzuno:\n{task_head}  allowed_tools: [t]\n---\nx\n")
         return str(root)
 
     def test_supported_versions_load(self):
-        self.assertEqual(hook.SUPPORTED_OKF_VERSIONS, ("v0.2", "v0.3"))
-        for version in hook.SUPPORTED_OKF_VERSIONS:
+        self.assertEqual(hook.LEGACY_OKF_VERSIONS, ("v0.2", "v0.3"))
+        self.assertEqual((hook.UPSTREAM_OKF_VERSION, hook.ZUNO_PROFILES), ("0.2", ("1.0",)))
+        for version in hook.LEGACY_OKF_VERSIONS:
             self.assertTrue(hook.AgentDeclarationStore(self._bundle(version)).loaded, version)
+
+    def test_profile_10_loads_and_a_mixed_bundle_too(self):
+        store = hook.AgentDeclarationStore(self._bundle('"0.2"', '"0.2"', '"1.0"', '"1.0"'))
+        self.assertTrue(store.loaded, store.load_error)
+        self.assertEqual(store.get("alpha").tasks, {"ask": ["t"]})
+        # The version is checked one document at a time.
+        self.assertTrue(hook.AgentDeclarationStore(self._bundle('"0.2"', "v0.3", '"1.0"')).loaded)
+
+    def test_the_bundle_root_index_is_not_read(self):
+        """Profile bundles carry an index.md whose frontmatter is only okf_version "0.2"."""
+        root = pathlib.Path(self._bundle('"0.2"', '"0.2"', '"1.0"', '"1.0"'))
+        (root / "alpha" / "index.md").write_text('---\nokf_version: "0.2"\n---\n\n# Alpha\n')
+        self.assertTrue(hook.AgentDeclarationStore(str(root)).loaded)
+
+    def test_profile_refusals_are_named_and_clear_every_agent(self):
+        for args, needle in (
+                (('"0.2"',), "unsupported zuno.profile None"),
+                (('"0.2"', "v0.2", '"2.0"'), "unsupported zuno.profile '2.0'"),
+                (("0.2", "v0.2", '"1.0"'), "unsupported okf_version 0.2"),  # an unquoted 0.2 is a YAML number
+                (("v0.3", "v0.2", '"1.0"'), 'zuno.profile is only valid with okf_version "0.2"'),
+                (("v0.2", '"0.2"'), "unsupported zuno.profile None")):  # the task document is checked too
+            with self.subTest(args=args):
+                store = hook.AgentDeclarationStore(self._bundle(*args))
+                self.assertFalse(store.loaded)
+                self.assertIn(needle, store.load_error)
+                self.assertEqual(store._agents, {})
 
     def test_unsupported_and_missing_versions_are_refused_by_name(self):
         for version, needle in (("v0.9", "unsupported okf_version 'v0.9'"), ("v0.1", "unsupported okf_version 'v0.1'"),

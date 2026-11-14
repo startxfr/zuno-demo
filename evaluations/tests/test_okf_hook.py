@@ -52,20 +52,47 @@ class ConformanceCases(unittest.TestCase):
 
 
 class VersionCheck(unittest.TestCase):
-    def _root(self, agent_version, task_version="v0.2"):
+    """ADR-0615 clause 5: legacy v0.2/v0.3 without zuno.profile, or okf_version "0.2" with zuno.profile "1.0"."""
+
+    def _root(self, agent_version, task_version="v0.2", agent_profile=None, task_profile=None):
         root = pathlib.Path(tempfile.mkdtemp())
         (root / "agents" / "alpha" / "tasks").mkdir(parents=True)
         head = f"okf_version: {agent_version}\n" if agent_version else ""
+        profile = f"  profile: {agent_profile}\n" if agent_profile else ""
         (root / "agents" / "alpha" / "agent.okf.md").write_text(
-            f"---\n{head}type: agent\nzuno:\n  status: active\n  tasks: [ask]\n---\nx\n")
+            f"---\n{head}type: agent\nzuno:\n{profile}  status: active\n  tasks: [ask]\n---\nx\n")
+        task_head = f"  profile: {task_profile}\n" if task_profile else ""
         (root / "agents" / "alpha" / "tasks" / "ask.md").write_text(
-            f"---\nokf_version: {task_version}\ntype: task\nzuno:\n  allowed_tools: [t]\n---\nx\n")
+            f"---\nokf_version: {task_version}\ntype: task\nzuno:\n{task_head}  allowed_tools: [t]\n---\nx\n")
         return root
 
     def test_supported_versions_read(self):
-        self.assertEqual(hook.SUPPORTED_OKF_VERSIONS, ("v0.2", "v0.3"))
-        for version in hook.SUPPORTED_OKF_VERSIONS:
+        self.assertEqual(hook.LEGACY_OKF_VERSIONS, ("v0.2", "v0.3"))
+        self.assertEqual((hook.UPSTREAM_OKF_VERSION, hook.ZUNO_PROFILES), ("0.2", ("1.0",)))
+        for version in hook.LEGACY_OKF_VERSIONS:
             self.assertEqual(hook.task_declarations(self._root(version), "alpha"), {"ask": {"allowed_tools": ["t"]}})
+        profile = self._root('"0.2"', '"0.2"', '"1.0"', '"1.0"')
+        self.assertEqual(hook.task_declarations(profile, "alpha"), {"ask": {"profile": "1.0", "allowed_tools": ["t"]}})
+        self.assertEqual(hook.agent_declaration(profile, "alpha").get("status"), "active")
+        # The version is checked one document at a time: a mixed bundle is read.
+        self.assertIn("ask", hook.task_declarations(self._root('"0.2"', "v0.3", '"1.0"'), "alpha"))
+
+    def test_the_bundle_root_index_is_not_read(self):
+        root = self._root('"0.2"', '"0.2"', '"1.0"', '"1.0"')
+        (root / "agents" / "alpha" / "index.md").write_text('---\nokf_version: "0.2"\n---\n\n# Alpha\n')
+        self.assertIn("ask", hook.task_declarations(root, "alpha"))
+
+    def test_profile_refusals_are_named(self):
+        for args, needle in (
+                (('"0.2"',), "unsupported zuno.profile None"),
+                (('"0.2"', "v0.2", '"2.0"'), "unsupported zuno.profile '2.0'"),
+                (("0.2", "v0.2", '"1.0"'), "unsupported okf_version 0.2"),  # an unquoted 0.2 is a YAML number
+                (("v0.3", "v0.2", '"1.0"'), 'zuno.profile is only valid with okf_version "0.2"'),
+                (("v0.2", '"0.2"'), "unsupported zuno.profile None")):  # the task document is checked too
+            with self.subTest(args=args):
+                with self.assertRaises(ValueError) as caught:
+                    hook.task_declarations(self._root(*args), "alpha")
+                self.assertIn(needle, str(caught.exception))
 
     def test_unsupported_missing_and_frontmatterless_are_refused_by_name(self):
         for version, needle in (("v0.9", "unsupported okf_version 'v0.9'"), (None, "missing okf_version")):

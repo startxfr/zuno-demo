@@ -1275,8 +1275,37 @@ def _load_tool_probes(config: MlopsConfig) -> Optional[Dict[str, Any]]:
     return doc
 
 
-# ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions mlops reads.
-SUPPORTED_OKF_VERSIONS = ("v0.2", "v0.3")
+# ADR-0508 clause 3 / ADR-0615 clause 5: the versions mlops reads. Profile 1.0
+# is okf_version "0.2" (upstream OKF, a quoted string) plus zuno.profile "1.0";
+# the legacy okf_version values v0.2 and v0.3 carry no zuno.profile and stay
+# readable until WP-268 removes them. mlops keeps its own copy of the rule
+# (ADR-0508 clause 4); platform/okf/tests/test_okf_version_dispatch.py checks
+# that every copy accepts and refuses the same documents.
+UPSTREAM_OKF_VERSION = "0.2"
+ZUNO_PROFILES = ("1.0",)
+LEGACY_OKF_VERSIONS = ("v0.2", "v0.3")
+SUPPORTED_OKF_VERSIONS_TEXT = (f'okf_version "{UPSTREAM_OKF_VERSION}" with zuno.profile '
+                               f'{", ".join(ZUNO_PROFILES)}, or legacy {", ".join(LEGACY_OKF_VERSIONS)}')
+
+
+def okf_document_version(front: Dict[str, Any]) -> str:
+    """The version a document's frontmatter follows: "v0.2" or "v0.3" (legacy)
+    or "1.0" (profile). ValueError, naming the cause, for any other pair."""
+    version = front.get("okf_version")
+    zuno = front.get("zuno")
+    profile = zuno.get("profile") if isinstance(zuno, dict) else None
+    if version is None:
+        raise ValueError(f"missing okf_version (supported: {SUPPORTED_OKF_VERSIONS_TEXT})")
+    if isinstance(version, str) and version in LEGACY_OKF_VERSIONS:
+        if profile is not None:
+            raise ValueError(f'zuno.profile is only valid with okf_version "{UPSTREAM_OKF_VERSION}" '
+                             f"(this document says okf_version {version!r})")
+        return version
+    if isinstance(version, str) and version == UPSTREAM_OKF_VERSION:
+        if isinstance(profile, str) and profile in ZUNO_PROFILES:
+            return profile
+        raise ValueError(f"unsupported zuno.profile {profile!r} (supported: {', '.join(ZUNO_PROFILES)})")
+    raise ValueError(f"unsupported okf_version {version!r} (supported: {SUPPORTED_OKF_VERSIONS_TEXT})")
 
 
 def _task_system_prompt(config: MlopsConfig, task_name: str) -> str:
@@ -1290,14 +1319,12 @@ def _task_system_prompt(config: MlopsConfig, task_name: str) -> str:
     parts = raw.split("---", 2)
     if len(parts) < 3:
         raise SystemExit(f"{path} has no YAML frontmatter; cannot recover its prompt body")
-    # ADR-0508: this function is mlops's OKF hook, so it states the schema
-    # versions it understands and refuses the rest by name.
-    version = (yaml.safe_load(parts[1]) or {}).get("okf_version")
-    if version is None:
-        raise SystemExit(f"{path}: missing okf_version (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
-    if version not in SUPPORTED_OKF_VERSIONS:
-        raise SystemExit(
-            f"{path}: unsupported okf_version {version!r} (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
+    # ADR-0508: this function is mlops's OKF hook, so it states the versions
+    # it understands (okf_document_version) and refuses the rest by name.
+    try:
+        okf_document_version(yaml.safe_load(parts[1]) or {})
+    except ValueError as exc:
+        raise SystemExit(f"{path}: {exc}") from None
     return parts[2].strip()
 
 

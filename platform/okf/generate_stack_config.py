@@ -149,7 +149,7 @@ def verify_keyless() -> dict:
 
 
 def okf_v03_fields(agent_dir: pathlib.Path) -> dict:
-    """OKF v0.3 agent declarations (ADR-0579), aliases normalised; empty for v0.2.
+    """OKF v0.3 and profile 1.0 agent declarations (ADR-0579, ADR-0615), aliases normalised; empty for v0.2.
 
     models/guardrails/limits are exposed for the consumers WP-157 and the
     ai-gateway wiring will add; nothing reads them yet."""

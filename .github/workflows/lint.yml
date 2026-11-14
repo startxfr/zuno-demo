@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
-      - run: pip install pyyaml packaging
+      # jinja2: the OKF version dispatch test renders the Ansible check's expression (WP-263).
+      - run: pip install pyyaml packaging jinja2
       # ADR-0580/WP-165: agents and the corp policies are not in this
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
@@ -95,6 +96,12 @@ jobs:
           python3 platform/okf/tests/test_okf_conformance.py
           python3 components/mcp-gateway/tests/test_okf_conformance.py
           python3 evaluations/tests/test_okf_hook.py
+      # ADR-0615 clause 5 (WP-263): every reader hook's copy of the version dispatch rule gives the
+      # same answer, on a fixed table and on every document of the conformance cases.
+      - name: OKF version dispatch across the reader hooks (ADR-0615)
+        run: |
+          python3 platform/okf/tests/test_okf_version_dispatch.py
+          python3 platform/docs/tests/test_okf_frontmatter.py
       # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
       - name: Golden-path probe judgement tests (ADR-0605)
         run: python3 evaluations/tests/test_golden_path_probe.py

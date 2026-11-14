@@ -29,10 +29,39 @@ logger = logging.getLogger("a2a_gateway.agent_declarations")
 AGENTS_DIR = os.getenv("AGENTS_DIR", "/app/agents")
 
 
-# ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions this reader
-# understands. A document declaring anything else (or nothing) is refused, so a
-# bundle written for a newer schema is never read with older rules.
-SUPPORTED_OKF_VERSIONS = ("v0.2", "v0.3")
+# ADR-0508 clause 3 / ADR-0615 clause 5: the versions this reader understands.
+# Profile 1.0 is okf_version "0.2" (upstream OKF, a quoted string) plus
+# zuno.profile "1.0"; the legacy okf_version values v0.2 and v0.3 carry no
+# zuno.profile and stay readable until WP-268 removes them. A document declaring
+# anything else (or nothing) is refused, so a bundle written for a newer schema
+# is never read with older rules. This reader keeps its own copy of the rule
+# (ADR-0508 clause 4); platform/okf/tests/test_okf_version_dispatch.py checks
+# that every copy accepts and refuses the same documents.
+UPSTREAM_OKF_VERSION = "0.2"
+ZUNO_PROFILES = ("1.0",)
+LEGACY_OKF_VERSIONS = ("v0.2", "v0.3")
+SUPPORTED_OKF_VERSIONS_TEXT = (f'okf_version "{UPSTREAM_OKF_VERSION}" with zuno.profile '
+                               f'{", ".join(ZUNO_PROFILES)}, or legacy {", ".join(LEGACY_OKF_VERSIONS)}')
+
+
+def okf_document_version(frontmatter: Dict) -> str:
+    """The version a document's frontmatter follows: "v0.2" or "v0.3" (legacy)
+    or "1.0" (profile). ValueError, naming the cause, for any other pair."""
+    version = frontmatter.get("okf_version")
+    zuno = frontmatter.get("zuno")
+    profile = zuno.get("profile") if isinstance(zuno, dict) else None
+    if version is None:
+        raise ValueError(f"missing okf_version (supported: {SUPPORTED_OKF_VERSIONS_TEXT})")
+    if isinstance(version, str) and version in LEGACY_OKF_VERSIONS:
+        if profile is not None:
+            raise ValueError(f'zuno.profile is only valid with okf_version "{UPSTREAM_OKF_VERSION}" '
+                             f"(this document says okf_version {version!r})")
+        return version
+    if isinstance(version, str) and version == UPSTREAM_OKF_VERSION:
+        if isinstance(profile, str) and profile in ZUNO_PROFILES:
+            return profile
+        raise ValueError(f"unsupported zuno.profile {profile!r} (supported: {', '.join(ZUNO_PROFILES)})")
+    raise ValueError(f"unsupported okf_version {version!r} (supported: {SUPPORTED_OKF_VERSIONS_TEXT})")
 
 
 def _split_frontmatter(path: Path) -> Dict:
@@ -41,11 +70,10 @@ def _split_frontmatter(path: Path) -> Dict:
     if len(parts) < 3:
         raise ValueError(f"{path}: expected a leading '---' YAML frontmatter block")
     frontmatter = yaml.safe_load(parts[1]) or {}
-    version = frontmatter.get("okf_version")
-    if version is None:
-        raise ValueError(f"{path}: missing okf_version (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
-    if version not in SUPPORTED_OKF_VERSIONS:
-        raise ValueError(f"{path}: unsupported okf_version {version!r} (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
+    try:
+        okf_document_version(frontmatter)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from None
     return frontmatter
 
 

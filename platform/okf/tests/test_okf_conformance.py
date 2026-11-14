@@ -85,26 +85,45 @@ class DelegationNarrowing(unittest.TestCase):
 
 
 class VersionCheck(unittest.TestCase):
-    def _release(self, version):
+    """ADR-0615 clause 5: legacy v0.2/v0.3 without zuno.profile, or okf_version "0.2" with zuno.profile "1.0"."""
+
+    def _release(self, version, profile=None, task_version="v0.2", task_profile=None):
         root = pathlib.Path(tempfile.mkdtemp())
         (root / "agents" / "alpha" / "tasks").mkdir(parents=True)
         head = f"okf_version: {version}\n" if version else ""
+        agent_profile = f"  profile: {profile}\n" if profile else ""
         (root / "agents" / "alpha" / "agent.okf.md").write_text(
-            f"---\n{head}type: agent\nzuno:\n  status: active\n  tasks: [ask]\n---\nx\n")
+            f"---\n{head}type: agent\nzuno:\n{agent_profile}  status: active\n  tasks: [ask]\n---\nx\n")
+        task_head = f"  profile: {task_profile}\n" if task_profile else ""
         (root / "agents" / "alpha" / "tasks" / "ask.md").write_text(
-            "---\nokf_version: v0.2\ntype: task\nzuno:\n  allowed_tools: [t]\n---\nx\n")
+            f"---\nokf_version: {task_version}\ntype: task\nzuno:\n{task_head}  allowed_tools: [t]\n---\nx\n")
         return root
 
     def test_supported_versions_read(self):
-        self.assertEqual(admit.SUPPORTED_OKF_VERSIONS, ("v0.2", "v0.3"))
-        for version in admit.SUPPORTED_OKF_VERSIONS:
+        self.assertEqual(admit.LEGACY_OKF_VERSIONS, ("v0.2", "v0.3"))
+        self.assertEqual((admit.UPSTREAM_OKF_VERSION, admit.ZUNO_PROFILES), ("0.2", ("1.0",)))
+        for version in admit.LEGACY_OKF_VERSIONS:
             self.assertIn("alpha", admit.agents_view(self._release(version)))
+        profile = admit.agents_view(self._release('"0.2"', '"1.0"', task_version='"0.2"', task_profile='"1.0"'))
+        self.assertEqual(profile["alpha"]["tasks"], {"ask": {"tools": ["t"], "knowledge": [], "quota_class": "standard"}})
+        # The version is checked one document at a time: a mixed bundle is read.
+        self.assertIn("alpha", admit.agents_view(self._release('"0.2"', '"1.0"', task_version="v0.3")))
 
     def test_unsupported_missing_and_frontmatterless_are_refused_by_name(self):
         for version, needle in (("v0.9", "unsupported okf_version 'v0.9'"), (None, "missing okf_version")):
             with self.assertRaises(ValueError) as caught:
                 admit.agents_view(self._release(version))
             self.assertIn(needle, str(caught.exception))
+        for args, needle in (
+                (('"0.2"',), "unsupported zuno.profile None"),
+                (('"0.2"', '"2.0"'), "unsupported zuno.profile '2.0'"),
+                (("0.2", '"1.0"'), "unsupported okf_version 0.2"),  # an unquoted 0.2 is a YAML number
+                (("v0.3", '"1.0"'), 'zuno.profile is only valid with okf_version "0.2"'),
+                (("v0.2", None, '"0.2"'), "unsupported zuno.profile None")):  # the task document is checked too
+            with self.subTest(args=args):
+                with self.assertRaises(ValueError) as caught:
+                    admit.agents_view(self._release(*args))
+                self.assertIn(needle, str(caught.exception))
         release = self._release("v0.2")
         (release / "agents" / "alpha" / "agent.okf.md").write_text("# prose only\n")
         with self.assertRaises(ValueError):

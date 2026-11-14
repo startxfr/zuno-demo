@@ -1,4 +1,4 @@
-"""OKF v0.3 narrowing rule, re-checked at admission (ADR-0579 clause 5, WP-163).
+"""OKF narrowing rule, re-checked at admission (ADR-0579 clause 5, ADR-0615 clause 6, WP-163).
 
 A copy of zuno-demo-agents platform/okf/check_narrowing.py, re-rooted on an
 extracted release directory: the rule runs once in the agents repository's
@@ -7,7 +7,13 @@ alone. Duplicated on purpose (small, well-specified logic, independent
 life cycles - the same convention zuno-demo-agents' validate_okf_bundle.py states); keep the
 two in step when the rule changes.
 
-Used by admit_okf_bundle.py validate; v0.2 bundles pass trivially.
+The rules apply from legacy v0.3 up, profile 1.0 included. The gate compares
+levels (legacy v0.2 < legacy v0.3 <= profile 1.0), never a version string, so
+a new profile can never skip them in silence (ADR-0615 F11). Legacy v0.2
+bundles have none of these fields and pass trivially; a bundle whose agent
+document declares no supported version is a finding, never a pass.
+
+Used by admit_okf_bundle.py validate.
 """
 from __future__ import annotations
 
@@ -17,6 +23,43 @@ from typing import Dict, List, Optional, Set
 import yaml
 
 CLASS_ORDER = ["C1", "C2", "C3"]
+
+# ADR-0615 clause 5: which version a document follows. This module keeps its own
+# copy of the dispatch rule (ADR-0508 clause 4); platform/okf/tests/
+# test_okf_version_dispatch.py checks that every copy accepts and refuses the same
+# documents.
+UPSTREAM_OKF_VERSION = "0.2"
+ZUNO_PROFILES = ("1.0",)
+LEGACY_OKF_VERSIONS = ("v0.2", "v0.3")
+# ADR-0615 clause 6: narrowing applies at "v0.3 or above". Compare levels, never versions.
+LEVEL = {"v0.2": 2, "v0.3": 3, "1.0": 4}
+
+
+def okf_document_version(front: dict) -> str:
+    """The version a document's frontmatter follows: "v0.2" or "v0.3" (legacy)
+    or "1.0" (profile). ValueError, naming the cause, for any other pair."""
+    version = front.get("okf_version")
+    zuno = front.get("zuno")
+    profile = zuno.get("profile") if isinstance(zuno, dict) else None
+    supported = (f'okf_version "{UPSTREAM_OKF_VERSION}" with zuno.profile {", ".join(ZUNO_PROFILES)}, '
+                 f'or legacy {", ".join(LEGACY_OKF_VERSIONS)}')
+    if version is None:
+        raise ValueError(f"missing okf_version (supported: {supported})")
+    if isinstance(version, str) and version in LEGACY_OKF_VERSIONS:
+        if profile is not None:
+            raise ValueError(f'zuno.profile is only valid with okf_version "{UPSTREAM_OKF_VERSION}" '
+                             f"(this document says okf_version {version!r})")
+        return version
+    if isinstance(version, str) and version == UPSTREAM_OKF_VERSION:
+        if isinstance(profile, str) and profile in ZUNO_PROFILES:
+            return profile
+        raise ValueError(f"unsupported zuno.profile {profile!r} (supported: {', '.join(ZUNO_PROFILES)})")
+    raise ValueError(f"unsupported okf_version {version!r} (supported: {supported})")
+
+
+def at_least_v03(version: str) -> bool:
+    """True when the v0.3 rules (skills, models, guardrails, limits, delegation) apply."""
+    return LEVEL.get(version, 0) >= LEVEL["v0.3"]
 
 
 def frontmatter(path: pathlib.Path) -> dict:
@@ -116,10 +159,15 @@ def check_bundle(bundle: pathlib.Path, corp: Corp, root: pathlib.Path) -> List[s
     label = bundle.relative_to(root).as_posix()
     agent = frontmatter(bundle / "agent.okf.md")
     z = agent.get("zuno") or {}
-    if agent.get("okf_version") != "v0.3":
+    try:
+        version = okf_document_version(agent)
+    except ValueError as exc:
+        # Fail closed: without a known version this rule cannot tell which checks apply.
+        return [f"{label}/agent.okf.md: {exc}"]
+    if not at_least_v03(version):
         if z.get("delegation") or (z.get("limits") or {}).get("delegation"):
-            return [f"{label}/agent.okf.md: delegation is an OKF v0.3 field; this bundle declares "
-                    f"okf_version {agent.get('okf_version')!r}"]
+            return [f"{label}/agent.okf.md: delegation is an OKF v0.3 field (profile 1.0 included); this bundle "
+                    f"declares okf_version {agent.get('okf_version')!r}"]
         return []
     classification = (z.get("model") or {}).get("preferred_classification", "")
     findings: List[str] = []

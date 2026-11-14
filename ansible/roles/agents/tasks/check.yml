@@ -128,13 +128,16 @@
   ansible.builtin.fail:
     msg: >-
       agents/{{ catalog_okf.key }}/agent.okf.md is structurally invalid: expected
-      okf_version v0.2 or v0.3 (ADR-0579), type agent, zuno.status
+      okf_version "0.2" with zuno.profile "1.0" (ADR-0615), or legacy okf_version v0.2 or v0.3
+      without zuno.profile (ADR-0579), type agent, zuno.status
       {{ _agents_catalog_expected_status[catalog_okf.key] }} -
+      {{ _agents_okf_version_error | default('version accepted', true) }};
       got okf_version={{ catalog_okf.value.okf_version | default('missing') }}
+      zuno.profile={{ (catalog_okf.value.zuno | default({}, true)).profile | default('missing') }}
       type={{ catalog_okf.value.type | default('missing') }}
       status={{ (catalog_okf.value.zuno | default({})).status | default('missing') }}.
   when: >-
-    catalog_okf.value.okf_version | default('') not in ['v0.2', 'v0.3'] or
+    _agents_okf_version_error | length > 0 or
     catalog_okf.value.type | default('') != 'agent' or
     (catalog_okf.value.zuno | default({})).status | default('') != _agents_catalog_expected_status[catalog_okf.key]
   loop: "{{ _agents_catalog_okf | dict2items }}"
@@ -142,6 +145,24 @@
     loop_var: catalog_okf
     label: "{{ catalog_okf.key }}"
   vars:
+    # ADR-0615 clause 5: this check's own copy of the version dispatch rule (ADR-0508 clause 4).
+    # Empty when the document's version is accepted (legacy v0.2/v0.3 without zuno.profile, or
+    # okf_version "0.2" as a string with zuno.profile "1.0"), else the reason, named like the other
+    # readers name it. An unquoted 0.2 is a YAML number and is refused. platform/okf/tests/
+    # test_okf_version_dispatch.py renders this expression on the same table as every other reader.
+    _agents_okf_version_error: >-
+      {%- set _version = catalog_okf.value.okf_version | default(none) -%}
+      {%- set _zuno = catalog_okf.value.zuno | default({}, true) -%}
+      {%- set _profile = (_zuno.profile | default(none)) if _zuno is mapping else none -%}
+      {%- if _version is none -%}
+      missing okf_version
+      {%- elif _version is string and _version in ['v0.2', 'v0.3'] -%}
+      {{ '' if _profile is none else 'zuno.profile is only valid with okf_version "0.2"' }}
+      {%- elif _version is string and _version == '0.2' -%}
+      {{ '' if (_profile is string and _profile in ['1.0']) else ('unsupported zuno.profile %r' | format(_profile)) }}
+      {%- else -%}
+      {{ 'unsupported okf_version %r' | format(_version) }}
+      {%- endif -%}
     _agents_catalog_expected_status:
       comage: active
       advantage: placeholder

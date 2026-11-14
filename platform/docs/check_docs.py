@@ -1056,8 +1056,37 @@ def check_doc_links() -> List[Finding]:
     return findings
 
 
-# ADR-0508 clause 3 / ADR-0579 clause 6.
-OKF_SUPPORTED_VERSIONS = ("v0.2", "v0.3")
+# ADR-0508 clause 3 / ADR-0615 clause 5: profile 1.0 is okf_version "0.2"
+# (upstream OKF, a quoted string) plus zuno.profile "1.0"; the legacy
+# okf_version values v0.2 and v0.3 carry no zuno.profile and stay readable until
+# WP-268 removes them. check_docs keeps its own copy of the rule (ADR-0508
+# clause 4); platform/okf/tests/test_okf_version_dispatch.py checks that every
+# copy accepts and refuses the same documents.
+OKF_UPSTREAM_VERSION = "0.2"
+OKF_ZUNO_PROFILES = ("1.0",)
+OKF_LEGACY_VERSIONS = ("v0.2", "v0.3")
+OKF_SUPPORTED_VERSIONS_TEXT = (f'okf_version "{OKF_UPSTREAM_VERSION}" with zuno.profile '
+                               f'{", ".join(OKF_ZUNO_PROFILES)}, or legacy {", ".join(OKF_LEGACY_VERSIONS)}')
+
+
+def okf_document_version(front: dict) -> str:
+    """The version an OKF document's frontmatter follows: "v0.2" or "v0.3"
+    (legacy) or "1.0" (profile). ValueError, naming the cause, for any other pair."""
+    version = front.get("okf_version")
+    zuno = front.get("zuno")
+    profile = zuno.get("profile") if isinstance(zuno, dict) else None
+    if version is None:
+        raise ValueError(f"missing okf_version (supported: {OKF_SUPPORTED_VERSIONS_TEXT})")
+    if isinstance(version, str) and version in OKF_LEGACY_VERSIONS:
+        if profile is not None:
+            raise ValueError(f'zuno.profile is only valid with okf_version "{OKF_UPSTREAM_VERSION}" '
+                             f"(this document says okf_version {version!r})")
+        return version
+    if isinstance(version, str) and version == OKF_UPSTREAM_VERSION:
+        if isinstance(profile, str) and profile in OKF_ZUNO_PROFILES:
+            return profile
+        raise ValueError(f"unsupported zuno.profile {profile!r} (supported: {', '.join(OKF_ZUNO_PROFILES)})")
+    raise ValueError(f"unsupported okf_version {version!r} (supported: {OKF_SUPPORTED_VERSIONS_TEXT})")
 
 
 def _okf_frontmatter(path: pathlib.Path) -> dict:
@@ -1072,14 +1101,12 @@ def _okf_frontmatter(path: pathlib.Path) -> dict:
     if len(parts) < 3 or parts[0].strip():
         raise ValueError(f"{path}: expected a leading '---' YAML frontmatter block")
     front = yaml.safe_load(parts[1]) or {}
-    # ADR-0508: this function is check_docs's OKF hook, so it states the schema
-    # versions it understands and refuses the rest by name.
-    version = front.get("okf_version")
-    supported = ", ".join(OKF_SUPPORTED_VERSIONS)
-    if version is None:
-        raise ValueError(f"{path}: missing okf_version (supported: {supported})")
-    if version not in OKF_SUPPORTED_VERSIONS:
-        raise ValueError(f"{path}: unsupported okf_version {version!r} (supported: {supported})")
+    # ADR-0508: this function is check_docs's OKF hook, so it states the
+    # versions it understands (okf_document_version) and refuses the rest by name.
+    try:
+        okf_document_version(front)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from None
     return front
 
 

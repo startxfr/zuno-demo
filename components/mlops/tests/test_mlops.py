@@ -755,16 +755,26 @@ def _task_file(agents_dir: pathlib.Path, front: str, body: str = "Do the thing.\
 
 
 def test_task_system_prompt_reads_the_supported_okf_versions() -> None:
-    """ADR-0508: v0.2 and v0.3 read; the body is returned either way."""
-    assert mlops.SUPPORTED_OKF_VERSIONS == ("v0.2", "v0.3")
-    for version in mlops.SUPPORTED_OKF_VERSIONS:
+    """ADR-0508, ADR-0615 clause 5: legacy v0.2 and v0.3, and profile 1.0 (okf_version "0.2" with
+    zuno.profile "1.0") read; the body is returned either way."""
+    assert mlops.LEGACY_OKF_VERSIONS == ("v0.2", "v0.3")
+    assert (mlops.UPSTREAM_OKF_VERSION, mlops.ZUNO_PROFILES) == ("0.2", ("1.0",))
+    fronts = [f"okf_version: {version}\n" for version in mlops.LEGACY_OKF_VERSIONS]
+    fronts.append('okf_version: "0.2"\nzuno:\n  profile: "1.0"\n')
+    for front in fronts:
         with tempfile.TemporaryDirectory() as d:
-            _task_file(pathlib.Path(d), f"okf_version: {version}\n")
+            _task_file(pathlib.Path(d), front)
             assert mlops._task_system_prompt(_config(agents_dir=d, agent="alpha"), "ask") == "Do the thing."
 
 
 def test_task_system_prompt_refuses_an_unsupported_or_missing_okf_version_by_name() -> None:
-    for front, needle in (("okf_version: v0.9\n", "unsupported okf_version 'v0.9'"), ("", "missing okf_version")):
+    for front, needle in (("okf_version: v0.9\n", "unsupported okf_version 'v0.9'"), ("", "missing okf_version"),
+                          ('okf_version: "0.2"\n', "unsupported zuno.profile None"),
+                          ('okf_version: "0.2"\nzuno:\n  profile: "2.0"\n', "unsupported zuno.profile '2.0'"),
+                          # An unquoted 0.2 is a YAML number, not the string "0.2".
+                          ('okf_version: 0.2\nzuno:\n  profile: "1.0"\n', "unsupported okf_version 0.2"),
+                          ('okf_version: v0.3\nzuno:\n  profile: "1.0"\n',
+                           'zuno.profile is only valid with okf_version "0.2"')):
         with tempfile.TemporaryDirectory() as d:
             _task_file(pathlib.Path(d), front)
             try:

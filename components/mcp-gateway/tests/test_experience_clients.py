@@ -84,6 +84,31 @@ class ExperienceClients(unittest.TestCase):
             "okf_version": "v0.3", "type": "agent", "title": "x", "zuno": {"name": "open-webui", "tasks": []}})
         self.assertIn("type must be 'experience-client'", self.store().load_error)
 
+    def test_a_profile10_client_is_loaded(self):
+        # ADR-0615 clause 5: okf_version "0.2" (a string) with zuno.profile "1.0".
+        _write(self.clients, "open-webui/client.okf.md", {
+            "okf_version": "0.2", "type": "experience-client", "title": "open-webui", "description": "d",
+            "zuno": {"profile": "1.0", "name": "open-webui", "tasks": ["chat"], "classification": "C1",
+                     "access": {"groups": ["sales"]}}})
+        _write(self.clients, "open-webui/tasks/chat.md", {
+            "okf_version": "0.2", "type": "task", "title": "t",
+            "zuno": {"profile": "1.0", "allowed_tools": ["read_gmail"]}})
+        store = self.store()
+        self.assertIsNone(store.load_error)
+        self.assertEqual(store.get("open-webui").tasks, {"chat": ["read_gmail"]})
+
+    def test_a_client_without_a_supported_profile_fails_the_load_closed(self):
+        for zuno_profile, needle in (({}, "unsupported zuno.profile None"),
+                                     ({"profile": "2.0"}, "unsupported zuno.profile '2.0'")):
+            with self.subTest(needle=needle):
+                _write(self.clients, "open-webui/client.okf.md", {
+                    "okf_version": "0.2", "type": "experience-client", "title": "open-webui",
+                    "zuno": dict(zuno_profile, name="open-webui", tasks=["chat"])})
+                store = self.store()
+                self.assertIn(needle, store.load_error)
+                self.assertFalse(store.loaded)
+                self.assertIsNone(store.get("tekos"))
+
     def test_a_missing_clients_directory_declares_no_client(self):
         store = self.store(clients_dir=self.agents.parent / "absent")
         self.assertIsNone(store.load_error)
