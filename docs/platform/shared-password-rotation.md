@@ -95,7 +95,7 @@ the Keycloak Jobs cannot sign in. They retry past the 30-failure limit and lock 
 | Twins | Force a sync of `zuno-keycloak-d1` (`ansible/tasks/force_argocd_sync.yml`). The keycloak role alone does not trigger it |
 | `zuno-ai-run/acceptance-gate-credentials` | `make d2 check agents`: the only target that refreshes this copy |
 | `zuno-mlops/acceptance-gate-credentials` | `make d2 install mlops` |
-| `zuno-ai-run/demo-persona-probe-credentials` | `make demo check` |
+| `zuno-ai-run/demo-persona-probe-credentials` | `make demo check` (after `make demo use <id> 5\|15`; also `make demo golden-path`) |
 | Stress-test and failover credentials | Refreshed by their next run; stale until then |
 | OpenClaw Control UI (`openclaw/<persona>`, field `ui_password`) | `vault kv patch` only that field (the path also holds `cookie_secret`), refresh the ExternalSecret, then **delete the assistant pod**: the value is read as an env var |
 | Dify admin | Change it in Dify first: `flask reset-password` in the `api` container of the pod labelled `app.kubernetes.io/name=dify,component=api`. Then `vault kv patch zuno/dify/admin`. Nothing else changes it, and `make d2 configure dify` signs in with the Vault value |

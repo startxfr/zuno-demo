@@ -19,14 +19,15 @@ with the golden-path baseline run and closes when the demonstration ends.
    - the frozen commands: every `make d0|d1|d2 install|reconcile|build`, `make d3 release|restore|stresstest|run`, any
      operator, catalog or image pin, and any node or MachineSet change;
    - what stays allowed: editing files and committing locally.
+   Then run `make demo freeze on` on every workstation that plays a demo. The marker is local to that workstation, not in git, so each presenter sets it.
    Each session answers before the freeze starts. A session that does not answer is listed in the runbook as unconfirmed.
 
 ## During the freeze
 
 - **Do not push** to `devel` or `main`. On demo333 the Applications track `devel` with automated sync, so a push is a
   deployment.
-- **Do not run any frozen command.** That includes running one "just to check".
-- **Read-only work is allowed:** `make demo check`, `oc get`, logs, dashboards, Tempo searches.
+- **Do not run any frozen command.** That includes running one "just to check". While the freeze marker is set, `make demo install`, `uninstall` and `rehearse` refuse.
+- **Read-only work is allowed:** `make demo check` (the check of the demo chosen with `make demo use <id> 5|15`), `make demo golden-path`, `make demo browser`, `make demo status`, `oc get`, logs, dashboards, Tempo searches.
 - **Break glass only with the owner's go.** Name the one change, make it, then run the full golden path. Write the change
   and its result in the runbook.
 - **A red probe on the morning switches that moment to its fallback.** Do not try to fix it.
@@ -43,7 +44,7 @@ Never run an `install`, `reconcile`, `release`, `restore` or `stresstest` templa
 
 ## After the demonstration
 
-1. Tell every session that the freeze is over.
+1. Tell every session that the freeze is over, and run `make demo freeze off` on every workstation that set the marker.
 2. Push the commits held during the freeze: the baseline snapshot, the runbook results, and the local work of other
    sessions, in the order they agree on.
 3. Run the delayed cluster steps in their own windows, for example the release ledger (`make d3 release`), which builds on

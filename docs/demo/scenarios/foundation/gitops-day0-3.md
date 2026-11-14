@@ -41,7 +41,7 @@ Which verbs are safe on stage:
 
 | Read-only, allowed during a freeze | Changes the cluster: rehearsal only, never during a freeze, with the platform owner's go |
 |---|---|
-| Every `check` (Day 2 `agents` runs the ADR-0053 acceptance gate); `make d3 test`; `make d3 admit agents` (no cluster; `UPDATE_LOCK=1` rewrites the lock file); `make demo check`, `make demo golden-path` (creates test sessions and deletes them), `make demo browser`, `make demo step-1` to `step-5` (they only print) | `install`, `uninstall`, `reinstall`, `all`, `reconcile`, `build` (an in-cluster build rolls the pods that run `:latest`); `make d3 stresstest`, `make d3 restore`, `make d3 run`, `make d3 release`, `make d3 scenario-failover-node`; `make demo reset` (uncordons a node, creates UnifAI team workspaces). `make d3 backup` writes a backup to S3; the freeze protocol does not freeze it |
+| Every `check` (Day 2 `agents` runs the ADR-0053 acceptance gate); `make d3 test`; `make d3 admit agents` (no cluster; `UPDATE_LOCK=1` rewrites the lock file); `make demo list`, `use`, `status`, `check`, `step next|<N>`, `freeze on|off`, `make demo golden-path` (creates test sessions and deletes them), `make demo browser` | `install`, `uninstall`, `reinstall`, `all`, `reconcile`, `build` (an in-cluster build rolls the pods that run `:latest`); `make d3 stresstest`, `make d3 restore`, `make d3 run`, `make d3 release`, `make d3 scenario-failover-node`; `make demo install`, `uninstall` and `rehearse` (refused while the freeze marker is set); `make demo start` and `stop` of a demo that declares a changing unit (they ask for the typed demo id). `make d3 backup` writes a backup to S3; the freeze protocol does not freeze it |
 
 **The message:** "The platform is the repository. One command installs or checks any piece of it, Argo CD keeps the
 cluster equal to Git, and before any live session we prove each moment with a real answer."
@@ -88,11 +88,23 @@ Other identities:
 - The golden-path probes sign in as `eval-consultant-01`. Some spend the budget of consultant-02, ai-ops-01 or sale-01
   ([golden-path.md](../../golden-path.md)).
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 its group `ocp-paas-ops` did not exist.
-  Then log a terminal in with `oc` as **paas-ops-01**, at the root of the checkout that holds `ansible/confidential.yml`,
-  large font.
+`make demo use gitops-day0-3 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/gitops-day0-3/<action>.yml`) has run, and says
+what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo list` (14:15) through their local playbooks.
+
+### Status
+
+Nothing to do. The file reads the Argo CD Applications in `openshift-gitops`. A few are not Synced and Healthy on
+purpose (see the status banner): they are known on screen, not a failure. If many are missing or Degraded, stop and
+tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It reads the Argo CD Applications. No golden-path probe covers this scenario. Two checks
+are worth running by hand before the session:
+
 - [ ] `make d0 check argocd` passes the same day. It fails when the GitOps operator's pod restarted in the last 15
   minutes: on 2026-11-13 its manager had restarted 25 times in under three hours. Argo CD itself was not affected.
 - [ ] Run `make d3 check operators` and `make d3 check drift` the day before. On 2026-11-13 both would have reported
@@ -100,14 +112,34 @@ Other identities:
   (expected from the code and the live Subscriptions; not run for this page). Decide with the platform owner: show the
   findings as the checks at work, or have the two operators declared or removed first. Removing them is a cluster
   change, outside any freeze.
-- [ ] No golden-path probe covers this scenario. Keep the output of the morning's `make demo golden-path` run open
-  (about 15 minutes; never run it while the audience watches), see [golden-path.md](../../golden-path.md).
+
+### Install
+
+Nothing to do. GitOps is part of the shared platform: the file only verifies it.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the root of the checkout that holds
+  `ansible/confidential.yml`, large font. If **paas-ops-01** has never signed in to the OpenShift console (on
+  2026-11-13 its group `ocp-paas-ops` did not exist), sign in once in a browser first, then log the terminal in.
+- [ ] Keep the output of the morning's `make demo golden-path` run open (about 15 minutes; never run it while the
+  audience watches), see [golden-path.md](../../golden-path.md).
 - [ ] Optional, 15-minute version: the Argo CD UI
   `https://openshift-gitops-server-openshift-gitops.apps.demo333.startx.fr`, **Log in via OpenShift** as
   **paas-ops-01**. Not rehearsed. Look only: never press Sync, Hard Refresh or Delete.
 - [ ] Open [freeze-protocol.md](../../freeze-protocol.md) and
   [docs/platform/canary-rehearsal.md](../../../platform/canary-rehearsal.md) in a browser tab.
-- [ ] Known on screen, not a failure: the three Applications that are not Synced and Healthy (see the status banner).
+- Known on screen, not a failure: the three Applications that are not Synced and Healthy (see the status banner).
+
+### Stop
+
+Nothing to do. Close the terminal and the browser tabs.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
@@ -136,7 +168,7 @@ Run the 5-minute version, then:
 | 11:45 | Show the morning's `make demo golden-path` output | "Green status is not proof. Before a live session we send one real request through each demonstration moment, and a moment that fails switches to its fallback. It runs the day before, at the start of the freeze, and twice on the morning." | One line per moment and `RESULT: PASS` (14 of 14 on 2026-11-08). |
 | 12:45 | [Freeze protocol](../../freeze-protocol.md), section "During the freeze" | "From the baseline run to the end of the demonstration nobody pushes to the deployment branch and nobody runs a command that writes. One break-glass change needs the owner's go, then the whole golden path again." | The frozen commands and namespaces. |
 | 13:30 | `oc get ns -l zuno.io/canary=true` | "Changes are rehearsed in labelled canary namespaces with a quota and a default-deny network policy. Operators, Vault, the mesh and Argo CD cannot be rehearsed there, and we say so. A canary left behind is a drift finding." | `No resources found` on 2026-11-13. |
-| 14:15 | `make demo` | "The presenter's own tools: a preflight, the golden path, the browser checks. Only `reset` changes anything." | The list of `make demo` verbs. |
+| 14:15 | `make demo list` | "The presenter's own tools: one lifecycle for every demo, and the golden path and browser checks for the whole catalogue. `install` and `uninstall` change the cluster, and a freeze refuses them." | The demos, their step counts in each version and whether they are show-ready. |
 | 14:45 | Close | Repeat the message. | |
 
 ## If something goes wrong
@@ -173,10 +205,11 @@ Run the 5-minute version, then:
   downgrades: an operator release is undone by a restore or a forward fix (ADR-0607).
 - **Day 0 verbs, `uninstall` and `reinstall` never go through AAP**, whatever `zuno_make_aap_mode` says (ADR-0418
   clause 6). With `local`, AAP records none of the runs.
-- **`make demo step-1` to `step-4` print the September 2026 webinar script.** Steps 1 to 4 open
-  `https://arkos.<domain>`, `https://tekos.<domain>` and `https://comage.<domain>`; no such route existed on demo333 on
-  2026-11-13 (the agent frontends were retired with
-  [WP-156](../../../roadmap/work-packages/wp-156-retire-zuno-agent-and-rag-code.md)). Use the scenario pages instead.
+- **The retired webinar steps (`make demo step-1` to `step-5`) are replaced by `make demo step next|<N>`.** The old steps
+  opened `https://arkos.<domain>`, `https://tekos.<domain>` and `https://comage.<domain>`; no such route existed on demo333
+  on 2026-11-13 (the agent frontends were retired with
+  [WP-156](../../../roadmap/work-packages/wp-156-retire-zuno-agent-and-rag-code.md)). Select a page with
+  `make demo use <id> 5|15`; each step then runs the reads of its timed row and prints it ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 - **Canary namespaces cannot hold** cluster-scoped operators and CRDs, Vault, mesh-wide settings, Argo CD and its
   AppProjects, or GPU node pools (ADR-0609 clause 3). Those changes are scheduled, backed up and followed by a
   golden-path run.
