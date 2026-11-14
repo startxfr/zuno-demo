@@ -18,11 +18,15 @@ zunoManagedNamespaces: []
 # (zuno-auth) and the Vault bootstrap and unseal material (zuno-vault). Found on 2026-11-13 while
 # writing the demo scenarios; ocp-paas-ops (cluster-admin) still administers both. The read-only
 # personaView binding stays: `view` does not include Secrets.
-# Not excluded yet, to review: zuno-data (database credentials), zuno-mesh (mesh CA material),
-# zuno-rhtas (signing services), zuno-registry (Quay robots), zuno-aap (AAP credentials).
+# Also excluded: zuno-data (the database role credentials), zuno-rhtas (signing services) and zuno-mesh
+# (mesh signing material). zuno-aap stays open on purpose: the ops persona works there. zuno-registry has
+# no binding (not labelled managed).
 aiProfileExcludedNamespaces:
   - zuno-auth
   - zuno-vault
+  - zuno-data
+  - zuno-rhtas
+  - zuno-mesh
 
 # ADR-0524 : lecture seule des personas metier sur les namespaces Zuno, pour
 # que l'introspection cluster de Lightspeed leur reponde quelque chose.
