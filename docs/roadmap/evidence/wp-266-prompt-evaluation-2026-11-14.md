@@ -97,3 +97,26 @@ Open points:
 - **Delegation messages.** In the golden path's delegation-approval moment (Arkos to Tekos, approval rejected), the trace
   holds 4 A2A `send_message` spans after the promotion, against 2 before. The a2a-gateway logged 38 POSTs to Tekos
   (most are task polling). One sample each; to watch with Arkos scenario 21 (at most 3 messages).
+
+## Agents v1.0.1: the coding pair and the delegation count (12:35-13:15 UTC)
+
+v1.0.1 (corp `e205c34b`) was promoted with the owner's go at f33a332d:
+- arkos `write-code` runs on the local gpt-oss-20b (#58);
+- tekos `write-code` falls back to gpt-oss-20b instead of the wesh fine-tune (#57).
+
+The golden path passed 13/13 before and after. The same one-shot Job ran each turn, and Tempo gave the
+ai-gateway's `model_call` spans of each run:
+
+| Run | Model calls (provider@level) | Result |
+|---|---|---|
+| tekos `write-code`, NetworkPolicy request | 1 × `mistral-codestral@C1` | The manifest, in 1.8 s |
+| arkos `write-code`, the same request | 11 × `local-gpt-oss-maas@C3` | The manifest with a namespace placeholder, in 23 s. The 422 is gone |
+| arkos delegation to tekos (scenario 21 prompt), run 1 | 38 × `local-gpt-oss-maas@C3` | 5 A2A `send_message`: **above the bound of 3** |
+| same, run 2 | 26 × `local-gpt-oss-maas@C3` | 3 A2A messages |
+| same, run 3 | 24 × `local-gpt-oss-maas@C3` | 3 A2A messages |
+
+Both halves of the coding pair are proven. The repeated delegation shows in about one run out of three:
+- The golden path's delegation-approval moment served 6 calls before and 6 after v1.0.1. The 38 calls seen once after
+  v1.0.0 were a one-off.
+- The repetition belongs to the operator's delegation loop, and it was reported to the fork maintainers. It is not
+  caused by the prompts.
