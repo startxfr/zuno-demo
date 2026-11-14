@@ -94,25 +94,60 @@ Other identities:
 - The local AAP `admin` account (Vault `aap/admin`): used by the `aap_config` role's API calls and as a break-glass
   sign-in. Never on stage.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use aap-audited-operations 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/aap-audited-operations/<action>.yml`) has run, and says
+what is left to the presenter. Start changes the cluster: it launches one AAP job.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-aap-d0`/`-d1`, `zuno-aap-config-d0`/`-d1` and
+`zuno-mcp-aap-d0`/`-d1`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
+nothing.
+
+### Check
+
+Nothing to do when it passes. It reads the `AnsibleAutomationPlatform` `aap` (`Running` and `Successful`), its Route, the
+job and workflow templates in `zuno-aap` and Deployment `aap-mcp` in `zuno-ai-run`. No golden-path probe covers this
+page: the `delegation-approval` probe rejects its approval, so it never launches an AAP job. Rehearse the page the
+same day. If a read fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. AAP is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file launches one read-only check job the same day, `zuno-day0-check`, and so proves the execution path
+([freeze protocol](../../freeze-protocol.md)). It is a changing unit: it creates an AAP job record and an
+`automation-job-*` pod in `zuno-aap`, and it counts against the launch limit of `aap-mcp` (2 per caller in 900 s). The
+job takes several minutes (about six in the delegation scenario). Green AAP resources hid a dead dispatcher for a week
+(2026-11-02) and a two-day stop after a cluster restart (2026-09-14). What only a person does:
 
 - [ ] Two browser profiles, one for **consultant-03** and one for **consultant-02** (password in Vault,
   `keycloak/demo-personas`). Open `https://aap.apps.demo333.startx.fr` and sign in through Keycloak (authenticator
   `Keycloak zuno`). Neither sign-in is recorded on demo333: WP-103 tested consultant-03 and paas-dev-01 on 2026-08-30,
   before demo333's first install. Rehearse both, and check the menu names below in AAP 2.7.
-- [ ] **paas-ops-01** has signed in once to the OpenShift console (on 2026-11-13 it had not), then a terminal logged in
-  with `oc` as **paas-ops-01**.
-- [ ] Prove the execution path the same day ([freeze protocol](../../freeze-protocol.md)): as consultant-02, launch
-  `zuno-day0-check`, see an `automation-job-*` pod start in `zuno-aap`, and let the job end. Green AAP resources hid a
-  dead dispatcher for a week (2026-11-02) and a two-day stop after a cluster restart (2026-09-14). The job takes several
-  minutes (about six in the delegation scenario).
+- [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If
+  **paas-ops-01** has never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser
+  first, then log the terminal in.
 - [ ] **Templates**, `zuno-day0-check`: no Survey. A required Survey question typed by hand in AAP on 2026-09-29 made
   every agent launch fail with `'env' value missing` until 2026-11-06 ([WP-174](../../../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md)).
 - [ ] **Jobs** lists at least one `zuno-day0-check` run launched by `zuno-mcp`. If none exists, rehearse the
   [delegation scenario](../governance/a2a-delegation-approval.md) with **Approve** at least 15 minutes before the
   session (2 launches per caller in 900 s).
-- [ ] Known on screen, not a failure: the report of `zuno-day0-check` always says `vault is NOT installed`. The
+- Known on screen, not a failure: the report of `zuno-day0-check` always says `vault is NOT installed`. The
   read-only identity cannot exec into the Vault pod for `vault status` (ADR-0354, accepted limitation).
+
+### Stop
+
+The file launches nothing and cancels nothing: let the job end, its pod disappears and its record stays. Close the two
+browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
