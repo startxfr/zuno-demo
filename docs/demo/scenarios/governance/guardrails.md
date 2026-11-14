@@ -62,23 +62,54 @@ Other identities:
 - `service-account-dify`, which signs every Dify call as **consultant-02**. The probe `guardrails` calls through the
   same token proxy, so its detection is also counted for the client `dify`.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 it had not, so its group
-  `ocp-paas-ops` did not exist yet. Then log a terminal in with `oc` as **paas-ops-01**, at the repository root.
-- [ ] Golden-path probe `guardrails` passed within the last hour (`ONLY=guardrails make demo golden-path`), see
-  [golden-path.md](../../golden-path.md). It sends the same prompt as the 5-minute version through Dify's token proxy,
-  then looks for a `guardrails DETECTED` line for `agent=dify` in the ai-gateway log. Its own detection stays on the
-  dashboard: the live step adds a second one.
+`make demo use guardrails 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/guardrails/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-trustyai-config-d1`, `zuno-ai-gateway-d1`, `zuno-dify-d1` and
+`zuno-token-proxy-dify-d1`, the `NemoGuardrails` phase, the gateway's guardrails environment and the two Grafana
+dashboards (**Five experiences** and **TrustyAI evaluation & guardrails**). If one is missing or not Healthy, stop and
+tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `guardrails` and the browser check `dify` (see
+[golden-path.md](../../golden-path.md)). The probe sends the same prompt as the 5-minute version through Dify's token
+proxy, then looks for a `guardrails DETECTED` line for `agent=dify` in the ai-gateway log. Its own detection stays on
+the dashboard: the live step adds a second one. If it fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The guardrails are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file wakes the model with one answer through Dify's token proxy, the way the probe does, without the injection
+text. What only a person does:
+
 - [ ] Browser profile 1, **consultant-02**: `https://dify.apps.demo333.startx.fr`. Keycloak first, then Dify's own form
-  as `dify-admin@zuno.local`, password from Vault `zuno/dify/admin`, typed off screen. Open **Zuno Agent** and ask
-  one question to wake the model.
+  as `dify-admin@zuno.local`, password from Vault `zuno/dify/admin`, typed off screen. Open **Zuno Agent**.
 - [ ] Browser profile 2, **ai-ops-01**: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`,
   dashboard **Zuno Platform / Five experiences**, last 1 hour, `client` = All. 15-minute version: a second tab on
   **Zuno Platform / TrustyAI evaluation & guardrails**, and the Tempo search UI
   `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr`.
-- [ ] Known on screen, not a failure: the stat **Detection rate (window)** can read 0% with a few detections among
-  many clean calls. It rounds. Use **Detections (count, window)**.
+- [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If `status`
+  reported that the group `ocp-paas-ops` is missing, **paas-ops-01** has never signed in to the OpenShift console: sign
+  in once in a browser first, then log the terminal in.
+- Known on screen, not a failure: the stat **Detection rate (window)** can read 0% with a few detections among many
+  clean calls. It rounds. Use **Detections (count, window)**.
+
+### Stop
+
+Nothing to do. Close the two browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
