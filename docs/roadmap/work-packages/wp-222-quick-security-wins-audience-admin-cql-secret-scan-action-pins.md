@@ -4,8 +4,8 @@
   2026-11-14 both gateways run with `JWT_AUDIENCE=zuno-admin-api` and `JWT_AUDIENCE_REQUIRED=true`. Named exception:
   the live checks of the rollout (audience refusal, admin routes, Confluence CQL) are not run; the user closed the
   package without them. The zuno-demo-agents part, never pushed from `wp-222-action-pins`, was replayed onto the
-  agents' current `devel` and opened as PR startxfr/zuno-demo-agents#60 on 2026-11-14 (CI green); it reaches a release
-  with the next agents release, which needs the user's go.
+  agents' current `devel` as PR startxfr/zuno-demo-agents#60, merged by the user on 2026-11-14 (8d1a4a91); it reaches
+  a release with the next agents release, which needs the user's go.
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** none
 - **Blocks:** WP-227
