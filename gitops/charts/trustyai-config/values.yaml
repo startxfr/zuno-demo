@@ -76,6 +76,9 @@ guardrailsSmoke:
   name: zuno-guardrails-smoke
   # The operator's public Route cannot be switched off; a NetworkPolicy keeps the router out of the pod.
   closeRoute: true
+  # Known, accepted (2026-11-14): the detector answers HTTP 500 on /metrics, so the ServiceMonitor target
+  # zuno-guardrails-smoke-service is down (up=0 over the 7 days checked, before and after closeRoute).
+  # /health answers 200 and ai-gateway reaches the Service. A fallback detector, so no fix is planned.
 
 # ADR-0540/WP-120: the guardrail policy the retired agent-runtime image
 # used to carry as a Python dict, expressed as NeMo rails config.
