@@ -64,24 +64,59 @@ Other identities:
   never on stage;
 - consultant-01 and consultant-02 are named only: they ran the recorded Codestral fallback drill of 2026-11-05.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 it had not, so its group
-  `ocp-paas-ops` did not exist yet. Then log a terminal in with `oc` as **paas-ops-01**, at the repository root.
-- [ ] Golden-path probe `zuno-code` passed within the last hour (`ONLY=zuno-code make demo golden-path`), see
-  [golden-path.md](../../golden-path.md). It asks "Write a one-line Python function that adds two numbers." with the
-  `zuno-code` model through Open WebUI.
+`make demo use ai-gateway-routing 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/ai-gateway-routing/<action>.yml`) has
+run, and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1`, `zuno-llm-d1` and `zuno-open-webui-d1`,
+the Deployments `ai-gateway` and `open-webui`, the gateway environment (`MODEL_TASK_ALIASES`,
+`MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`, `CIRCUIT_OPEN_SECONDS`), the ConfigMaps
+`ai-gateway-model-routing` and `zuno-provider-routing`, the ExternalSecret `llm-provider-mistral-codestral`, the
+`LLMInferenceService` models in `zuno-ai-run`, Grafana and `tempo-tempo-0`. The key of Codestral itself is not
+tested. If one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing. The four
+local models were `READY True` on 2026-11-13.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `zuno-code` (see [golden-path.md](../../golden-path.md)).
+It asks "Write a one-line Python function that adds two numbers." with the `zuno-code` model through Open WebUI, as
+`eval-consultant-01`. If it fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The routing is part of the shared platform: the file only verifies it.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] A terminal at the repository root, logged in with `oc` as **paas-ops-01**. If `status` reported that the group
+  `ocp-paas-ops` is missing, **paas-ops-01** has never signed in to the OpenShift console (still the case on
+  2026-11-13): sign in once in a browser first, then log the terminal in.
 - [ ] Browser profile 1: `https://open-webui.apps.demo333.startx.fr`, **Continue with Keycloak** as **sale-01**. Start
   a new chat with the model **Zuno** and ask one question before the audience arrives. It wakes the local model and
   gives the dashboard a local series to compare with.
 - [ ] Browser profile 2: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, signed in as
   **ai-ops-01**. Dashboard **Zuno Platform / Five experiences**, last 1 hour, `client` = `open-webui`.
-- [ ] Check the local models: `oc get llminferenceservice -n zuno-ai-run`. Four `READY True` on 2026-11-13.
 - [ ] 15-minute version: the Tempo search UI `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr`, signed
   in as **ai-ops-01**, and the
   [WP-194 evidence](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md) open at section T5.
-- [ ] Known on screen, not a failure: Open WebUI generates the chat title with the model you picked, so one **Zuno
+- Known on screen, not a failure: Open WebUI generates the chat title with the model you picked, so one **Zuno
   Code** question makes two Codestral calls.
+- The optional block [The coding pair: C1 and C3](#the-coding-pair-c1-and-c3) is not a step. It is an owner action:
+  the lifecycle prints it and never runs it. If you play it, you sign in to UnifAI as **consultant-01** yourself.
+
+### Stop
+
+Nothing to do. Close the two browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
