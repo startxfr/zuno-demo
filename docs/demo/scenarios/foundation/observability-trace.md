@@ -67,28 +67,58 @@ Other identities:
 - `grafana-oauth-proxy` and the Tempo operator's oauth-proxy check each viewer's OpenShift rights; neither holds a
   Keycloak client of its own.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use observability-trace 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/observability-trace/<action>.yml`) has run, and says
+what is left to the presenter.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-observability-d0`/`-d1`, `zuno-tempo-d0`/`-d1`,
+`zuno-grafana-d0`/`-d1` and `zuno-perses-d1`, the collector, Tempo and Grafana, and the local models
+(`oc get llminferenceservice -n zuno-ai-run`: at least one `Ready=True`). If one is missing or not Healthy, stop and
+tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probes `unifai-tekos` and `trace` together: both lines must print
+`PASS` (`ONLY=unifai-tekos,trace make demo golden-path`, within the hour before the session). The `trace` moment alone
+always fails: it reads the run id that `unifai-tekos` produces. See [golden-path.md](../../golden-path.md). The probes
+prove that the trace exists. The Tempo search, the dashboards and Perses have no probe: rehearse them the same day.
+
+### Install
+
+Nothing to do. Observability is part of the shared platform: the file only verifies it.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
 
 - [ ] Two browser profiles, signed in through Keycloak (Vault `keycloak/demo-personas`):
   - profile 1, **consultant-02**: UnifAI `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr`, **Team**, workspace
     `agent-tekos`, **Collaboration Hub**, your own session on workflow `tekos` (see the
-    [UnifAI agents scenario](../experiences/unifai-agents.md#before-you-start));
+    [UnifAI agents scenario](../experiences/unifai-agents.md#presenter-lifecycle));
   - profile 2, **ai-ops-01**: the Tempo search UI `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr` and
     Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, both through the OpenShift sign-in.
-- [ ] Run `ONLY=unifai-tekos,trace make demo golden-path` within the hour before the session. Both lines must print
-  `PASS`. The `trace` moment alone always fails: it reads the run id that `unifai-tekos` produces. See
-  [golden-path.md](../../golden-path.md).
 - [ ] Warm-up: ask Tekos once as consultant-02 before the audience arrives. The local model is then warm and the
   service list of the Tempo search UI is filled.
-- [ ] `oc get llminferenceservice -n zuno-ai-run`: at least one local model `Ready=True`.
 - [ ] 15-minute version:
-  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01** (sign it in to OpenShift once
-    first), large font;
+  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01** (if it has never signed in to the
+    OpenShift console, as on 2026-11-13, sign in once first), large font;
   - [ ] the OpenShift console `https://console-openshift-console.apps.demo333.startx.fr` as **paas-ops-01**;
   - [ ] in profile 2, Grafana dashboards **Zuno Platform / Run Trace (per-run drill-down)** (last 1 hour) and
     **Zuno Platform / Usage & cost** (last 24 hours) open in two tabs.
-- [ ] Known on screen, not a failure: the OpenShift AI dashboard **RHOAI Distributed Tracing** in Perses is Degraded
+- Known on screen, not a failure: the OpenShift AI dashboard **RHOAI Distributed Tracing** in Perses is Degraded
   on demo333 (a vendor dashboard error). Do not open it.
+
+### Stop
+
+Nothing to do. Close the two browser profiles, the console and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
