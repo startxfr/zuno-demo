@@ -70,7 +70,35 @@ Other identities:
 - the MCP backends reach Confluence and AAP with their own technical identities, within what the gateway allows for
   the user's groups (for Confluence, the spaces of those groups).
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use genai-playground 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/genai-playground/<action>.yml`) has run,
+and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-openshift-ai-d0`, `zuno-openshift-ai-d1`, `zuno-mcp-d1` and
+`zuno-models-d1`, the OGXServer `lsd-genai-playground` and `genai-pgvector` in `zuno-playground`, and the
+`LLMInferenceService` `gpt-oss-20b` in `zuno-ai-run` (`READY True`). If one is missing or not Healthy, stop and tell
+the platform owner: this demo installs nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the OGXServer
+(`Ready`), `genai-pgvector` (1/1), the `zuno-mcp-gateway` entry of the ConfigMap `gen-ai-aa-mcp-servers`, and the DSC
+conditions `MaaSConsumerPortalAvailable`, `OGXReady` and `ModelsAsAServiceReady`. Two items were unhealthy on
+2026-11-13: the `maas-controller` pod (`oc get pods -n redhat-ods-applications | grep maas-controller`) and the DSC
+`Ready` condition (`oc get dsc -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].message}'`). Read both
+before any session. Their effect on the playground was not tested.
+
+### Install
+
+Nothing to do. The playground is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file prepares nothing; the two browser windows are the presenter's. What only a person does:
 
 - [ ] Both personas have signed in to OpenShift before (their `User` objects existed on 2026-11-13). Password: Vault
   `keycloak/demo-personas`.
@@ -83,11 +111,6 @@ Other identities:
   project.
 - [ ] **Settings**, **Model**: `publishers/zuno-ai-run/models/gpt-oss-20b`, subscription `gpt-oss-20b-ocp-ai-ops`
   (window 1) or `gpt-oss-20b-ocp-ai-dev` (window 2). The human subscriptions cover gpt-oss-20b only.
-- [ ] Check the model and the playground: `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` (`READY True`),
-  `oc get ogxserver -n zuno-playground` (`Ready`).
-- [ ] Check the two items that were unhealthy on 2026-11-13:
-  - `oc get pods -n redhat-ods-applications | grep maas-controller`;
-  - `oc get dsc -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].message}'`.
 - [ ] Warm the model: ask one question in window 1 before the audience arrives.
 - [ ] The MCP token of each persona, fetched before the session in that persona's window:
   `https://oauth-openshift.apps.demo333.startx.fr/oauth/token/request`, **Display Token**. It is valid 24 hours and
@@ -99,10 +122,18 @@ Other identities:
   already lists it from a rehearsal, remove it so the audience sees a real upload.
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. On 2026-11-13
   paas-ops-01 had never signed in to OpenShift: sign it in once to the console first.
-- [ ] Known on screen, not a failure: a RAG answer can show a malformed citation marker such as `{{cit[1]ation:1}}`.
-  The model wrote the marker badly; the citation itself works
+- Known on screen, not a failure: a RAG answer can show a malformed citation marker such as `{{cit[1]ation:1}}`. The
+  model wrote the marker badly; the citation itself works
   ([WP-220](../../../roadmap/work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md),
   section 18).
+
+### Stop
+
+Nothing to do. Remove the uploaded file from **Uploaded files**, then close both windows and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
