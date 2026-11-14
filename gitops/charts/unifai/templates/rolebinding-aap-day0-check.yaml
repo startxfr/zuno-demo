@@ -1,0 +1,36 @@
+{{- if .Values.stack.enabled }}
+# `make d3 check unifai` (ansible/roles/unifai/tasks/check_s3_backup.yml) lists the newest backups from a
+# short-lived Job in this namespace. Under AAP the check runs as the cluster-reader tier's ServiceAccount, which
+# can read Jobs and pod logs but not create a Job: AAP job 1437 failed on that 403 (2026-11-14). The Job
+# removes itself (ttlSecondsAfterFinished), so create is the only verb added. It is the same targeted widening
+# as gitops/charts/postgresql/templates/rolebinding-aap-day0-check-secrets.yaml (ADR-0354: a targeted extra
+# Role, never a broader built-in), confined to this namespace. No Secret access: the Job's pod mounts the
+# backup credentials, not the identity.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zuno-aap-day0-check-unifai-backup
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-aap-day0-check-unifai-backup
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zuno-aap-day0-check-unifai-backup
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.dayCheck.serviceAccount }}
+    namespace: {{ .Values.dayCheck.namespace }}
+{{- end }}

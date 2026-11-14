@@ -320,3 +320,10 @@ redhatDocs:
 #   aclGroups: [agent_tekos]
 #   syncInterval: 6h
 #   resyncToken: demo-1   # WP-200: change the value to sync now (a live oc patch is reverted by ArgoCD)
+
+# The zuno-cluster-reader credential tier's ServiceAccount, used by the *-check Job Templates in AAP.
+# templates/rolebinding-aap-day0-check.yaml lets it run the backup check's short-lived Job in this namespace.
+# Kept in sync by hand with gitops/charts/aap-config/values.yaml, as gitops/charts/postgresql does.
+dayCheck:
+  serviceAccount: aap-day0-check
+  namespace: zuno-aap
