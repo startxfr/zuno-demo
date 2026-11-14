@@ -58,8 +58,8 @@ one on the SaaS models). It carries the traffic of every chat experience.
 
 `make demo use maas-portal-api-keys 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/maas-portal-api-keys/<action>.yml`) has
-run, and says what is left to the presenter. `start` and `stop` are changing units: each shows what it will change and
-asks you to type the demo id `maas-portal-api-keys`.
+run, and says what is left to the presenter. Nothing in this demo changes the cluster by itself: the presenter creates
+the API key live, in the portal, at row 1:00, and that is the proof of the demo.
 
 ### Status
 
@@ -82,8 +82,7 @@ Nothing to do. MaaS is part of the shared platform: the file only verifies it.
 
 ### Start
 
-The file creates the presenter's key. It is a changing unit: it needs the typed demo id, and the key is never printed
-or written to a file. What only a person does:
+The file creates no key: the key made live at row 1:00 is the demo. What only a person does:
 
 - [ ] **ai-dev-01** has signed in to OpenShift once before the session. Its OpenShift group is created at first
   sign-in.
@@ -98,8 +97,7 @@ or written to a file. What only a person does:
 
 ### Stop
 
-The file revokes the presenter's key. It is a changing unit: it needs the typed demo id. What only a person does:
-revoke by hand in the portal, **API keys**, any key created live at row 1:00 (15-minute version: row 12:00 does it;
+The file revokes nothing. What only a person does: revoke by hand in the portal, **API keys**, any key created live at row 1:00 (15-minute version: row 12:00 does it;
 5-minute version: right after the close), then close the browser profile and the terminals, and unset `MAAS_API_KEY`.
 
 ### Uninstall
