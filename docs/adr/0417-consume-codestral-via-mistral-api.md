@@ -228,3 +228,10 @@ considerations, Migration/evolution, Acceptance criteria and Review evidence.
   `MISTRAL_CODESTRAL_API_KEY`: a real completion came back,
   `response_metadata.model_name: codestral-latest`. The id is correct as written and the
   dedicated credential chain resolves end to end.
+- Pending the promotion of agents v1.0.1: the Arkos half of this decision no longer holds. It
+  pinned `arkos/write-code` to `mistral-codestral` with `strict: true`, relying on the agent
+  runtime evaluating that branch at a fixed C2 ceiling. That runtime was removed on 2026-10-23,
+  and ADR-0565 gives every task its agent's floor: Arkos is C3, Codestral is eligible for C1/C2
+  only, so every Arkos code call failed closed. Agents v1.0.1 routes `arkos/write-code` to the
+  local models only (`local_only_for: [C1, C2, C3]`, the quality model first). Codestral keeps
+  serving Tekos `write-code` (C1, non-strict) and the "Zuno Code" experience.

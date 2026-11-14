@@ -118,8 +118,8 @@ Run the 5-minute version, then:
 - **Dashboards show providers, not levels.** No `zuno_model_*` metric carries a classification label. The level is on
   the trace span and in the routing decision only.
 - **The probe is a synthetic call** ("Say OK." with a forged C1 header). It is not a real Arkos conversation in UnifAI.
-- **Do not ask Arkos to write code on stage.** Its `write-code` task prefers Codestral strictly and is floored at C3.
-  That combination probably fails (not verified).
+- **Arkos writes code locally.** Its `write-code` task is floored at C3 and, since agents v1.0.1, runs on the local
+  models only. Codestral is never a candidate for it.
 - **Guardrails run in observe mode at every level.** They record; they do not block.
 - **Failing closed has a cost.** With the GPU nodes down, C3 work stops. That is the intended trade-off.
 
