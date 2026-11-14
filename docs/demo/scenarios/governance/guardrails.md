@@ -100,6 +100,9 @@ text. What only a person does:
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If `status`
   reported that the group `ocp-paas-ops` is missing, **paas-ops-01** has never signed in to the OpenShift console: sign
   in once in a browser first, then log the terminal in.
+- Known on screen, not a failure: at 7:30 the `oc get ... guardrailsorchestrator` line shows `zuno-guardrails-smoke` in phase
+  `Error` (since 2026-11-07). Say: "That is the parked fallback. The NeMo path is the one that runs, and the probe proves it."
+  It is also why the DataScienceCluster `zuno-dsc` reads `Ready=False`.
 - Known on screen, not a failure: the stat **Detection rate (window)** can read 0% with a few detections among many
   clean calls. It rounds. Use **Detections (count, window)**.
 
