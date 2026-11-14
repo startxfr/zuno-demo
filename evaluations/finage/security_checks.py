@@ -244,8 +244,11 @@ def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
         bogus = httpx.post(
             f"{CONFLUENCE_MCP_URL}/mcp",
             json={"jsonrpc": "2.0"},
-            headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
-            headers={"Authorization": "Bearer not-a-gateway-assertion"},
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "Authorization": "Bearer not-a-gateway-assertion",
+            },
             timeout=15,
         )
     except httpx.TransportError as exc:

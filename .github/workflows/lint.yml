@@ -120,6 +120,10 @@ jobs:
         run: python3 platform/okf/generate_quota_enforcement.py --check
       - name: Permitted SaaS fallback capability check (ADR-0053)
         run: python3 evaluations/tekos/gate_checks.py --config-only
+      # The per-agent security_checks.py files run only inside the acceptance gate Job, so no test imports them:
+      # a SyntaxError in three of them (a repeated `headers=` keyword) went unnoticed from 2026-11-12 to 2026-11-14.
+      - name: Every evaluation script compiles
+        run: python3 -m compileall -q evaluations
       # ADR-0307 (WP-41): scaffolds a throwaway agent, runs the composed
       # OKF/knowledge-ref validators (+ helm lint when available) against
       # it, and always discards it - proving the onboarding template stays
