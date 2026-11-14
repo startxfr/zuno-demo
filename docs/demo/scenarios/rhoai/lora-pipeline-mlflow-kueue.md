@@ -76,14 +76,42 @@ Other identities:
 - The `evaluate` stage signs in to Keycloak as demo personas, like the acceptance gate. The password is copied into
   the Secret `acceptance-gate-credentials` by `ansible/roles/mlops`.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console. On 2026-11-13 it had not: its group `ocp-paas-ops`
-  did not exist. Then log a terminal in with `oc` as **paas-ops-01**, at the repository root.
-- [ ] `oc get dspa mlops-dspa -n zuno-mlops -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}'`. The
-  run list needs `APIServerReady=True`. On 2026-11-13, `WorkflowControllerReady=False`.
-- [ ] `oc get deploy -n redhat-ods-applications kubeflow-trainer-controller-manager model-registry-operator-controller-manager`
-  and `oc get deploy -n openshift-jobset-operator jobset-controller-manager`: all were 0/1 on 2026-11-13.
+`make demo use lora-pipeline-mlflow-kueue 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/lora-pipeline-mlflow-kueue/<action>.yml`)
+has run, and says what is left to the presenter. No step of this demo changes the cluster. One optional action does,
+and it is a human one: see [Start](#start).
+
+### Status
+
+Nothing to do. The file reads the DSPA `mlops-dspa` in `zuno-mlops`, the `MLflow` `mlflow` and the deployments
+`kubeflow-trainer-controller-manager` and `model-registry-operator-controller-manager` in `redhat-ods-applications`,
+and `jobset-controller-manager` in `openshift-jobset-operator`. All three controllers were 0/1 on 2026-11-13: tell
+the platform owner and do not start a run. If something else is missing, stop: this demo installs nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only:
+- the DSPA: `APIServerReady=True` is what the run list needs. **`Ready=False` is a known failure of 2026-11-13**:
+  `WorkflowControllerReady=False`, its workflow controller was crash-looping, so a new run would not execute. The page
+  shows past runs only, so the 5-minute version can be played with it. Say it if asked;
+- the TrainJob evidence (`trainjob_evidence`): the TrainJob `lora-comage-4c28m` is `Complete`;
+- MLflow: `status.address.url` ends in `/mlflow`.
+
+If the DSPA, the Trainer or JobSet controllers are down, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. Pipelines, MLflow and Kueue are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file prepares nothing and starts no run. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root (15-minute version). If **paas-ops-01**
+  has never signed in to the OpenShift console (on 2026-11-13 it had not: its group `ocp-paas-ops` did not exist),
+  sign in once in a browser first, then log the terminal in.
 - [ ] Browser profile **ai-dev-01** on `https://rh-ai.apps.demo333.startx.fr`, project **Zuno MLOps** (`zuno-mlops`).
   Open the pipeline run list and the training jobs page once, and choose the run to show. The content of the run list
   was not checked on 2026-11-13. Rehearse the navigation: the menu names of RHOAI 3.6.0-ea.2 were not checked in a
@@ -93,11 +121,18 @@ Other identities:
   in the 2026-11-13 check.
 - [ ] A third tab on the evidence of the registered adapter:
   [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md). demo333 has no Model Registry instance.
-- [ ] Optional, the day before: a fresh run with `make d3 run mlops` (agent `comage` by default). **Cluster change:
-  rehearse only, never during a freeze.** It scales up the burst GPU node (billed). Expect 2 to 7 minutes for the
-  node and about 30 minutes of training. The run then stops at `merge-export` by design (see [Limits](#limits)). Do it
-  only when the Trainer and JobSet controllers are Available.
-- [ ] No golden-path probe covers this scenario.
+- [ ] Optional, the day before, by hand and outside `make demo`: a fresh run with `make d3 run mlops` (agent `comage`
+  by default). It is a changing unit: **run it only with the owner's go**, never during a freeze. It scales up the
+  burst GPU node (billed). Expect 2 to 7 minutes for the node and about 30 minutes of training. The run then stops at
+  `merge-export` by design (see [Limits](#limits)). Do it only when the Trainer and JobSet controllers are Available.
+
+### Stop
+
+Nothing to do. Close the browser profile and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
