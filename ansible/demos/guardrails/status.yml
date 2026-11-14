@@ -20,5 +20,17 @@
     workloads:
       - {"name": "zuno-guardrails", "namespace": "zuno-ai-run"}
       - {"name": "zuno-guardrails-smoke", "namespace": "zuno-ai-run"}
+- name: "guardrails status | the NemoGuardrails server and the two dashboards the page names"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "trustyai.opendatahub.io/v1alpha1", "kind": "NemoGuardrails", "name": "zuno-guardrails", "namespace": "zuno-ai-run", "phase": "Ready"}
+      - {"api_version": "grafana.integreatly.org/v1beta1", "kind": "GrafanaDashboard", "name": "three-experiences", "namespace": "zuno-monitoring", "exists": true}
+      - {"api_version": "grafana.integreatly.org/v1beta1", "kind": "GrafanaDashboard", "name": "trustyai", "namespace": "zuno-monitoring", "exists": true}
+- name: "guardrails status | the gateway's guardrails environment"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc set env deploy/ai-gateway -n zuno-ai-run --list | grep GUARDRAILS_"
 - name: "guardrails status | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

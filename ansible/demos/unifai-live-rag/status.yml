@@ -14,5 +14,16 @@
       - {"name": "qdrant", "namespace": "zuno-unifai"}
       - {"name": "mongodb", "namespace": "zuno-unifai", "kind": "StatefulSet"}
       - {"name": "rabbitmq", "namespace": "zuno-unifai", "kind": "StatefulSet"}
+- name: "unifai-live-rag status | the stack, the embedding model, the workflows and the retrievers the page names"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiStack", "name": "unifai", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "serving.kserve.io/v1beta1", "kind": "InferenceService", "name": "embeddings", "namespace": "zuno-ai-run", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiWorkflow", "name": "consultant-01-my-documents", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiWorkflow", "name": "sale-01-my-documents", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiWorkflow", "name": "consultant-rag", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiRetriever", "name": "consultant-01-documents", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiRetriever", "name": "sale-01-documents", "namespace": "zuno-unifai", "condition": "Ready"}
 - name: "unifai-live-rag status | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

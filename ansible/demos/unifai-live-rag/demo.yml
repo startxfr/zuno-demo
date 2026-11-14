@@ -7,7 +7,9 @@ probes: []
 browser: ["unifai"]
 # Units that change the cluster, `<action>: "what it changes"`: the guard prints it and asks for the demo id
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
-mutations: {}
+mutations:
+  start: "deletes travel-and-expense-policy.md, on-call-rota-handbook.md and questions.md from consultant-01's Personal documents, uploads the two demo files of docs/demo/unifai-rag-upload/ and waits until they are DONE, then runs one turn of consultant-01-my-assistant"
+  stop: "deletes travel-and-expense-policy.md, on-call-rota-handbook.md and questions.md from consultant-01's Personal documents"
 # Step metadata, keyed by the quoted time stamp: `optional` rows, `mutating` rows (never run by `step`, SKIPPED by
 # `rehearse`), `manual` rows (a command the presenter runs by hand).
 steps:

@@ -1,0 +1,23 @@
+---
+# One call of evaluations/unifai_rag_library.py, recorded as a command of the unit (WP-274). Only the changing units
+# of unifai-live-rag include it (demo.yml `mutations:`). Vars: rag_args (the arguments after `--persona <p>`),
+# rag_persona (default consultant-01). The library prints one JSON line per action and never prints the password.
+- name: "unifai-live-rag | unifai_rag_library.py {{ rag_args | join(' ') }}"
+  ansible.builtin.command:
+    argv: "{{ ['python3', zuno_repo_root ~ '/evaluations/unifai_rag_library.py', '--persona',
+              rag_persona | default('consultant-01')] + rag_args }}"
+    chdir: "{{ zuno_repo_root }}"
+  register: _rag
+  changed_when: true
+  failed_when: false
+  timeout: 600
+
+- name: "unifai-live-rag | record the call"
+  ansible.builtin.set_fact:
+    demo_unit_commands: >-
+      {{ demo_unit_commands + [{'cmd': 'python3 evaluations/unifai_rag_library.py --persona '
+                                       ~ (rag_persona | default('consultant-01')) ~ ' ' ~ (rag_args | join(' ')),
+                                'rc': _rag.rc, 'output': (_rag.stdout_lines + _rag.stderr_lines[-5:]) | join(_rag_nl),
+                                'truncated': false}] }}
+  vars:
+    _rag_nl: "\n"
