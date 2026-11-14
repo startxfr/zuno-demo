@@ -305,7 +305,7 @@ def test_every_agent_run_scenarios_selects_unifai_and_covers_every_scenario_type
             types = {s["type"] for s in yaml.safe_load(pathlib.Path(rs.__file__).resolve().parent.parent.joinpath(rs.AGENT, "scenarios.yaml").read_text())["scenarios"]}
             missing = types - set(rs.HANDLERS)
             # chat-shaped types must be served by the UnifAI transport (the u_ handlers)
-            for t in types & {"chat_basic_qa","chat_first_token_latency","chat_streaming_sse","chat_triggers_tool","chat_register_conformance","chat_blocked_for_placeholder_agent","rag_retrieval_has_citation","health_endpoints_all_ok"}:
+            for t in types & {"chat_basic_qa","chat_first_token_latency","chat_streaming_sse","chat_triggers_tool","chat_register_conformance","chat_blocked_for_placeholder_agent","rag_retrieval_has_citation","health_endpoints_all_ok","chat_routing"}:
                 assert rs.HANDLERS[t].__name__.startswith("u_"), t
             # every `services:` list names a service the health handler knows
             known = {"unifai-ui", "mcp-gateway", "ai-gateway"}
@@ -777,3 +777,115 @@ def test_gateway_tool_invoked_is_false_when_nothing_is_found_and_raises_when_tem
 
     with pytest.raises(unifai_target.UnifaiError):
         unifai_target.tempo_gateway_tool_invoked("r", "http://tempo", wait_seconds=0, client=Broken())
+
+
+# --- the coding pair (tekos 21, arkos 22): which model served a task, from the ai-gateway's spans -----------
+
+
+def _model_call_span(provider, level, run="run-1", task="write-code", start=1):
+    return {
+        "name": "model_call",
+        "startTimeUnixNano": str(start),
+        "attributes": [
+            {"key": "zuno.run_id", "value": {"stringValue": run}},
+            {"key": "zuno.task", "value": {"stringValue": task}},
+            {"key": "zuno.provider", "value": {"stringValue": provider}},
+            {"key": "zuno.model", "value": {"stringValue": "m"}},
+            {"key": "zuno.classification", "value": {"stringValue": level}},
+            {"key": "zuno.model_kind", "value": {"stringValue": "local"}},
+        ],
+    }
+
+
+def _gateway_tempo(spans):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/search":
+            q = request.url.params["q"]
+            assert 'name="model_call"' in q and 'span.zuno.run_id="run-1"' in q, q
+            return httpx.Response(200, json={"traces": [{"traceID": "t1"}] if spans else []})
+        if request.url.path == "/api/traces/t1":
+            return httpx.Response(200, json={"batches": [{"scopeSpans": [{"spans": spans}]}]})
+        return httpx.Response(404)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_tempo_gateway_model_calls_returns_the_calls_of_the_run_in_order():
+    spans = [
+        _model_call_span("local-gpt-oss", "C3", start=2),
+        _model_call_span("local-gpt-oss-maas", "C3", start=1),
+        _model_call_span("mistral-codestral", "C1", run="other-run"),
+        _model_call_span("local-maas", "C3", task="draft-architecture-testimonial"),
+        {"name": "mas.session", "attributes": []},
+    ]
+    got = ut.tempo_gateway_model_calls("run-1", TEMPO, task="write-code", wait_seconds=0, client=_gateway_tempo(spans))
+    assert [(c["provider"], c["classification"]) for c in got] == [("local-gpt-oss-maas", "C3"), ("local-gpt-oss", "C3")]
+
+
+def test_tempo_gateway_model_calls_is_empty_when_no_span_matches():
+    assert ut.tempo_gateway_model_calls("run-1", TEMPO, wait_seconds=0, client=_gateway_tempo([])) == []
+
+
+def _chat_routing(agent: str, tempo_url: str, routing: str, calls: str, expect: str, level: str) -> str:
+    """Runs u_chat_routing with a stubbed turn and a stubbed gateway-span helper."""
+    return _probe(
+        agent,
+        f"""
+        import run_scenarios as rs
+        from unifai_target import UnifaiRun
+        os.environ["TEMPO_URL"] = {tempo_url!r}
+        class FakeTarget:
+            def run(self, persona, message, **k):
+                assert k["workflow"] == "{agent}-write-code"
+                return UnifaiRun("run-1", 200, "code", 1.0, {{"routing": {routing}}})
+        rs._unifai_target = FakeTarget()
+        rs._unifai_placeholder_skip = lambda s: False
+        def fake_calls(run_id, url, task):
+            assert run_id == "run-1" and task == "write-code"
+            r = {calls}
+            if isinstance(r, Exception):
+                raise r
+            return r
+        rs._unifai_gateway_model_calls = fake_calls
+        res = rs.u_chat_routing({{"id": 22, "title": "t", "persona": "p", "message": "m",
+                                  "workflow": "{agent}-write-code", "task": "write-code",
+                                  "expect_providers": {expect}, "expect_classification": "{level}"}})
+        print(res.passed, res.skipped, res.detail)
+        """,
+    )
+
+
+def test_chat_routing_passes_when_every_call_is_the_expected_local_model_at_c3():
+    calls = '[{"provider": "local-gpt-oss-maas", "classification": "C3"}, {"provider": "local-gpt-oss-maas", "classification": "C3"}]'
+    out = _chat_routing("arkos", "http://tempo", "None", calls, '["local-gpt-oss-maas", "local-gpt-oss"]', "C3")
+    assert out.startswith("True False") and "model_call spans" in out, out
+
+
+def test_chat_routing_fails_on_another_provider_or_level():
+    calls = '[{"provider": "local-maas", "classification": "C3"}]'
+    out = _chat_routing("arkos", "http://tempo", "None", calls, '["local-gpt-oss-maas", "local-gpt-oss"]', "C3")
+    assert out.startswith("False False") and "local-maas@C3" in out, out
+    calls = '[{"provider": "mistral-codestral", "classification": "C2"}]'
+    out = _chat_routing("tekos", "http://tempo", "None", calls, '["mistral-codestral"]', "C1")
+    assert out.startswith("False False"), out
+
+
+def test_chat_routing_fails_without_a_span_or_when_tempo_is_down():
+    out = _chat_routing("arkos", "http://tempo", "None", "[]", '["local-gpt-oss-maas"]', "C3")
+    assert out.startswith("False False") and "no model_call span" in out, out
+    out = _chat_routing("arkos", "http://tempo", "None", "RuntimeError('down')", '["local-gpt-oss-maas"]', "C3")
+    assert out.startswith("False False") and "trace backend" in out, out
+
+
+def test_chat_routing_uses_the_routing_decision_without_a_trace_backend_and_fails_a_fallback():
+    ok = '{"provider": "mistral-codestral", "classification": "C1", "fallback_used": False}'
+    out = _chat_routing("tekos", "", ok, "RuntimeError('must not be called')", '["mistral-codestral"]', "C1")
+    assert out.startswith("True False") and "routing decision" in out, out
+    fell = '{"provider": "mistral-codestral", "classification": "C1", "fallback_used": True}'
+    out = _chat_routing("tekos", "", fell, "RuntimeError('must not be called')", '["mistral-codestral"]', "C1")
+    assert out.startswith("False False") and "(fallback)" in out, out
+
+
+def test_chat_routing_is_skipped_not_passed_without_any_evidence():
+    out = _chat_routing("tekos", "", "None", "RuntimeError('must not be called')", '["mistral-codestral"]', "C1")
+    assert out.startswith("False True") and "TEMPO_URL" in out, out

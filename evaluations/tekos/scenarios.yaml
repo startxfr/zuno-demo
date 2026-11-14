@@ -175,3 +175,17 @@ scenarios:
     # health, still checked below, is the honest proxy for "can this
     # agent's traffic reach it".
     services: [unifai-ui, mcp-gateway, ai-gateway]
+
+  - id: 21
+    title: A code request on C1 data is served by Mistral Codestral (tekos write-code)
+    type: chat_routing
+    # The C1/C2 half of the coding pair: Tekos is C1, and its write-code task lists mistral-codestral first,
+    # not strict (agents policies/model-routing, zuno-demo ADR-0417). The C3 half is arkos scenario 22.
+    # Proven by the ai-gateway's model_call spans of the run (TEMPO_URL); a fallback to a local model fails it.
+    persona: consultant-01
+    workflow: tekos-write-code
+    task: write-code
+    message: Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.
+    expect_providers: [mistral-codestral]
+    expect_classification: C1
+    timeout_seconds: 120
