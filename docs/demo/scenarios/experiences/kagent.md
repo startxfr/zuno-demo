@@ -62,7 +62,33 @@ Other identities:
   `cluster-monitoring-view`. Its rights bound what can be read; the mcp-gateway decides who may ask.
 - The golden-path probe `kagent` calls through the same token proxy, so it also counts as ai-ops-01.
 
-## Before you start
+## Presenter lifecycle
+
+`make demo use kagent 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/kagent/<action>.yml`) has run, and
+says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-kagent-d0`, `zuno-kagent-d1`, `zuno-token-proxy-kagent-d1`,
+`zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1`, the Deployments of `zuno-kagent`, the Agent `zuno-sre`, the RemoteMCPServer
+`zuno-mcp-gateway` and the route `kagent.apps.demo333.startx.fr`. If one is missing or not Healthy, stop and tell the
+platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probe `kagent` and the browser check `kagent` (see
+[golden-path.md](../../golden-path.md)). The probe proves the model path through the token proxy. The browser check
+proves the front door and the UI. By hand, `make d2 check kagent` proves that the controller discovered the governed
+tools and accepted `zuno-sre`; run it too. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. kagent is part of the shared platform: the file only verifies it.
+
+### Start
+
+The file asks the 5-minute question once, to wake the model. What only a person does:
 
 - [ ] A browser profile used by **ai-ops-01** only. A Keycloak session of another persona in the same browser gets a
   403 from the front door ([WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md) D4).
@@ -70,14 +96,19 @@ Other identities:
   login: kagent's UI has none of its own.
 - [ ] **Click "Skip wizard"** on the first screen of a new browser. The onboarding wizard creates a stray agent
   (`my-first-k8s-agent`, with no tools, on 2026-11-05). If one is already in the list, ignore it and use `zuno-sre`.
-- [ ] The agent **zuno-sre** is listed. Ask the 5-minute question once before the audience arrives, to wake the model.
-- [ ] Golden-path probe `kagent` passed within the last hour (`ONLY=kagent make demo golden-path`), see
-  [golden-path.md](../../golden-path.md), and `make d2 check kagent` passes. The probe proves the model path through
-  the token proxy. The check proves that the controller discovered the governed tools and accepted `zuno-sre`.
+- [ ] The agent **zuno-sre** is listed.
 - [ ] 15-minute version:
   - a terminal logged in with `oc` as **paas-ops-01**;
   - Grafana in the ai-ops-01 profile, dashboard **Zuno Platform / Five experiences**, last 1 hour;
   - optional: a second profile for **consultant-02**.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
