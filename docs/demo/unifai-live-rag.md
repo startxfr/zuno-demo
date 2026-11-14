@@ -142,7 +142,8 @@ the cluster ([freeze protocol](freeze-protocol.md)). Prepare it before the sessi
 ### Stop
 
 The file deletes the three named files (`travel-and-expense-policy.md`, `on-call-rota-handbook.md` and
-`questions.md`) from **consultant-01**'s **Personal** documents, and nothing else. What only a person does: close the
+`questions.md`) from **consultant-01**'s **Personal** documents, and nothing else. These three include the two demo
+files, so after `stop` the library holds none of them; `make demo start` uploads the two demo files again. What only a person does: close the
 two browser profiles and the terminal. After an optional resync, revert the Confluence edit, and revert or drop the
 `resyncToken` commit as the owner decides.
 

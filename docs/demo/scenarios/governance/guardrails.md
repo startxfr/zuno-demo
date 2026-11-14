@@ -74,6 +74,8 @@ Nothing to do. The file reads the Applications `zuno-trustyai-config-d1`, `zuno-
 `zuno-token-proxy-dify-d1`, the `NemoGuardrails` phase, the gateway's guardrails environment and the two Grafana
 dashboards (**Five experiences** and **TrustyAI evaluation & guardrails**). If one is missing or not Healthy, stop and
 tell the platform owner: this demo installs nothing.
+The gateway environment lists `GUARDRAILS_DETECTOR_URL`, the address of the smoke service. It belongs to the parked
+fallback and is not an active path: `GUARDRAILS_BACKEND` is `nemo`.
 
 ### Check
 
@@ -100,9 +102,11 @@ text. What only a person does:
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If `status`
   reported that the group `ocp-paas-ops` is missing, **paas-ops-01** has never signed in to the OpenShift console: sign
   in once in a browser first, then log the terminal in.
-- Known on screen, not a failure: at 7:30 the `oc get ... guardrailsorchestrator` line shows `zuno-guardrails-smoke` in phase
-  `Error` (since 2026-11-07). Say: "That is the parked fallback. The NeMo path is the one that runs, and the probe proves it."
-  It is also why the DataScienceCluster `zuno-dsc` reads `Ready=False`.
+- Known on screen, not a failure: at 7:30 the `oc get nemoguardrails,guardrailsorchestrator,deploy` line prints names and
+  ages only, so the phase of `zuno-guardrails-smoke` is not visible there. It is `Error` (since 2026-11-07) and shows
+  only with `oc get guardrailsorchestrator` alone, or in the DataScienceCluster `zuno-dsc`, which reads `Ready=False`
+  for that reason. If asked, say: "That is the parked fallback. The NeMo path is the one that runs, and the probe proves
+  it."
 - Known on screen, not a failure: the stat **Detection rate (window)** can read 0% with a few detections among many
   clean calls. It rounds. Use **Detections (count, window)**.
 
