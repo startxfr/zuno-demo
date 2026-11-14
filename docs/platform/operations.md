@@ -284,6 +284,20 @@ Durable fix, applied on demo333 on 2026-11-14: move repo2 to a fresh path, so it
 4. Prove it: `pgbackrest --stanza=db archive-get <a recent segment> /tmp/x` without `--repo` in a replica's `database`
    container returns 0. The old path stays in the bucket until its removal gets its own go.
 
+Moving repo2 to another bucket follows the same steps, with three differences seen when demo333 moved from
+`zuno-demo222-backups` (eu-west-2) to `zuno-demo333-backups/postgresql` (eu-central-1) later on 2026-11-14:
+- The bucket, endpoint, region, path and key change together in `ansible/confidential.yml`, and the key goes into Vault
+  `postgresql/backup-s3` (the vault role's seed task; the ExternalSecrets pick it up with a `force-sync` annotation).
+  From that moment until PGO switches, archive-push fails (2 min that day), so run `make d0 install postgresql` at once.
+- A bucket change does alter PGO's `repoOptionsHash`, so PGO runs stanza-create by itself (unlike a path-only change).
+- UnifAI reuses the same bucket, region and Vault key for its MongoDB and Qdrant backups: run `make d2 install unifai`
+  (it also moves the EgressFirewall to the new region's S3 ranges, `egress.s3CidrsByRegion` in the unifai chart), then
+  `make d3 backup unifai` and `make d3 check unifai`.
+The key belongs to the IAM user `zuno-demo333-backups-databases`, limited to the `postgresql/` and `unifai/` prefixes
+(`ansible/playbooks/backups_bucket.yml`, run from a workstation with an AWS profile allowed to manage IAM). A destination
+prefix that already holds this database's stanza (same system-id, history id 1) is reused as is: `make d3 check
+postgresql` confirms the archive ids agree.
+
 Before that fix, or if it recurs: with the owner's go, point recovery at repo1 for as long as the replica needs it, in
 the leader's `database` container: `patronictl edit-config --force -p 'restore_command=pgbackrest --stanza=db archive-get
 --repo=1 %f "%p"'`. PGO owns that parameter: the CRD refuses it in `spec.config.parameters`, it ignores it under

@@ -41,8 +41,9 @@ chart and applied by hand. There is no e2e make target for this. Not `zuno-unifa
 ## Backup
 
 `stack.backup.enabled` is `false` in the chart. The unifai Ansible role adds `stack.backup` when it applies the Application, so the two backup CronJobs exist in
-`zuno-unifai`; check the firewall against those applied values, not the chart defaults. The live stack's backup bucket is `zuno-demo222-backups` (eu-west-2, from `zuno_postgresql_backup_s3_*`; the name is
-a leftover of demo222, the bucket is still the one in use). `zuno-demo333-backups` (eu-central-1) is the MariaDB bucket. To rehearse:
+`zuno-unifai`; check the firewall against those applied values, not the chart defaults. The live stack's backup bucket is `zuno-demo333-backups` (eu-central-1, from `zuno_postgresql_backup_s3_*`, prefix
+`unifai/`) since 2026-11-14; MariaDB writes under `mariadb/` of the same bucket. Until then it was `zuno-demo222-backups`
+(eu-west-2), a leftover of demo222, which the rehearsal below used. To rehearse:
 
 1. Enable `stack.backup` on the throwaway stack with that bucket and a rehearsal prefix, and the chart's default
    credentials (`postgresql/backup-s3`).
