@@ -93,6 +93,14 @@ def oc(*args: str, stdin: Optional[str] = None, timeout: float = 120) -> subproc
     return subprocess.run(cmd + list(args), input=stdin, capture_output=True, text=True, timeout=timeout)
 
 
+def ai_gateway_logs(since: str, timeout: float = 120) -> subprocess.CompletedProcess:
+    """The ai-gateway log of EVERY replica (ADR-0614: two pods since WP-260 P3). `oc logs deploy/...` reads one pod
+    only, so a line written by the other replica was missed. A label selector defaults to the last 10 lines per
+    pod, hence --tail=-1."""
+    return oc("-n", "zuno-ai-run", "logs", "-l", "app.kubernetes.io/name=ai-gateway", "-c", "ai-gateway",
+              f"--since={since}", "--tail=-1", "--max-log-requests=10", timeout=timeout)
+
+
 def secret_value(namespace: str, name: str, key: str) -> str:
     jsonpath = "{.data." + key.replace(".", "\\.") + "}"
     out = oc("-n", namespace, "get", "secret", name, "-o", f"jsonpath={jsonpath}")
@@ -127,7 +135,7 @@ class Context:
         self.gateway_persona = os.getenv("GOLDEN_GATEWAY_PERSONA", "consultant-01")
         self.password = secret_value("zuno-ai-run", "acceptance-gate-credentials", "demo-persona-password")
         self._eval_secret = secret_value("zuno-ai-run", "acceptance-gate-credentials", "eval-client-secret")
-        self.keycloak = f"https://keycloak.{self.domain}"
+        self.keycloak = os.getenv("GOLDEN_KEYCLOAK_URL") or f"https://keycloak.{self.domain}"
         self.unifai = f"https://unifai-ui-zuno-unifai.{self.domain}"
         self.open_webui = f"https://open-webui.{self.domain}"
         self.tekos_run_id = ""  # set by unifai-tekos, read by trace
@@ -416,7 +424,7 @@ def probe_guardrails(ctx: Context) -> Result:
     if answered.get("status") not in (200, 400, 403):
         return Result("guardrails", FAIL, f"the DAN prompt got no answer: {answered or sent.stderr.strip()[:160]}")
     time.sleep(3)
-    log = oc("-n", "zuno-ai-run", "logs", "deploy/ai-gateway", "-c", "ai-gateway", "--since=5m", timeout=120)
+    log = ai_gateway_logs("5m", timeout=120)
     return judge_guardrails(log.stdout)
 
 
@@ -765,7 +773,8 @@ def probe_blender(ctx: Context) -> Result:
     from device_login import DeviceLoginError, PersonaRefused, device_token, revoke
 
     addon = load_addon()
-    gateway, issuer = addon.endpoints(ctx.domain)
+    gateway, issuer = addon.endpoints(
+        ctx.domain, issuer_override=f"{ctx.keycloak}/realms/zuno" if os.getenv("GOLDEN_KEYCLOAK_URL") else "")
     persona = os.getenv("GOLDEN_BLENDER_PERSONA", "eval-ai-dev-01")
     s: Dict = {"persona": persona}
     s["no_token"] = httpx.post(f"{gateway}/v1/chat/completions", json={}, timeout=30, verify=VERIFY_TLS).status_code
@@ -802,7 +811,7 @@ def probe_blender(ctx: Context) -> Result:
             s["problems"] = addon.check_script(code)
         else:
             s["generation_error"] = str(answer.get("error", answer) if isinstance(answer, dict) else answer)[:160]
-        logs = oc("-n", "zuno-ai-run", "logs", "deploy/ai-gateway", "-c", "ai-gateway", "--since=3m", timeout=60)
+        logs = ai_gateway_logs("3m", timeout=60)
         s["floor_logged"] = bool(_FLOOR_LINE_RE.search(logs.stdout or ""))
         s["gpt_oss_called"] = bool(_GPT_OSS_CALL_RE.search(logs.stdout or ""))
     finally:

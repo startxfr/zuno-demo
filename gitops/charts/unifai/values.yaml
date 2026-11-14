@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.64, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.69, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:f0c3cf5d46d0f1fee6f8a3d5ccb8f3a9f8eb40e735128beb9fb27c42e3a61d58
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:cae636ce84db20024a046f12dc63722aa3abdbb5ab6532358709c8f781585f96
   catalogSourceName: unifai-operator-catalog
   channel: alpha
   package: unifai-operator
@@ -40,7 +40,19 @@ stack:
   # Extra environment by component (operator >= 0.1.22): multiagent,
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
-  extraEnv: {}
+  extraEnv:
+    # Defaults the UnifAI lineage 0.1 stops hard-coding for zuno (unifai-compare, 2026-11-12). Both are zuno values the
+    # stack keeps explicit until the typed fields ship (spec.rag.bearerAudience, spec.outboundAllowedHosts): then these
+    # entries are removed.
+    # RAG accepts only tokens whose `aud` is this client (mcp-gateway rag_query, trustyai-eval, evaluations).
+    rag:
+      - {name: RAG_BEARER_AUDIENCE, value: zuno-admin-api}
+    # The SSRF guard of multiagent: the stack's own namespace is repeated because extraEnv REPLACES the value the
+    # operator sets since 0.1.65. zuno-ai-run holds mcp-gateway and a2a-gateway (delegation).
+    multiagent:
+      - {name: OUTBOUND_ALLOWED_HOSTS, value: ".zuno-ai-run.svc,.zuno-ai-run.svc.cluster.local,.zuno-unifai.svc,.zuno-unifai.svc.cluster.local"}
+    multiagentWorker:
+      - {name: OUTBOUND_ALLOWED_HOSTS, value: ".zuno-ai-run.svc,.zuno-ai-run.svc.cluster.local,.zuno-unifai.svc,.zuno-unifai.svc.cluster.local"}
   # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
   # embedding model of `rag` below.
   memory:
@@ -122,12 +134,34 @@ stack:
 # identity Route, stack.rag.confluenceUrl's host and, with stack.backup, the S3
 # endpoint and the bucket's virtual-hosted name. Hosts verified against the
 # live demo333 stack on 2026-11-06.
-# Off until the zuno-unifai rehearsal (canary window, user's go): never
-# rehearsed, and the stack may reach hosts not listed here (googleapis via
-# GOOGLE_APPLICATION_CREDENTIALS, a search API, docling model downloads).
+# On since 2026-11-11 (user's go, WP-224 step 6). Rehearsed on 2026-11-08 on a throwaway
+# stack (docs/roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md): the hosts
+# below answer through the firewall, everything else is blocked. A host the stack needs
+# and that is missing here fails silently in a restart path or a CronJob: add it with a
+# reason line. Rollback at once: `oc -n zuno-unifai delete egressfirewall default`, then
+# `enabled: false` plus a `disabledReason` here (ArgoCD recreates it otherwise).
 egress:
-  enabled: false
-  disabledReason: not rehearsed yet on zuno-unifai; enable in the canary window with the user's go (WP-224 rollout step 8).
+  enabled: true
+  # The address ranges AWS publishes for S3 in the backup bucket's region (stack.backup.region), allowed on 443 next to
+  # the name rules (templates/egressfirewall.yaml says why). Refresh: curl -s https://ip-ranges.amazonaws.com/ip-ranges.json |
+  # jq -r '.prefixes[] | select(.service=="S3" and .region=="<region>") | .ip_prefix' | sort -u. A region missing here
+  # keeps the name rules only: it works, slowly. eu-west-2 from syncToken 1794458826 (2026-11-12).
+  s3CidrsByRegion:
+    eu-west-2:
+      - 1.178.94.0/24
+      - 16.12.15.0/24
+      - 16.12.16.0/23
+      - 18.168.37.160/28
+      - 18.168.37.176/28
+      - 3.2.110.0/24
+      - 3.2.72.0/24
+      - 3.5.244.0/22
+      - 52.219.219.0/24
+      - 52.95.142.0/23
+      - 52.95.144.0/24
+      - 52.95.148.0/23
+      - 52.95.150.0/24
+      - 52.95.191.0/24
   # The Kubernetes API on the control-plane nodes (6443): rag-server's
   # TokenReview (stack.rag.tokenReview; RAG_TOKENREVIEW_ENABLED=true live).
   apiServer: true

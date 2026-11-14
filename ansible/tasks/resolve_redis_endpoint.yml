@@ -1,0 +1,66 @@
+---
+# ADR-0352 clause 11 (WP-214): the mode-agnostic Redis endpoint. The consumer side (ai-gateway's REDIS_ADDR, the
+# zuno-ai-run EgressFirewall rule) receives these facts through ansible/tasks/redis_seam_values.yml and never reads
+# zuno_redis_mode: the information a consumer needs arrives as an endpoint value, not as a mode. The internal values
+# reproduce today's chart literal exactly (gitops/charts/ai-gateway/values.yaml, semanticCache.redis.addr), so an
+# internal-mode render stays byte-identical.
+#
+# Idempotent behind the same `is not defined` guard the resolve_cluster_*.yml discovery tasks use (ADR-0547 clause 2).
+# Self-contained: soft-loads confidential.yml itself (the resolve_mariadb_endpoint.yml pattern), so a caller that never
+# loads it still resolves correctly.
+#
+# Sets:
+#   redis_endpoint_host       host name or IP
+#   redis_endpoint_port       port, as a string
+#   redis_endpoint_addr       host:port (the REDIS_ADDR shape ai-gateway parses)
+#   redis_endpoint_tls        'true' when a CA bundle declares a TLS endpoint, else 'false' (the built-in is plaintext)
+#   redis_endpoint_ca_bundle  the supplied PEM, '' when none
+# The password is not a fact here: it flows confidential.yml -> Vault zuno/redis/session-store -> ExternalSecret
+# (ADR-0352 clause 8), seeded by the redis role in external mode.
+- name: "redis-endpoint | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _redis_endpoint_confidential_file
+  when: redis_endpoint_addr is not defined
+
+- name: "redis-endpoint | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when:
+    - redis_endpoint_addr is not defined
+    - _redis_endpoint_confidential_file.stat.exists
+
+- name: "redis-endpoint | resolve the Redis endpoint facts"
+  ansible.builtin.set_fact:
+    redis_endpoint_host: >-
+      {{
+        (zuno_redis_external_host | default('xxxxxx') | string | trim)
+        if (zuno_redis_mode | default('internal')) == 'external'
+        else 'zuno-redis-master.zuno-auth.svc.cluster.local'
+      }}
+    redis_endpoint_port: >-
+      {{
+        (zuno_redis_external_port | default('6379') | string | trim)
+        if (zuno_redis_mode | default('internal')) == 'external'
+        else '6379'
+      }}
+    redis_endpoint_tls: >-
+      {{
+        ('true' if (zuno_redis_external_ca_bundle | default('') | trim | length > 0) else 'false')
+        if (zuno_redis_mode | default('internal')) == 'external'
+        else 'false'
+      }}
+    redis_endpoint_ca_bundle: >-
+      {{
+        (zuno_redis_external_ca_bundle | default('') | trim)
+        if (zuno_redis_mode | default('internal')) == 'external'
+        else ''
+      }}
+  when: redis_endpoint_addr is not defined
+
+# A separate task: set_fact templates its keys together, so the address cannot read the two facts above in the same
+# task. The guard sits on redis_endpoint_addr, set last, so a half-resolved run re-resolves everything.
+- name: "redis-endpoint | compose the host:port address"
+  ansible.builtin.set_fact:
+    redis_endpoint_addr: "{{ redis_endpoint_host }}:{{ redis_endpoint_port }}"
+  when: redis_endpoint_addr is not defined

@@ -34,7 +34,7 @@ cluster-gpu:
       operator:
         channel: stable
         name: gpu-operator-certified
-        installPlanApproval: Automatic  # startx chart defaults to Manual
+        installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
         source:
           name: certified-operators
           namespace: openshift-marketplace

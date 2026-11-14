@@ -90,6 +90,8 @@ def get_app(settings: Optional[Settings] = None) -> FastAPI:
             await runtime._gpu(engine.reset, warm)
             for _ in range(3):
                 await runtime._gpu(runtime._timed_step, runtime_warm_ctrl())
+            # A first image edit costs ~10 s cold (measured): pay it here, not at the first anchor mid-walk.
+            await runtime._gpu(images.edit, warm, "warm-up", 0)
             # The capability probe of ADR-0604 D4: which H.264 encoder this node really has. Not ready without one,
             # and the choice is known (status, metric, preflight) before the first visitor.
             probe = await loop.run_in_executor(None, build_encoder, settings)
@@ -207,11 +209,19 @@ def get_app(settings: Optional[Settings] = None) -> FastAPI:
         async def receive() -> None:
             try:
                 while True:
-                    msg = json.loads(await ws.receive_text())
+                    try:
+                        msg = json.loads(await ws.receive_text())
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(msg, dict):  # a malformed message is dropped, it must not end the session
+                        continue
                     kind = msg.get("type")
                     if kind == "control":
-                        world.controls.update(msg.get("seq"), msg.get("keys") or [], msg.get("mouse"),
-                                              msg.get("scroll", 0))
+                        try:
+                            world.controls.update(msg.get("seq"), msg.get("keys") or [], msg.get("mouse"),
+                                                  msg.get("scroll", 0))
+                        except (TypeError, ValueError, AttributeError):
+                            logger.warning("ignored a malformed control message")
                     elif kind == "edit":
                         version, prompt = msg.get("prompt_version"), msg.get("prompt")
                         if not (isinstance(version, int) and isinstance(prompt, str)
@@ -219,7 +229,7 @@ def get_app(settings: Optional[Settings] = None) -> FastAPI:
                             await send_event({"type": "prompt", "prompt_version": version, "status": "rejected"})
                     elif kind == "stop":
                         break
-            except (WebSocketDisconnect, json.JSONDecodeError, RuntimeError):
+            except (WebSocketDisconnect, RuntimeError):
                 pass
             finally:
                 rt.stop()

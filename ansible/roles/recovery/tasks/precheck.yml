@@ -1,0 +1,35 @@
+---
+# `make d3 check recovery` (WP-248 incident, 2026-11-12): is the cluster back after a node drain, a reboot or an MCO roll?
+# Nodes, MachineConfigPools, ClusterOperators, stuck pods, Quay, the Kuadrant wasm Service and Authorino, a MaaS route without
+# a token (platform/recovery/check_recovery.py). Read-only, needs `oc` logged in on the machine that runs it.
+# Fails with a finding for each layer, in the order the layers have to recover, and the next step for it.
+- name: "recovery | look for oc (an AAP execution environment has none)"
+  ansible.builtin.shell: "command -v oc >/dev/null"
+  register: _recovery_tools
+  changed_when: false
+  failed_when: false
+
+- name: "recovery | skipped: run it from a workstation"
+  ansible.builtin.debug:
+    msg: "recovery check skipped: it needs `oc` logged in (run `make d3 check recovery` from a workstation)"
+  when: _recovery_tools.rc != 0
+
+- name: "recovery | look at the layers"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/platform/recovery/check_recovery.py"]
+  register: _recovery
+  changed_when: false
+  failed_when: false
+  when: _recovery_tools.rc == 0
+
+- name: "recovery | report"
+  ansible.builtin.debug:
+    msg: "{{ _recovery.stdout_lines + _recovery.stderr_lines }}"
+  when: _recovery is not skipped
+
+- name: "recovery | fail when a layer is not back"
+  ansible.builtin.fail:
+    msg: "the cluster is not fully back (see the report above); fix the first finding, then run `make d3 check recovery` again"
+  when:
+    - _recovery is not skipped
+    - _recovery.rc != 0

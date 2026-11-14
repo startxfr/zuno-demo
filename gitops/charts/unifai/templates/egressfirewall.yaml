@@ -85,6 +85,20 @@ spec:
         - protocol: TCP
           port: 443
     {{- end }}
+    {{- if and $s.backup.region (not $s.backup.endpoint) }}
+    # The same S3 region by its published address ranges (egress.s3CidrsByRegion). The name rules alone hold only the few
+    # addresses they resolved out of a pool of hundreds: the first scheduled backups under this firewall (2026-11-12)
+    # took 7 and 13 minutes instead of 14 and 29 seconds, every blocked connection waiting for a retry onto a lucky one.
+    # Nothing but S3 lives in these ranges and the pods hold no credential for another bucket.
+    {{- range (get $.Values.egress.s3CidrsByRegion $s.backup.region | default list) }}
+    - type: Allow
+      to:
+        cidrSelector: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- end }}
     {{- end }}
     {{- end }}
     {{- range .Values.egress.hosts }}

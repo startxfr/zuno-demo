@@ -12,6 +12,7 @@ import asyncio
 import base64
 import io
 import logging
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -64,6 +65,38 @@ def video_message(payload: bytes, keyframe: bool, pts_us: int, seq: int = -1) ->
     return VIDEO_TAG + bytes([1 if keyframe else 0]) + pts_us.to_bytes(8, "big") + seq32.to_bytes(4, "big") + payload
 
 
+# The anchor prompt, measured 2026-11-09 on the GPU node (closed loop with Waypoint, 42 s walks, several seeds).
+# - "first-person view" made FLUX redraw the frame but also draw first-person arms and HUD (Waypoint itself
+#   hallucinates hands and weapons while walking: it is trained on game footage; FLUX then keeps them).
+# - A camera cue that names no character ("a camera at eye level moving through the scene, only the environment")
+#   redraws the frame without the arms in most runs; a few runs keep a Waypoint-made hand as a snow-covered lump.
+# - An explicit instruction at the end removes the rest ("Remove any hands, arms, weapons and interface elements."),
+#   while a negation ("no hands") is ignored or only partial.
+# The scene text must not say "first-person": it is stripped.
+ANCHOR_CUE = ", cinematic view from a camera at eye level moving through the scene, only the environment"
+ANCHOR_CLEAN = ". Remove any hands, arms, weapons and interface elements."
+_POV = re.compile(r",?\s*\b(?:cinematic\s+)?first[- ]person(?:\s+(?:camera\s+)?view)?\b", re.IGNORECASE)
+FRAME_RATE = 60
+
+
+def anchor_prompt(scene: str, last_edit: str, limit: int) -> str:
+    """The scene (plus the newest world edit) as a FLUX prompt; "" when the world has no text to anchor on."""
+    parts = [_POV.sub("", p).strip(" ,.") for p in (scene, last_edit) if p and p.strip()]
+    parts = [p for p in parts if p]
+    if not parts:
+        return ""
+    tail = ANCHOR_CUE + ANCHOR_CLEAN
+    return ", ".join(parts)[: max(0, limit - len(tail))].rstrip(" ,") + tail
+
+
+def edit_size(spec: str):
+    """"1024x512" -> (1024, 512); "" -> None (edit at the display size)."""
+    if not spec:
+        return None
+    w, h = spec.lower().split("x")
+    return int(w), int(h)
+
+
 @dataclass
 class World:
     world_id: str
@@ -73,6 +106,10 @@ class World:
     prompt_version: int = 0
     controls: ControlState = field(default_factory=ControlState)
     created: float = field(default_factory=time.monotonic)
+    scene_prompt: str = ""  # the text the first image came from, for drift anchoring
+    last_edit: str = ""  # the newest applied world edit: it becomes part of the scene
+    moving_seconds: float = 0.0  # generated video time since the last anchor, counted only while moving
+    anchors: int = 0
 
 
 SendBytes = Callable[[bytes], Awaitable[None]]
@@ -115,7 +152,7 @@ class Runtime:
             raise ValueError("a prompt or an image is required")
         await self._gpu(self.engine.reset, image)
         metrics.RESETS.labels(reason="new_world").inc()
-        self.world = World(world_id=uuid.uuid4().hex, seed=seed, image=image)
+        self.world = World(world_id=uuid.uuid4().hex, seed=seed, image=image, scene_prompt=prompt or "")
         return self.world
 
     async def close_world(self, world_id: str) -> None:
@@ -211,10 +248,14 @@ class Runtime:
     async def _loop(self, world: World, encoder: FrameEncoder, out, send_event: SendEvent, pts: int) -> str:
         step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
         while not self._stop.is_set():
-            frames, step_seconds, seq = await step
+            frames, step_seconds, seq, moving = await step
             metrics.FRAMES_GENERATED.labels(model=self.engine.name, precision=self.precision).inc(len(frames))
+            if moving:
+                world.moving_seconds += len(frames) / FRAME_RATE
             if not self._edits.empty():
                 await self._apply_edit(world, encoder, frames[-1], send_event)
+            elif self._anchor_due(world):
+                await self._reanchor(world, encoder, frames[-1], send_event)
             # Generate the next batch while this one plays (upstream pacing).
             step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
             interval = max(step_seconds, 1e-3) / len(frames)
@@ -235,7 +276,54 @@ class Runtime:
         spent = time.perf_counter() - started
         self.last_step_seconds = spent
         metrics.ENGINE_STEP.labels(model=self.engine.name).observe(spent)
-        return frames, spent, ctrl.seq
+        moving = bool(ctrl.button) or abs(ctrl.mouse[0]) + abs(ctrl.mouse[1]) > 0.02
+        return frames, spent, ctrl.seq, moving
+
+    def _anchor_due(self, world: World) -> bool:
+        every = self.settings.anchor_seconds
+        return every > 0 and world.moving_seconds >= every and bool(self._anchor_text(world))
+
+    def _anchor_text(self, world: World) -> str:
+        return anchor_prompt(world.scene_prompt, world.last_edit, self.settings.max_prompt_chars)
+
+    def _anchor_edit(self, current: np.ndarray, prompt: str, seed: int) -> np.ndarray:
+        """FLUX edit, at the autoencoder's native size when configured: about 0.66 s instead of 1.17 s at 720p, and
+        the engine takes the result at that size anyway (raw mode)."""
+        size = edit_size(self.settings.anchor_edit_size)
+        if size and current.shape[1::-1] != size:
+            from PIL import Image
+
+            current = np.asarray(Image.fromarray(current).resize(size, Image.LANCZOS))
+        return self.images.edit(current, prompt, seed)
+
+    async def _reanchor(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
+        """Redraw the current frame from the scene prompt and restart the world from it: the world keeps its scene.
+
+        Waypoint-1.5 only invents what it has never seen, so after some seconds of walking it has drifted into
+        close-up texture; it never recovers on its own. The UI shows the same banner as a world edit.
+        """
+        world.state = State.RECONDITIONING
+        await send_event({"type": "state", "state": world.state.value, "reason": "stabilize"})
+        started = time.perf_counter()
+        world.moving_seconds = 0.0  # also on failure: no retry storm
+        try:
+            fixed = await self._gpu(self._anchor_edit, current, self._anchor_text(world), world.seed + 1000 + world.anchors)
+            # reset, not splice: Waypoint keeps ~8 s of history in its KV cache, so after a splice the weapons and
+            # collapsed textures of earlier frames pull the next frames back (measured: a rifle on 9 of 11 frames of
+            # a 60 s walk with splice, none on 22 frames with reset). The cleaned frame is the new first image.
+            await self._gpu(self.engine.reset, fixed)
+            world.anchors += 1
+            encoder.request_keyframe()
+            metrics.IMAGE_SECONDS.labels(kind="anchor").observe(time.perf_counter() - started)
+            metrics.ANCHORS.labels(result="applied").inc()
+            await send_event({"type": "anchor", "status": "applied", "count": world.anchors,
+                              "ms": round((time.perf_counter() - started) * 1000)})
+        except Exception as exc:  # noqa: BLE001 - a failed anchor keeps the world running, drifting
+            logger.exception("world anchor failed")
+            metrics.ANCHORS.labels(result="failed").inc()
+            await send_event({"type": "anchor", "status": "failed", "message": str(exc)[:200]})
+        world.state = State.STREAMING
+        await send_event({"type": "state", "state": world.state.value})
 
     async def _apply_edit(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
         version, prompt = self._edits.get_nowait()
@@ -249,6 +337,8 @@ class Runtime:
             metrics.IMAGE_SECONDS.labels(kind="edit").observe(time.perf_counter() - started)
             await self._gpu(self.engine.splice, edited)
             world.prompt_version = version
+            world.last_edit = prompt
+            world.moving_seconds = 0.0
             encoder.request_keyframe()
             elapsed = time.perf_counter() - started
             metrics.PROMPT_APPLY.labels(result="applied").observe(elapsed)

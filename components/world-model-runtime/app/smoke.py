@@ -17,6 +17,7 @@ import statistics
 import subprocess
 import sys
 import time
+import traceback
 
 import numpy as np
 
@@ -103,7 +104,7 @@ def main() -> int:
             }
             engine.close()
         except Exception as exc:  # noqa: BLE001 - one quantization failing must not hide the others
-            report["waypoint"][quant] = {"error": str(exc)[:300]}
+            report["waypoint"][quant] = {"error": str(exc)[:300], "trace": traceback.format_exc()[-1200:]}
     print(json.dumps(report, indent=2))
     return 0
 

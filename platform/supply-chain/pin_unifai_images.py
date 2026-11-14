@@ -103,6 +103,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--cluster", default="demo333")
     parser.add_argument("--accept-dev", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--mirror-to", metavar="PREFIX",
+                        help="after a successful pin, copy the five images with their signatures into the internal Quay, "
+                             "e.g. quay-quay-zuno-registry.apps.demo333.startx.fr/zuno (push robot in DOCKER_CONFIG; ADR-0612). "
+                             "The operator, bundle and catalog travel with platform/supply-chain/mirror_unifai_images.py --version")
     parser.add_argument("--no-admission-preflight", action="store_true",
                         help="do not ask the cluster's admission webhook about the digests (WP-178)")
     args = parser.parse_args(argv)
@@ -115,7 +119,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (PinError, admit.AdmissionError, OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
         return 1
-    print(json.dumps({"ok": True, "tag": args.tag, "written": not args.dry_run, "pins": pins}, indent=2))
+    if args.mirror_to and not args.dry_run:
+        import mirror_unifai_images as mirror  # noqa: E402
+        try:
+            mirror.mirror_all({f"unifai-{c}": ref for c, ref in pins.items()}, args.mirror_to, args.accept_dev)
+        except (mirror.MirrorError, admit.AdmissionError, v.ImageError) as exc:
+            print(json.dumps({"ok": False, "error": f"pinned, but the mirror copy failed: {exc}"}, indent=2))
+            return 1
+    print(json.dumps({"ok": True, "tag": args.tag, "written": not args.dry_run, "pins": pins,
+                      "mirrored_to": args.mirror_to if not args.dry_run else None}, indent=2))
     return 0
 
 

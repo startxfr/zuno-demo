@@ -212,10 +212,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) *(stub)* | Proposed | Introduce controlled shared agent memory |
-| [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) *(stub)* | Proposed | Expose agent delegation traces to users |
-| [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | Proposed | Add specialized task-oriented frontend views |
-| [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Proposed | Automate removal of inaccessible private RAG content |
+| [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Implemented | Automate removal of inaccessible private RAG content |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
@@ -371,18 +368,18 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Implemented | Derive data classification from OKF and only allow raising it |
-| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Accepted | Gate every live demo on a golden-path check and a freeze window |
+| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Implemented | Gate every live demo on a golden-path check and a freeze window |
 
 ## v0.16
 
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
-| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
-| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Implemented | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Accepted | Harden the platform's trust boundaries before a customer runs it |
+| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Accepted | Close the medium-severity security gaps found in the 2026-11-06 review |
 | [ADR-0604](0604-introduce-an-interactive-generative-world-model-experience.md) | Accepted | Introduce an interactive generative world-model experience on OpenShift AI and NVIDIA Blackwell |
-| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Accepted | Admit new experiences with a definition of done and a WIP limit |
+| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Implemented | Admit new experiences with a definition of done and a WIP limit |
 | [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Implemented | Pin, gate and schedule pre-GA dependencies |
 | [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Implemented | Keep the repository the only source of cluster state |
 | [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Implemented | Rehearse on canary namespaces of demo333 |
@@ -394,13 +391,16 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 | [ADR-0610](0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md) | Implemented | Generate Blender objects as bpy scripts from a local model through the ai-gateway |
-| [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) | Proposed | Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io |
+| [ADR-0611](0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) | Superseded in part by ADR-0612 | Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io |
+| [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) | Partially implemented | Serve every zuno image from an internal Red Hat Quay backed by an S3 bucket |
+| [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md) | Proposed | Close the three remaining live hardening items of ADR-0603 (M4, M2, M7) in mid-December |
+| [ADR-0614](0614-split-the-cluster-into-infra-general-worker-and-gpu-node-pools.md) | Implemented | Split the cluster into infra, general-worker and GPU node pools |
 
 ## OKF v0.1
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | Accepted | Establish the OKF stream with its own milestones and roadmap |
+| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | Implemented | Establish the OKF stream with its own milestones and roadmap |
 | [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | Implemented | Define the agent tests directory structure and promotion gate |
@@ -427,6 +427,9 @@ part of its decision is still in force.
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
 | [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | v0.16 | Deprecated | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
+| [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) *(stub)* | v0.4 | Deprecated | Introduce controlled shared agent memory |
+| [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) *(stub)* | v0.4 | Deprecated | Expose agent delegation traces to users |
+| [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | v0.4 | Deprecated | Add specialized task-oriented frontend views |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Superseded by ADR-0218 and ADR-0568 | Automate source-specific knowledge ingestion |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |

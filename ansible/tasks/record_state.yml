@@ -8,8 +8,11 @@
       - state_report_file is defined
     fail_msg: "record_state.yml requires '_state_is_installed' and 'state_report_file' to be set (state_report_file comes from ansible/tasks/init_state_report.yml)"
 
+# A templated KEY, not a templated dict: on ansible-core 2.19 `set_fact: "{{ {name: value} }}"` sets nothing (found
+# 2026-11-11 by the Day-1 vital gate, ADR-0352 clause 10, which reads these facts).
 - name: "state-report | set {{ ansible_role_name }}_state_installed"
-  ansible.builtin.set_fact: "{{ {ansible_role_name + '_state_installed': _state_is_installed} }}"
+  ansible.builtin.set_fact:
+    "{{ ansible_role_name }}_state_installed": "{{ _state_is_installed | bool }}"
 
 - name: "state-report | record the install state line"
   ansible.builtin.lineinfile:

@@ -15,6 +15,7 @@ ansible/confidential*.back
 # once to the Ansible controller by ansible/roles/vault (and its .bak copies).
 ansible/vault-recovery*
 
+
 # Real / unapproved business data
 *.dump
 *.sql.gz

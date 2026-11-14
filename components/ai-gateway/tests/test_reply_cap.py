@@ -53,7 +53,9 @@ def _msgs(chars):
 def test_the_cap_shrinks_to_the_room_left_in_the_model_window():
     cfg = {"max_model_len": 32768}
     estimated = main._estimate_prompt_tokens(_msgs(100_000), None)
-    assert main._candidate_max_tokens(8192, cfg, _msgs(100_000), None) == min(8192, 32768 - estimated)
+    # WP-208 D8: char/4 only approximates the tokenizer, so 5 % of the prompt (at least 256 tokens) stays free.
+    margin = max(256, estimated // 20)
+    assert main._candidate_max_tokens(8192, cfg, _msgs(100_000), None) == min(8192, 32768 - estimated - margin)
     assert main._candidate_max_tokens(8192, cfg, _msgs(400), None) == 8192
 
 

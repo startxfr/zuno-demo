@@ -1,6 +1,6 @@
 # ADR-0603: Close the medium-severity security gaps found in the 2026-11-06 review
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.16 (retargeted from v0.15 on 2026-11-07, with ADR-0602: v0.15 became the demo-ready band of ADR-0605)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team
@@ -118,3 +118,70 @@ decision clause changes.
   (`ClusterImagePolicy` from warn to enforce, digests rendered into the charts, `zuno_validate_route_certs`). Each one
   rebuilds or rolls shared components, so none of them runs inside the freeze of
   [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md).
+
+## Amendment (2026-11-11): M12 and M13 values decided
+
+User decisions of 2026-11-11 (post-demo hardening list, item 4). Both are now values in git.
+
+- **M13.** `metrics.query` is offered to `ocp-ai-ops` only. That group's PromQL is scoped to:
+  - the 13 namespaces that mcp-k8s already reads;
+  - `nvidia-gpu-operator`.
+  The values are in `metricsQuery.namespacesByGroup` in `gitops/apps/mcp/application-d1.yaml`. The kagent service
+  account carries `ocp-ai-ops`, so kagent keeps the tool. A node-level or cluster-level series, which has no
+  `namespace` label, selects nothing.
+- **M12.** The shared Confluence identity sees 42 spaces: 4 internal ones, about 12 customer or project spaces, and 26
+  personal spaces. It can write to them.
+  - `consultant`, `board`, `cdp` and `lightspeed_readonly` now reach only the four internal spaces: SXSI, SXS, SXSD
+    and SAC.
+  - `consultant`, `board` and `cdp` reach only `github:startxfr/*` on git-forge. The GitHub token is a fine-grained,
+    public, read-only token, so this narrows reads.
+  - The `"*"` entries of `sales`, `finance`, `adv` and `recrut` are removed. The tool policy gives those groups no
+    Confluence or git tool.
+  - A space or repository is added to a group when a flow needs it.
+
+Both are live on demo333 since 2026-11-11 22:41 UTC. The golden path passed afterwards, and each restriction was
+checked with one allowed call and one refused call
+([evidence](../roadmap/evidence/hardening-allowlists-metrics-matcher-2026-11-11.md)).
+
+## Status of M1 to M22 (2026-11-12)
+
+The record had no status per finding. This is the state on devel e2be4384 plus the bootstrap locks of 2026-11-12.
+The open findings were checked in the code: M2, M4, M7, M9, M12 and M19.
+
+| Finding | Status | Evidence | What is left |
+|---|---|---|---|
+| M1 | Partly done | deny-all EgressFirewall live on zuno-ai-run (2026-11-07) and zuno-unifai (2026-11-11, WP-224) | TEMPORARY `pypi.org` entries until the acceptance gate runs from a prebuilt image; egress of the other namespaces |
+| M2 | Open | `destinationrule-postgres.yaml:59` and `destinationrule-mariadb.yaml:23` still `mode: DISABLE`; clients use `require`/`prefer` | database-native `verify-full` for every client: [WP-253](../roadmap/work-packages/wp-253-verify-full-database-transport-for-every-client.md), planned mid-December ([ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)) |
+| M3 | Done live | `zuno_validate_route_certs: true` since 2026-11-11 | nothing |
+| M4 | Open | the Keycloak CR keeps `httpEnabled: true`; the operator's NetworkPolicy admits 8080 from any source | limit 8080 to its callers, or accept it here: [WP-252](../roadmap/work-packages/wp-252-limit-or-accept-the-keycloak-http-listener.md), planned mid-December |
+| M5 | Done live | the reconcile Job updates realm settings (WP-223) | nothing |
+| M6 | Done in the `hardened` profile only | 1 h idle in `keycloak/values.yaml` for `hardened`; demo333 runs `demo` (8 h) | decide whether the profile closes it, or wait for WP-227 |
+| M7 | Open | `configure.sh:130-134`: root `ttl=87600h`, no intermediate; the three cert-manager roles share one ServiceAccount | an intermediate (or an offline root) and a separate ServiceAccount for the Istio role; [WP-254](../roadmap/work-packages/wp-254-intermediate-ca-and-separate-istio-service-account.md), planned mid-December |
+| M8 | Done live | Vault UI Route off; htpasswd kept as break-glass by decision (WP-223) | nothing |
+| M9 | Done live for the vault role (2026-11-12) | `ansible/tasks/vault_cli.yml` passes the token and the values as files copied into the pod; the vault role and `vault_seed_if_missing.yml` use it; role run and golden path PASS ([evidence](../roadmap/evidence/adr-0603-m9-vault-seeding-2026-11-12.md)) | 20 calls in other roles (aap_config, dify, quay_registry, the external modes, openclaw, the KMS migration playbook) and the one-time root-token steps |
+| M10 | Done live | `/admin/*` needs an admin token (WP-222) | nothing |
+| M11 | Done live | CQL escaping, space-key check, caps (WP-222) | nothing |
+| M12 | Partly done | Confluence and git allowlists live 2026-11-11; `email.recipientAllowlist: {}` (the handler is in demo mode and sends nothing); Salesforce owner scoping waits for an org | email allowlist values; Salesforce recorded as deferred |
+| M13 | Done live | the 2026-11-11 amendment above | nothing |
+| M14 | Done live | call assertion required, REST entitlement, Transit signing, workload token retired, `requireFor` (WP-225, WP-247, WP-250, WP-251) | unifai and zuno-evaluations stay out of `requireFor` until the UnifAI fork signs its calls: a residual to accept |
+| M15 | Done live | no per-user label, JSON-RPC batch cap 20, AAP launch limit (WP-225) | nothing |
+| M16 | Partly done | digests rendered for v0.14.5 and cleared (2026-11-08); base images pinned by digest | a release that keeps its digests; the AAP execution environment base digest |
+| M17 | Partly done | `ClusterImagePolicy` enforce on the opt-in namespaces; CI keyless signing written, never run | zuno-ai-run opted in (with WP-227); one CI signing run (needs Quay credentials) |
+| M18 | Done in the repo | cosign and oras checksums, `ignore-unfixed` dropped, SBOM attestation written | the same CI run as M17 |
+| M19 | Done in the repo | actions pinned by SHA, `lint.yml` permissions, secret scan, pre-commit, Dependabot; `.github/CODEOWNERS` and `SECURITY.md` added on 2026-11-12 | owner: enable private vulnerability reporting (the channel `SECURITY.md` names) and the GitHub settings on `main` |
+| M20 | Done in the repo | hashed locks, constraints, `kubernetes.core` pinned; the bootstrap tools hashed on 2026-11-12 (WP-226) | live as each image is rebuilt |
+| M21 | Done | the virtual environment is untracked | history purge is the user's choice |
+| M22 | Owner action | `.gitignore` is the only barrier | the maintainer rotates the keys and moves the files |
+
+What still stands between this record and `Implemented`:
+- Live windows: M2, M4 and M7; M9's remaining calls in other roles, one role run each. M2, M4 and M7 now have work packages
+  (WP-253, WP-252, WP-254, [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)), planned for mid-December 2026.
+- Decisions or residuals to record:
+  - M6: does the `hardened` profile close it?
+  - M12: Salesforce is deferred.
+  - M14: the UnifAI signer gap is accepted.
+  - M1: egress of the other namespaces.
+- Small repository items: M12 (the email allowlist values). M19's files were added on 2026-11-12.
+- Steps that depend on other work: M16, M17 and M18 need a release that keeps its digests, the AAP execution
+  environment digest and one CI signing run.
+- Owner actions: M22, the GitHub settings on `main`, and enabling private vulnerability reporting (M19).

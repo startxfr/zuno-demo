@@ -19,6 +19,10 @@
 # oras and the admission files since WP-161). apply_gitops_app.yml REPLACES
 # the Application's inline helm values, so they are read back and merged
 # (same pattern as ansible/roles/mlops).
+# ADR-0611: zuno_okf_registry_mirror lives in the committed per-cluster variables (ansible/clusters).
+- name: "mcp | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "mcp | read the admitted agents release"
   ansible.builtin.set_fact:
     _mcp_okf_reference: >-
@@ -33,6 +37,11 @@
       source of agents: admit one first (make d3 admit agents
       RELEASE=vX.Y.Z UPDATE_LOCK=1).
 
+# ADR-0611: both gateways (mcp-gateway here, a2a-gateway further down) fetch the release from the mirror first; roll
+# nothing until the mirror holds the locked digest, or the pods silently fall back to quay.io.
+- name: "mcp | refuse to roll the gateways when the internal mirror lacks the locked release (ADR-0611)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/okf_mirror_holds_lock.yml"
+
 # The release's digest merged into the Application's inline values.
 - name: "mcp | apply the MCP Gateway GitOps Application (d1, agents from the release)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -46,6 +55,9 @@
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
+                                     'mirror': {'prefix': zuno_okf_registry_mirror | default(''),
+                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool,
+                                                'pullSecret': zuno_okf_registry_mirror_pull_secret | default('')},
                                      'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
                   recursive=True)
       }}
@@ -174,6 +186,9 @@
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
+                                     'mirror': {'prefix': zuno_okf_registry_mirror | default(''),
+                                                'plainHttp': zuno_okf_registry_mirror_plain_http | default(true) | bool,
+                                                'pullSecret': zuno_okf_registry_mirror_pull_secret | default('')},
                                      'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
                   recursive=True)
       }}

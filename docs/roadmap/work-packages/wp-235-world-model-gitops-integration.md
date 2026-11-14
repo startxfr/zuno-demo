@@ -1,6 +1,6 @@
 # WP-235: World-model GitOps integration (delivers ADR-0604 D5, D6, §7, §8)
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-229, WP-234
 - **Blocks:** WP-236
@@ -65,3 +65,18 @@ node. Nothing else: no Application is applied while the switch is off.
 `helm lint` and `helm template`; `python3 -B platform/docs/check_docs.py` (AAP DAGs, values clobber, make commands);
 `platform/supply-chain/check_build_matrix.py`; `platform/security/check_workload_hardening.py`. The live install is part of
 WP-237.
+
+## Result (2026-11-08)
+
+Installed on demo333 and `make d2 check world-model` green (Waypoint bf16, FLUX.2 klein, NVENC, Keycloak 200, ai-gateway
+reached, no other egress, Route 200). The first live install found four things the mocks could not:
+
+- `seed_vault.yml` never looked up the Vault pod that `vault_seed_if_missing.yml` execs into.
+- The Application wait defaulted to 5 minutes while the runtime needs about 8 cold: the role now passes its own 25 minutes.
+- The EgressFirewall's S3 name rules let 3 addresses in 90 through, so the 20 GB model copy crawled (one 22 MB file in 7
+  minutes): the chart also allows the bucket region's published S3 address ranges (`egress.s3CidrsByRegion`).
+- The runtime image had no WebSocket library: uvicorn answered the upgrade 404, no world could stream, and the CPU tests
+  (starlette's test client needs none) could not see it. A test now fails when the image has neither.
+
+A cold start of the runtime pod is about 10 minutes (weights 2.5 min, then models and kernels). `make d2 uninstall
+world-model` runs after the 2026-11-09 demo.

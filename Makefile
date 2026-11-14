@@ -76,7 +76,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
+DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
 DAY2_VERBS := check install build uninstall reconcile all reinstall
@@ -106,7 +106,7 @@ DAY2_RECONCILE_COMPONENTS := models
 # availability test for agents/platform and to each component's own
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
-DAY3_BACKUP_COMPONENTS := postgresql unifai
+DAY3_BACKUP_COMPONENTS := postgresql unifai quay-registry
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
 # (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and
@@ -115,7 +115,9 @@ DAY3_BACKUP_COMPONENTS := postgresql unifai
 # OLSConfig operand is absent, and vice versa.
 # "operators" (2026-11-04): report-only audit of the OLM operators that can be
 # updated (platform/olm/audit_operator_updates.py, ansible/roles/operators).
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift
+# "recovery" (2026-11-12): read-only, is the cluster back after a node drain or a reboot
+# (platform/recovery/check_recovery.py, ansible/roles/recovery).
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift recovery
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
 # already-installed platform - the same tier as backup/restore, never
@@ -153,7 +155,11 @@ DEMO_VERBS := check all-check golden-path browser reset step-1 step-2 step-3 ste
 # resolve_aap_mode() reads ansible/confidential.yml directly: the Makefile
 # has no other way to reach an Ansible-sourced variable before deciding
 # whether to invoke ansible-playbook at all, and this decision must happen
-# here, in the shell, before any playbook runs. Never fails even if the
+# here, in the shell, before any playbook runs. When the file is
+# ansible-vault encrypted it is read through `ansible-vault view` (the
+# passphrase comes from ansible.cfg vault_password_file); a failed decrypt is
+# reported as "undecryptable" and aap_route refuses to run, because guessing
+# local or remote would be worse than stopping. Never fails even if the
 # file, PyYAML, or the key itself is missing - defaults to "auto"
 # throughout, matching this repo's existing "graceful if confidential.yml
 # is absent" convention (see ansible/roles/aap/tasks/install.yml).
@@ -181,8 +187,13 @@ define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
   local mode="auto"; \
   if [[ -f ansible/confidential.yml ]]; then \
-    local val; \
-    val="$$(python3 -c "import yaml; d=yaml.safe_load(open('ansible/confidential.yml')) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
+    local val txt; \
+    if head -n 1 ansible/confidential.yml | grep -q '^[$$]ANSIBLE_VAULT;'; then \
+      txt="$$(ansible-vault view ansible/confidential.yml 2>/dev/null)" || { echo "Cannot decrypt ansible/confidential.yml (ansible.cfg vault_password_file, see ansible/README.md)" >&2; echo "undecryptable"; return 0; }; \
+    else \
+      txt="$$(cat ansible/confidential.yml)"; \
+    fi; \
+    val="$$(printf '%s' "$$txt" | python3 -c "import sys, yaml; d=yaml.safe_load(sys.stdin) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
     [[ -n "$$val" ]] && mode="$$val"; \
   fi; \
   case "$$mode" in \
@@ -202,6 +213,7 @@ aap_route() { \
         return 99; \
       fi ;; \
     remote) ;; \
+    *) echo "zuno_make_aap_mode could not be resolved ('$$mode'): refusing to guess between local and remote" >&2; return 2 ;; \
   esac; \
   $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "{\"aap_launch_type\": \"$$kind\", \"aap_launch_template\": \"$$template\", \"aap_launch_extra_vars\": $$extra_vars_json}" $(EXTRA_VARS); \
 };
@@ -749,7 +761,17 @@ case "$$verb" in \
     admit_args=(); \
     if [[ -n "$${RELEASE:-}" ]]; then admit_args+=(--release "$$RELEASE"); fi; \
     case "$${UPDATE_LOCK:-0}" in 1|true|yes) admit_args+=(--update-lock) ;; esac; \
-    python3 platform/supply-chain/admit_okf_bundle.py admit "$${admit_args[@]}" ;; \
+    python3 platform/supply-chain/admit_okf_bundle.py admit "$${admit_args[@]}" || exit $$?; \
+    if [[ -n "$${OKF_MIRROR_TO:-}" ]]; then \
+      mirror_args=(--to "$$OKF_MIRROR_TO"); \
+      case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) mirror_args+=(--plain-http) ;; esac; \
+      python3 platform/supply-chain/admit_okf_bundle.py mirror "$${mirror_args[@]}" || exit $$?; \
+      prune_args=(--mirror "$$OKF_MIRROR_TO" --keep "$${OKF_MIRROR_KEEP:-3}"); \
+      case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) prune_args+=(--plain-http) ;; esac; \
+      case "$${OKF_MIRROR_PRUNE:-0}" in 1|true|yes) prune_args+=(--apply) ;; esac; \
+      case "$${OKF_MIRROR_QUAY:-0}" in 1|true|yes) prune_args+=(--quay) ;; esac; \
+      python3 platform/supply-chain/admit_okf_bundle.py prune "$${prune_args[@]}"; \
+    fi ;; \
   release) \
     case " $(DAY3_RELEASE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 release component: '$$component' (expected one of: $(DAY3_RELEASE_COMPONENTS) or all)" >&2; exit 2;; esac; \
     if [[ -z "$${TAG:-}" ]]; then echo "day3 release requires TAG=<release_tag>, e.g. TAG=v0.2.0 (must already be a real, pushed git tag)" >&2; exit 2; fi; \

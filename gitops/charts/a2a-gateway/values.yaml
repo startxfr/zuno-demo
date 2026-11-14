@@ -13,11 +13,14 @@ image:
 
 replicas: 1
 
-# ADR-0101: PodDisruptionBudget and a soft spread across zones. The task store is in memory, so
-# more than one replica needs sticky sessions for tasks/get; one replica is the demo footprint.
+# ADR-0101: PodDisruptionBudget and a soft spread across zones. Tasks and pending delegation
+# approvals are in memory, so the gateway runs one replica (the owner's decision, ADR-0614 update
+# 2026-11-14). maxUnavailable: 1 lets a node drain or a MachineConfig update evict it, which is the
+# 31-65 s outage ADR-0101 accepts; minAvailable: 1 on one replica blocked every drain until someone
+# deleted the pod. At two replicas it still keeps one pod up.
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1
+  maxUnavailable: 1
 
 topologySpreadConstraints:
   enabled: true
@@ -67,10 +70,26 @@ unifaiNamespace: zuno-unifai
 # private_key and public_key; the key must be granted to zuno-ai-run in
 # platform/vault/secret-access.yaml); the gateways get public_key as
 # agentChain.publicKey. Off by default: no header, as before.
+#
+# WP-247 lot 2 (ADR-0602 option A): who holds the signing key when sign is true.
+#   file     the private key is a Kubernetes Secret (ExternalSecret from vaultKey)
+#            mounted in the pod (today's behaviour).
+#   transit  the key never leaves Vault: the gateway logs in with its ServiceAccount
+#            token (role vault.authRole) and asks transit/sign for each chain. No
+#            ExternalSecret, no key mount. If Vault cannot sign, NO chain is sent (the
+#            same as an unreadable key today; the verifiers keep the unverified
+#            headers), never a fallback to a local key. Switch it in the same window
+#            that puts the Transit public key into agentChain.publicKey of the
+#            mcp-gateway and the ai-gateway.
 agentChain:
   sign: false
+  signer: file
   vaultKey: a2a/agent-chain
   vaultProperty: private_key
+  vault:
+    addr: https://zuno-vault.zuno-vault.svc:8200
+    authRole: a2a-gateway
+    transitKey: agent-chain
 
 # ADR-0580/WP-161: agent definitions come from the admitted zuno-demo-agents release, pulled and
 # verified offline by an init container (same mechanism as mcp-gateway). A failed verification
@@ -79,6 +98,15 @@ okf:
   fetch:
     enabled: false
     corpReference: ""
+    # ADR-0611/WP-246: a registry prefix (e.g. quay-quay-zuno-registry.apps.<domain>/zuno, ADR-0612) holding the release
+    # by the same digest. Set, okf-fetch reads from there first (2 short attempts) and falls back to
+    # `corpReference`'s own registry; verification is identical either way. Empty: today's behaviour.
+    mirror:
+      prefix: ""
+      plainHttp: false
+      # ADR-0612: name of the Secret holding a docker config.json (key config.json) for a Quay prefix. mcp-gateway renders it
+      # from Vault registry/quay-pull; a2a-gateway only mounts it. Empty: anonymous pulls (zot).
+      pullSecret: ""
     image:
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
       tag: latest

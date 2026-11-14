@@ -13,12 +13,16 @@ image:
   # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always
 
-replicas: 1
+# ADR-0614 (WP-260 P3, 2026-11-13): two replicas spread over zones, so the loss
+# of one zone or node leaves one serving pod. # Stateless per request (POST-only /mcp, one backend MCP session per call), so
+# no affinity is needed; /admin/reload-policy acts on one pod: call it once
+# per pod or roll the Deployment.
+replicas: 2
 
 # ADR-0101 (roadmap WP-12): the HA-capable shape - a PodDisruptionBudget
 # (templates/poddisruptionbudget.yaml) and topology spread across nodes,
 # both correct and safe at any replica count including the current
-# demo-scale replicas: 1 above (a PDB with minAvailable 1 simply protects
+# replicas count above (a PDB with minAvailable 1 simply protects
 # the sole pod from voluntary eviction; whenUnsatisfiable ScheduleAnyway
 # makes the spread constraint a soft preference, never a scheduling
 # blocker on a single-node/single-zone cluster). replicas itself is left
@@ -113,11 +117,26 @@ jsonRpc:
 #              a binding with `user_token: true` keeps the bearer. Needs the key
 #              pair in Vault (vaultKey, fields private_key and public_key) and the
 #              key granted to zuno-ai-run in platform/vault/secret-access.yaml.
+#
+# WP-247 (ADR-0602 option A): who holds the signing key, when mode is assertion.
+#   file     the private key is a Kubernetes Secret (ExternalSecret from vaultKey)
+#            mounted in the pod (today's behaviour).
+#   transit  the key never leaves Vault: the gateway logs in with its
+#            ServiceAccount token (role vault.authRole) and asks transit/sign
+#            for each assertion. No ExternalSecret, no key mount. Vault down =
+#            the call is refused (502), never a fallback. Switch it in the same
+#            window that puts the Transit public key into each server's
+#            callAssertion.publicKey.
 outboundIdentity:
   mode: bearer
+  signer: file
   assertionTtlSeconds: 60
   vaultKey: mcp/gateway-call-assertion
   vaultProperty: private_key
+  vault:
+    addr: https://zuno-vault.zuno-vault.svc:8200
+    authRole: mcp-gateway
+    transitKey: mcp-call-assertion
 
 # ADR-0603 M14 (WP-225 lot C): verify the a2a-gateway's signed X-Zuno-Agent-Chain.
 # With verify true and publicKey set (the PEM of Vault a2a/agent-chain public_key),
@@ -230,6 +249,15 @@ okf:
   fetch:
     enabled: false
     corpReference: ""
+    # ADR-0611/WP-246: a registry prefix (e.g. quay-quay-zuno-registry.apps.<domain>/zuno, ADR-0612) holding the release
+    # by the same digest. Set, okf-fetch reads from there first (2 short attempts) and falls back to
+    # `corpReference`'s own registry; verification is identical either way. Empty: today's behaviour.
+    mirror:
+      prefix: ""
+      plainHttp: false
+      # ADR-0612: name of the Secret holding a docker config.json (key config.json) for a Quay prefix. mcp-gateway renders it
+      # from Vault registry/quay-pull; a2a-gateway only mounts it. Empty: anonymous pulls (zot).
+      pullSecret: ""
     image:
       repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
       tag: latest

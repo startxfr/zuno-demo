@@ -30,6 +30,7 @@ by its own NetworkPolicy (ingress from mcp-gateway only).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import os
@@ -37,16 +38,17 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from app import call_assertion
+
 logger = logging.getLogger("mcp_gateway.handlers.diagram_gen")
 
 DIAGRAM_RENDER_URL = os.getenv("DIAGRAM_RENDER_URL", "http://diagram-render.zuno-ai-run.svc:8080")
 DIAGRAM_RENDER_TIMEOUT_SECONDS = float(os.getenv("DIAGRAM_RENDER_TIMEOUT_SECONDS", "35"))
-# ADR-0037's second defense-in-depth layer (NetworkPolicy is the first) -
-# same shared secret app/downstream.py already reads for its
-# streamable-http backends; diagram-render checks this header itself
-# (see components/diagram-render/server.js), unlike ai-gateway, which
-# has no equivalent check for image_gen.py's own call.
-MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+# WP-250 lot 2: diagram-render verifies the gateway's Vault-Transit-signed call assertion
+# (components/diagram-render/assertion.js), the same trust anchor as the MCP servers; the
+# shared workload token is retired. NetworkPolicy stays the first layer.
+DIAGRAM_RENDER_AUDIENCE = "diagram-render"
+DIAGRAM_RENDER_TOOL = "render"
 
 
 async def handle(
@@ -61,11 +63,20 @@ async def handle(
         return {"error": "mermaid_source is required"}
 
     try:
+        # In a thread: with the Vault Transit signer this is a network call.
+        assertion = await asyncio.to_thread(
+            call_assertion.mint, audience=DIAGRAM_RENDER_AUDIENCE, sub=caller_sub, tool=DIAGRAM_RENDER_TOOL,
+        )
+    except call_assertion.AssertionUnavailable as exc:
+        logger.error("no call assertion for diagram-render: %s", exc)
+        return {"error": "diagram generation failed: the gateway cannot sign the call assertion"}
+
+    try:
         async with httpx.AsyncClient(timeout=DIAGRAM_RENDER_TIMEOUT_SECONDS) as client:
             response = await client.post(
                 f"{DIAGRAM_RENDER_URL}/render",
                 json={"mermaid_source": mermaid_source},
-                headers={"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN},
+                headers={"Authorization": f"Bearer {assertion}"},
             )
             response.raise_for_status()
             body = response.json()

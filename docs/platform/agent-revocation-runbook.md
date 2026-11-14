@@ -1,6 +1,7 @@
 # Runbook: withdrawing an agent after an incident
 
-**Status: draft.** It becomes final when the revocation has been rehearsed once on demo333 (acceptance of
+**Status: final** (2026-11-11). Rehearsed once on demo333 on `comage`
+([evidence](../roadmap/evidence/wp-221-revocation-rehearsal-2026-11-11.md), acceptance of
 [WP-221](../roadmap/work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md)). It implements
 [ADR-0584](../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) clause 5.
 
@@ -9,10 +10,10 @@
 An agent must stop being served now, and waiting for a new agents release would take too long: a leaked secret in a
 prompt, an unsafe tool, wrong data reaching users, or a compromised release workflow.
 
-## Response target (proposed)
+## Response target
 
-The agent is withdrawn from `zuno-unifai` **within one hour** of the decision. The decision owners confirm or change
-this target (ADR-0584, operational considerations).
+The agent is withdrawn from `zuno-unifai` **within one hour** of the decision (confirmed by the decision owners on
+2026-11-11). The rehearsal took about five minutes from the install to the end of the sync.
 
 ## Who decides
 
@@ -59,6 +60,23 @@ change with a named approver (`deprecated` or `retired`), set `annotations` with
   `Error` with the reason `RevocationListUnreadable`: nothing new is admitted and what is emitted stays. Fix the list.
 - **Events** (source `unifai-operator`): `Admitted`, `StateChanged` (to `deprecated` or `retired`), `Revoked` and
   `Rejected`, each with the digest, the actor and the reason.
+
+## Bringing the agent back, and the team it leaves Terminating
+
+Known defect of operator 0.1.68 (found by the rehearsal, fix pending in the fork): the revocation also deletes the
+agent's `UnifaiTeam agent-<agent>`, and that deletion is refused while the chart's `UnifaiRetriever knowledge-<agent>`
+references it. The team CR stays Terminating; the UnifAI team and its sessions are kept. Do not delete
+`knowledge-<agent>` meanwhile: the team and its workspace would go with it.
+
+To serve the agent again:
+
+1. Remove the entry from `agentRevocations`, push, `make d2 install unifai`. The bundle is Ready again, the team CR is
+   still Terminating.
+2. Note the team id: `oc get unifaiteam agent-<agent> -n zuno-unifai -o jsonpath='{.status.conditions[0].message}'`.
+3. Remove its finalizer: `oc patch unifaiteam agent-<agent> -n zuno-unifai --type json -p
+   '[{"op":"remove","path":"/metadata/finalizers"}]'`. The operator does not delete the UnifAI team; the bundle
+   recreates the CR within seconds and adopts the existing team by name.
+4. Check: the new CR has no `deletionTimestamp`, is `Ready` on the same team id, and `knowledge-<agent>` is `Ready`.
 
 ## A compromised signing identity
 

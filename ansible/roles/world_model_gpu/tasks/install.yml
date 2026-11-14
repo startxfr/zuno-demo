@@ -79,23 +79,32 @@
               | from_yaml)['spec']['source']['helm']['values'] | from_yaml }}
         _world_model_gpu_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
 
-    - name: "world-model-gpu | resolve the MachineSet's availability zone"
+    # g7e capacity comes and goes per zone: the Application declares one MachineSet per zone (replicas 0) and the
+    # zones named by zuno_world_model_gpu_azs (else zuno_world_model_gpu_az, else "a") are scaled to 1.
+    - name: "world-model-gpu | resolve the zones to search and each MachineSet's subnet"
       ansible.builtin.set_fact:
-        _world_model_gpu_entry: >-
-          {{ _world_model_gpu_values_raw['cluster-machine']['machineSet']['list'][0]
-             | combine({'az': _world_model_gpu_az_overrides[world_model_gpu_machineset]}
-                       if world_model_gpu_machineset in _world_model_gpu_az_overrides else {}) }}
+        _world_model_gpu_search_azs: >-
+          {{ zuno_world_model_gpu_azs if (zuno_world_model_gpu_azs | length) > 0
+             else ([zuno_world_model_gpu_az] if (zuno_world_model_gpu_az | string | length) > 0 else ['a']) }}
+        _world_model_gpu_entries: >-
+          {% set out = [] %}{% for e in _world_model_gpu_values_raw['cluster-machine']['machineSet']['list']
+          if (cluster_aws_identity.region ~ e.az) in cluster_aws_identity.subnetByAz %}{% set _ = out.append(e | combine({
+            'ami': cluster_aws_identity.ami,
+            'securityGroupName': cluster_aws_identity.securityGroupName,
+            'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ e.az],
+            'replicas': (1 if e.name in zuno_world_model_gpu_sets else 0) if (zuno_world_model_gpu_sets | length) > 0
+                        else (1 if (e.instanceType == 'g7e.4xlarge' and e.az in (zuno_world_model_gpu_azs if (zuno_world_model_gpu_azs | length) > 0
+                                      else ([zuno_world_model_gpu_az] if (zuno_world_model_gpu_az | string | length) > 0 else ['a']))) else 0)
+          })) %}{% endfor %}{{ out }}
 
-    - name: "world-model-gpu | fail if the zone has no installer subnet"
+    - name: "world-model-gpu | fail if a requested zone has no installer subnet"
       ansible.builtin.fail:
         msg: >-
-          {{ world_model_gpu_machineset }} wants availability zone
-          '{{ cluster_aws_identity.region }}{{ _world_model_gpu_entry.az }}', but no
-          installer MachineSet exists there to read the subnet from (discovered:
-          {{ cluster_aws_identity.subnetByAz.keys() | list }}). Set
-          zuno_machines_az_override['{{ world_model_gpu_machineset }}'] to a zone
-          that has one and offers g7e.
-      when: (cluster_aws_identity.region ~ _world_model_gpu_entry.az) not in cluster_aws_identity.subnetByAz
+          Zones {{ _world_model_gpu_search_azs }} were requested for the world-model GPU node, but only
+          {{ _world_model_gpu_entries | map(attribute='az') | list }} have an installer MachineSet to read the
+          subnet from (discovered: {{ cluster_aws_identity.subnetByAz.keys() | list }}). Fix
+          zuno_world_model_gpu_azs in ansible/clusters/<cluster>.yml.
+      when: _world_model_gpu_search_azs | difference(_world_model_gpu_entries | map(attribute='az') | list) | length > 0
 
     - name: "world-model-gpu | build the values with this cluster's identity"
       ansible.builtin.set_fact:
@@ -103,25 +112,22 @@
           {{ _world_model_gpu_values_raw | combine({'cluster-machine': {
                'cluster': {'id': cluster_aws_identity.id,
                            'region': cluster_aws_identity.region},
-               'machineSet': {'list': [_world_model_gpu_entry | combine({
-                 'ami': cluster_aws_identity.ami,
-                 'securityGroupName': cluster_aws_identity.securityGroupName,
-                 'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ _world_model_gpu_entry.az]
-               })]}}}, recursive=True) }}
+               'machineSet': {'list': _world_model_gpu_entries}}}, recursive=True) }}
 
     # The chart's default list is the GPU fleet: if the injected list were ever
     # lost, this Application would render a second copy of the fleet, and
     # turning one autoscaler toggle on would take the ClusterAutoscaler
     # singleton away from zuno-machines-d0.
-    - name: "world-model-gpu | refuse to apply anything but the one world-model MachineSet"
+    - name: "world-model-gpu | refuse to apply anything but the world-model MachineSets"
       ansible.builtin.assert:
         that:
           - _world_model_gpu_values['cluster-machine']['machineSet']['enabled'] | bool
           - not (_world_model_gpu_values['cluster-machine']['machineAutoscaler']['enabled'] | bool)
           - not (_world_model_gpu_values['cluster-machine']['cluster']['autoscaler']['enabled'] | bool)
-          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | length) == 1
-          - _world_model_gpu_values['cluster-machine']['machineSet']['list'][0]['name'] == world_model_gpu_machineset
-          - "'placeholder' not in _world_model_gpu_values['cluster-machine']['machineSet']['list'][0]['ami']"
+          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | length) >= 1
+          - _world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='name') | difference(world_model_gpu_machinesets) | length == 0
+          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | selectattr('replicas', 'equalto', 1) | list | length) >= 1
+          - "'placeholder' not in (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='ami') | join(','))"
         fail_msg: "The world-model values are not exactly one resolved MachineSet: {{ _world_model_gpu_values }}"
 
     - name: "world-model-gpu | apply the node's Application"

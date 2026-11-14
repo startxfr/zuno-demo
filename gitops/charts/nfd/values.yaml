@@ -32,7 +32,7 @@ cluster-nfd:
       operator:
         channel: stable
         name: nfd
-        installPlanApproval: Automatic
+        installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
         source:
           name: redhat-operators
           namespace: openshift-marketplace

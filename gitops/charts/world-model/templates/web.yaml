@@ -34,6 +34,9 @@ spec:
               valueFrom: {secretKeyRef: {name: world-model-internal, key: token}}
             # The public https issuer: the token's `iss` must match it, so never the in-cluster http Service.
             - {name: KEYCLOAK_ISSUER, value: {{ include "world-model.keycloakIssuer" . | quote }}}
+            # The Sign out button: oauth2-proxy cookie, then Keycloak's logout, then back to this URL.
+            - {name: WORLD_MODEL_PUBLIC_URL, value: "https://{{ .Values.global.zuno.routeHost }}"}
+            - {name: WORLD_MODEL_LOGOUT_CLIENT_ID, value: {{ .Values.frontDoor.clientId | quote }}}
             - {name: JWT_AUDIENCE, value: {{ .Values.web.audience | quote }}}
             - {name: ALLOWED_GROUPS, value: {{ .Values.web.allowedGroups | quote }}}
             - {name: OPS_GROUPS, value: {{ .Values.web.opsGroups | quote }}}

@@ -16,6 +16,9 @@ keycloakExternal:
   adminRealm: zuno     # realm the admin credential signs in to; `master` for a master-realm admin
   caConfigMap: ""      # ConfigMap (key ca-bundle.crt) in this namespace holding the external CA; "" = system trust
   seedPersonas: false  # create the demo personas (and, with them, nothing else) when missing
+  # Groups the live realm carries that the realm file does not (found by the WP-211 lot C export): the group of the
+  # evaluation personas (evalPersonasGroup) and the Tekos preview agent group. Created when missing, like the others.
+  extraGroups: [zuno-evaluation, agent_tekos_preview]
 
 # Namespace for the Keycloak CR, KeycloakRealmImport and ExternalSecrets.
 # No Namespace template here - zuno-auth is created by gitops/charts/namespaces.
@@ -163,7 +166,7 @@ operator:
     operator:
       channel: ""
       name: rhbk-operator
-      installPlanApproval: Automatic
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
       source:
         name: ""
         namespace: openshift-marketplace

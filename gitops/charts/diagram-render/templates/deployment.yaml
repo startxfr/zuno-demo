@@ -49,11 +49,12 @@ spec:
           env:
             - name: PORT
               value: "8080"
-            - name: MCP_GATEWAY_WORKLOAD_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.gatewayToken.secretName }}
-                  key: {{ .Values.gatewayToken.secretKey }}
+            {{- /* WP-250: /render accepts only the gateway's Vault-Transit-signed call assertion. Without the key every
+                   /render call is refused (fail closed). */}}
+            {{- if .Values.callAssertion.publicKey }}
+            - name: MCP_CALL_ASSERTION_PUBLIC_KEY
+              value: {{ .Values.callAssertion.publicKey | quote }}
+            {{- end }}
           volumeMounts:
             # Chromium's own cache/user-data-dir lands under HOME=/tmp
             # (Dockerfile), and mermaid-cli writes its per-request

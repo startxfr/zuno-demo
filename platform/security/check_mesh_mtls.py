@@ -51,7 +51,7 @@ EGRESS_NAMESPACES = {"zuno-ai-run", "zuno-unifai"}
 # A namespace whose firewall is switched off on purpose, pending its rehearsal:
 # accepted only with `egress.enabled: false` AND a non-empty
 # `egress.disabledReason` in the chart's values (printed on every run).
-EGRESS_DEFERRABLE = {"zuno-unifai": "gitops/charts/unifai/values.yaml"}
+EGRESS_DEFERRABLE: dict = {}
 
 
 def egress_deferred(ns: str) -> str:

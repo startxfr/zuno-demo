@@ -2,6 +2,9 @@
 # shared with other components come from platform/python/constraints.txt.
 fastapi
 uvicorn
+# uvicorn serves the session WebSocket (/internal/worlds/{id}/stream) only with one of these installed: without it
+# the upgrade is answered 404 and no world can stream (found on the first live session, 2026-11-08).
+websockets
 pydantic
 httpx
 numpy

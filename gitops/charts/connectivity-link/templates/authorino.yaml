@@ -32,6 +32,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "30"
 spec:
+  # ADR-0614 (WP-260 P3): two Authorino pods, so the MaaS AuthPolicy keeps an
+  # answering authorizer when one pod, node or zone goes away.
+  replicas: {{ .Values.kuadrant.authorinoReplicas | default 1 }}
   listener:
     tls:
       enabled: true

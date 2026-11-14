@@ -1,7 +1,10 @@
 # zuno-unifai EgressFirewall rehearsal plan (WP-224 rollout step 6)
 
-Status: plan only. Nothing here has been run. Every cluster step needs the user's go, and the start waits for the
-end of the UnifAI canary (a9) and for the golden path and GPU window of other sessions.
+Status (2026-11-11): the rehearsal ran on 2026-11-08 and passed, see [the evidence](../roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md).
+This file is the plan it followed. What is left is the real switch in `zuno-unifai`, which needs the user's go and a
+window, and a note: the rehearsal used the UnifAI 0.1.65 images and `zuno-unifai` now runs 0.1.68 (pinned 2026-11-11), so
+the logs of the first restart after the switch are the check for a host that appeared since. Every cluster step needs the
+user's go.
 
 ## Why
 
@@ -14,9 +17,10 @@ switch, on a throwaway stack.
 
 ## Where
 
-A throwaway `UnifaiStack` in its own namespace (for example `unifai-fw-rehearsal`), with the same chart values as
-`zuno-unifai` plus `egress.enabled: true`. Not `zuno-unifai`, and not the `unifai-e2e-*` or `unifai-operator-canary`
-namespaces of a9. Ask a9 for the e2e make targets that create a stack. Delete the namespace at the end.
+A throwaway `UnifaiStack` in its own namespace (`unifai-fw-rehearsal` was used): a copy of the live stack's spec with
+`deletionPolicy: Delete` (the live one is `Retain`), placeholder Secrets, no Vault/ESO, and the EgressFirewall rendered from the
+chart and applied by hand. There is no e2e make target for this. Not `zuno-unifai`, and not the `unifai-e2e-*` or
+`unifai-operator-canary` namespaces of a9. Delete the namespace at the end.
 
 ## Hosts to test
 
@@ -36,10 +40,9 @@ namespaces of a9. Ask a9 for the e2e make targets that create a stack. Delete th
 
 ## Backup
 
-`stack.backup.enabled` is `false` in the chart. On demo333 the Application passes only `stack.enabled`, so no backup
-CronJob exists in `zuno-unifai` today. The cluster's backup bucket is `zuno-demo333-backups` (eu-central-1, endpoint
-`s3.eu-central-1.amazonaws.com`, see `ansible/clusters/demo333.yml`). The older name `zuno-demo222-backups` is the
-retired demo222 bucket. To rehearse:
+`stack.backup.enabled` is `false` in the chart. The unifai Ansible role adds `stack.backup` when it applies the Application, so the two backup CronJobs exist in
+`zuno-unifai`; check the firewall against those applied values, not the chart defaults. The live stack's backup bucket is `zuno-demo222-backups` (eu-west-2, from `zuno_postgresql_backup_s3_*`; the name is
+a leftover of demo222, the bucket is still the one in use). `zuno-demo333-backups` (eu-central-1) is the MariaDB bucket. To rehearse:
 
 1. Enable `stack.backup` on the throwaway stack with that bucket and a rehearsal prefix, and the chart's default
    credentials (`postgresql/backup-s3`).
@@ -78,3 +81,29 @@ ArgoCD recreates it.
 
 Announce the window to a9 (UnifAI) and b9 before creating the namespace. Keep the throwaway stack light (no GPU, no
 new images) so it does not collide with other heavy actions.
+
+## Result
+
+Run on 2026-11-08, see [the evidence file](../roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md).
+
+## 2026-11-12: S3 address ranges added to the backup rules
+
+The first scheduled backups under the firewall (02:00 UTC, 2026-11-12) succeeded but took 7 min 16 s (MongoDB) and 13 min (Qdrant)
+instead of 11-14 s and 27-35 s: the dump takes 1 s, the S3 upload crawled because the `dnsName` rules hold only the few S3 addresses
+they resolved out of a pool of hundreds (same finding as the world-model copy, 2026-11-08). `egress.s3CidrsByRegion` (chart `unifai`,
+eu-west-2 from syncToken 1794458826) now allows the region's published S3 ranges on 443 next to the name rules, only while
+`stack.backup.region` is set and `stack.backup.endpoint` is not. Proof: a manual backup after the sync, compared with the durations above.
+
+Result (user's go, devel 4c799be9): ArgoCD applied the rules (28 in the EgressFirewall, 14 of them S3 ranges), no pod rolled. Manual backup Jobs
+right after: MongoDB 12 s (was 7 min 16 s), Qdrant 33 s (was 13 min). Golden path 13/13, no timeout or blocked line in the multiagent logs.
+Still not hand-checked under the firewall: the ingestion of the git, web and Confluence sources.
+
+## 2026-11-12: outbound hosts probed from the live pods (read-only)
+
+HTTPS probes from the `unifai-rag-celery` and `unifai-rag-server` pods of the live `zuno-unifai`, no pod roll, no index write: `startxfr.atlassian.net`
+answers 403 (anonymous, as expected: the network path works), `github.com`, `api.github.com`, `codeload.github.com` (HEAD of the repository archive),
+`raw.githubusercontent.com`, `argo-cd.readthedocs.io` and `helm.sh` answer 200 in under a second, `docs.redhat.com` accepts TCP 443 (not fetched,
+Akamai 403), and `example.com` is unreachable ("Network is unreachable" after 24 s) with DNS still resolving. A sweep of the logs of the nine
+Deployments over the last 30 h found no refused connection, DNS, SSL or unreachable error: every hit for "timeout" is an info line carrying a
+parameter (`EmbeddingClient initialized ... timeout=60s`, `HITL gate created ... timeout=300.0s`). This proves the firewall admits what the sources
+need; it does not run an ingestion through the application (that writes to the live index and needs a test source that can be removed again).

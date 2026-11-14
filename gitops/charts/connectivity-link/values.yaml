@@ -188,7 +188,7 @@ operator:
       # suppressing the fallback to subscription.name.
       name: rhcl-operator
       channel: ""
-      installPlanApproval: Automatic  # startx chart defaults to Manual
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
       source:
         name: ""
         namespace: openshift-marketplace
@@ -248,6 +248,8 @@ project:
     requester: zuno
 
 kuadrant:
+  # ADR-0614 (WP-260 P3): Authorino pods (templates/authorino.yaml).
+  authorinoReplicas: 2
   enabled: false
   # Enables the spec.listener.tls override in templates/authorino.yaml so
   # Authorino's own listener is TLS-enabled - required for

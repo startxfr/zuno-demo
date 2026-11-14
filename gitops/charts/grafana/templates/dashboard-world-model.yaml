@@ -144,7 +144,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "max((time() - mapi_machine_created_timestamp_seconds{name=~\"zuno-gpu-world-model-a-.*\"}) / 3600)",
+              "expr": "max((time() - mapi_machine_created_timestamp_seconds{name=~\"zuno-gpu-world-model-.*\"}) / 3600)",
               "legendFormat": "hours",
               "refId": "A"
             }

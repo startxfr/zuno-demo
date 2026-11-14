@@ -398,6 +398,15 @@ def agent_chain_required_clients() -> List[str]:
     return [c.strip() for c in raw.split(",") if c.strip()]
 
 
+def client_self_name(client: str) -> str:
+    """WP-251: the name an experience client may give itself as X-Zuno-Agent without a chain:
+    its Keycloak client (`azp`), and `openclaw` for the per-assistant `openclaw-*` clients (the
+    name the metrics already carry). Such a name matches nothing in the floors, the routing
+    policy or the guardrails modes, so letting it through protects nothing and breaks nothing."""
+    client = (client or "").strip().lower()
+    return "openclaw" if client.startswith("openclaw-") else client
+
+
 def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerIdentity) -> "tuple[str, str, bool]":
     """ADR-0603 M14 (WP-225 lot C): the (agent, task) a call is made for, and
     whether it comes from a verified chain.
@@ -410,7 +419,8 @@ def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerId
     Without a verified chain the headers apply, as before, and the floor is the
     higher of the agent's and the client's. A client listed in
     AGENT_CHAIN_REQUIRE_FOR that names an agent without a valid chain gets the
-    agent header ignored (logged): only its client floor applies."""
+    agent header ignored (logged): only its client floor applies. WP-251: unless the
+    header is the client's own name (`client_self_name`), which stays as it is."""
     resolved = signed_chain.resolve(
         chain_header, agent, task, token=identity.token, audience="ai-gateway", log=logger
     )
@@ -418,6 +428,8 @@ def _agent_identity(chain_header: str, agent: str, task: str, identity: CallerId
         return resolved.agent, resolved.task, True
     required = agent_chain_required_clients()
     if (agent or "").strip() and required and client_allowed(identity.client, required):
+        if agent.strip().lower() == client_self_name(identity.client):
+            return resolved.agent, resolved.task, False
         logger.warning(
             "X-Zuno-Agent %r ignored: client %s must present a valid agent chain (AGENT_CHAIN_REQUIRE_FOR)",
             agent, identity.client,
@@ -616,6 +628,7 @@ async def chat_completions(
             candidates, classification, messages, request_id, adapter_decl,
             identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
             project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
+            include_usage=bool((payload.stream_options or {}).get("include_usage")),
         )
         if maas_adapter.quota_429_passthrough_enabled():
             # WP-157: a MaaS 429 must reach the caller as an HTTP 429, and a
@@ -1394,6 +1407,24 @@ def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[st
     ) + "\n\n"
 
 
+def _sse_usage_chunk(completion_id: str, created: int, model_name: str, prompt_tokens: int, completion_tokens: int) -> str:
+    """The OpenAI usage-only chunk (empty `choices`) sent when the request set stream_options.include_usage."""
+    return "data: " + json.dumps(
+        {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model_name,
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+    ) + "\n\n"
+
+
 async def _stream_completion(
     candidates: List[ProviderCandidate],
     classification: str,
@@ -1417,6 +1448,9 @@ async def _stream_completion(
     # which calls this endpoint non-streaming, ever drew the budget down).
     quota_class: str = "",
     max_tokens: Optional[int] = None,
+    # R-543: the caller asked for stream_options.include_usage, so the tokens this gateway read from
+    # the provider's terminal chunk are republished as the OpenAI usage-only chunk before [DONE].
+    include_usage: bool = False,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -1645,6 +1679,8 @@ async def _stream_completion(
             yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="tool_calls")
         else:
             yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="stop")
+        if include_usage:
+            yield _sse_usage_chunk(completion_id, created, effective_model_name, prompt_tokens, completion_tokens)
         yield "data: [DONE]\n\n"
         return
 

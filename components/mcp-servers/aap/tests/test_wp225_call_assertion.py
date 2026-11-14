@@ -29,7 +29,6 @@ _REPO_ROOT = _HERE.parents[4]
 sys.path.insert(0, str(_SERVER_DIR))
 # What each of the four servers needs at import time (one file for all four).
 for _name, _value in {
-    "MCP_GATEWAY_WORKLOAD_TOKEN": "test-workload-token",
     "CONFLUENCE_BASE_URL": "https://example.atlassian.net",
     "CONFLUENCE_EMAIL": "technical@example.com",
     "CONFLUENCE_API_TOKEN": "test-token",
@@ -121,10 +120,11 @@ class CallAssertionTest(unittest.TestCase):
     def test_registered_on_the_mcp_app(self):
         self.assertIn(server.CallAssertionMiddleware, [m.cls for m in server.mcp_asgi_app.user_middleware])
 
-    def test_off_by_default_a_user_bearer_passes_as_before(self):
-        status, reached = _run("Bearer some.user.jwt", _call("t"))
-        self.assertEqual(status, 200)
-        self.assertEqual(reached["body"], _call("t"), "the body reaches the app intact")
+    def test_always_required_since_wp250_a_user_bearer_is_refused(self):
+        # Lot 2 retired the optional mode and the shared workload token: the assertion is the only way in.
+        self.assertEqual(_run("Bearer some.user.jwt", _call("t"))[0], 401)
+        self.assertEqual(_run(None, _call("t"))[0], 401)
+        self.assertEqual(_run(None, _call("t"), env=ON)[0], 401)
 
     def test_a_valid_assertion_for_this_tool_is_served_and_the_body_is_replayed(self):
         status, reached = _run(_assertion("t"), _call("t"), env=REQUIRED)
@@ -247,7 +247,6 @@ class CallAssertionTest(unittest.TestCase):
         from mcp.client.streamable_http import streamable_http_client
 
         base = "http://localhost:8000"
-        gateway = {"X-Zuno-Gateway-Token": server.GATEWAY_WORKLOAD_TOKEN}
 
         async def listing(transport, headers):
             client = httpx2.AsyncClient(transport=transport, base_url=base, headers=headers)
@@ -262,9 +261,9 @@ class CallAssertionTest(unittest.TestCase):
             await lifespan.__aenter__()
             try:
                 token = "Bearer " + ca.mint(audience=AUD, sub=ca.SELF_SUBJECT, tool="", key=KEY)
-                listed = await listing(transport, {**gateway, "Authorization": token})
+                listed = await listing(transport, {"Authorization": token})
                 try:
-                    await listing(transport, gateway)
+                    await listing(transport, {})
                     refused = False
                 except BaseException:  # noqa: BLE001 - the SDK wraps the 401 in its task group
                     refused = True
@@ -272,7 +271,7 @@ class CallAssertionTest(unittest.TestCase):
             finally:
                 await lifespan.__aexit__(None, None, None)
 
-        with mock.patch.dict(os.environ, REQUIRED):
+        with mock.patch.dict(os.environ, ON):
             listed, refused = asyncio.run(scenario())
         self.assertTrue(listed, "the tools are listed with a valid assertion")
         self.assertTrue(refused, "a session without an assertion is refused when required")

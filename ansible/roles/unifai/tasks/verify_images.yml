@@ -49,6 +49,31 @@
           Pin each image by digest (repo@sha256:...) from a CI-built signed build, or switch verification off
           explicitly in ansible/clusters/<cluster>.yml with its reason.
       when: _unifai_verify.rc != 0
+    # WP-248: "copy before pin". With the signatures read from the internal registry, an image that is not there yet would be
+    # refused by the admission policy with nothing in the pin to say why. Read-only, anonymous (the repositories are public).
+    - name: "unifai | verify images | check that the images are in the internal registry"
+      ansible.builtin.command:
+        argv: >-
+          {{ ['python3', zuno_repo_root ~ '/platform/supply-chain/check_unifai_in_registry.py',
+              '--prefix', zuno_unifai_signature_mirror_host ~ '/zuno', '--refs-json', _unifai_refs_file.path] }}
+      register: _unifai_in_registry
+      changed_when: false
+      failed_when: false
+      when: (zuno_unifai_signature_mirror_host | default('')) | length > 0
+    - name: "unifai | verify images | refuse to go on with an image that is not in the internal registry"
+      ansible.builtin.fail:
+        msg: >-
+          The {{ _unifai_verify_scope }} images are not all in the internal registry {{ zuno_unifai_signature_mirror_host }}, nothing was
+          applied: the admission policies read the signatures there, so the pods would be refused.
+          {% for r in ((_unifai_in_registry.stdout | default('{}') | from_json).results | default([])) if not r.ok %}
+          {{ r.reference }}: {{ r.reason | truncate(300) }}
+          {% endfor %}
+          {{ (_unifai_in_registry.stdout | default('{}') | from_json).error | default('') }}
+          Copy the release first: python3 platform/supply-chain/mirror_unifai_images.py --to {{ zuno_unifai_signature_mirror_host }}/zuno --version <x.y.z>
+          (the push robot's DOCKER_CONFIG, QUAY_API_TOKEN to make the repositories public).
+      when:
+        - _unifai_in_registry is not skipped
+        - _unifai_in_registry.rc != 0
   always:
     - name: "unifai | verify images | remove the references file"
       ansible.builtin.file:

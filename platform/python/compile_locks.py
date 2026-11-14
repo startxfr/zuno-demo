@@ -48,12 +48,20 @@ LOCK_GLOBS = (
     "components/*/requirements.in",
     "components/*/*/requirements.in",
     "evaluations/*/requirements.in",
+    # ADR-0603 M20: the pinned tools a Dockerfile installs outside its component lock (pip, setuptools, wheel,
+    # PyYAML). check_python_locks.py also checks that no Dockerfile installs them any other way.
+    "platform/python/bootstrap/*/requirements.in",
 )
 
 # Locks that are a separate tool environment, never installed beside a
 # component: compiled without the shared constraints, and left out of the
 # one-version-per-library check (check_python_locks.py), each with its reason.
 SEPARATE_ENVIRONMENTS = {
+    "platform/python/bootstrap/tools": (
+        "the installer itself, upgraded before each component lock is installed; a component lock may pin its own "
+        "setuptools, which then replaces this one"
+    ),
+    "platform/python/bootstrap/pip": "the installer itself, upgraded before the mlops lock is installed",
     "components/mlops/tooling": (
         "the local pipeline compiler of ansible/roles/mlops (kfp), installed on the control host only; "
         "kfp 2.x requires kubernetes<31 while the components run kubernetes 35"

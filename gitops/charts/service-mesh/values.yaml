@@ -31,7 +31,7 @@ istioVersion: v1.30.3
 meshNamespace: zuno-mesh
 
 # Thin wrapper around the startx `cluster-istio` chart (vendored as a Helm
-# dependency, resolved via the "alias:startx" Helm repo) - but only for its
+# dependency, from the startx Helm repo over HTTPS) - but only for its
 # generic operator subchart (operatorIstio), which renders nothing more than
 # a Subscription driven entirely by these values. cluster-istio's own
 # top-level templates (serviceMeshControlPlane.yaml/serviceMeshMember.yaml)
@@ -71,9 +71,9 @@ cluster-istio:
         csv: servicemeshoperator3
         # Deviates from the startx chart's own default (Manual): this repo
         # has no ansible InstallPlan-approval step, so every other
-        # alias:startx-wrapped operator here (see cert-manager/values.yaml)
+        # startx-wrapped operator here (see cert-manager/values.yaml)
         # uses Automatic instead.
-        installPlanApproval: Automatic
+        installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
         # Overrides the vendored chart's own default (config.infra: true,
         # which pins the operator pod to infra nodes via a
         # nodeSelector/toleration) - not wanted for this component.
@@ -104,6 +104,10 @@ cluster-istio:
 # `resources`/`nodeSelector` or a future chart version.
 cert-manager-istio-csr:
   replicaCount: 2
+  # WP-248 family (d): pinned by digest (index of v0.16.0) so the internal registry can serve it (an ImageDigestMirrorSet only
+  # redirects digest pulls). Changing it rolls the two istio-csr pods.
+  image:
+    digest: sha256:b62b26e10339803cc0e3643ec90dc2ceaf6eb43b29bf0cadda71a9912a3e6d72
   app:
     certmanager:
       # Namespace istio-csr creates its own CertificateRequests in - must be

@@ -14,6 +14,10 @@
 #                /en/documentation/ forms, with or without a trailing slash or `index`.
 #   granularity  book (one html-single book), product (a product crawled from its root, where the
 #                answering page is not pinned) or page (one Confluence page)
+#   expect_git   path fragments of the pages of the git sources (OpenShift 4.22, blob URLs of openshift/openshift-docs)
+#                that answer it, matched against results of type GIT when the retriever also searches GIT
+#                (fork/ci/rag_eval.py --merge-types WEB,GIT). Taken from the enterprise-4.22 tree, not from a live
+#                result; left out where the git sources hold nothing (OpenShift AI, Argo CD, Satellite, Confluence).
 #   expect_none  true: nothing in the corpus answers it; a good retriever returns no result above
 #                the relevance threshold (used to calibrate it)
 #
@@ -37,54 +41,67 @@
   expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization,
            openshift_container_platform/4.22/html-single/building_applications]
   granularity: book
+  expect_git: [applications/projects/working-with-projects.adoc]
 - id: 2
   query: How do I connect OpenShift to Keycloak so users log in with their company account?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization]
   granularity: book
+  expect_git: [authentication/external-auth.adoc,
+              authentication/identity_providers/configuring-oidc-identity-provider.adoc]
 - id: 3
   query: How can I give a colleague admin rights on just one project?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization]
   granularity: book
+  expect_git: [authentication/using-rbac.adoc,
+              applications/projects/working-with-projects.adoc]
 - id: 4
   query: How do I ask for persistent storage for my pod?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/storage]
   granularity: book
+  expect_git: [storage/understanding-persistent-storage.adoc]
 - id: 5
   query: How do I expose the internal image registry outside the cluster?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/registry]
   granularity: book
+  expect_git: [registry/securing-exposing-registry.adoc]
 - id: 6
   query: What is an update channel and which one should I pick to upgrade my cluster?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/updating_clusters]
   granularity: book
+  expect_git: [updating/understanding_updates/understanding-update-channels-release.adoc]
 - id: 7
   query: How do I back up etcd before a risky change?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/backup_and_restore]
   granularity: book
+  expect_git: [backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc,
+              etcd/etcd-backup-restore/etcd-backup.adoc]
 - id: 8
   query: How do I block traffic between two namespaces?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/network_security]
   granularity: book
+  expect_git: [networking/network_security/network_policy/about-network-policy.adoc,
+              networking/network_security/network_policy/creating-network-policy.adoc]
 - id: 9
   query: How do I add more worker nodes automatically when the cluster is full?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/machine_management]
   granularity: book
+  expect_git: [machine_management/applying-autoscaling.adoc]
 - id: 10
   query: How do I keep normal pods off a node reserved for databases?
   sourceType: WEB
@@ -92,30 +109,43 @@
   # taints and tolerations, node selectors
   expect: [openshift_container_platform/4.22/html-single/nodes]
   granularity: book
+  expect_git: [nodes/scheduling/nodes-scheduler-taints-tolerations.adoc]
 - id: 11
   query: How do I forward application logs to an external Splunk?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/logging]
   granularity: book
+  expect_git: [observability/logging/log_collection_forwarding/configuring-log-forwarding.adoc,
+              observability/logging/log_collection_forwarding/log-forwarding.adoc,
+              observability/logging/logging-6.0/log6x-clf.adoc,
+              observability/logging/logging-6.1/log6x-clf-6.1.adoc,
+              observability/logging/logging-6.2/log6x-clf-6.2.adoc]
 - id: 12
   query: How do I create an alert on my own application's metrics?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/monitoring]
   granularity: book
+  expect_git: [observability/monitoring/managing-alerts/managing-alerts-as-a-developer.adoc,
+              observability/monitoring/managing-alerts/managing-alerts-as-an-administrator.adoc]
 - id: 13
   query: How do I mirror the release images to install a cluster with no internet access?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/disconnected_environments]
   granularity: book
+  expect_git: [disconnected/about-installing-oc-mirror-v2.adoc,
+              disconnected/installing-mirroring-disconnected.adoc,
+              disconnected/installing-mirroring-installation-images.adoc]
 - id: 14
   query: How do I create a Windows virtual machine on OpenShift?
   sourceType: WEB
   tags: knowledge.tech
   expect: [openshift_container_platform/4.22/html-single/virtualization]
   granularity: book
+  expect_git: [virt/creating_vm/virt-creating-vms-from-templates.adoc,
+              virt/managing_vms/virt-install-virtio-drivers-on-windows-vms.adoc]
 - id: 15
   query: How do I serve a large language model with OpenShift AI?
   sourceType: WEB
@@ -181,6 +211,7 @@
   pair: 4
   expect: [openshift_container_platform/4.22/html-single/storage]
   granularity: book
+  expect_git: [storage/understanding-persistent-storage.adoc]
 - id: 26
   query: Comment exposer le registre d'images interne en dehors du cluster ?
   sourceType: WEB
@@ -189,6 +220,7 @@
   pair: 5
   expect: [openshift_container_platform/4.22/html-single/registry]
   granularity: book
+  expect_git: [registry/securing-exposing-registry.adoc]
 - id: 27
   query: Qu'est-ce qu'un canal de mise à jour et lequel choisir pour mettre à niveau mon cluster ?
   sourceType: WEB
@@ -197,6 +229,7 @@
   pair: 6
   expect: [openshift_container_platform/4.22/html-single/updating_clusters]
   granularity: book
+  expect_git: [updating/understanding_updates/understanding-update-channels-release.adoc]
 - id: 28
   query: Comment sauvegarder etcd avant un changement risqué ?
   sourceType: WEB
@@ -205,6 +238,8 @@
   pair: 7
   expect: [openshift_container_platform/4.22/html-single/backup_and_restore]
   granularity: book
+  expect_git: [backup_and_restore/control_plane_backup_and_restore/backing-up-etcd.adoc,
+              etcd/etcd-backup-restore/etcd-backup.adoc]
 - id: 29
   query: Comment bloquer le trafic entre deux namespaces ?
   sourceType: WEB
@@ -213,6 +248,8 @@
   pair: 8
   expect: [openshift_container_platform/4.22/html-single/network_security]
   granularity: book
+  expect_git: [networking/network_security/network_policy/about-network-policy.adoc,
+              networking/network_security/network_policy/creating-network-policy.adoc]
 - id: 30
   query: Comment copier les images de release pour installer un cluster sans accès à internet ?
   sourceType: WEB
@@ -221,6 +258,9 @@
   pair: 13
   expect: [openshift_container_platform/4.22/html-single/disconnected_environments]
   granularity: book
+  expect_git: [disconnected/about-installing-oc-mirror-v2.adoc,
+              disconnected/installing-mirroring-disconnected.adoc,
+              disconnected/installing-mirroring-installation-images.adoc]
 - id: 31
   query: Comment enregistrer un serveur RHEL auprès de Satellite ?
   sourceType: WEB

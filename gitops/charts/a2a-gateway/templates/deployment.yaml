@@ -28,6 +28,9 @@ spec:
         {{- if .Values.okf.fetch.enabled }}
         # ADR-0580: a promoted release changes this, which rolls the pods.
         zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+        {{- with .Values.okf.fetch.mirror.prefix }}
+        zuno.startx.fr/okf-mirror: {{ . | quote }}
+        {{- end }}
         {{- end }}
         {{- with $digestAnnotations }}
         {{- . | nindent 8 }}
@@ -36,7 +39,8 @@ spec:
     spec:
       serviceAccountName: a2a-gateway
       priorityClassName: zuno-workload-default
-      automountServiceAccountToken: false
+      # WP-247 lot 2: the Transit signer authenticates to Vault with this token.
+      automountServiceAccountToken: {{ and .Values.agentChain.sign (eq .Values.agentChain.signer "transit") }}
       {{- if .Values.topologySpreadConstraints.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
@@ -60,22 +64,58 @@ spec:
         - name: okf-fetch
           image: {{ include "a2a-gateway.imageRef" .Values.okf.fetch.image | quote }}
           imagePullPolicy: {{ include "a2a-gateway.imagePullPolicy" .Values.okf.fetch.image }}
+          # Each attempt is cut after 150 s and retried (4 attempts, new connection each time): the
+          # egress firewall's dnsName rule for quay.io lets only some of its addresses through, and an
+          # `oras` call on a blocked one never returns (seen on demo333, 2026-11-09). Verification is
+          # unchanged: any failure of the last attempt still keeps the pod in Init (fail closed).
           command:
-            - python3
-            - /app/platform/supply-chain/admit_okf_bundle.py
-            - extract
-            - {{ .Values.okf.fetch.corpReference | quote }}
-            - --out
-            - /okf
+            - sh
+            - -c
+            - |
+              if [ -n "$OKF_MIRROR_REFERENCE" ]; then
+                for i in 1 2; do
+                  timeout 60 python3 /app/platform/supply-chain/admit_okf_bundle.py extract "$OKF_MIRROR_REFERENCE" --mirror "$OKF_MIRROR_PREFIX" $OKF_MIRROR_FLAGS --out /okf && exit 0
+                  echo "okf-fetch: mirror attempt $i failed or timed out" >&2
+                  sleep 2
+                done
+                echo "okf-fetch: falling back to the source registry" >&2
+                find /okf -mindepth 1 -delete
+              fi
+              for i in 1 2 3 4; do
+                timeout 150 python3 /app/platform/supply-chain/admit_okf_bundle.py extract "$OKF_REFERENCE" --out /okf && exit 0
+                echo "okf-fetch attempt $i failed or timed out" >&2
+                sleep 5
+              done
+              exit 1
           env:
+            - name: OKF_REFERENCE
+              value: {{ .Values.okf.fetch.corpReference | quote }}
+            {{- with .Values.okf.fetch.mirror.prefix }}
+            {{- $corp := $.Values.okf.fetch.corpReference }}
+            - name: OKF_MIRROR_PREFIX
+              value: {{ . | quote }}
+            - name: OKF_MIRROR_REFERENCE
+              value: {{ printf "%s/%s@%s" (trimSuffix "/" .) (base (first (splitList "@" $corp))) (last (splitList "@" $corp)) | quote }}
+            - name: OKF_MIRROR_FLAGS
+              value: {{ ternary "--plain-http" "" $.Values.okf.fetch.mirror.plainHttp | quote }}
+            {{- end }}
             - name: HOME
               value: /tmp
+            {{- if .Values.okf.fetch.mirror.pullSecret }}
+            - name: DOCKER_CONFIG
+              value: /quay-pull
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
             readOnlyRootFilesystem: true
           volumeMounts:
+            {{- if .Values.okf.fetch.mirror.pullSecret }}
+            - name: quay-pull
+              mountPath: /quay-pull
+              readOnly: true
+            {{- end }}
             - name: okf
               mountPath: /okf
             - name: okf-tmp
@@ -116,8 +156,21 @@ spec:
               value: {{ .Values.toolsEnabled | quote }}
             {{- if .Values.agentChain.sign }}
             # WP-225 lot C: the signing key of X-Zuno-Agent-Chain (externalsecret-agent-chain.yaml).
+            {{- if eq .Values.agentChain.signer "transit" }}
+            - name: AGENT_CHAIN_SIGNER
+              value: transit
+            - name: VAULT_ADDR
+              value: {{ .Values.agentChain.vault.addr | quote }}
+            - name: VAULT_AUTH_ROLE
+              value: {{ .Values.agentChain.vault.authRole | quote }}
+            - name: VAULT_TRANSIT_KEY
+              value: {{ .Values.agentChain.vault.transitKey | quote }}
+            - name: VAULT_CACERT
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            {{- else }}
             - name: AGENT_CHAIN_SIGNING_KEY_FILE
               value: /var/run/zuno-agent-chain/private_key
+            {{- end }}
             {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
@@ -135,7 +188,7 @@ spec:
               mountPath: /okf
               readOnly: true
             {{- end }}
-            {{- if .Values.agentChain.sign }}
+            {{- if and .Values.agentChain.sign (eq .Values.agentChain.signer "file") }}
             - name: agent-chain-key
               mountPath: /var/run/zuno-agent-chain
               readOnly: true
@@ -157,7 +210,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if .Values.agentChain.sign }}
+        {{- if and .Values.agentChain.sign (eq .Values.agentChain.signer "file") }}
         - name: agent-chain-key
           secret:
             secretName: a2a-gateway-agent-chain
@@ -167,4 +220,9 @@ spec:
           emptyDir: {}
         - name: okf-tmp
           emptyDir: {}
+        {{- if .Values.okf.fetch.mirror.pullSecret }}
+        - name: quay-pull
+          secret:
+            secretName: {{ .Values.okf.fetch.mirror.pullSecret }}
+        {{- end }}
         {{- end }}

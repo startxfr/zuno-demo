@@ -1,6 +1,6 @@
 # ADR-0611: Mirror the admitted OKF release into the internal registry so pod start does not depend on quay.io
 
-- **Status:** Proposed
+- **Status:** Superseded in part by [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md) (2026-11-12, WP-248) - the registry (the in-cluster zot `okf-mirror`, removed on 2026-11-12 after the drill) is now the internal Quay; the admitted-release mirroring, the offline verification and the mirror-before-roll check stay in force
 - **Target:** v0.17
 - **Date:** 2026-11-09
 - **Decision owners:** Zuno Demo architecture team
@@ -29,24 +29,31 @@ On 2026-11-09 that stopped being true.
 first. `quay.io` stays only as a second source, and no CDN address range is opened.**
 
 1. **Gate on a measurement.** Before anything is built, WP-246 proves in a canary namespace (ADR-0609) that the
-   OpenShift internal registry stores these artifacts with their signatures and that `cosign` and `oras` read them back.
-   If it does not, the mirror is a small registry in `zuno-ai-build` instead, and this record is amended; the rest of
-   the decision does not change.
+   mirror stores these artifacts with their signatures and that `cosign` and `oras` read them back.
+   **Measured 2026-11-09: the OpenShift internal registry fails** (no Referrers API, the tag-schema fallback is refused,
+   `cosign verify` finds no signature; see WP-246). The mirror is therefore a small OCI registry in `zuno-ai-build`
+   (or `zuno-ai-run`). **Measured the same day on zot v2.1.22: it passes**, provided the legacy `.sig` and `.att` tags
+   are copied with the artifact; the rest of the decision does not change. Every `image-registry...:5000`
+   address in clauses 2 and 6 reads as that registry.
 2. **Mirror at admission.** `admit_okf_bundle.py` gets a `mirror` step run by `make d3 admit agents`: `oras copy -r` of
    the corp artifact, every agent artifact it lists, and their signatures and attestations, to
-   `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/okf/...`. The digest is identical to `quay.io`'s; the
-   step fails if it is not.
+   the mirror registry. The `.sig` and `.att` tags that `cosign verify` reads are copied
+   too. The digest is identical to `quay.io`'s; the step fails if it is not.
 3. **Pull from the mirror, verify as before.** `okf-fetch` tries the mirror reference, then `quay.io`, with the retry
    and timeout of commit a10c10b3 on each. Verification is unchanged: offline, by the Sigstore identity of ADR-0578,
    pinned by the digest in `platform/okf/agents.lock`. The mirror is an untrusted transport; it cannot widen what a pod
-   accepts.
+   accepts. `okf-index.json` names each agent artifact on `quay.io`, so the consumer replaces that registry prefix with
+   the mirror's; the digest, covered by the signature, is unchanged.
 4. **The lock stays the only pin.** The chart derives the mirror reference from the locked reference; no second digest is
    recorded anywhere.
 5. **Mirror before merge.** A promotion pull request cannot roll the gateways before the mirror holds its digest. The
    promotion check runs the `mirror` step, and the merge is blocked if it fails. The `quay.io` fallback covers the
    window if a pod restarts earlier anyway.
-6. **Egress.** The two gateways get a NetworkPolicy rule to the internal registry. The EgressFirewall is left as it is:
-   no Akamai or other CDN range is added.
+6. **Network.** The gateways' namespace policies are ingress-only, so the gateways need no egress rule. The mirror
+   registry gets an ingress NetworkPolicy that admits only the two gateways. It runs in the meshed `zuno-ai-run` namespace, so the mesh carries the traffic
+   over mTLS and the registry itself speaks plain HTTP (a service-CA certificate would need that CA in the init
+   container, for no gain inside the mesh). Admission writes through a port-forward, not through a route. The EgressFirewall is left as it is: no Akamai
+   or other CDN range is added.
 7. **Scope.** Only the OKF release fetched by `okf-fetch`. The bundles `unifai-operator` pulls (ADR-0564) and the
    `quay.io/zuno` runtime images (ADR-0353) are not covered; they are named here so nobody assumes otherwise.
 
@@ -81,3 +88,28 @@ firewall change. A promotion cycle is timed before and after to show the effect.
 
 [WP-246](../roadmap/work-packages/wp-246-mirror-the-okf-release-into-the-internal-registry.md) (measurement, `mirror`
 step, chart, NetworkPolicy, drill with `quay.io` blocked).
+
+## Update 2026-11-11: retention and the check before rolling
+
+Decisions of the owner. **The mirror keeps the last three releases the lock has pinned**, in the order of the git
+history of `platform/okf/agents.lock` (one commit per promoted release). `make d3 admit agents` runs `prune` after a
+successful `mirror`: it lists what no kept release names (release artifacts with their referrers, and the legacy
+`.sig` / `.att` tags of dropped artifacts) and deletes nothing unless `OKF_MIRROR_PRUNE=1`, so every deletion is a
+decision of the operator running admission from the workstation. `prune` refuses to run when the locked release is not
+on the mirror, skips a kept release the mirror never received (the mirror fills naturally at each promotion, nothing is
+back-filled), and leaves tags it does not recognise alone. Measured the same day: one release is about 100 KB of
+manifests and layers, so the 1 Gi volume holds the three releases with a large margin and is not resized.
+
+**Clause 5 holds at the roll, not at the merge.** The promotion workflow runs on GitHub and cannot reach a registry
+inside the cluster, so it cannot check the mirror. The check lives where the cluster is reachable:
+`ansible/tasks/okf_mirror_holds_lock.yml` runs in `make d2 check agents` and first in `make d2 install mcp`, which also
+installs a2a-gateway, and stops with the command that feeds the mirror when the locked digest is not on it. The
+`quay.io` fallback of clause 3 still covers a pod that restarts before the mirror is fed.
+
+## Addendum 2026-11-12 (WP-248): zot retired, Quay serves the release
+
+The gateways read the OKF release from the internal Quay (`zuno_okf_registry_mirror`), proven with quay.io unreachable for the pods
+(the `zuno-ai-run` EgressFirewall no longer allows `quay.io` and its CDN hosts; both gateways restarted and verified the bundle from Quay).
+The `okf-mirror` component (chart, Application, role, Makefile and AAP workflow entries) is removed. What stays from this record: the mirror
+holds only the admitted release with its signatures, `okf-fetch` verifies offline by digest, and `ansible/tasks/okf_mirror_holds_lock.yml`
+blocks a gateway roll when the registry lacks the locked digest. The retention and prune plan of the zot mirror was never needed and is dropped.

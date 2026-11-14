@@ -51,6 +51,9 @@
     gitops_app_extra_helm_values:
       clusterBaseDomain: "{{ cluster_base_domain }}"
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
+      # ADR-0602 clause 10 (WP-225 lot C): the Keycloak clients (azp) whose tokens are admitted; empty = every client of the
+      # realm. A trailing * is a prefix; a bare * is refused by the chart.
+      jwtAllowedClients: "{{ zuno_ai_gateway_jwt_allowed_clients | default([]) }}"
       quotaLedger:
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
       # WP-184: empty outside a shared-quota proof.
@@ -78,6 +81,9 @@
       agentChain:
         verify: "{{ zuno_ai_gateway_agent_chain_verify | default(false) | bool }}"
         publicKey: "{{ zuno_ai_gateway_agent_chain_public_key | default('') }}"
+        # WP-251: clients whose X-Zuno-Agent is ignored without a valid chain, except their own name.
+        # Empty (the default) requires it of nobody. Needs verify true.
+        requireFor: "{{ zuno_ai_gateway_agent_chain_require_for | default([]) }}"
       classification:
         floorsGenerated: "{{ zuno_ai_gateway_classification_floors_generated | default(false) | bool }}"
         defaultWhenAbsent: "{{ zuno_ai_gateway_classification_default_when_absent | default('C1') }}"

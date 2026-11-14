@@ -1,0 +1,69 @@
+{{- if .Values.registry.enabled }}
+# Quay needs pg_trgm in its database. The init script runs once when PGO creates the cluster
+# (\connect: the script starts in the postgres database).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.database.name }}-init-sql
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+data:
+  init.sql: |
+    \set ON_ERROR_STOP on
+    \connect quay
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    GRANT ALL ON SCHEMA public TO quay;
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: {{ .Values.database.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+spec:
+  postgresVersion: {{ .Values.database.postgresVersion }}
+  databaseInitSQL:
+    name: {{ .Values.database.name }}-init-sql
+    key: init.sql
+  users:
+    - name: quay
+      databases: [quay]
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.database.storage }}
+        {{- with .Values.database.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+      resources:
+        {{- toYaml .Values.database.resources | nindent 8 }}
+  backups:
+    pgbackrest:
+      # Without a manual block PGO ignores the pgbackrest-backup annotation (same trap as the shared cluster, WP-131).
+      manual:
+        repoName: repo1
+      repos:
+        - name: repo1
+          schedules:
+            full: {{ .Values.database.backupSchedules.full | quote }}
+            differential: {{ .Values.database.backupSchedules.differential | quote }}
+          volume:
+            volumeClaimSpec:
+              accessModes: [ReadWriteOnce]
+              resources:
+                requests:
+                  storage: {{ .Values.database.backupRepoStorage }}
+              {{- with .Values.database.storageClassName }}
+              storageClassName: {{ . }}
+              {{- end }}
+{{- end }}

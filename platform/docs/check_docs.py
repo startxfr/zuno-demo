@@ -55,6 +55,10 @@ from reporting):
     days later, neither recording a supersession; the coverage half found
     `arkos/structure-demo` still riding the file-order default that
     ADR-0531 decision 1 claims no task rides.
+  - doc_links: every relative link in a git-tracked markdown file resolves
+    from that file's own directory, stays inside this repository, and its
+    #anchor matches a heading of the target file (a file that moved to
+    startxfr/zuno-demo-agents is linked by its GitHub URL).
   - model_context_windows: every local provider's max_model_len (ADR-0544)
     matches gitops/charts/models/values.yaml's real maxModelLen for that
     served model, every SaaS provider omits the field, and -maas/direct
@@ -70,7 +74,9 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from typing import List
 
@@ -106,10 +112,17 @@ MAKE_COMMAND_RE = re.compile(r"\bmake[ \t]+(?:day)?(d?[0-3])[ \t]+(\S+)(?:[ \t]+
 # what happened to `make d0 reconcile openshift-ai` (a Day 0 verb applied
 # to a Day 1 component), printed by nine findings and runnable by none.
 AUTO_FIX_RE = re.compile(r"^\s*auto_fix:\s*[\"']?(.+?)[\"']?\s*$", re.MULTILINE)
-# Relative markdown links naming a 4-digit-prefixed ADR/WP file. Absolute
-# URLs and bare anchors are deliberately out of scope - this catches the
-# one mistake that actually recurs: a path correct for the wrong depth.
-DOC_LINK_RE = re.compile(r"\]\((?!https?:)([^)\s]*?\d{4}-[^)\s]*?\.md(?:#[^)\s]*)?)\)")
+# Inline markdown links `[text](target)` (the text may hold one level of
+# nested brackets, the target may be wrapped in <>) and reference
+# definitions `[label]: target`. Links with a URL scheme are out of scope:
+# a link to another repository is written as its GitHub URL.
+DOC_LINK_RE = re.compile(r"\[((?:[^\]\[]|\[[^\]]*\])*)\]\(<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\)")
+DOC_LINK_REF_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)")
+DOC_LINK_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
+# Inline code, except a code span that is the whole link text (`[`x`](y)`).
+DOC_LINK_CODE_SPAN_RE = re.compile(r"(?<!\[)`[^`\n]*`(?!\])")
+# Files whose links are placeholders by design.
+DOC_LINK_EXEMPT = {"docs/adr/TEMPLATE.md"}
 OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)\b")
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
@@ -927,36 +940,119 @@ def check_agent_status_vs_adr() -> List[Finding]:
     return findings
 
 
+def markdown_anchors(text: str) -> set:
+    """The `#fragment`s GitHub generates for a markdown file's headings.
+
+    GitHub's slug: heading text without markup, lowercased, every character
+    other than a letter, digit, space, `-` or `_` dropped, spaces turned into
+    `-`, and `-1`, `-2`... appended to repeats. Explicit `<a name|id="...">`
+    targets count too. Headings inside fenced code are not headings.
+    """
+    anchors: set = set()
+    seen: dict = {}
+    in_fence = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        heading = re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
+        if heading:
+            title = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", heading.group(1)).replace("`", "")
+            slug = re.sub(r"[^\w\- ]", "", title.strip().lower()).replace(" ", "-")
+            count = seen.get(slug, 0)
+            seen[slug] = count + 1
+            anchors.add(slug if count == 0 else f"{slug}-{count}")
+        anchors.update(re.findall(r"<a\s+(?:name|id)=\"([^\"]+)\"", line))
+    return anchors
+
+
+def doc_link_problems(path: pathlib.Path, text: str, root: pathlib.Path,
+                      anchor_cache: dict = None) -> List[tuple]:
+    """(line, target, reason) for every relative link in `text` (the content
+    of `path`) that GitHub would render broken: a missing file, a path that
+    leaves `root`, or a `#fragment` no heading of the target markdown file
+    generates. Links in fenced code and inline code are not links."""
+    anchor_cache = {} if anchor_cache is None else anchor_cache
+    problems: List[tuple] = []
+    root = root.resolve()
+    in_fence = False
+    for number, line in enumerate(text.split("\n"), 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        line = DOC_LINK_CODE_SPAN_RE.sub("", line)
+        targets = [m.group(2) for m in DOC_LINK_RE.finditer(line)]
+        ref = DOC_LINK_REF_RE.match(line)
+        if ref:
+            targets.append(ref.group(1))
+        for target in targets:
+            if DOC_LINK_SCHEME_RE.match(target):
+                continue
+            file_part, _, fragment = target.partition("#")
+            file_part = urllib.parse.unquote(file_part)
+            if not file_part:
+                resolved = path.resolve()
+            elif file_part.startswith("/"):
+                resolved = (root / file_part.lstrip("/")).resolve()
+            else:
+                resolved = (path.parent / file_part).resolve()
+            if resolved != root and root not in resolved.parents:
+                problems.append((number, target, "points outside this repository; link to the "
+                                 "other repository's GitHub URL instead"))
+                continue
+            if not resolved.exists():
+                problems.append((number, target, "does not resolve from that file's own directory"))
+                continue
+            fragment = urllib.parse.unquote(fragment).lower()
+            if (fragment and resolved.suffix == ".md" and resolved.is_file()
+                    and not re.fullmatch(r"l\d+(-l\d+)?", fragment)):
+                if resolved not in anchor_cache:
+                    anchor_cache[resolved] = markdown_anchors(resolved.read_text(encoding="utf-8"))
+                if fragment not in anchor_cache[resolved]:
+                    problems.append((number, target, f"has no heading that generates '#{fragment}'"))
+    return problems
+
+
+def _tracked_markdown() -> List[pathlib.Path]:
+    try:
+        out = subprocess.run(["git", "-C", str(REPO_ROOT), "ls-files", "-z", "*.md"],
+                             capture_output=True, text=True, check=True).stdout
+        return [REPO_ROOT / rel for rel in sorted(out.split("\0")) if rel]
+    except (OSError, subprocess.CalledProcessError):
+        # No git (a source tarball): the directories the check covered first.
+        return sorted({p for d in (WP_DIR, ADR_DIR, REPO_ROOT / "docs" / "roadmap")
+                       for p in d.glob("*.md")})
+
+
 def check_doc_links() -> List[Finding]:
-    """Every relative markdown link to an ADR resolves from the file that
-    writes it.
+    """Every relative markdown link, and its #anchor, resolves from the file
+    that writes it, in every git-tracked markdown file.
 
     Work-package briefs live two directories below `docs/adr/`, so a link
     written as `](0309-....md)` - the shape that is correct inside an ADR
-    body - silently points at a sibling that does not exist. Nothing
-    rendered these as errors, so 15 of them across 11 briefs survived at
-    HEAD until a 2026-09-03 audit. Cheap to assert, and the failure mode
-    is invisible in review: the link text reads correctly either way.
+    body - silently points at a sibling that does not exist: 15 across 11
+    briefs survived until a 2026-09-03 audit, which made this check. It
+    then covered only 4-digit ADR names in three directories, and a
+    2026-11-12 audit found 18 more it could not see: the agent pages and the
+    access matrix still linking `agents/` and `policies/` files that moved
+    to startxfr/zuno-demo-agents (ADR-0576), `README.md#standard-clauses`
+    one directory too shallow, a WP brief named after a memory note, and an
+    anchor to a heading ADR-0212 does not have. The link text reads
+    correctly in every one of these cases, so review cannot catch them.
     """
     findings: List[Finding] = []
-    roots = [WP_DIR, ADR_DIR, REPO_ROOT / "docs" / "roadmap"]
-    seen = set()
-
-    for root in roots:
-        for path in sorted(root.glob("*.md")):
-            if path in seen:
-                continue
-            seen.add(path)
-            for link in DOC_LINK_RE.findall(path.read_text(encoding="utf-8")):
-                target = link.split("#", 1)[0]
-                if not target:
-                    continue
-                if not (path.parent / target).resolve().is_file():
-                    findings.append(Finding(
-                        "doc_links",
-                        f"{path.relative_to(REPO_ROOT)} links to '{target}', which does not "
-                        f"resolve from that file's own directory.",
-                    ))
+    anchor_cache: dict = {}
+    for path in _tracked_markdown():
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if rel in DOC_LINK_EXEMPT or not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for number, target, reason in doc_link_problems(path, text, REPO_ROOT, anchor_cache):
+            findings.append(Finding("doc_links", f"{rel}:{number} links to '{target}', which {reason}."))
     return findings
 
 
@@ -1446,6 +1542,58 @@ def check_confidential_var_loaders() -> List[Finding]:
     return findings
 
 
+_BLOCK_SCALAR_KEY = re.compile(r"^(\s*)(-\s+)?[^#\s][^#]*?:\s*[>|][-+0-9]*\s*(#.*)?$")
+_JINJA_EXPR = re.compile(r"\{\{.*?\}\}", re.S)
+
+
+def jinja_newline_findings(rel: str, text: str) -> List[Finding]:
+    """`\n` written inside `{{ }}` in a YAML block scalar (`>`, `>-`, `|`, `|-`).
+
+    A block scalar does no escape processing, and on ansible-core 2.19 a `{{ }}`
+    expression then keeps "\n" as the two characters backslash + n (inside
+    `{% %}` statements it does become a newline). On 2026-11-08 this glued two
+    PEM certificates into one bad `user-ca-bundle` (openshift_oauth, WP-211) and
+    degraded the machine-config and network clusteroperators; WP-129 had hit the
+    same trap in a CA-bundle merge. The fix is a variable set from a
+    double-quoted YAML scalar, which YAML turns into a real newline.
+    """
+    findings: List[Finding] = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        m = _BLOCK_SCALAR_KEY.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        key_col = len(m.group(1)) + (len(m.group(2)) if m.group(2) else 0)
+        start = i + 1
+        j = start
+        while j < len(lines) and (not lines[j].strip()
+                                  or len(lines[j]) - len(lines[j].lstrip()) > key_col):
+            j += 1
+        block = "\n".join(lines[start:j])
+        for expr in _JINJA_EXPR.finditer(block):
+            for esc in re.finditer(r"\\n", expr.group(0)):
+                line_no = start + 1 + block.count("\n", 0, expr.start() + esc.start())
+                findings.append(Finding(
+                    "jinja_newline",
+                    f"{rel}:{line_no}: \\n inside {{{{ }}}} in a YAML block scalar stays the two "
+                    "characters backslash + n (ansible-core 2.19); use a variable set from a "
+                    "double-quoted scalar instead (`nl: \"\\n\"`, see "
+                    "ansible/roles/openshift_oauth/tasks/install.yml)"))
+        i = max(j, i + 1)
+    return findings
+
+
+def check_jinja_newline_in_block_scalars() -> List[Finding]:
+    """Every Ansible YAML file, checked with jinja_newline_findings()."""
+    findings: List[Finding] = []
+    root = REPO_ROOT / "ansible"
+    for path in sorted(list(root.rglob("*.yml")) + list(root.rglob("*.yaml"))):
+        findings += jinja_newline_findings(str(path.relative_to(REPO_ROOT)), path.read_text(errors="ignore"))
+    return findings
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1461,6 +1609,7 @@ def main() -> int:
         + check_debug_make_commands()
         + check_gitops_values_clobber()
         + check_confidential_var_loaders()
+        + check_jinja_newline_in_block_scalars()
         + check_version_consistency(profile)
         + check_model_roles()
         + check_doc_links()
@@ -1475,10 +1624,11 @@ def main() -> int:
           "consistency, Makefile component lists against aap-config's AAP "
           "workflow DAGs, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           "roles reading ansible/confidential.yml variables without loading the file, "
+          "\\n escapes inside {{ }} in YAML block scalars of ansible/, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
           "model architectural roles against provider-routing.yaml/"
-          "model-routing-policy.yaml, relative ADR links in ADR/roadmap/"
-          "work-package markdown, and model context windows against "
+          "model-routing-policy.yaml, relative links and #anchors in every "
+          "tracked markdown file, and model context windows against "
           "gitops/charts/models/values.yaml.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")

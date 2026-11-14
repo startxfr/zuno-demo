@@ -1,6 +1,6 @@
 # WP-234: World-model web, API and UI (delivers ADR-0604 D4, D7, D8)
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-09) - what remains (teardown, signed-in rehearsal) is carried by WP-237
 - **ADRs:** ADR-0604
 - **Depends on:** WP-231, WP-233
 - **Blocks:** WP-235

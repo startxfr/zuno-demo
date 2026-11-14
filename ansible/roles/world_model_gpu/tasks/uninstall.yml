@@ -39,7 +39,7 @@
     kind: Machine
     namespace: openshift-machine-api
     label_selectors:
-      - "machine.openshift.io/cluster-api-machineset={{ world_model_gpu_machineset }}"
+      - "machine.openshift.io/cluster-api-machineset in ({{ world_model_gpu_machinesets | join(',') }})"
   register: _world_model_gpu_machines
   until: (_world_model_gpu_machines.resources | default([])) | length == 0
   retries: 40

@@ -34,7 +34,7 @@ are the AAP-side token and the agent OKF declarations.
 | `AAP_API_TOKEN` | ExternalSecret from Vault `zuno/aap/mcp-token` | The least-privilege `zuno-mcp` user's token. Never `zuno/aap/admin`, never WP-073's `zuno/aap/controller-token` (that one is admin). |
 | `AAP_BASE_URL` | same secret, key `url` | The AAP **Gateway** Service, `http://aap.zuno-aap.svc`. Never `aap-controller-service`: on AAP 2.5+ it answers 401 to a gateway-minted token. |
 | `AAP_CONTROLLER_UI_URL` | chart value `clusterBaseDomain` (`https://aap.<domain>`) | The Gateway's public Route - deliberately separate from `AAP_BASE_URL` above, which is internal-only and meaningless in a browser. Empty means no `url` field is surfaced, never a guessed hostname. |
-| `MCP_GATEWAY_WORKLOAD_TOKEN` | `mcp-gateway-workload-token` Secret | ADR-0037. |
+| `MCP_CALL_ASSERTION_PUBLIC_KEY` | chart value `callAssertion.publicKey` | WP-250: the PUBLIC half of the Vault Transit key; every `/mcp` call needs the gateway's signed assertion (the shared workload token is retired, lot 3 removes its Secret). |
 | `AAP_HTTP_TIMEOUT_SECONDS` | default `20` | Per-request timeout. |
 
 The credential is minted by the Day 1 `aap_config` role, not the `vault`

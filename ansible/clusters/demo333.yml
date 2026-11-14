@@ -29,6 +29,8 @@ zuno_mlflow_artifacts_s3_prefix: "mlflow-artifacts"
 zuno_mlops_s3_bucket: "zuno-demo333-mlops"
 zuno_mlops_s3_region: "eu-central-1"
 zuno_mlops_style_corpus_s3_uri: "s3://zuno-demo-sources/training-corpus/qwen-wesh-training-corpus.tgz"
+zuno_quay_s3_bucket: "zuno-demo333-registry"
+zuno_quay_s3_region: "eu-central-1"
 zuno_mariadb_backup_s3_bucket: "zuno-demo333-backups"
 zuno_mariadb_backup_s3_prefix: "mariadb"
 zuno_mariadb_backup_s3_endpoint: "s3.eu-central-1.amazonaws.com"
@@ -46,7 +48,17 @@ zuno_build_git_ref: "devel"
 # Turning it on starts billing a GPU instance: enable it ~40 minutes before
 # use and back to false (then `make d2 uninstall world-model` and
 # `make d0 uninstall world-model-gpu`) right after. An alert fires after 8 h.
+# TRUE since 2026-11-08 for the 2026-11-09 demo (node and app installed and the preflight
+# green on 2026-11-08): with false, any `make d2 install all` converges the app away.
+# Set it back to false right after the demo, then uninstall as above.
 zuno_world_model_enabled: false
+# g7e.4xlarge had no capacity in eu-central-1a on 2026-11-07 (InsufficientInstanceCapacity, the machine controller retried
+# ~2900 times); eu-central-1b gave the node in minutes. Both zones offer g7e for this account.
+# 2026-11-10: no g7e.4xlarge capacity in a or b for hours, so both zones are searched (one MachineSet each; zone c does not offer the type);
+# keep only the zone that got the node: `oc scale machineset zuno-gpu-world-model-<z> -n openshift-machine-api --replicas=0`.
+zuno_world_model_gpu_azs: ["a", "b"]
+# Same GPU, other host sizes (another capacity pool): g7e.4xlarge, g7e.2xlarge and g7e.8xlarge in zones a and b, searched together.
+zuno_world_model_gpu_sets: [zuno-gpu-world-model-a, zuno-gpu-world-model-b, zuno-gpu-world-model-2xl-a, zuno-gpu-world-model-2xl-b, zuno-gpu-world-model-8xl-a, zuno-gpu-world-model-8xl-b]
 
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
@@ -206,6 +218,143 @@ zuno_unifai_values:
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/processus-renouvellement.html
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/qualification-opportunite.html
           - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/reponses-objections.html
+  # R-530 (2026-11-08): public git documentation sources, tag knowledge.tech, read from the repository archive.
+  - name: ocp-4-22-docs
+    type: git
+    visibility: public
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:openshift
+    git:
+      url: https://github.com/openshift/openshift-docs
+      ref: enterprise-4.22
+      maxFiles: 3000
+      metadata:
+        product: OpenShift Container Platform
+        version: '4.22'
+        language: en
+      attributeFiles:
+      - _attributes/common-attributes.adoc
+      attributes:
+        openshift-enterprise: ''
+        product-title: OpenShift Container Platform
+        product-version: '4.22'
+      paths:
+      - welcome
+      - release_notes
+      - tutorials
+      - architecture
+      - disconnected
+      - installing
+      - post_installation_configuration
+      - updating
+      - support
+      - web_console
+      - cli_reference
+      - security
+      - authentication
+      - networking
+      - storage
+      - registry
+      - operators
+      - extensions
+      - cicd
+      - openshift_images
+      - applications
+      - serverless
+      - machine_configuration
+      - machine_management
+      - etcd
+      - hosted_control_planes
+      - vcp
+      - nodes
+      - windows_containers
+      - sandboxed_containers
+      - observability
+      - scalability_and_performance
+      - ai_workloads
+      - edge_computing
+      - hardware_enablement
+      - hardware_accelerators
+      - backup_and_restore
+      - migrating_from_ocp_3_to_4
+      - lightspeed
+      - service_mesh
+      - virt
+      - ai_applications
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
+  - name: rhacm-2-17-docs
+    type: git
+    # stolostron/rhacm-docs has no LICENSE file: not shared until that is clarified (user decision 2026-11-09).
+    visibility: private
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:rhacm
+    git:
+      url: https://github.com/stolostron/rhacm-docs
+      ref: 2.17_prod
+      metadata:
+        product: Red Hat Advanced Cluster Management
+        version: '2.17'
+        language: en
+      attributeFiles:
+      - modules/common-attributes.adoc
+      paths:
+      - about
+      - add-ons
+      - applications
+      - business_continuity
+      - clusters
+      - console
+      - get_started
+      - gitops
+      - global_hub
+      - governance
+      - health_metrics
+      - mce_acm_integration
+      - mce_release_notes
+      - mce_troubleshooting
+      - mcp
+      - networking
+      - observability
+      - release_notes
+      - search
+      - secure_clusters
+      - troubleshooting
+      - virtualization
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
+  - name: rhoai-odh-3-3-docs
+    type: git
+    visibility: public
+    classification: C1
+    tags:
+    - knowledge.tech
+    - product:openshift-ai
+    git:
+      url: https://github.com/opendatahub-io/opendatahub-documentation
+      ref: main
+      metadata:
+        product: Red Hat OpenShift AI Self-Managed (from the Open Data Hub docs)
+        version: 3.x (main, March 2026)
+        language: en
+      attributes:
+        upstream!: ''
+        self-managed: ''
+      include:
+      - '*.adoc'
+      exclude:
+      - modules/*
+      - assemblies/*
+      - examples/*
+      - scripts/*
+      - _artifacts/*
+      - README.adoc
+    syncInterval: 168h
+    resyncToken: git-2026-11-08-1
   retrievers:
   - config:
       # WEB too: the sales-demo source (knowledge.sales) is a web source.
@@ -219,8 +368,10 @@ zuno_unifai_values:
     teamRef: agent-comage
   - config:
       forward_user_token: true
+      # GIT too (R-530, 2026-11-08): the OpenShift, RHACM and RHOAI/ODH documentation read from git (tag knowledge.tech).
       extra_source_types:
       - WEB
+      - GIT
       source_type: CONFLUENCE
       threshold: 0.3
       # 10, not 5 (2026-10-25): the Red Hat corpus repeats each page across
@@ -252,11 +403,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:25cf3c6d65c8e4e774b60897020bc51da241df93f41a9f4b981b959be1a12650  # v0.1.64
-      identity: quay.io/zuno/unifai-identity@sha256:6b6bf1070d35a7b05378d3f2d301b14d218925fc540a7f9dd2decb6797c80397  # v0.1.64
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:adb05e40c6d7bdba910735655726a51678cf9c37f9f3defbc31b368d3c75439d  # v0.1.64
-      rag: quay.io/zuno/unifai-rag@sha256:81a2539506f02b53924e473bcc4b56efe9d2458568494ac4fcee6568e904b85d  # v0.1.64
-      ui: quay.io/zuno/unifai-ui@sha256:b06a5da46c1c817f47e99c43a2ad9c3031069937b24534212c813f26cfb4e768  # v0.1.64
+      backend: quay.io/zuno/unifai-backend@sha256:accc1561f3cbabed2294859c3ddaee80462c1e484b2a6e87ef9260895b06ae86  # v0.1.69
+      identity: quay.io/zuno/unifai-identity@sha256:0ee33573429a1a0bbd75499f4a508772adb1a2987aeb663973e10c447839195f  # v0.1.69
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:d31e160d12a2f02594b5a913cc560b5c56e638b83d6db8592a06ce70c10b2b64  # v0.1.69
+      rag: quay.io/zuno/unifai-rag@sha256:e310b780cdd7ce5a2ffdfbbba1518309a39b28e2b79e49b142ce3c4b22ddb126  # v0.1.69
+      ui: quay.io/zuno/unifai-ui@sha256:0be43d74b87e0e6fa2a971ba2d8b86eabe172479b74b40815f766383df0e64e0  # v0.1.69
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -338,6 +489,20 @@ zuno_ai_gateway_workstation_entry: true
 # `evaluation` class from their group. User-facing clients are never listed.
 zuno_ai_gateway_trusted_platform_clients:
   - zuno-stresstest
+# ADR-0602 clause 10 (WP-225 lot C, user go 2026-11-11): only the Keycloak clients that carry the zuno-admin-api audience
+# (read from the live realm on 2026-11-11: 10 clients) may call the ai-gateway. A forgotten client gets a 401: empty
+# this list and re-run `make d2 install llm` to go back to "any client of the realm".
+zuno_ai_gateway_jwt_allowed_clients:
+  - unifai
+  - open-webui
+  - dify
+  - kagent
+  - world-model
+  - blender
+  - openclaw-*
+  - zuno-evaluations
+  - zuno-stresstest
+  - zuno-admin-api
 # ADR-0591 (WP-188, user go 2026-11-02): skip local models whose
 # LLMInferenceService is not Ready, and providers that just failed, instead of
 # waiting 180 s per *-maas candidate (GPU nodes down that day). Needs
@@ -396,7 +561,31 @@ zuno_drift_strict: true
 # WP-225 lot C, rollout step 2 (user's go 2026-11-07): the ai-gateway verifies the a2a-gateway's
 # signed agent chain. The public half of Vault a2a/agent-chain; a chain-less call keeps today's behaviour.
 zuno_ai_gateway_agent_chain_verify: true
+# WP-247 lot 2: the public half of the Vault Transit key agent-chain (the private half never leaves Vault).
 zuno_ai_gateway_agent_chain_public_key: |
   -----BEGIN PUBLIC KEY-----
-  MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+  MCowBQYDK2VwAyEAT/I4wgI087mkIC5Pl4R2a5wOVQN9VlrJQ+E/B6fWYz8=
   -----END PUBLIC KEY-----
+# WP-251 (user's go 2026-11-12): these experience clients may not claim another agent (tekos, arkos...) without a
+# valid agent chain; naming themselves is still allowed. unifai and zuno-evaluations stay unlisted (see the WP).
+zuno_ai_gateway_agent_chain_require_for:
+  - dify
+  - kagent
+  - open-webui
+  - "openclaw-*"
+  - blender
+  - world-model
+# ADR-0612 (WP-248 family a): the gateways' okf-fetch reads the admitted OKF release from the internal Quay, through its route
+# (the Service certificate does not cover the Service name), and falls back to the source registry. The pull robot's docker
+# config comes from Vault registry/quay-pull through the quay-pull ExternalSecret. The zot mirror of ADR-0611 was removed on
+# 2026-11-12 after the drill (WP-248); the zuno-ai-run EgressFirewall no longer allows quay.io, so an empty value here also
+# needs the four quay.io dnsName rules back (gitops/charts/namespaces/values.yaml).
+zuno_okf_registry_mirror: "quay-quay-zuno-registry.apps.demo333.startx.fr/zuno"
+# WP-248 family (c): the UnifAI admission policies read the image signatures from the internal registry (one policy per
+# repository). Empty = quay.io, as before (rollback: remove the line, then make d1 install rhtas-config).
+zuno_unifai_signature_mirror_host: "quay-quay-zuno-registry.apps.demo333.startx.fr"
+zuno_okf_registry_mirror_plain_http: false
+zuno_okf_registry_mirror_pull_secret: quay-pull
+# WP-261 family (e) S2, owner's go 2026-11-14: the zuno+pull robot for the route host is in the global pull secret, so the
+# nodes can read the PRIVATE Red Hat mirror repositories (roles/quay_registry/tasks/node_pull_secret.yml; no drain).
+zuno_quay_node_pull_secret: true

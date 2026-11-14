@@ -4,7 +4,7 @@ aap MCP server.
 Two layers, same style as components/mcp-servers/git-forge/tests/:
 
   - protocol: the /mcp endpoint speaks real, standards-compliant MCP
-    streamable-HTTP, and rejects a caller with no gateway token before any
+    streamable-HTTP, and rejects a request without a call assertion before any
     protocol handling (ADR-0037).
   - behaviour: AAP itself is mocked at the transport boundary
     (`server._client` is replaced with an httpx.AsyncClient over an
@@ -29,7 +29,6 @@ import json
 import os
 import sys
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("AAP_API_TOKEN", "test-token")
 os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
 # WP-225 lot B: these tests launch cluster_audit many times; the per-caller
@@ -37,7 +36,9 @@ os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
 os.environ.setdefault("AAP_CLUSTER_AUDIT_RATE_LIMIT", "0")
 os.environ.setdefault("AAP_CONTROLLER_UI_URL", "https://aap.apps.demo333.startx.fr")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx  # noqa: E402
 import httpx2  # noqa: E402
@@ -46,9 +47,10 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-GATEWAY_HEADERS = {"X-Zuno-Gateway-Token": "test-workload-token"}
+AUD = "aap"  # this server's backend name
 
 JOB_TEMPLATE_ID = 8
 OTHER_TEMPLATE_ID = 99
@@ -175,7 +177,7 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
         )
-    assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
+    assert resp.status_code == 401, f"expected 401 without a call assertion, got {resp.status_code}"
 
 
 async def _open_session(transport, headers):
@@ -184,7 +186,7 @@ async def _open_session(transport, headers):
 
 
 async def test_tools_list_reports_both_capabilities(transport) -> None:
-    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+    async with await _open_session(transport, headers_for(AUD, "", groups=["ocp-ai-ops"])) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
@@ -196,7 +198,7 @@ async def test_cluster_audit_exposes_no_template_parameter(transport) -> None:
     """ADR-0355 Security considerations: the launch capability must not be
     retargetable. If a template/job-template/playbook argument ever appears
     in its schema, the server-construction half of the defence is gone."""
-    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+    async with await _open_session(transport, headers_for(AUD, "", groups=["ocp-ai-ops"])) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()

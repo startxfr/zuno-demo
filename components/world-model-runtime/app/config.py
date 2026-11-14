@@ -46,6 +46,15 @@ class Settings:
     # FLUX.2 klein distilled: 4 steps, guidance 1.0 (model card).
     flux_steps: int = 4
     flux_guidance: float = 1.0
+    # Drift control (measured 2026-11-09): Waypoint-1.5 loses the scene within ~10 s of walking, never while
+    # idle. Every `anchor_seconds` of MOVEMENT the current frame is re-drawn by FLUX from the scene prompt and
+    # spliced back. 0 disables it.
+    anchor_seconds: float = 0.0
+    # Waypoint only: skip world_engine's 720p <-> 512x1024 bilinear round trip, upscale on the GPU instead.
+    ae_raw: bool = False
+    # Size of the frame handed to FLUX for an anchor, "WxH" ("" = the display size). 1024x512 is the autoencoder's
+    # native size: the edit takes ~0.66 s instead of ~1.17 s and nothing is lost, the engine works at that size.
+    anchor_edit_size: str = ""
 
     @property
     def waypoint_dir(self) -> Path:
@@ -76,6 +85,9 @@ class Settings:
             max_prompt_chars=_int("WORLD_MODEL_MAX_PROMPT_CHARS", 600),
             flux_steps=_int("WORLD_MODEL_FLUX_STEPS", 4),
             flux_guidance=_float("WORLD_MODEL_FLUX_GUIDANCE", 1.0),
+            anchor_seconds=_float("WORLD_MODEL_ANCHOR_SECONDS", 0.0),
+            ae_raw=os.getenv("WORLD_MODEL_AE_RAW", "").strip().lower() in ("1", "true", "yes"),
+            anchor_edit_size=os.getenv("WORLD_MODEL_ANCHOR_EDIT_SIZE", "").strip(),
         )
         settings.validate()
         return settings
@@ -89,5 +101,14 @@ class Settings:
             raise ValueError(f"WORLD_MODEL_ENCODER must be auto, nvenc or x264, not {self.encoder!r}")
         if self.quant not in (None, "intw8a8", "fp8w8a8", "nvfp4"):
             raise ValueError(f"WORLD_MODEL_QUANT {self.quant!r} is not a world_engine quantization")
+        if self.anchor_seconds < 0 or (0 < self.anchor_seconds < 1):
+            raise ValueError("WORLD_MODEL_ANCHOR_SECONDS must be 0 (off) or at least 1")
+        if self.anchor_edit_size:
+            try:
+                w, h = (int(v) for v in self.anchor_edit_size.lower().split("x"))
+            except ValueError:
+                raise ValueError("WORLD_MODEL_ANCHOR_EDIT_SIZE must look like 1024x512") from None
+            if w % 16 or h % 16 or w < 256 or h < 256:
+                raise ValueError("WORLD_MODEL_ANCHOR_EDIT_SIZE sides must be multiples of 16, at least 256")
         if self.width % 16 or self.height % 16:
             raise ValueError("width and height must be multiples of 16")

@@ -223,6 +223,11 @@ spec:
   web:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .git }}
+  # R-530 (unifai-operator >= 0.1.65): a public git repository read from its archive at `ref`.
+  git:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   visibility: {{ default "private" .visibility }}
   {{- with .classification }}
   # WP-187 (unifai-operator >= 0.1.50): written on every chunk and returned in search results, so the

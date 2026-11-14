@@ -129,7 +129,7 @@ cluster-certmanager:
       operator:
         channel: stable-v1
         name: openshift-cert-manager-operator
-        installPlanApproval: Automatic
+        installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
         source:
           name: redhat-operators
           namespace: openshift-marketplace
@@ -138,3 +138,9 @@ cluster-certmanager:
       enabled: true
       name: cert-manager-operator-group
       namespace: cert-manager-operator
+
+# ADR-0614: router=true moves the default IngressController (2 replicas) onto
+# the infra nodes (nodePlacement in templates/acme-cluster-patches.yaml).
+# false until the infra nodes exist.
+infraNodes:
+  router: true   # WP-260 P2 step 2, 2026-11-13

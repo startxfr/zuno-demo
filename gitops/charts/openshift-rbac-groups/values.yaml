@@ -12,6 +12,22 @@ roleBindings:
 # is intended behavior.
 zunoManagedNamespaces: []
 
+# Namespaces where the AI profiles (ocp-ai-dev -> edit, ocp-ai-ops -> admin) get NO RoleBinding, although
+# they are labelled zuno.io/managed=true. Both ClusterRoles read and write Secrets, and these namespaces
+# hold the identity and secrets roots of the platform: the Keycloak admin and realm credentials
+# (zuno-auth) and the Vault bootstrap and unseal material (zuno-vault). Found on 2026-11-13 while
+# writing the demo scenarios; ocp-paas-ops (cluster-admin) still administers both. The read-only
+# personaView binding stays: `view` does not include Secrets.
+# Also excluded: zuno-data (the database role credentials), zuno-rhtas (signing services) and zuno-mesh
+# (mesh signing material). zuno-aap stays open on purpose: the ops persona works there. zuno-registry has
+# no binding (not labelled managed).
+aiProfileExcludedNamespaces:
+  - zuno-auth
+  - zuno-vault
+  - zuno-data
+  - zuno-rhtas
+  - zuno-mesh
+
 # ADR-0524 : lecture seule des personas metier sur les namespaces Zuno, pour
 # que l'introspection cluster de Lightspeed leur reponde quelque chose.
 personaView:

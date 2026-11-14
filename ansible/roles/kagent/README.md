@@ -5,8 +5,8 @@ experience client over the governed chain (ADR-0600, under ADR-0587's admission 
 gateways through the token proxy of ADR-0601).
 
 - `make d2 install kagent` seeds Vault (`keycloak/kagent`, `kagent/app`; `kagent/postgresql-app` comes from
-  the vault role), gives the `kagent` Keycloak service account the groups of its persona `ai-ops-01` (realm
-  users are create-only), applies three Applications (`zuno-kagent-d0` CRDs, `zuno-token-proxy-kagent-d1`,
+  the vault role), gives the `kagent` Keycloak service account the groups listed in `kagent_groups` (default `ocp-ai-ops` only,
+  S5 hardening; they must be groups of its persona `ai-ops-01`, and any other group is removed; realm users are create-only), applies three Applications (`zuno-kagent-d0` CRDs, `zuno-token-proxy-kagent-d1`,
   `zuno-kagent-d1`) and waits for the Deployments.
 - `make d2 check kagent` compares the running images with the pinned digests, checks that the controller
   discovered the governed tools and accepted the declarative agent `zuno-sre`, and that the Route answers

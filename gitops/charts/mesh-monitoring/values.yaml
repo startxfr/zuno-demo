@@ -48,7 +48,7 @@ operator:
       # suppressing the fallback to subscription.name.
       name: cluster-observability-operator
       channel: stable
-      installPlanApproval: Automatic  # startx chart defaults to Manual
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
       source:
         name: redhat-operators
         namespace: openshift-marketplace

@@ -50,4 +50,10 @@ spec:
         identities:
           - issuer: {{ .Values.policyOperand.clusterImagePolicy.certIdentityIssuer | quote }}
             subject: {{ .Values.policyOperand.clusterImagePolicy.certIdentitySubject | quote }}
+          {{- /* ADR-0352/WP-211: images signed while the built-in Keycloak was the issuer keep that identity; the
+                 role lists it here in external mode so a switch of issuer never orphans an existing signature. */}}
+          {{- range (.Values.policyOperand.clusterImagePolicy.certIdentityExtraIssuers | default list) }}
+          - issuer: {{ . | quote }}
+            subject: {{ $.Values.policyOperand.clusterImagePolicy.certIdentitySubject | quote }}
+          {{- end }}
 {{- end }}

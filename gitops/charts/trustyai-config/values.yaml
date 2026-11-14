@@ -74,6 +74,8 @@ kueue:
 guardrailsSmoke:
   enabled: true
   name: zuno-guardrails-smoke
+  # The operator's public Route cannot be switched off; a NetworkPolicy keeps the router out of the pod.
+  closeRoute: true
 
 # ADR-0540/WP-120: the guardrail policy the retired agent-runtime image
 # used to carry as a Python dict, expressed as NeMo rails config.
@@ -85,6 +87,8 @@ guardrailsSmoke:
 nemoGuardrails:
   enabled: false
   name: zuno-guardrails
+  # No public Route to the guardrails server: the ai-gateway reaches it through the Service.
+  exposeRoute: false
   # Mounted at /app/config/<configId>; also the config_id the client
   # sends on every request.
   configId: zuno-observe

@@ -387,7 +387,8 @@ Roll the mcp-gateway first, then confluence, git-forge, salesforce and aap (see 
 **REST entitlement gated (2026-11-07, request of zuno-demo-59):** the per-call agent entitlement in `evaluate()` is
 behind `restAgentEntitlement` (env `AGENT_ENTITLEMENT_EVERY_CALL`), **off** by default and on demo333. It is kept off
 until a post-demo golden-path run, belt and braces: UnifAI calls `/mcp`, which keeps its own up-front refusal either
-way, and the only REST callers are the evaluation scripts. Switch it on in the post-demo window, with a golden-path run
+way, and the only REST callers are the evaluation scripts. **Switched on 2026-11-11** (user's go, `gitops/apps/mcp/application-d1.yaml`;
+golden path 13/13 right after). Switch it on in the post-demo window, with a golden-path run
 right after. With the switch off, a lot C merge changes no default behaviour.
 
 Committed locally on `wp-225-lot-c`, cut from `wp-225-lot-b` (lots A and B). Not pushed. Not live. Every new behaviour is a

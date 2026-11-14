@@ -1,6 +1,6 @@
 # ADR-0606: Admit new experiences with a definition of done and a WIP limit
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team
@@ -102,3 +102,40 @@ For the experiences already admitted (UnifAI, Open WebUI, OpenClaw, Dify, kagent
 Clauses 2 to 7 are in force, and the number check and the template are in place (WP-239). This record stays
 `Accepted` until each rollback has been tested once, which clause 1 requires; the tests run in the window after the
 2026-11-09 demonstration. The world model (ADR-0604) is the first experience admitted under this record, in v0.16.
+
+## Status note (2026-11-11)
+
+The rollback tests have their own work package,
+[WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md): one test per experience, cheapest first,
+with WP-243's scale-to-zero negative case. The world model's teardown already ran (2026-11-09 and 2026-11-11). This record
+moves to `Implemented` when WP-249 is Done.
+
+## Amendment (2026-11-11, user decision): a single-version experience is tested at its first version change
+
+Clause 1 asks for a rollback "tested once": the previous pinned digest, or the uninstall path. An experience that has only
+ever run one version (kagent, Dify, Open WebUI on 2026-11-11) has no previous pin to return to, and its uninstall path is
+a deletion. For those, the rollback is tested at the first version change: pin the new version, golden path, move back to
+the old pin, golden path, move forward again. This record moves to `Implemented` once the experiences that do have a
+version history have their rollback recorded (OpenClaw, UnifAI, Lightspeed, Blender, the first-party images, the world
+model) and WP-243's negative case is recorded. The single-version experiences stay tracked in
+[WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md) until their first upgrade. The other
+clauses are unchanged.
+
+## Status note (2026-11-12): Implemented
+
+[WP-249](../roadmap/work-packages/wp-249-test-one-rollback-per-experience.md) is Done. Every experience that has a
+version history has its rollback tested once and recorded, as the amendment above asks:
+
+| Experience | Rollback tested | Evidence |
+|---|---|---|
+| OpenClaw | 2026-11-03, a pin revert run live | WP-249 brief, "Evidence already recorded" |
+| World model | 2026-11-09 and 2026-11-11, teardown | WP-237, WP-249 row 9 |
+| Lightspeed | 2026-11-12, `git revert` of the chart and forward. The 2026-10-24 version answers 413 today | [evidence](../roadmap/evidence/wp-249-lightspeed-rollback-2026-11-12.md) |
+| Blender | 2026-11-12, edge removed (503) and restored (401) | [evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md) |
+| First-party images | 2026-11-08, v0.14.5 digests rendered, then `--clear` | [evidence](../roadmap/evidence/wp-249-first-party-digests-2026-11-08.md) |
+| UnifAI | 2026-11-12, v0.1.69 pinned, stack back to v0.1.68 and forward; operator data restore drilled 2026-10-23 | [evidence](../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md) |
+
+WP-243's negative case is recorded too ([evidence](../roadmap/evidence/wp-243-negative-case-2026-11-11.md)).
+
+kagent, Dify and Open WebUI have run one version only. Their rollback is tested at their first version change. Each
+row of `docs/demo/rollback.md` says so in its Tested column, which replaces WP-249 as the place they are tracked.

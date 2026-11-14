@@ -77,6 +77,12 @@ jobs:
       # ADR-0606 clause 5 (WP-239): two ADR files under one number.
       - name: ADR number collision tests (ADR-0606)
         run: python3 platform/docs/tests/test_adr_number_collisions.py
+      # WP-211: a newline escape inside {{ }} in a YAML block scalar stays backslash + n.
+      - name: Jinja newline in YAML block scalars tests (WP-211)
+        run: python3 platform/docs/tests/test_jinja_newline_in_block_scalars.py
+      # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
+      - name: Markdown link and anchor tests (doc_links)
+        run: python3 platform/docs/tests/test_doc_links.py
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).
@@ -133,7 +139,7 @@ jobs:
       - name: keycloak realm and reconcile Job tests (ADR-0530, WP-169)
         run: |
           # Chart.yaml names its operator dependency by the alias "startx".
-          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
           helm dependency build gitops/charts/keycloak
           pip install pytest
           python3 -m pytest -q platform/keycloak/tests
@@ -148,7 +154,7 @@ jobs:
         working-directory: platform/supply-chain
         run: python3 tests/test_render_release_digests.py
       # The check renders the keycloak and postgresql charts, which both depend
-      # on the startx "operator" chart (alias:startx); keycloak's was built
+      # on the startx "operator" chart (HTTPS URL); keycloak's was built
       # above, postgresql's was not and `helm template` refused to render it.
       - name: Workload hardening baseline (ADR-0052)
         run: |
@@ -179,7 +185,7 @@ jobs:
       # dependency is built first; --strict-dependencies fails on a gap.
       - name: ArgoCD AppProject split (ADR-0602)
         run: |
-          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
           for repo in https://borispolonsky.github.io/dify-helm https://charts.bitnami.com/bitnami https://charts.jetstack.io https://helm.openwebui.com https://helm.releases.hashicorp.com; do helm repo add "$(echo "$repo" | tr -c 'a-z0-9\n' '-')" "$repo"; done
           for chart in gitops/charts/*/; do if grep -q '^dependencies:' "$chart/Chart.yaml"; then helm dependency build "$chart"; fi; done
           python3 platform/gitops/check_app_projects.py --strict-dependencies
@@ -227,10 +233,19 @@ jobs:
           # instead of the forwarded bearer, one entitlement check for REST and /mcp,
           # the signed agent chain, the azp allowlist.
           python3 tests/test_wp225_lot_c.py
+          # WP-250: the caller context inside the call assertion, and generate_diagram's assertion.
+          python3 tests/test_wp250_assertion_context.py
+          python3 tests/test_wp250_diagram_assertion.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
           python3 -m pytest -q tests/test_rag_query.py
+      # WP-250 lot 2: diagram-render verifies the gateway's call assertion (assertion.js), in the Node 20 image.
+      - name: diagram-render call-assertion tests (WP-250)
+        run: |
+          docker run --rm -v "$PWD/components/diagram-render:/work" -w /work \
+            docker.io/library/node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb \
+            node test/assertion.test.js
       - name: world-model-runtime tests on the CPU mocks (ADR-0604)
         working-directory: components/world-model-runtime
         run: |
@@ -336,6 +351,8 @@ jobs:
           python3 tests/test_wp225_space_allowlist.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       # ADR-0119: was missing (a real gap the new
       # check_mcp_server_conformance.py checker caught) - these tests
       # existed but never ran in CI.
@@ -348,6 +365,8 @@ jobs:
           python3 tests/test_wp225_owner_scoping.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: git-forge MCP server tests (ADR-0120)
         working-directory: components/mcp-servers/git-forge
         run: |
@@ -357,6 +376,8 @@ jobs:
           python3 tests/test_wp225_repository_allowlist.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: aap MCP server tests (ADR-0355)
         working-directory: components/mcp-servers/aap
         run: |
@@ -366,6 +387,8 @@ jobs:
           python3 tests/test_wp225_launch_rate_limit.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.
           python3 tests/test_wp225_call_assertion.py
+          # WP-250: the caller context rides inside the signed assertion (`ctx`); no shared token.
+          python3 tests/test_wp250_assertion_caller.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

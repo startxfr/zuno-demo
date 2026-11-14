@@ -1,7 +1,12 @@
 # Questions and expected answers for the live RAG demo
 
-Upload the two documents of this folder on the UnifAI **Documents** page, wait until their status is ready, then run the
-`<team>-rag` workflow of your team (for example `consultant-rag`). Each answer must cite the document.
+Upload the two documents of this folder, not this file (it holds the answers), on the **Documents** page of the
+UnifAI **Personal** workspace. Wait until their status is **Done**, then ask the questions in your personal workflow
+`<user>-my-documents` (for example `consultant-01-my-documents`). Each answer must cite the document.
+
+Do not use a team workflow `<team>-rag` (for example `consultant-rag`) for these questions. It runs as the team, so it
+never finds a member's personal uploads: asked these questions, it must answer that the documents do not say. The
+full scenario is [UnifAI live RAG](../unifai-live-rag.md).
 
 | Question | Expected answer | Document |
 |---|---|---|

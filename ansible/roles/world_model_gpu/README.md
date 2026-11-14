@@ -1,6 +1,6 @@
 # world_model_gpu (Day 0, local)
 
-ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSet `zuno-gpu-world-model-a`
+ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSets `zuno-gpu-world-model-a` and `-b` (one per zone, replicas 0 unless listed in `zuno_world_model_gpu_azs`)
 (g7e.4xlarge, one whole RTX PRO 6000, `nvidia.com/mig.config: all-disabled`, label
 `zuno.io/gpu-workload: world-model`, taint `zuno.io/gpu-world-model=true:NoSchedule`), rendered by the Application
 `zuno-machines-world-model-d0` from `gitops/charts/machines`, apart from the GPU fleet's `zuno-machines-d0`.
@@ -12,9 +12,16 @@ ADR-0604 D5, WP-229. The on-demand GPU node of the world-model demo: MachineSet 
 | `make d0 uninstall world-model-gpu` | any | Removes the node (Application, MachineSet, Machine, EC2 instance); refuses while the app is installed |
 | `make d0 check world-model-gpu` | any | Reports the node against the switch; reads Nodes only, so it also runs under AAP |
 
+`zuno_world_model_gpu_azs` (cluster file, a list of zone letters, demo333: `["a", "b"]`) says which zones are scaled to 1: capacity for
+g7e.4xlarge comes and goes per zone (no capacity in a and b for hours on 2026-11-10, and zone c offers no g7e.4xlarge at all:
+InvalidConfiguration). Searching both zones at once is the fast way to get the node; when one zone has it, scale the other to 0
+(`oc scale machineset zuno-gpu-world-model-<z> -n openshift-machine-api --replicas=0`).
+
 The switch lives in `ansible/clusters/<cluster>.yml` (committed: AAP reads the SCM checkout) and can be overridden
-locally from `ansible/confidential.yml`. `zuno_machines_az_override['zuno-gpu-world-model-a']` moves the node to another
-zone letter that offers g7e.
+locally from `ansible/confidential.yml`. `zuno_world_model_gpu_az` (cluster file; demo333 sets `b`, because g7e.4xlarge had no
+capacity in eu-central-1a on 2026-11-07) moves the node to another zone letter that offers g7e. It is a variable of its own
+because `zuno_machines_az_override` is one map that a workstation's `confidential.yml` replaces whole: an entry added to the
+cluster file would not apply there. The map's entry for this MachineSet still works and the dedicated variable wins over it.
 
 **Local only.** The AAP installer credential has no Machine API rights by design
 (`gitops/charts/aap-config/templates/clusterrole-installer.yaml`); this role runs with the operator's own credentials,

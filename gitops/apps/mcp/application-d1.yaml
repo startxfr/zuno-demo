@@ -35,12 +35,55 @@ spec:
         # the public key (gitops/apps/mcp-*); enforcing it (callAssertion.required) is a later, separate step.
         agentChain:
           verify: true
+          # WP-247 lot 2: the public half of the Vault Transit key agent-chain (the private half never leaves Vault).
           publicKey: |
             -----BEGIN PUBLIC KEY-----
-            MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+            MCowBQYDK2VwAyEAT/I4wgI087mkIC5Pl4R2a5wOVQN9VlrJQ+E/B6fWYz8=
             -----END PUBLIC KEY-----
         outboundIdentity:
           mode: assertion
+          # WP-247 (ADR-0602 option A): Vault Transit signs the assertion; no key Secret in the pod.
+          signer: transit
+        # ADR-0602 clause 10 (WP-225 lot C, user's go 2026-11-11, after the ai-gateway ran a clean golden path):
+        # only the Keycloak clients that carry the zuno-admin-api audience (read from the live realm) are admitted.
+        # An OpenShift token on /mcp (Lightspeed, TokenReview) has no azp and is not subject to the list. A forgotten
+        # client gets a 401: remove this key and re-run `make d2 install mcp` to go back to "any client of the realm".
+        jwtAllowedClients:
+          - unifai
+          - open-webui
+          - dify
+          - kagent
+          - world-model
+          - blender
+          - openclaw-*
+          - zuno-evaluations
+          - zuno-stresstest
+          - zuno-admin-api
+        # WP-225 lot C, post-demo item 4 (user's go 2026-11-11): the per-call agent entitlement also applies to REST
+        # tool calls (env AGENT_ENTITLEMENT_EVERY_CALL); /mcp already enforced it. Back out: remove this key and re-run
+        # `make d2 install mcp`.
+        restAgentEntitlement: true
+        # ADR-0603 M13, post-demo item 4 (user decision 2026-11-11): metrics.query is offered to ocp-ai-ops only (tool
+        # policy); its PromQL is scoped to the namespaces mcp-k8s already reads (readNamespaces in
+        # gitops/charts/mcp-k8s/values.yaml) plus nvidia-gpu-operator for the GPU metrics. A series without a namespace
+        # label (node, cluster) selects nothing. Back out: remove this key and re-run `make d2 install mcp`.
+        metricsQuery:
+          namespacesByGroup:
+            ocp-ai-ops:
+              - zuno-ai-run
+              - zuno-ai-build
+              - zuno-auth
+              - zuno-data
+              - zuno-dify
+              - zuno-kagent
+              - zuno-mesh
+              - zuno-mlops
+              - zuno-monitoring
+              - zuno-openwebui
+              - zuno-unifai
+              - zuno-vault
+              - zuno-aap
+              - nvidia-gpu-operator
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

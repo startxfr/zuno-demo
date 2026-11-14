@@ -33,6 +33,10 @@ class Settings:
     issuer: str = "https://keycloak.apps.mycluster.example.com/realms/zuno"
     jwks_url: str = ""
     audience: str = "zuno-admin-api"  # carried by every experience client (maas-gateway-audience)
+    # Sign out (oauth2-proxy cookie, then the Keycloak SSO session): the public https URL of this site and the
+    # Keycloak client Keycloak may send the browser back for. Empty public_url = no sign-out link (a local run).
+    public_url: str = ""
+    logout_client_id: str = "world-model"
     # Groups that may open the demo, and groups that may also release someone else's session.
     allowed_groups: Tuple[str, ...] = ("zuno-world-model-users", "ocp-ai-ops", "ocp-paas-ops")
     ops_groups: Tuple[str, ...] = ("ocp-ai-ops", "ocp-paas-ops")
@@ -66,6 +70,8 @@ class Settings:
             issuer=issuer,
             jwks_url=os.getenv("KEYCLOAK_JWKS_URL", f"{issuer}/protocol/openid-connect/certs"),
             audience=os.getenv("JWT_AUDIENCE", cls.audience),
+            public_url=os.getenv("WORLD_MODEL_PUBLIC_URL", "").strip().rstrip("/"),
+            logout_client_id=os.getenv("WORLD_MODEL_LOGOUT_CLIENT_ID", cls.logout_client_id).strip(),
             allowed_groups=_list("ALLOWED_GROUPS", ",".join(cls.allowed_groups)),
             ops_groups=_list("OPS_GROUPS", ",".join(cls.ops_groups)),
             allowed_origins=_list("ALLOWED_ORIGINS", ""),

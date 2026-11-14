@@ -60,6 +60,21 @@ spec:
         - protocol: TCP
           port: 443
     {{- end }}
+    {{- if and .redis $.Values.redisExternal.host }}
+    {{- if not (regexMatch "\\.svc(\\.cluster\\.local)?\\.?$" $.Values.redisExternal.host) }}
+    # ADR-0352 / WP-214: the external Redis (ai-gateway's semantic cache, quota ledger and routing side-channel).
+    - type: Allow
+      to:
+        {{- if regexMatch "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" $.Values.redisExternal.host }}
+        cidrSelector: {{ $.Values.redisExternal.host }}/32
+        {{- else }}
+        dnsName: {{ $.Values.redisExternal.host }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.redisExternal.port | default 6379 }}
+    {{- end }}
+    {{- end }}
     {{- range .routeHosts }}
     # {{ required (printf "platformNamespaces[%s].egressFirewall.routeHosts[].reason is required" $entry.name) .reason }}
     - type: Allow
@@ -79,6 +94,15 @@ spec:
         - protocol: TCP
           port: {{ . }}
         {{- end }}
+    {{- end }}
+    {{- range .cidrs }}
+    # {{ required (printf "platformNamespaces[%s].egressFirewall.cidrs[%s].reason is required" $entry.name .cidr) .reason }}
+    - type: Allow
+      to:
+        cidrSelector: {{ required (printf "platformNamespaces[%s].egressFirewall.cidrs[].cidr is required" $entry.name) .cidr }}
+      ports:
+        - protocol: TCP
+          port: 443
     {{- end }}
     {{- with .salesforce }}
     {{- if .enabled }}

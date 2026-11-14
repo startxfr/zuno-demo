@@ -633,3 +633,41 @@ chart. Clauses 5 and 6 above still name agent-runtime, the six agent charts and 
 ADR-0561: the consumer list of the WP-211 brief replaces it. The live there-and-back (lot C) is not done, so the ADR
 stays `Partially implemented`.
 
+
+## Amendment (2026-11-11): Keycloak done; the consumer list of clauses 5 and 6
+
+**Clause 9 note.** Keycloak, the first hard component, is done
+([WP-211](../roadmap/work-packages/wp-211-keycloak-internal-external-mode.md), 2026-11-11): the external mode ran live
+on demo333 from 2026-11-08 and the way back on 2026-11-09, golden path 14/14 in each mode, with the built-in instance
+and its database kept for the return (same users and ids). The way back found three role defects, fixed on 2026-11-11:
+the Application apply never removed a seam value it no longer set; `rhtas_config` waited for a renamed operator
+Deployment; `openshift_oauth` joined two PEMs with a literal backslash-n. Remaining under this record: Vault, PostgreSQL,
+Redis and AAP (WP-212 to WP-215), ArgoCD (WP-218, ADR-0557) and the clause-10 vital gate, so it stays
+`Partially implemented`.
+
+**Clauses 5 and 6.** Their consumer lists name agent-runtime, the six agent charts and the aiagent-operator, retired with
+ADR-0561. For Keycloak they are replaced by the consumer inventory of the WP-211 brief (ai-gateway, mcp-gateway,
+a2a-gateway, the token proxies, dify, kagent, open-webui, openclaw, unifai, world-model, models, openshift-oauth,
+namespaces, connectivity-link, rhtas, rhtas-config, trustyai-config, mlops, the image-signing scripts); the other
+components' work packages list their own consumers the same way. The decision itself is unchanged.
+
+## Update (2026-11-11) - clause 10, the Day-1 vital gate, is built
+
+`make d1 install` (all components or one) now starts with `ansible/tasks/check_day1_vital_gate.yml`: it runs the
+precheck of argocd, vault, external_secrets, cert_manager, postgresql, keycloak, aap and aap_config, and refuses to start
+Day 1 when one of them is not functional, listing its findings and the Day-0 fix. The prechecks are the functional
+assertions of clause 10 (internal mode: Applications Synced/Healthy plus CR readiness; external mode: the clause-7
+assertions of the external-capable prechecks). Advisory findings are shown and do not block. Break-glass:
+`-e zuno_day1_vital_gate=false`, printed in the run. Proven on demo333 the same day: it passed with the eight components
+functional (about 80 s), and refused with a non-functional component in the list. Building it found that
+`ansible/tasks/record_state.yml` set no `<role>_state_installed` fact on ansible-core 2.19 (a templated-dict `set_fact`);
+fixed. The external-mode work packages of the remaining components (WP-212 to WP-215, WP-218) inherit the gate through
+their prechecks.
+
+## Update (2026-11-11) - Redis done (WP-214)
+
+[WP-214](../roadmap/work-packages/wp-214-redis-internal-external-mode.md) is Done: `zuno_redis_mode` with the
+`zuno_redis_external_*` payload, a mode-agnostic endpoint (`ansible/tasks/resolve_redis_endpoint.yml`), the clause-7
+assertion as an in-cluster Job, and the one consumer left (ai-gateway) reached through a seam. It ran there and back on
+demo333 the same day, with golden path 13/13 in each mode. TLS to an external Redis is refused until ai-gateway's Redis
+clients support it. Remaining under this record: Vault, PostgreSQL and AAP (WP-212, WP-213, WP-215) and ArgoCD (WP-218).

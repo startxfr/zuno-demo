@@ -55,7 +55,7 @@ mandatory (this touches a classification boundary).
    > the ai-gateway chart values, default off. Hits/misses are traced and
    > counted in the existing cost/usage instrumentation (ADR-0029).
    >
-   > See [Standard clauses](README.md#standard-clauses) for Alternatives
+   > See [Standard clauses](../../adr/README.md#standard-clauses) for Alternatives
    > considered, Consequences, Security/Operational considerations,
    > Acceptance criteria and Review evidence.
 

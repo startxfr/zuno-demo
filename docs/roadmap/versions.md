@@ -26,8 +26,9 @@ state are not restated here.
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.3` | 2026-11-07 | patch before the demonstration of 2026-11-09 (user decision, in place of `v0.15.0`): the state that is demonstrated, cut from `devel` 14a34d0f after a passing golden-path run (WP-238); in-cluster ledger run 2026-11-07, 12 components in 38 min; named exception: D11 (ADR-0605, a v0.15 record, is open and is not part of this patch's band) |
+| v0.14 | `v0.14.5` | 2026-11-08 | patch, Sunday stabilisation cut before the demonstration freeze: Keycloak external-mode seam (WP-211), WP-225 lot C stages 1-3 and lot B live, image policy accepts both Keycloak issuers, the zuno-ai-run egress firewall allows the eu-west-2 S3 ranges, experience clients answer on the local reasoning model, Blender experience (ADR-0610), golden path 14/14; cut from `devel` 6e6e1e8b after a passing golden-path run; the first signing attempt failed (checkout in internal Keycloak mode), the re-run signed 12 of 12 through the external issuer; the first-party digests are rendered into the charts (`RENDER_DIGESTS=1`, back to `:latest` with `render_release_digests.py --clear` after the demonstration) |
 | v0.14 | `v0.14.4` | 2026-11-07 | patch, proven checkpoint before the demonstration of 2026-11-09: WP-225 hardening lots A-C deployed with their new behaviours off, ADR-0608 nfs-provisioner adopted, the WP-226 image policy enforced for the opt-in namespaces, golden path extended, CI quality-gate fix; cut from `devel` 21ddff13 after a passing golden-path run (11/11); in-cluster ledger run 2026-11-07, 12 components in 36 min; the Secret scan run on the tag is red on a documented false positive (`Authorization: Bearer placeholder` in the golden-path probe, fixed in the next tag) |
-| v0.15 | planned | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238); tagged later, once more content joins the band (user decision 2026-11-07) |
+| v0.15 | `v0.15.0` | 2026-11-11 | demo-ready band closed: the classification floor (ADR-0565, WP-209) and the golden-path check and freeze window (ADR-0605, WP-238); also carries everything merged since `v0.14.5` (WP-247 Vault Transit signing, WP-224 zuno-unifai firewall, WP-221 revocation rehearsed, WP-211 role fixes, ADR-0408 and ADR-0501 Implemented, ADR-0404/0405/0407 Deprecated); cut from `devel` 24ffd733 after a passing golden-path run (13/13, world model shown as roadmap), merged to `main` 96e66ab3; 8 first-party images rebuilt beforehand so all 12 `:latest` images are signed through the built-in Keycloak (supply-chain check 12/12); in-cluster ledger run 2026-11-11, 12 components in 35 min |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
 | v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610) |
 
@@ -84,8 +85,8 @@ observability and project work actually delivered during it — ADR-0516,
 ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536, plus the webinar
 sovereign-AI demonstration (ADR-0550).
 
-**29 ADRs.** Open: ADR-0404, ADR-0405, ADR-0407, ADR-0408 (stubs), ADR-0550 (`Accepted`);
-WP-55, WP-093, WP-101, WP-112, WP-135, WP-136, WP-137.
+**30 ADRs, all closed.** ADR-0408 was proven live and implemented on 2026-11-11; ADR-0404, ADR-0405 and ADR-0407 were
+withdrawn the same day (`Deprecated`, user decision). No open work package.
 
 ## v0.5
 
@@ -279,6 +280,8 @@ Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
 
 **9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165) and ADR-0580 (2026-10-24, first full promotion cycle). Open: ADR-0579, ADR-0581 – ADR-0584; WP-161, WP-163, WP-164, WP-167.
 
+Documentation follow-up (2026-11-13): WP-255 to WP-259 write the OKF reference, the "add an agent" guide, the publish-verify-rollback page and the `UnifaiAgentBundle` page in `zuno-demo-agents`, so UnifAI can link to them. No ADR changes.
+
 ## v0.13
 
 Show that the platform is the governed chain, not the UI: three user
@@ -310,7 +313,7 @@ stays `C1` by decision). A live demonstration is given only after a golden-path 
 each demonstration moment, inside a freeze window that starts with that check (ADR-0605, WP-238). The band was
 re-scoped on 2026-11-07 for the demonstration of 2026-11-09 09:00: the work that cannot close before it moved to v0.16.
 
-**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Accepted`.** Open work packages: WP-238.
+**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Implemented` (2026-11-11).** No open work package.
 
 ## v0.16
 
@@ -323,24 +326,24 @@ rehearsals in canary namespaces of demo333 (ADR-0609). ADR-0110 sits here, `Impl
 model (ADR-0604, WP-228 to WP-237) is the band's first new experience under ADR-0606: a browser world model on a GPU
 node that exists only while the demo is enabled, shown on 2026-11-09 as roadmap, not live.
 
-**10 ADRs: ADR-0110, the hardening and delivery records, and the world model.** Open: ADR-0584, ADR-0602, ADR-0603,
-ADR-0604, ADR-0606 (ADR-0607, ADR-0608 and ADR-0609 Implemented 2026-11-07). Open work packages: WP-221, WP-224
-to WP-237 (WP-225 lots A, B and C Operator pending 2026-11-07).
+**10 ADRs: ADR-0110, the hardening and delivery records, and the world model.** Open: ADR-0602, ADR-0603, ADR-0604
+(ADR-0607, ADR-0608 and ADR-0609 Implemented 2026-11-07; ADR-0584 and ADR-0606 Implemented 2026-11-12, with UnifAI
+v0.1.69 pinned and WP-249 Done). Open work packages: WP-224, WP-227 and WP-237.
 
 ## v0.17
 
 Run the remaining day-0 platform services in internal or external mode, one component per work package (ADR-0352:
 keycloak, vault, postgresql, redis, aap, then argocd; external_secrets and cert_manager are done, WP-216 and WP-217),
 each rehearsed against a service simulated in a canary namespace (ADR-0609), and implement the remote ArgoCD of ADR-0557
-with the argocd work package. Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
+with the argocd work package, in both flavors, native and RHACM (pick confirmed by the user on 2026-11-11). Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
 deprecated on 2026-11-07.
 
 One new experience: Blender 3D objects generated as `bpy` scripts by `gpt-oss-20b` through the ai-gateway, under
 the user's own identity and a C3 floor (ADR-0610), the first of the band's two experience slots (ADR-0606 clause 2);
 its work package is opened when the band starts.
 
-**4 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Implemented`, ADR-0611 `Proposed`.** Open work
-packages: WP-211 to WP-215, WP-218, WP-246 (the OKF release mirror of ADR-0611).
+**6 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Implemented`, ADR-0611 `Implemented`, ADR-0612 `Accepted`, ADR-0613 `Proposed`.** Open work
+packages: WP-212, WP-213, WP-215, WP-218, WP-248, and WP-252 to WP-254 (the M4, M2 and M7 hardening windows of ADR-0613, planned for mid-December 2026) (WP-211, Keycloak, and WP-214, Redis, Done 2026-11-11).
 
 ## OKF stream
 
@@ -350,10 +353,12 @@ from the platform bands — [OKF roadmap](okf-roadmap.md).
 - **OKF v0.1** — content excellence in-repo: the two-stage agent maturity
   model, generated per-agent authorization matrices, real `deployment/`
   content, the `tests/` target structure, per-conversation task tabs.
-  **8 ADRs.** Open: ADR-0501. No open work packages.
+  **8 ADRs, all closed** (ADR-0501 on 2026-11-11). No open work packages.
 - **OKF v0.2 / OKF v0.3** — extraction into `zuno-okf` and live operator
   reconciliation. Both milestones are **vacant**: every ADR that defined them
   (ADR-0506 – ADR-0510) was retargeted to platform v0.7 on 2026-08-30, then
   to its own platform v0.10 band on 2026-09-05. Their work packages
   (WP-48 – WP-53) are tracked as phases 34–35 of the
-  [implementation roadmap](implementation-roadmap.md).
+  [implementation roadmap](implementation-roadmap.md). Their outcomes were delivered in the platform bands by
+  ADR-0576 (extraction into `zuno-demo-agents`) and ADR-0580 (one digest pin, promoted by pull request), which
+  supersede ADR-0506, ADR-0507, ADR-0509 and ADR-0510.

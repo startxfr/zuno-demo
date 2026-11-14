@@ -1,0 +1,56 @@
+---
+# ADR-0352 / WP-214: in EXTERNAL mode, point the Redis consumer side at the external endpoint. Included by
+# apply_gitops_app.yml for the d1 Applications when zuno_redis_mode is external; internal mode never gets here, so its
+# Application values stay byte-identical. Each key below is a chart value whose default is the built-in instance; this
+# file only fills it in.
+#
+#   ai-gateway  semanticCache.redis.addr: REDIS_ADDR, read by the semantic cache, the quota ledger (quotaLedger.store
+#               redis) and the routing-decision side-channel. The password is not a value: it comes from Vault
+#               zuno/redis/session-store (seeded by the redis role) through the chart's ExternalSecret. No TLS value:
+#               the ai-gateway code has no Redis TLS option (WP-214 limit), so the redis role refuses a CA bundle.
+#   namespaces  redisExternal: the Allow rule of the zuno-ai-run EgressFirewall (ADR-0352 clause 6: an external
+#               endpoint is a first-class allowlist input now that egress policies exist, WP-224).
+#
+# It merges into the Application's own values (never replaces them), after the role's gitops_app_extra_helm_values.
+# Needs: _gitops_app_definition, gitops_component_name (set by apply_gitops_app.yml).
+# `.get('values', ...)`, never ['values'] or .values (see keycloak_seam_values.yml).
+- name: "redis-seams | resolve the Redis endpoint (ADR-0352, WP-214)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_redis_endpoint.yml"
+
+- name: "redis-seams | the chart values per consumer component"
+  ansible.builtin.set_fact:
+    _redis_seams:
+      ai-gateway:
+        semanticCache:
+          redis:
+            addr: "{{ redis_endpoint_addr }}"
+      namespaces:
+        redisExternal:
+          host: "{{ redis_endpoint_host }}"
+          port: "{{ redis_endpoint_port | int }}"
+
+# The redis role validates the payload before anything is written, but the consumers are applied by other roles
+# (`make d2 install llm`, `make d2 install namespaces`): never render the sentinel as an endpoint.
+- name: "redis-seams | refuse to render an unset external endpoint"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_redis_mode is 'external' but zuno_redis_external_host is missing or still the 'xxxxxx' sentinel in
+      ansible/confidential.yml, so the {{ gitops_component_name }} Application cannot be pointed at it. Fill in the
+      zuno_redis_external_* keys (see ansible/confidential.example.yml), run `make d1 install redis`, then this
+      component again.
+  when:
+    - gitops_component_name in _redis_seams
+    - redis_endpoint_host in ['xxxxxx', '']
+
+- name: "redis-seams | merge them into the Application values of {{ gitops_component_name }}"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        _gitops_app_definition
+        | combine({'spec': {'source': {'helm': {'values':
+            ((_gitops_app_definition.spec.source.helm.get('values', '{}') | from_yaml)
+             | combine(_redis_seams[gitops_component_name], recursive=True)) | to_nice_yaml}}}}, recursive=True)
+      }}
+  when:
+    - gitops_component_name in _redis_seams
+    - _gitops_app_definition.spec.source.helm is defined

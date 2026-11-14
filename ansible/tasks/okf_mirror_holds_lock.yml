@@ -1,0 +1,32 @@
+---
+# ADR-0611/ADR-0612: when the gateways read the release from the internal registry (zuno_okf_registry_mirror = registry
+# prefix, e.g. quay-quay-zuno-registry.apps.<domain>/zuno), the locked digest must be on it, signatures included, before a
+# promotion is rolled. It is verified as the gateways verify it (offline cosign + oras, by digest), through the Quay route
+# with the pull docker config written by roles/quay_registry. Empty (default) = no mirror, nothing to check.
+# Included by `make d2 check agents` (agents role) and BEFORE `make d2 install mcp` applies the gateways (mcp role,
+# which also installs a2a-gateway): the promotion workflow runs on GitHub and cannot reach the registry, so the roll is
+# the one point where "mirror before roll" can be enforced. Feed it with `OKF_MIRROR_TO=<route>/zuno make d3 admit agents`.
+# Needs zuno_okf_registry_mirror: the caller loads ansible/tasks/load_cluster_vars.yml first.
+- name: "okf mirror | verify that the internal registry holds the locked release (ADR-0611, ADR-0612)"
+  ansible.builtin.shell: |
+    set -u
+    export DOCKER_CONFIG="${HOME}/.config/zuno/quay-pull"
+    [ -f "$DOCKER_CONFIG/config.json" ] || { echo "missing $DOCKER_CONFIG/config.json: run make d2 install quay-registry" >&2; exit 1; }
+    prefix="{{ zuno_okf_registry_mirror }}"
+    lock="$(grep -v '^#' platform/okf/agents.lock | grep .)"
+    ref="$(python3 -c 'import sys; sys.path.insert(0, "platform/supply-chain"); import admit_okf_bundle as a; print(a.mirror_reference(sys.argv[1], sys.argv[2]))' "$lock" "$prefix")"
+    exec python3 platform/supply-chain/admit_okf_bundle.py verify "$ref" --mirror "$prefix"
+  args:
+    executable: /bin/bash
+    chdir: "{{ zuno_repo_root }}"
+  register: _okf_mirror_holds_lock
+  changed_when: false
+  failed_when: false
+  when: (zuno_okf_registry_mirror | default('')) | length > 0
+
+- name: "okf mirror | fail when the mirror does not hold the locked release"
+  ansible.builtin.fail:
+    msg: "{{ ['The mirror ' ~ zuno_okf_registry_mirror ~ ' does not hold the locked release; run OKF_MIRROR_TO=... make d3 admit agents (ADR-0611).'] + _okf_mirror_holds_lock.stdout_lines + _okf_mirror_holds_lock.stderr_lines }}"
+  when:
+    - (zuno_okf_registry_mirror | default('')) | length > 0
+    - _okf_mirror_holds_lock.rc != 0

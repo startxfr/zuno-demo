@@ -306,5 +306,283 @@ class ConformanceLayerExtractTest(unittest.TestCase):
             self._extract([{"cases/a": b"1"}, {"cases/b": b"2"}])
 
 
+class MirrorTest(unittest.TestCase):
+    """ADR-0611 / WP-246: the mirror copies by digest and is read back by digest."""
+
+    CORP = "quay.io/zuno/okf-corp@sha256:" + "a" * 64
+    AGENT = "quay.io/zuno/okf-tekos@sha256:" + "b" * 64
+    MIRROR = "zot.example.svc:5000/okf"
+
+    def test_reference_keeps_name_and_digest_and_changes_the_registry(self) -> None:
+        self.assertEqual(admit.mirror_reference(self.AGENT, self.MIRROR + "/"),
+                         "zot.example.svc:5000/okf/okf-tekos@sha256:" + "b" * 64)
+
+    def test_reference_refuses_a_tag_and_a_bad_prefix(self) -> None:
+        with self.assertRaises(admit.AdmissionError):
+            admit.mirror_reference("quay.io/zuno/okf-corp:latest", self.MIRROR)
+        for bad in ("", "/okf", "host@sha256:x", "host:"):
+            with self.assertRaises(admit.AdmissionError):
+                admit.mirror_reference(self.CORP, bad)
+
+    def test_plain_http_is_only_for_the_mirror_host(self) -> None:
+        admit.set_plain_http(self.MIRROR)
+        try:
+            self.assertEqual(admit._oras_http(self.MIRROR + "/okf-corp"), ["--plain-http"])
+            self.assertEqual(admit._oras_http(self.CORP), [])
+            self.assertEqual(admit._cosign_http(self.CORP), [])
+            self.assertIn("--allow-http-registry", admit._cosign_http(self.MIRROR + "/x@sha256:1"))
+        finally:
+            admit.set_plain_http(None)
+
+    def _run_mirror(self, fake_run, resolve_digest: str):
+        calls = []
+        saved = (admit.run, admit.require, admit.verify)
+        verified = []
+        admit.require = lambda b: b
+        admit.run = lambda args, **k: fake_run(calls, args, resolve_digest)
+        admit.verify = lambda ref, dev=False, mirror=None: (
+            verified.append((ref, mirror)) or {"release": "0.0.1", "channel": "release",
+                                               "agents": [{"name": "tekos", "version": "1", "reference": self.AGENT}]})
+        try:
+            return admit.mirror_release(self.CORP, self.MIRROR), calls, verified
+        finally:
+            admit.run, admit.require, admit.verify = saved
+
+    @staticmethod
+    def _resolve(args, resolve_digest):
+        """What the mirror holds under the release tag: the pushed digest, unless the test says otherwise."""
+        if resolve_digest != "same":
+            return resolve_digest
+        return "sha256:" + args[-1].rsplit("release-", 1)[1][:1] * 64
+
+    def _ok(self, calls, args, resolve_digest):
+        calls.append(args)
+        return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+    def test_copies_every_artifact_with_its_sig_and_att_tags_and_verifies_from_the_mirror(self) -> None:
+        index, calls, verified = self._run_mirror(self._ok, "same")
+        copies = [c for c in calls if c[1] == "cp"]
+        self.assertEqual(len(copies), 6)  # corp + agent, each: artifact, .sig, .att
+        tags = [c[-1].rsplit(":", 1)[1] for c in copies]
+        self.assertIn("sha256-" + "a" * 64 + ".sig", tags)
+        self.assertIn("sha256-" + "b" * 64 + ".att", tags)
+        self.assertTrue(all("-r" in c for c in copies))
+        self.assertEqual(verified[0], (self.CORP, None))
+        self.assertEqual(verified[1], ("zot.example.svc:5000/okf/okf-corp@sha256:" + "a" * 64, self.MIRROR))
+
+    def test_a_digest_that_changed_on_the_way_is_refused(self) -> None:
+        with self.assertRaises(admit.AdmissionError) as ctx:
+            self._run_mirror(self._ok, "sha256:" + "c" * 64)
+        self.assertIn("digest mismatch", str(ctx.exception))
+
+    def test_a_missing_att_tag_is_skipped_but_other_failures_are_not(self) -> None:
+        def missing(calls, args, resolve_digest):
+            calls.append(args)
+            if args[1] == "cp" and args[-1].endswith(".att"):
+                raise admit.AdmissionError("oras cp failed: sha256-x.att: not found")
+            return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+        index, calls, _ = self._run_mirror(missing, "same")
+        self.assertEqual(index["release"], "0.0.1")
+
+        def broken(calls, args, resolve_digest):
+            calls.append(args)
+            if args[1] == "cp" and args[-1].endswith(".sig"):
+                raise admit.AdmissionError("oras cp failed: connection refused")
+            return self._resolve(args, resolve_digest) if args[1] == "resolve" else ""
+
+        with self.assertRaises(admit.AdmissionError):
+            self._run_mirror(broken, "same")
+
+
+class PruneTests(unittest.TestCase):
+    """ADR-0611: the mirror keeps the last three locked releases and prunes the rest."""
+
+    MIRROR = "zot.example.svc:5000/okf"
+    CORP = {n: "a b c d".split()[n - 1] * 64 for n in (1, 2, 3, 4)}      # release n -> corp digest
+    TEKOS = {n: "1 2 3 4".split()[n - 1] * 64 for n in (1, 2, 3, 4)}     # release n -> tekos digest
+
+    def _src(self, n: int) -> str:
+        return "quay.io/zuno/okf-corp@sha256:" + self.CORP[n]
+
+    def _world(self, releases, missing_layer=()):
+        """A fake mirror holding `releases`, with the commands prune issues through oras; returns (calls, restore)."""
+        calls, deletes = [], []
+        tags = {"okf/okf-corp": [], "okf/okf-tekos": []}
+        digest_of = {}
+        for n in releases:
+            for repo, d in (("okf/okf-corp", self.CORP[n]), ("okf/okf-tekos", self.TEKOS[n])):
+                tags[repo] += [f"release-{d[:12]}", f"sha256-{d}.sig", f"sha256-{d}.att"]
+                digest_of[(repo, f"release-{d[:12]}")] = "sha256:" + d
+
+        def fake_run(args, **_kw):
+            calls.append(args)
+            cmd = args[1:3]
+            if cmd == ["repo", "ls"]:
+                return "\n".join(tags) + "\nother/thing\n"
+            if cmd == ["repo", "tags"]:
+                return "\n".join(tags[args[-1].split("/", 1)[1]]) + "\n"
+            if args[1] == "resolve":
+                repo, tag = args[-1].split("/", 1)[1].rsplit(":", 1)
+                return digest_of[(repo, tag)] + "\n"
+            if args[1] == "discover":
+                return "{}"
+            if cmd == ["manifest", "delete"]:
+                deletes.append(args[-1])
+                return ""
+            raise AssertionError(args)
+
+        def fake_layer(reference, media_type):
+            digest = reference.split("@sha256:")[1]
+            n = next(k for k, v in self.CORP.items() if v == digest)
+            if n in missing_layer or n not in releases:
+                raise admit.AdmissionError("not found")
+            return ('{"release": "0.0.%d", "agents": [{"name": "tekos", "reference": '
+                    '"quay.io/zuno/okf-tekos@sha256:%s"}]}' % (n, self.TEKOS[n])).encode()
+
+        saved = (admit.run, admit.require, admit._layer)
+        admit.run, admit.require, admit._layer = fake_run, (lambda b: b), fake_layer
+        self.addCleanup(lambda: setattr(admit, "run", saved[0]))
+        self.addCleanup(lambda: setattr(admit, "require", saved[1]))
+        self.addCleanup(lambda: setattr(admit, "_layer", saved[2]))
+        return deletes
+
+    def _history(self, *ns):
+        return [self._src(n) for n in ns]
+
+    def test_keeps_the_last_three_and_lists_the_oldest_in_a_dry_run(self) -> None:
+        deletes = self._world([1, 2, 3, 4])
+        result = admit.prune_mirror(self.MIRROR, 3, False, self._history(4, 3, 2))
+        listed = [ref for _kind, ref in result["candidates"]]
+        d1, t1 = self.CORP[1], self.TEKOS[1]
+        self.assertEqual(
+            sorted(listed),
+            sorted([f"zot.example.svc:5000/okf/okf-corp@sha256:{d1}", f"zot.example.svc:5000/okf/okf-tekos@sha256:{t1}",
+                    f"zot.example.svc:5000/okf/okf-corp:sha256-{d1}.sig", f"zot.example.svc:5000/okf/okf-corp:sha256-{d1}.att",
+                    f"zot.example.svc:5000/okf/okf-tekos:sha256-{t1}.sig", f"zot.example.svc:5000/okf/okf-tekos:sha256-{t1}.att"]))
+        self.assertEqual(deletes, [])  # a dry run deletes nothing
+        self.assertFalse(result["applied"])
+
+    def test_apply_deletes_exactly_what_the_dry_run_listed(self) -> None:
+        deletes = self._world([1, 2, 3, 4])
+        planned = admit.prune_mirror(self.MIRROR, 3, False, self._history(4, 3, 2))["candidates"]
+        admit.prune_mirror(self.MIRROR, 3, True, self._history(4, 3, 2))
+        self.assertEqual(sorted(deletes), sorted(ref for _k, ref in planned))
+
+    def test_a_first_install_with_one_release_prunes_nothing(self) -> None:
+        deletes = self._world([4])
+        result = admit.prune_mirror(self.MIRROR, 3, True, self._history(4))
+        self.assertEqual(result["candidates"], [])
+        self.assertEqual(deletes, [])
+
+    def test_a_kept_release_the_mirror_never_received_is_skipped(self) -> None:
+        deletes = self._world([1, 2, 4])  # release 3 was promoted but never fed to the mirror
+        result = admit.prune_mirror(self.MIRROR, 3, True, self._history(4, 3, 2))
+        self.assertEqual(result["absent"], [self._src(3)])
+        self.assertTrue(deletes)
+        self.assertTrue(all(self.CORP[1] in d or self.TEKOS[1] in d for d in deletes))  # only release 1 goes
+
+    def test_it_refuses_to_run_when_the_locked_release_is_not_on_the_mirror(self) -> None:
+        self._world([1, 2, 3])  # the lock names release 4, never mirrored
+        with self.assertRaises(admit.AdmissionError) as ctx:
+            admit.prune_mirror(self.MIRROR, 3, True, self._history(4, 3, 2))
+        self.assertIn("does not hold the locked release", str(ctx.exception))
+
+    def test_the_history_is_the_last_distinct_digests_of_the_lock_newest_first(self) -> None:
+        locks = {"h1": self._src(4), "h2": self._src(4), "h3": self._src(3), "h4": self._src(2), "h5": self._src(1)}
+
+        def git(args):
+            if args[0] == "log":
+                return "\n".join(locks) + "\n"
+            return "# release\n" + locks[args[1].split(":", 1)[0]] + "\n"
+
+        self.assertEqual(admit.lock_history(3, git), self._history(4, 3, 2))
+        self.assertEqual(admit.lock_history(5, git), self._history(4, 3, 2, 1))
+
+
+class QuayPruneTests(unittest.TestCase):
+    """ADR-0612: the same retention on Red Hat Quay, by tag deletion through its API."""
+
+    MIRROR = "quay.example.svc/zuno"
+    CORP = {1: "a" * 64, 2: "b" * 64, 3: "c" * 64, 4: "d" * 64}
+    TEKOS = {1: "1" * 64, 2: "2" * 64, 3: "3" * 64, 4: "4" * 64}
+
+    def _src(self, n: int) -> str:
+        return "quay.io/zuno/okf-corp@sha256:" + self.CORP[n]
+
+    def _world(self, releases, page_size=100):
+        calls = []
+        repos = {"okf-corp": self.CORP, "okf-tekos": self.TEKOS}
+
+        def tags_of(name):
+            out = []
+            for n in releases:
+                d = repos[name][n]
+                out += [{"name": f"release-{d[:12]}", "manifest_digest": "sha256:" + d},
+                        {"name": f"sha256-{d}", "manifest_digest": "sha256:" + "7" * 64},
+                        {"name": f"sha256-{d}.sig", "manifest_digest": "sha256:" + "9" * 64},
+                        {"name": f"sha256-{d}.att", "manifest_digest": "sha256:" + "8" * 64}]
+            return out
+
+        def http(method, url, token):
+            calls.append((method, url, token))
+            if method == "DELETE":
+                return None
+            if "/repository?namespace=zuno" in url:
+                return {"repositories": [{"name": "okf-corp"}, {"name": "okf-tekos"}]}
+            name = url.split("/zuno/")[1].split("/")[0]
+            page = int(url.rsplit("page=", 1)[1])
+            tags = tags_of(name)
+            chunk = tags[(page - 1) * page_size: page * page_size]
+            return {"tags": chunk, "has_additional": page * page_size < len(tags)}
+
+        def fake_layer(reference, media_type):
+            digest = reference.split("@sha256:")[1]
+            n = next(k for k, v in self.CORP.items() if v == digest)
+            if n not in releases:
+                raise admit.AdmissionError("not found")
+            return ('{"release": "0.0.%d", "agents": [{"name": "tekos", "reference": '
+                    '"quay.io/zuno/okf-tekos@sha256:%s"}]}' % (n, self.TEKOS[n])).encode()
+
+        saved = admit._layer
+        admit._layer = fake_layer
+        self.addCleanup(lambda: setattr(admit, "_layer", saved))
+        return calls, http
+
+    def _history(self, *ns):
+        return [self._src(n) for n in ns]
+
+    def test_a_dry_run_lists_the_oldest_release_tags_and_deletes_nothing(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        d1, t1 = self.CORP[1], self.TEKOS[1]
+        self.assertEqual(sorted(ref for _k, ref in result["candidates"]), sorted([
+            f"zuno/okf-corp:release-{d1[:12]}", f"zuno/okf-corp:sha256-{d1}", f"zuno/okf-corp:sha256-{d1}.sig",
+            f"zuno/okf-corp:sha256-{d1}.att", f"zuno/okf-tekos:release-{t1[:12]}", f"zuno/okf-tekos:sha256-{t1}",
+            f"zuno/okf-tekos:sha256-{t1}.sig", f"zuno/okf-tekos:sha256-{t1}.att"]))
+        self.assertFalse([c for c in calls if c[0] == "DELETE"])
+
+    def test_apply_deletes_exactly_the_listed_tags_with_the_token(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        planned = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)["candidates"]
+        calls.clear()
+        admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
+        deletes = [c for c in calls if c[0] == "DELETE"]
+        self.assertEqual(len(deletes), len(planned))
+        self.assertTrue(all(c[2] == "tok" and c[1].startswith("https://quay.example.svc/api/v1/repository/zuno/") for c in deletes))
+        self.assertIn(f"https://quay.example.svc/api/v1/repository/zuno/okf-corp/tag/release-{self.CORP[1][:12]}",
+                      [c[1] for c in deletes])
+
+    def test_every_page_of_tags_is_read(self) -> None:
+        _calls, http = self._world([1, 2, 3, 4], page_size=4)
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        self.assertEqual(len(result["candidates"]), 8)
+
+    def test_it_refuses_when_the_locked_release_is_not_on_quay(self) -> None:
+        _calls, http = self._world([1, 2, 3])
+        with self.assertRaises(admit.AdmissionError):
+            admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
+
+
 if __name__ == "__main__":
     unittest.main()

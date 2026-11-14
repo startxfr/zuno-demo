@@ -41,6 +41,9 @@ spec:
             - --code-challenge-method=S256
             - --reverse-proxy=true
             - --skip-provider-button=true
+            # Sign out sends the browser on to Keycloak's logout endpoint (the UI's Sign out button): that host
+            # must be allowed as a redirect target.
+            - --whitelist-domain={{ include "world-model.keycloakHost" . }}
             # The upstream validates the token itself: forward it, and keep it fresh.
             - --pass-access-token=true
             - --cookie-refresh={{ .Values.frontDoor.cookieRefresh }}

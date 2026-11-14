@@ -10,8 +10,8 @@ Salesforce itself is mocked (`server._client` is patched to return a fake
 surface and the three tools' request/response mapping, not a live
 Salesforce call.
 
-Also re-proves ADR-0037's workload-identity requirement holds: a request
-with no X-Zuno-Gateway-Token is rejected before any MCP protocol handling.
+Also re-proves the call-assertion requirement (WP-250 lot 2) holds: a request
+without a call assertion is rejected with 401 before any MCP protocol handling.
 
 Run from this directory:
 
@@ -24,11 +24,12 @@ import os
 import sys
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("SALESFORCE_BASE_URL", "https://example.my.salesforce.com")
 os.environ.setdefault("SALESFORCE_ACCESS_TOKEN", "test-token")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -36,9 +37,10 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-GATEWAY_HEADERS = {"X-Zuno-Gateway-Token": "test-workload-token"}
+AUD = "salesforce"  # this server's backend name
 
 
 class _FakeResponse:
@@ -100,11 +102,11 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
         )
-    assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
+    assert resp.status_code == 401, f"expected 401 with no call assertion, got {resp.status_code}"
 
 
 async def test_tools_list_reports_exactly_the_three_declared_tools(transport) -> None:
-    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+    async with await _open_session(transport, headers_for(AUD, "")) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
@@ -121,7 +123,7 @@ async def test_read_opportunity_round_trip(transport) -> None:
     fake_client = _FakeSalesforceClient([_FakeResponse(200, fake_payload)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "read_opportunity")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("read_opportunity", {"query": "Acme Renewal"})
@@ -154,7 +156,7 @@ async def test_read_opportunity_escapes_a_single_quote_in_the_query(transport) -
     fake_client = _FakeSalesforceClient([_FakeResponse(200, {"records": []})])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "read_opportunity")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("read_opportunity", {"query": "O'Brien"})
@@ -168,7 +170,7 @@ async def test_create_opportunity_round_trip(transport) -> None:
     fake_client = _FakeSalesforceClient([_FakeResponse(200, {"id": "006NEW"})])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "create_opportunity")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -191,7 +193,7 @@ async def test_update_opportunity_patches_then_reads_back_the_current_state(tran
     fake_client = _FakeSalesforceClient([_FakeResponse(204), _FakeResponse(200, updated)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "update_opportunity")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -215,7 +217,7 @@ async def test_update_opportunity_with_no_fields_is_a_tool_error_not_a_no_op_cal
     fake_client = _FakeSalesforceClient([])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "update_opportunity")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("update_opportunity", {"opportunity_id": "006XX"})

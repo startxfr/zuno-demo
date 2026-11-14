@@ -23,6 +23,12 @@ renders:
   in WP-156) and the `google` identity-provider broker. See
   `gitops/charts/keycloak/files/realm-zuno.json`.
 
+> `zuno-auth/keycloak-admin` is the **bootstrap** credential only: it creates the first admin on an empty database
+> and is the fallback of the Jobs and roles when `keycloak-automation` is missing. Since ADR-0595 the bootstrap
+> `admin` is disabled; humans use `zuno-admin` (Secret `keycloak-console`) and the automation uses `zuno-automation`
+> (Secret `keycloak-automation`). After a WP-211 external flip this Secret holds the external admin credential until
+> `zuno/keycloak/admin` is restored (see the WP-211 brief, lot C, "Back").
+
 Two integration notes:
 
 - Confidential clients (`unifai`, `openshift`, `aap`, `zuno-admin-api`,

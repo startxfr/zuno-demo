@@ -25,11 +25,8 @@ zuno_envId: demo
 # (seed-only-if-missing, ADR-0345): hardened is meant for fresh installs.
 zuno_security_profile: demo
 
-# WP-223: the MCP Gateway workload token (Vault mcp/gateway-workload-token) no
-# longer derives from the admin password ("token-<password>" made the token as
-# guessable as the password). It is unset here on purpose so the vault role's
-# random default applies; seeding is seed-only-if-missing, so the live value of
-# an existing cluster does not move. The unused zuno_admin_vault_token went with it.
+# WP-250: the MCP Gateway workload token (Vault mcp/gateway-workload-token) is retired: the gateway's Vault-Transit-signed call
+# assertion is the only credential the MCP servers accept. The Vault value is no longer seeded or readable by any namespace store.
 
 # ADR-0057: default report format for `make day2|d2 test|stresstest` -
 # text (raw table, always printed regardless) | json | csv. Override
@@ -45,10 +42,21 @@ day2_report_format: text
 # serve the router's self-signed default certificate, which no control host
 # trusts. demo333's Routes do carry the Let's Encrypt wildcard (checked
 # 2026-11-07: keycloak, aap, rh-ai, grafana verify with the system trust
-# store), so the switch to true is a WP-226 Operator pending step: one run
-# with EXTRA_VARS="-e zuno_validate_route_certs=true", then this default.
+# store). Switched on 2026-11-11 (user's go): `make d0 check keycloak`, `make d0 check aap` and
+# `make d0 install aap-config` passed with it on, and every Route these tasks call (keycloak, aap, rh-ai,
+# ai-gateway, the mlops DSPA, the Tempo gateway, data-science-gateway, maas) verifies with the system trust store.
+# A cluster without the ACME wildcard sets it back to false in its own inventory.
 # It lives here, not in ansible/clusters/<cluster>.yml, because most of the
 # roles concerned (aap, aap_config, kagent, dify, openclaw) do not load the
 # cluster file. Calls to in-cluster Services signed by the service CA keep
 # their own reason in place.
-zuno_validate_route_certs: false
+zuno_validate_route_certs: true
+
+# Global OLM approval switch (post-demo 2026-11-09, ADR-0607 clause 2 can make Manual the rule): the approval mode of
+# every operator Subscription rendered by a gitops chart. `Automatic` lets OLM install new operator versions on its own;
+# `Manual` leaves each new InstallPlan waiting for an approval (freeze, pinning). Applied by ansible/tasks/
+# install_plan_approval.yml at every Application apply, and mirrored by the chart defaults (Automatic).
+zuno_operator_install_plan_approval: Automatic
+# Components that ignore the switch: pre-GA operators that stay Manual (rhods 3.6 EA, claw-operator staging,
+# nfs-provisioner pre-GA) and unifai-operator, which is pinned by its catalog image (its chart sets the mode itself).
+zuno_operator_install_plan_approval_exempt: [openshift-ai, openclaw, nfs-provisioner, unifai]

@@ -35,7 +35,6 @@ import os
 import socket
 import sys
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -85,20 +84,20 @@ def _build_fake_downstream_app() -> Starlette:
             raise ValueError(f"no customer with id {customer_id}")
         return {"customer": {"id": customer_id, "name": "Acme Corp"}}
 
-    class GatewayTokenMiddleware(BaseHTTPMiddleware):
+    class AuthorizationMiddleware(BaseHTTPMiddleware):
+        # WP-250: the shared X-Zuno-Gateway-Token is retired; this stand-in server only checks that
+        # the gateway sent an Authorization header (the caller's bearer in the default mode).
         async def dispatch(self, request: Request, call_next):
-            token = request.headers.get("x-zuno-gateway-token", "")
-            if not hmac.compare_digest(token, "test-workload-token"):
+            if not request.headers.get("authorization", "").startswith("Bearer "):
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
             return await call_next(request)
 
     asgi_app = mcp_server.streamable_http_app(streamable_http_path="/mcp")
-    asgi_app.add_middleware(GatewayTokenMiddleware)
+    asgi_app.add_middleware(AuthorizationMiddleware)
     return asgi_app
 
 
 async def test_successful_call_unwraps_structured_content_envelope(transport) -> None:
-    downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
 
@@ -118,7 +117,6 @@ async def test_successful_call_unwraps_structured_content_envelope(transport) ->
 
 
 async def test_tool_error_becomes_downstream_error_502(transport) -> None:
-    downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
 
@@ -141,7 +139,6 @@ async def test_tool_error_becomes_downstream_error_502(transport) -> None:
 
 
 async def test_unknown_tool_becomes_downstream_error_502(transport) -> None:
-    downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
 
@@ -176,7 +173,6 @@ async def test_unreachable_backend_becomes_downstream_error_502(transport) -> No
     # Deliberately does NOT patch httpx2.AsyncClient to the fake ASGI
     # transport (unlike every other test above) - the whole point is to
     # exercise the real network path and get a real httpx2.ConnectError.
-    downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
     port = _closed_local_port()
     binding = Binding(
         capability="sales.test.unreachable",

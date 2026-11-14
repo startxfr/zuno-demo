@@ -36,6 +36,8 @@
         global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
       open-webui:
         global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
+      world-model:
+        global: {zuno: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}", keycloakHost: "{{ zuno_keycloak_host }}"}}
       openclaw:
         keycloak: {host: "{{ zuno_keycloak_host }}"}
       unifai:
@@ -48,6 +50,7 @@
         keycloakHost: "{{ zuno_keycloak_host }}"
       connectivity-link:
         quotaEnforcement: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
+        workstationEntry: {keycloakIssuerUrl: "{{ zuno_keycloak_issuer_url }}"}
       rhtas:
         fulcio: {oidc: {issuerUrl: "{{ zuno_keycloak_issuer_url }}"}}
       trustyai-config:

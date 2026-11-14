@@ -1,6 +1,6 @@
 # git-forge-mcp must accept traffic ONLY from the MCP Gateway, not other
 # same-namespace pods - same reasoning as every other MCP server chart.
-# The app also validates the X-Zuno-Gateway-Token shared secret as
+# The app also verifies the gateway's signed call assertion as
 # defense in depth.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

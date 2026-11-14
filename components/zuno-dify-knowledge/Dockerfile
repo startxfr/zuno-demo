@@ -7,8 +7,9 @@
 ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
 FROM ${BASE_IMAGE} AS base
 
+COPY platform/python/bootstrap/tools/requirements.txt /tmp/bootstrap-tools.txt
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
+    pip install --no-cache-dir --require-hashes --upgrade -r /tmp/bootstrap-tools.txt
 
 WORKDIR /app
 

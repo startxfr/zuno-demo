@@ -1,0 +1,92 @@
+---
+# Runs from the operator's workstation with the operator's AWS credentials; no cluster access.
+# Uses the aws CLI (already required for the other buckets) rather than amazon.aws, which needs boto3 on the
+# controller and would add a Python dependency for four idempotent calls.
+- name: "registry_bucket | require the bucket name"
+  ansible.builtin.assert:
+    that: zuno_quay_s3_bucket | length > 0
+    fail_msg: "Set zuno_quay_s3_bucket in ansible/clusters/<cluster>.yml (ADR-0547)."
+    quiet: true
+
+- name: "registry_bucket | read the current state (read-only)"
+  ansible.builtin.shell: |
+    set -u
+    A="aws --profile {{ zuno_registry_aws_profile }} --region {{ zuno_quay_s3_region }}"
+    b=no; $A s3api head-bucket --bucket {{ zuno_quay_s3_bucket }} >/dev/null 2>&1 && b=yes
+    u=no; $A iam get-user --user-name {{ zuno_quay_s3_iam_user }} >/dev/null 2>&1 && u=yes
+    k=0; [ "$u" = yes ] && k=$($A iam list-access-keys --user-name {{ zuno_quay_s3_iam_user }} --query 'length(AccessKeyMetadata)' --output text)
+    echo "$b $u $k"
+  args:
+    executable: /bin/bash
+  register: _rb_state
+  changed_when: false
+
+- name: "registry_bucket | plan"
+  ansible.builtin.set_fact:
+    _rb_bucket: "{{ _rb_state.stdout.split()[0] }}"
+    _rb_user: "{{ _rb_state.stdout.split()[1] }}"
+    _rb_keys: "{{ _rb_state.stdout.split()[2] | int }}"
+
+- name: "registry_bucket | show the plan"
+  ansible.builtin.debug:
+    msg:
+      - "bucket {{ zuno_quay_s3_bucket }} ({{ zuno_quay_s3_region }}) exists: {{ _rb_bucket }}"
+      - "IAM user {{ zuno_quay_s3_iam_user }} exists: {{ _rb_user }}, access keys: {{ _rb_keys }}"
+      - "apply: {{ registry_bucket_apply }} (set -e registry_bucket_apply=true to write to AWS)"
+
+- name: "registry_bucket | create the bucket, block public access, encrypt by default"
+  ansible.builtin.shell: |
+    set -eu
+    A="aws --profile {{ zuno_registry_aws_profile }} --region {{ zuno_quay_s3_region }}"
+    {% if _rb_bucket == 'no' %}
+    $A s3api create-bucket --bucket {{ zuno_quay_s3_bucket }} \
+      --create-bucket-configuration LocationConstraint={{ zuno_quay_s3_region }}
+    {% endif %}
+    $A s3api put-public-access-block --bucket {{ zuno_quay_s3_bucket }} \
+      --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+    $A s3api put-bucket-encryption --bucket {{ zuno_quay_s3_bucket }} \
+      --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+  args:
+    executable: /bin/bash
+  changed_when: _rb_bucket == 'no'
+  when: registry_bucket_apply | bool
+
+- name: "registry_bucket | create the IAM user and scope it to this bucket only"
+  ansible.builtin.shell: |
+    set -eu
+    A="aws --profile {{ zuno_registry_aws_profile }} --region {{ zuno_quay_s3_region }}"
+    {% if _rb_user == 'no' %}
+    $A iam create-user --user-name {{ zuno_quay_s3_iam_user }}
+    {% endif %}
+    $A iam put-user-policy --user-name {{ zuno_quay_s3_iam_user }} --policy-name registry-bucket \
+      --policy-document '{"Version":"2012-10-17","Statement":[
+        {"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation",
+        "s3:ListBucketMultipartUploads"],"Resource":"arn:aws:s3:::{{ zuno_quay_s3_bucket }}"},
+        {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",
+        "s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],
+        "Resource":"arn:aws:s3:::{{ zuno_quay_s3_bucket }}/*"}]}'
+  args:
+    executable: /bin/bash
+  changed_when: _rb_user == 'no'
+  when: registry_bucket_apply | bool
+
+# An access key secret is readable only at creation: create it once, keep it 0600 outside the repository.
+- name: "registry_bucket | create the access key once"
+  ansible.builtin.shell: |
+    set -eu
+    umask 077
+    mkdir -p "$(dirname {{ registry_bucket_key_file | quote }})"
+    aws --profile {{ zuno_registry_aws_profile }} iam create-access-key --user-name {{ zuno_quay_s3_iam_user }} \
+      --query AccessKey --output json > {{ registry_bucket_key_file | quote }}
+  args:
+    executable: /bin/bash
+  no_log: true
+  changed_when: true
+  when:
+    - registry_bucket_apply | bool
+    - _rb_keys | int == 0
+
+- name: "registry_bucket | where the key is"
+  ansible.builtin.debug:
+    msg: "Access key file: {{ registry_bucket_key_file }} (0600). The quay_registry role moves it to Vault; it is never committed."
+  when: registry_bucket_apply | bool and _rb_keys | int == 0

@@ -1,6 +1,6 @@
 # ADR-0602: Harden the platform's trust boundaries before a customer runs it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.16 (retargeted from v0.15 on 2026-11-07: v0.15 became the demo-ready band of ADR-0605; the live part of the remaining work waits for the window after the 2026-11-09 demonstration)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team
@@ -156,3 +156,40 @@ clause changes; only the order of the live steps is set.
   namespace-scoped switches in a canary namespace, its cluster-scoped ones (Vault, mesh-wide settings, ArgoCD scope)
   verified by its `make check` only and named as not rehearsed. There is no scratch cluster; demo333 stays on the `demo`
   profile.
+
+## Amendment (2026-11-11): the two open points of clause 5 decided
+
+The user decided the two points that clause 5 left open.
+
+- **The plain-HTTP chart repository: fixed at its source.** The startx Helm repository
+  (`sx-helm-repository-prod`, S3 static website hosting) has no TLS. Its `index.yaml` and the 1,542 chart archive URLs
+  it lists are `http://`. The S3 REST endpoint `https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable`
+  serves the same files over TLS: the same index byte for byte, and the archives answer 200 (checked on 2026-11-11).
+  Switching only zuno's repository URL would protect the index, not the archives. So the fix has two steps:
+  1. The helm-repository project publishes its index with HTTPS URLs: `HELM_REPO_BASEURL` in its `.tools/config`,
+     then its publish step. That project owns the change and its publish.
+  2. zuno then moves to HTTPS everywhere the repository appears: the `startx-helm-repo` repository Secret, the
+     `sourceRepos` of the `zuno-platform` and `zuno-apps` AppProjects, and every `Chart.lock`. Each chart is checked
+     with `helm dependency build`, and every Application is hard-refreshed.
+
+  Step 1 was done on 2026-11-11: the index of stable, noschema and release-21 is HTTPS only (helm-repository commit
+  d883b367f3). The archive releases 14 to 20 keep http URLs; zuno does not use them.
+
+  Step 2 is prepared in three moves. A `Chart.lock` digest encodes the URL that `alias:startx` resolves to. With the
+  alias, a lock and the ArgoCD repository Secret would have to change at the same instant, because each half-switched
+  state fails with "Chart.lock is out of sync". So the 25 charts now name the HTTPS URL directly in `Chart.yaml`, which
+  ArgoCD registers on its own.
+  - (a) Both AppProjects admit the HTTPS URL next to the http one, through the argocd role.
+  - (b) The charts and locks switch in git, together with the CI, the console `HelmChartRepository`, the repository
+    Secret, and AppProjects without http.
+  - (c) The argocd role runs again.
+  The startx archives carry their own subcharts, so nothing is fetched over http afterwards.
+
+  Step 2 was done live on demo333 on 2026-11-12, between 04:23 and 04:35 UTC. The Applications kept the states they
+  had before, and the golden path passed
+  ([evidence](../roadmap/evidence/adr-0602-c4-startx-charts-over-https-2026-11-12.md)). Of the C4 finding, only the
+  controller's `cluster-admin` remains, and it is moved to WP-227.
+- **The ArgoCD controller's `cluster-admin`: moved to the `hardened` profile (WP-227).** That profile replaces the
+  binding with a ClusterRole built from the cluster-scoped kinds that `zuno-platform` allows, plus `admin` in the
+  managed namespaces. The `demo` profile keeps `cluster-admin`, as a risk the user accepts. Shrinking it on demo333
+  would turn any forgotten kind into a sync failure across about 106 Applications.

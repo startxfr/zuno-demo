@@ -1,0 +1,309 @@
+---
+# ADR-0612/WP-248 step 4, second half: the first admin, the organisation `zuno`, the pull and push robot accounts and the
+# default permissions that give them read and write on every repository created in the organisation. Idempotent:
+# /api/v1/user/initialize works once (on an empty database), everything else is create-if-missing. The admin password
+# and OAuth token (used by `make d3 admit` with OKF_MIRROR_QUAY=1 to prune) and the robot tokens go to Vault only.
+- name: "quay_registry | find the Quay route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-quay
+  register: _quay_registry_route
+  failed_when: _quay_registry_route.resources | length == 0
+
+- name: "quay_registry | set the API base"
+  ansible.builtin.set_fact:
+    _quay_registry_host: "{{ _quay_registry_route.resources[0].spec.host }}"
+    _quay_registry_api: "https://{{ _quay_registry_route.resources[0].spec.host }}/api/v1"
+
+- name: "quay_registry | find the Vault pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "quay_registry | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+# ADR-0603 M9: no secret on a command line. ansible/tasks/vault_cli.yml copies the token (and the payload) into the pod as files.
+- name: "quay_registry | read the admin record from Vault (rc 2 = not yet created)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv get -format=json zuno/registry/quay-admin"
+    vault_cli_capture_stdout: true
+    vault_cli_fail_on_error: false
+
+- name: "quay_registry | keep the Vault read"
+  ansible.builtin.set_fact:
+    _quay_registry_admin_vault: "{{ vault_cli_result }}"
+  no_log: true
+
+- name: "quay_registry | stop when the Vault read failed for another reason than a missing path"
+  ansible.builtin.fail:
+    msg: "Could not tell whether zuno/registry/quay-admin exists (rc={{ _quay_registry_admin_vault.rc | default('n/a') }}); not initializing."
+  when: (_quay_registry_admin_vault.rc | default(1) | int) not in [0, 2]
+
+- name: "quay_registry | first start: draw the admin password once"
+  ansible.builtin.set_fact:
+    _quay_registry_admin_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+  when: _quay_registry_admin_vault.rc | int == 2
+  no_log: true
+
+- name: "quay_registry | first start: initialize the admin user (works once, on an empty database)"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/user/initialize"
+    method: POST
+    body_format: json
+    body:
+      username: quayadmin
+      password: "{{ _quay_registry_admin_password }}"
+      email: "{{ zuno_quay_admin_email }}"
+      access_token: true
+    status_code: [200]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_init
+  when: _quay_registry_admin_vault.rc | int == 2
+  no_log: true
+
+# Store at once: the token is shown only now.
+- name: "quay_registry | store the admin record in Vault"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/registry/quay-admin @PAYLOAD"
+    vault_cli_payload:
+      username: quayadmin
+      password: "{{ _quay_registry_admin_password }}"
+      token: "{{ _quay_registry_init.json.access_token }}"
+  when: _quay_registry_admin_vault.rc | int == 2
+
+- name: "quay_registry | the admin OAuth token"
+  ansible.builtin.set_fact:
+    _quay_registry_token: >-
+      {{ _quay_registry_init.json.access_token if _quay_registry_admin_vault.rc | int == 2
+         else (_quay_registry_admin_vault.stdout | from_json).data.data.token }}
+  no_log: true
+
+# Quay gives the initialization token a one-day life (measured: expires_at 2026-11-11 23:36, the second run answered 401 and the
+# log said "OAuth access with an expired token"). Vault keeps the same token string, so a rejected token is revived by moving its
+# expiry forward in the Quay database, once per run; no new secret is created and the scope is unchanged.
+- name: "quay_registry | probe the admin token"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/user/"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 401]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_token_probe
+  no_log: true
+
+- name: "quay_registry | find the Quay database primary"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ zuno_quay_namespace }}"
+    label_selectors:
+      - postgres-operator.crunchydata.com/cluster=quay-db
+      - postgres-operator.crunchydata.com/role=master
+  register: _quay_registry_db_primary
+  when: _quay_registry_token_probe.status == 401
+
+- name: "quay_registry | extend the admin token by one day"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ zuno_quay_namespace }}"
+    pod: "{{ _quay_registry_db_primary.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -d quay -v ON_ERROR_STOP=1 -c "update oauthaccesstoken set expires_at = now() + interval '1 day' where authorized_user_id = 1"
+  when: _quay_registry_token_probe.status == 401
+
+# Look first, create on 404: accepting "400 = exists" would also swallow a real refusal (the first run did: the organisation
+# email must differ from the admin's).
+- name: "quay_registry | look up the organisation"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 404]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_org
+  no_log: true
+
+- name: "quay_registry | create the organisation"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    body_format: json
+    body:
+      name: "{{ zuno_quay_organization }}"
+      email: "{{ zuno_quay_organization_email }}"
+    status_code: [201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  when: _quay_registry_org.status == 404
+  no_log: true
+
+- name: "quay_registry | look up the robot accounts"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item }}"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    # Quay answers 400 ("Could not find robot") for a robot that does not exist yet.
+    status_code: [200, 400, 404]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop: [pull, push]
+  register: _quay_registry_robot_lookup
+  no_log: true
+
+- name: "quay_registry | create the missing robot accounts"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item.item }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    body_format: json
+    body:
+      description: "{{ 'Pull-only, used by the namespaces that run images' if item.item == 'pull' else 'Push, used by builds and admission' }}"
+    status_code: [201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop: "{{ _quay_registry_robot_lookup.results }}"
+  when: item.status != 200
+  no_log: true
+
+# A robot cannot create a repository by pushing to it unless it belongs to a team with the `creator` role: without this the
+# first push of an artifact answers 401 (found by the canary). PUT is idempotent for both the team and the membership.
+- name: "quay_registry | the creators team (role creator)"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    body_format: json
+    body: {role: creator, description: "Robots that may create repositories by pushing"}
+    status_code: [200, 201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  no_log: true
+
+- name: "quay_registry | look up the members of the creators team"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators/members"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_creators
+  no_log: true
+
+# Adding a member twice answers 400, so add only when absent.
+- name: "quay_registry | add the push robot to the creators team"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/team/creators/members/{{ zuno_quay_organization }}+push"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    status_code: [200, 201]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  when: (zuno_quay_organization ~ '+push') not in (_quay_registry_creators.json.members | default([]) | map(attribute='name') | list)
+  no_log: true
+
+- name: "quay_registry | read the robot tokens"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/robots/{{ item }}"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    return_content: true
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop: [pull, push]
+  register: _quay_registry_robots
+  no_log: true
+
+- name: "quay_registry | read the default permissions already set"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/prototypes"
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    return_content: true
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  register: _quay_registry_prototypes
+  no_log: true
+
+# A default permission applies to every repository created later in the organisation: pull = read, push = write.
+- name: "quay_registry | grant the robots their default role on new repositories"
+  ansible.builtin.uri:
+    url: "{{ _quay_registry_api }}/organization/{{ zuno_quay_organization }}/prototypes"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _quay_registry_token }}"
+    body_format: json
+    body:
+      role: "{{ 'read' if item == 'pull' else 'write' }}"
+      delegate:
+        name: "{{ zuno_quay_organization }}+{{ item }}"
+        kind: user
+    status_code: [200]
+    validate_certs: "{{ zuno_quay_validate_certs }}"
+  loop: [pull, push]
+  when: >-
+    (zuno_quay_organization ~ '+' ~ item) not in
+    (_quay_registry_prototypes.json.prototypes | default([]) | map(attribute='delegate.name') | list)
+  no_log: true
+
+- name: "quay_registry | store the robot tokens in Vault (first run only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: registry/quay-robots
+    vault_seed_fields:
+      pull_username: "{{ zuno_quay_organization }}+pull"
+      pull_token: "{{ _quay_registry_robots.results[0].json.token }}"
+      push_username: "{{ zuno_quay_organization }}+push"
+      push_token: "{{ _quay_registry_robots.results[1].json.token }}"
+
+# Pods read a pull-only record: the namespace Vault grants are per path (platform/vault/secret-access.yaml), and quay-robots also
+# holds the push token, which no consumer namespace may read.
+- name: "quay_registry | store the pull-only credential in Vault (first run only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: registry/quay-pull
+    vault_seed_fields:
+      username: "{{ zuno_quay_organization }}+pull"
+      token: "{{ _quay_registry_robots.results[0].json.token }}"
+
+# The bucket key exists once, in ~/.config/zuno on the workstation that ran registry_bucket.yml. Vault keeps the second copy so the
+# key survives the loss of that workstation (rotation: create the new key, update the config bundle, then overwrite this path).
+- name: "quay_registry | store the bucket access key in Vault (first run only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: registry/quay-bucket
+    vault_seed_fields:
+      bucket: "{{ zuno_quay_s3_bucket }}"
+      region: "{{ zuno_quay_s3_region }}"
+      access_key_id: "{{ _quay_registry_s3_key.AccessKeyId }}"
+      secret_access_key: "{{ _quay_registry_s3_key.SecretAccessKey }}"
+
+# The workstation verifies the mirror (okf_mirror_holds_lock.yml) and feeds it (make d3 admit agents) through the route with
+# the robots' docker configs, kept beside the bucket key. Rewritten at every run so a rotated token is picked up.
+- name: "quay_registry | create the workstation docker config directories"
+  ansible.builtin.file:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/quay-{{ item }}"
+    state: directory
+    mode: "0700"
+  loop: [pull, push]
+
+- name: "quay_registry | write the workstation docker configs for the pull and push robots (0600)"
+  ansible.builtin.copy:
+    dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/quay-{{ item.role }}/config.json"
+    mode: "0600"
+    content: >-
+      {{ {'auths': {_quay_registry_host: {'auth': ((item.user ~ ':' ~ item.token) | b64encode)}}} | to_nice_json }}
+  loop:
+    - {role: pull, user: "{{ zuno_quay_organization }}+pull", token: "{{ _quay_registry_robots.results[0].json.token }}"}
+    - {role: push, user: "{{ zuno_quay_organization }}+push", token: "{{ _quay_registry_robots.results[1].json.token }}"}
+  loop_control:
+    label: "{{ item.role }}"
+  no_log: true

@@ -1,0 +1,10 @@
+---
+# ADR-0612/WP-248 step 3. Workstation only; writes to AWS only with -e registry_bucket_apply=true.
+- name: "Provision the internal registry's S3 bucket"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../clusters/{{ zuno_cluster | default('demo333') }}.yml"
+  roles:
+    - registry_bucket

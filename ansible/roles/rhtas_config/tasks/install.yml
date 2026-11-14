@@ -32,7 +32,7 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
-- name: "rhtas_config | wait for the policy-controller-manager Deployment to become Available"
+- name: "rhtas_config | wait for the operator's own Deployments to become Available"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
@@ -42,13 +42,22 @@
     # zuno-rhtas - live finding, first real run of this never-before-
     # invoked role (2026-09-08).
     namespace: policy-controller-operator
-    name: policy-controller-manager
+    # Selected by OLM's owner label, not by name: the operator's Deployment
+    # was `policy-controller-manager` up to v1.0.x and is
+    # `policy-controller-operator` from v1.1.2, so a wait on the old name
+    # never ended after the upgrade (WP-211 way back, 2026-11-09). The
+    # label also leaves out the Helm-managed `zuno-policy-controller-webhook`
+    # the operator deploys from the PolicyController CR.
+    label_selectors:
+      - olm.owner.kind=ClusterServiceVersion
   register: _rhtas_config_operator_deployment
   until: >-
     (_rhtas_config_operator_deployment.resources | default([]) | length) > 0 and
-    (_rhtas_config_operator_deployment.resources[0].status.conditions | default([])
-     | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
-     | first | default('False')) == 'True'
+    (_rhtas_config_operator_deployment.resources
+     | map(attribute='status.conditions', default=[])
+     | map('selectattr', 'type', 'equalto', 'Available')
+     | map('selectattr', 'status', 'equalto', 'True')
+     | map('list') | map('length') | select('equalto', 0) | list | length) == 0
   retries: 60
   delay: 10
 
@@ -185,7 +194,16 @@
       {{ {'enabled': (zuno_unifai_admission_enabled | default(true) | bool),
           'mode': (zuno_unifai_admission_mode | default('warn')),
           'issuer': ids.issuer,
-          'subjectRegExps': rx} }}
+          'subjectRegExps': rx,
+          'signatureMirror': {'host': (zuno_unifai_signature_mirror_host | default(''))}} }}
+
+# One policy per repository when the signatures are read from the internal registry (WP-248), the single policy otherwise.
+- name: "rhtas_config | names of the UnifAI ClusterImagePolicies to wait for"
+  ansible.builtin.set_fact:
+    _rhtas_config_unifai_cip_names: >-
+      {{ (['unifai-backend', 'unifai-identity', 'unifai-multiagent', 'unifai-rag', 'unifai-ui', 'unifai-operator',
+           'unifai-operator-bundle', 'unifai-operator-catalog'] | map('regex_replace', '^', 'zuno-unifai-images-') | list)
+         if (zuno_unifai_signature_mirror_host | default('')) | length > 0 else ['zuno-unifai-images'] }}
 
 # gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
 # rather than merging (17e4117c's finding for cert-manager - values is a
@@ -214,7 +232,11 @@
             {
               'policyOperand': {
                 'trustRoot': {'rootJsonBase64': _rhtas_config_tuf_root.stdout | trim},
-                'clusterImagePolicy': {'certIdentityIssuer': zuno_keycloak_issuer_url},
+                'clusterImagePolicy': {
+                  'certIdentityIssuer': zuno_keycloak_issuer_url,
+                  'certIdentityExtraIssuers': ([] if zuno_keycloak_issuer_url == 'https://keycloak.' ~ cluster_base_domain ~ '/realms/zuno'
+                                               else ['https://keycloak.' ~ cluster_base_domain ~ '/realms/zuno'])
+                },
                 'unifai': _rhtas_config_unifai_admission
               }
             },
@@ -247,7 +269,8 @@
   kubernetes.core.k8s_info:
     api_version: policy.sigstore.dev/v1alpha1
     kind: ClusterImagePolicy
-    name: zuno-unifai-images
+    name: "{{ item }}"
+  loop: "{{ _rhtas_config_unifai_cip_names }}"
   register: _rhtas_config_unifai_cip
   until: >-
     (_rhtas_config_unifai_cip.resources | default([]) | length) > 0 and

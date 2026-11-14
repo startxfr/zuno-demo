@@ -24,6 +24,7 @@ import random
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
@@ -73,6 +74,16 @@ def load_presets(path: Path) -> list:
         image = item.get("image")
         out.append({**item, "_image_path": (path.parent / image) if image else None})
     return out
+
+
+def logout_url(settings: Settings) -> Optional[str]:
+    """Where the browser goes to sign out: the oauth2-proxy drops its cookie, then Keycloak ends the SSO session
+    and sends the browser back to the site. Without the second hop the next visit would sign straight back in."""
+    if not settings.public_url:
+        return None
+    keycloak = (f"{settings.issuer}/protocol/openid-connect/logout?client_id={quote(settings.logout_client_id, safe='')}"
+                f"&post_logout_redirect_uri={quote(settings.public_url + '/', safe='')}")
+    return "/oauth2/sign_out?rd=" + quote(keycloak, safe="")
 
 
 def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authenticator] = None,
@@ -142,7 +153,8 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
     @app.get("/api/me")
     async def me(request: Request):
         caller = caller_of(request)
-        return {"user": caller.username, "groups": caller.groups, "ops": caller.in_any(settings.ops_groups)}
+        return {"user": caller.username, "groups": caller.groups, "ops": caller.in_any(settings.ops_groups),
+                "logout_url": logout_url(settings)}
 
     @app.get("/api/presets")
     async def list_presets(request: Request):
@@ -211,7 +223,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
             else:
                 effective = screened.prompt if screened else preset.get("prompt", "")
                 base = await rt.image(effective, seed)
-            world = await rt.create_world(base, seed)
+            world = await rt.create_world(base, seed, effective)
         except (RuntimeBusy, RuntimeUnavailable) as exc:
             lease.release(session, "create_failed")
             metrics.WORLDS.labels(source=kind, result="runtime_error").inc()
@@ -221,6 +233,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
             lease.release(session, "create_failed")
             raise
         session.world_id, session.base_png_b64, session.state = world["world_id"], base, "READY"
+        session.scene_prompt = effective
         session.touch()
         metrics.WORLDS.labels(source=kind, result="created").inc()
         return {
@@ -273,7 +286,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
         last = "busy"
         for _ in range(20):  # the runtime clears its streaming flag a moment after the socket closes
             try:
-                world = await rt.create_world(session.base_png_b64, session.seed)
+                world = await rt.create_world(session.base_png_b64, session.seed, session.scene_prompt)
                 break
             except RuntimeBusy:
                 await asyncio.sleep(0.25)

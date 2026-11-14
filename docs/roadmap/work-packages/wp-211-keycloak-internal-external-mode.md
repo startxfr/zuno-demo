@@ -1,6 +1,6 @@
 # WP-211: Keycloak internal/external mode
 
-- **State:** Repo work in review (2026-11-07: lots A and B built and tested locally; lot A is pushed, lot B is committed locally and waits for the end of the demo freeze; lot C, the live there-and-back, needs a window with the user)
+- **State:** Done (2026-11-11)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md), [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (the reconcile mechanics reused)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [WP-216](wp-216-external-secrets-internal-external-mode.md) and [WP-217](wp-217-cert-manager-internal-external-mode.md) (mode-key mechanics: `mode.yml`, symmetric gating), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) (persona passwords)
@@ -161,6 +161,12 @@ on the user's `sub`; a re-created user gets a new id. The migration must keep th
    `make d1 check` green.
 5. ✋ Back: export the simulated realm with users, flip to `internal`, `make d0 install keycloak` and the same consumer
    roles, compare counts and ids, the same proofs, then delete `zuno-auth-ext`.
+   Also restore the bootstrap credential: the external flip overwrote Vault `zuno/keycloak/admin` (KV version 2), and
+   the vault role seeds create-if-missing (ADR-0345), so the path keeps the external admin after the flip back
+   (found 2026-11-11: `zuno-auth/keycloak-admin` still held `zuno-platform`). Run `vault kv rollback -version=1
+   zuno/keycloak/admin` (or re-seed the internal bootstrap credential), force-sync the `keycloak-admin` ExternalSecret,
+   and check the Secret no longer names the external admin. Sign-in is not affected meanwhile (`zuno-admin` and
+   `zuno-automation`, WP-192), only the bootstrap fallback is.
 
 Expected outage: each flip re-points every login; plan about 2 h with the user available for the console and
 experience logins.
@@ -326,3 +332,53 @@ ids into it (`SKIP`), re-run the consumer roles, same proofs, then delete `zuno-
 The data stays on the side it was last written on until the flip back: users created while external are lost unless
 they are exported.
 
+## Status (2026-11-11): lot C done live, the clean-up and three role fixes left
+
+- **Lot B** is on `devel` (4abc2ba1).
+- **Lot C, there:** Keycloak ran in external mode from 2026-11-08 (`keycloak-ext`, golden path 14/14 at 14:59) through
+  the demonstration of 2026-11-09.
+- **Lot C, back:** built-in Keycloak again on 2026-11-09, 11:36 to 12:40, with the same 38 users and ids, golden path
+  14/14 ([demo-day runbook](../../demo/demo-day-2026-11-09.md#back-on-the-built-in-keycloak-2026-11-09-1136-to-1240-cet)).
+
+Left before Done:
+
+1. **Role fixes for the traps of the way back: done on 2026-11-11.**
+   - `apply_gitops_app.yml` states `values: ""` when a manifest's helm block has none, so the merge patch replaces a
+     seam value left by a previous run.
+   - `rhtas_config` finds the operator's Deployments by OLM owner label: v1.1.2 renamed `policy-controller-manager` to
+     `policy-controller-operator`.
+   - `openshift_oauth` joins the PEMs with a real newline: inside `{{ }}` in a `>-` block, `"\n"` stayed backslash + n
+     and broke `user-ca-bundle` on 2026-11-08. `check_docs.py` now reports that pattern anywhere in `ansible/`.
+2. **Live clean-up, each with the user's go:**
+   - roll `zuno/keycloak/admin` back to the built-in credential and force-sync the `keycloak-admin` ExternalSecret
+     (5151869f): done on 2026-11-11 (version 1, user `admin`, restored as version 3; the Secret carries `admin`);
+   - empty the Blender add-on's issuer override on the presenter's laptop (the user's own step).
+3. **`zuno-auth-ext` and `certIdentityExtraIssuers`: done on 2026-11-11.** The 8 images still signed through
+   `keycloak-ext` were rebuilt (`make d2 build mcp`, `mlops`, `token-proxy`, `dify-knowledge`), so the supply-chain check
+   passes 12/12 through the built-in issuer; `make d1 install rhtas-config` in internal mode then set
+   `certIdentityExtraIssuers: []` (the ClusterImagePolicy keeps one identity, Ready). The `zuno-auth-ext` namespace was
+   already gone (removed by another session, not recorded in git); no Application spec, Securesign, OAuth or ConfigMap
+   names `keycloak-ext` any more. Golden path 13/13 after (17:07Z).
+4. **Evidence in both modes (user decision 2026-11-11):** the external mode is evidenced by its golden-path runs (14/14
+   on 2026-11-08), not by a second flip. The three checks ran in internal mode on 2026-11-11 (`-e
+   zuno_keycloak_mode=internal`):
+   - `make d1 check`: exit 0; 22 of 23 components installed. `openshift-ai` reports NOT installed for reasons that
+     predate WP-211 and do not involve Keycloak (DataScienceCluster `trustyai` module not ready on RHOAI 3.6 EA, the
+     TempoStack opa sidecar sizing, the pinned `3.6.0-ea.2` against a catalog serving `3.5.2`). `rhtas-config` is seen
+     installed again (the OLM-label fix).
+   - `make d2 check agents`: exit 0.
+   - `make d2 check supply-chain`: FAIL, 8 of 12 images. Their signatures carry the issuer `keycloak-ext` (v0.14.5 was
+     signed in external mode) and the check verifies against the built-in issuer only, while the admission policy accepts
+     both. It passes once a release is signed through the built-in issuer: item 3.
+
+Then: the brief to Done, an ADR-0352 clause-9 note, and clauses 5 and 6 amended to the consumer list of lot A.
+
+
+## Closure (2026-11-11)
+
+Done. Keycloak runs in internal or external mode with one key (`zuno_keycloak_mode`); both directions were run live on
+demo333 (external from 2026-11-08, back on 2026-11-09, golden path 14/14 each way); the three role traps of the way back
+are fixed; the bootstrap credential is restored; every running first-party image is signed through the built-in issuer and
+the image policy accepts that issuer only. Named exception, by user decision: the external mode is evidenced by its
+golden-path runs, not by the three `make` checks (run in internal mode only). ADR-0352 stays `Partially implemented`
+(Vault, PostgreSQL, Redis, AAP and ArgoCD remain, and the clause-10 gate).
