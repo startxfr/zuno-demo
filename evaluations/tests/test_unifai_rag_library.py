@@ -142,6 +142,33 @@ class LibraryTest(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertEqual(res["result"], "COLLECTING")
 
+    def test_warm_runs_one_turn_and_always_deletes_its_session(self):
+        class Run:
+            def __init__(self, status, reply):
+                self.status, self.reply, self.seconds = status, reply, 1.234
+
+        class Target:
+            def __init__(self, run):
+                self._run, self.cleaned, self.calls = run, 0, []
+
+            def run(self, persona, message, workflow=None, timeout=0):
+                self.calls.append((persona, workflow))
+                return self._run
+
+            def cleanup(self):
+                self.cleaned += 1
+
+        good = Target(Run(200, "I can help with your documents."))
+        [r] = lib.warm(good, "consultant-01", "consultant-01-my-assistant")
+        self.assertTrue(r["ok"])
+        self.assertEqual(good.calls, [("consultant-01", "consultant-01-my-assistant")])
+        self.assertEqual(good.cleaned, 1)
+        bad = Target(Run(403, ""))
+        [r] = lib.warm(bad, "consultant-01", "consultant-01-my-assistant")
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["result"], "HTTP 403")
+        self.assertEqual(bad.cleaned, 1)
+
     def test_names_with_a_path_are_refused(self):
         for bad in ["../x.md", "a/b.md", "", "a\\b.md"]:
             with self.assertRaises(lib.LibraryError):

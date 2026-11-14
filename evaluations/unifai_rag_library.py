@@ -20,6 +20,7 @@ A library is per user (`upload_by`), with no team or scope parameter. The person
     python3 evaluations/unifai_rag_library.py --persona consultant-01 list
     python3 evaluations/unifai_rag_library.py --persona consultant-01 delete a.md b.md
     python3 evaluations/unifai_rag_library.py --persona consultant-01 upload docs/demo/unifai-rag-upload/a.md --wait 300
+    python3 evaluations/unifai_rag_library.py --persona consultant-01 warm consultant-01-my-assistant
 
 The password is read at run time from zuno-ai-run/acceptance-gate-credentials and never printed. The output is one
 JSON object per line; the exit code is 0 only when every action succeeded.
@@ -149,8 +150,11 @@ def _oc(*args: str) -> str:
     return out.stdout.strip()
 
 
-def persona_client(persona: str) -> tuple:
-    """(client, api base) for the persona itself, never its eval twin."""
+WARM_PROMPT = "In one short sentence, say what you can help me with."
+
+
+def persona_target(persona: str) -> tuple:
+    """(UnifaiTarget, client, api base) for the persona itself, never its eval twin."""
     os.environ["EVAL_PERSONAS"] = "0"
     sys.path.insert(0, str(HERE / "common"))
     from unifai_target import UnifaiTarget  # imports httpx, needed only here
@@ -158,7 +162,19 @@ def persona_client(persona: str) -> tuple:
     ui = os.getenv("UNIFAI_URL") or f"https://unifai-ui-zuno-unifai.{_oc('get', 'ingresses.config.openshift.io', 'cluster', '-o', 'jsonpath={.spec.domain}')}"
     password = base64.b64decode(_oc("-n", "zuno-ai-run", "get", "secret", "acceptance-gate-credentials",
                                     "-o", "jsonpath={.data.demo-persona-password}")).decode()
-    return UnifaiTarget(password, ui_url=ui).client(persona), f"{ui.rstrip('/')}/api1"
+    target = UnifaiTarget(password, ui_url=ui)
+    return target, target.client(persona), f"{ui.rstrip('/')}/api1"
+
+
+def warm(target: Any, persona: str, workflow: str, timeout: float = 180) -> List[Dict[str, Any]]:
+    """One turn on the persona's own workflow, so the model answers fast on stage; the session is deleted after."""
+    try:
+        run = target.run(persona, WARM_PROMPT, workflow=workflow, timeout=timeout)
+    finally:
+        target.cleanup()
+    ok = run.status == 200 and bool(run.reply.strip())
+    return [{"action": "warm", "workflow": workflow, "seconds": round(run.seconds, 1),
+             "result": "answered" if ok else f"HTTP {run.status}", "ok": ok}]
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -171,11 +187,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_up = sub.add_parser("upload")
     p_up.add_argument("files", nargs="+", type=pathlib.Path)
     p_up.add_argument("--wait", type=float, default=0, help="seconds to wait until every file is DONE (0: no wait)")
+    p_warm = sub.add_parser("warm")
+    p_warm.add_argument("workflow")
     args = parser.parse_args(argv)
 
     try:
-        client, api = persona_client(args.persona)
-        if args.command == "list":
+        target, client, api = persona_target(args.persona)
+        if args.command == "warm":
+            results = warm(target, args.persona, args.workflow)
+        elif args.command == "list":
             results = [dict(s, action="list", ok=True) for s in list_sources(client, api)]
         elif args.command == "delete":
             results = delete_named(client, api, args.names)
