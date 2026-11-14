@@ -83,6 +83,8 @@ Nothing to do. The file reads the Applications `zuno-openshift-ai-d0`, `zuno-ope
 `LLMInferenceService` `gpt-oss-20b` in `zuno-ai-run` (`READY True`). If one is missing or not Healthy, stop and tell
 the platform owner: this demo installs nothing.
 
+The DataScienceCluster `zuno-dsc` shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The cause is the parked GuardrailsOrchestrator `zuno-guardrails-smoke`, in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the OGXServer
