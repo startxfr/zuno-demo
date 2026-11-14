@@ -83,16 +83,40 @@ Other identities:
 - A developer with a MaaS key reaches gpt-oss-20b through the same gateway (see the
   [MaaS scenario](./maas-portal-api-keys.md)).
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] **paas-ops-01** has signed in once to the OpenShift console: on 2026-11-13 its group `ocp-paas-ops` did not
-  exist yet. Then log a terminal in with `oc` as **paas-ops-01**, large font, at the repository root.
-- [ ] `oc get llminferenceservice,inferenceservice -n zuno-ai-run`: five `READY True`. A model restarted in the last
-  15 minutes may still be loading (see [If something goes wrong](#if-something-goes-wrong)).
-- [ ] Look for a wedged rollout: `oc get rs -n zuno-ai-run | grep -e kserve -e predictor`. A model line with `DESIRED 1`
-  and `CURRENT 0` is a rollout the quota refused; the model still serves on its old pod. On 2026-11-13 `gpt-oss-20b`
-  had one. Decide with the cluster owner the day before: leave it and show it at 9:45, or have the owner run
-  `make d2 reconcile models` (the model is down for a few minutes). Never run it on stage.
+`make demo use model-serving-llmd-mig 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/model-serving-llmd-mig/<action>.yml`) has
+run, and says what is left to the presenter. No action of this demo changes the cluster, and every step is a read.
+`make d2 reconcile models` is owner-only and is never run by a step or on stage.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-models-d0` and `zuno-models-d1`, the four `LLMInferenceService`
+and the `InferenceService` `embeddings` in `zuno-ai-run` (five `READY True`; a model restarted in the last 15 minutes
+may still be loading, see [If something goes wrong](#if-something-goes-wrong)), the two GPU nodes and the
+ResourceQuota `zuno-ai-run-gpu-cap`. If one is missing or not Ready, stop and tell the platform owner: this demo
+installs nothing.
+
+### Check
+
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only, among them a look
+for a wedged rollout: `oc get rs -n zuno-ai-run | grep -e kserve -e predictor`. A model line with `DESIRED 1` and
+`CURRENT 0` is a rollout the quota refused; the model still serves on its old pod. On 2026-11-13 `gpt-oss-20b` had
+one. Decide with the cluster owner the day before: leave it and show it at 9:45, or have the owner run
+`make d2 reconcile models` (the model is down for a few minutes). It is never run by the step file and never on stage.
+
+### Install
+
+Nothing to do. The models, the GPU operator and the quota are part of the shared platform: the file only verifies them.
+
+### Start
+
+The file prepares nothing. What only a person does:
+
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, large font, at the repository root. If **paas-ops-01** has
+  never signed in to the OpenShift console (on 2026-11-13 its group `ocp-paas-ops` did not exist yet), sign in once in
+  a browser first, then log the terminal in.
 - [ ] Browser profile **ai-ops-01**: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, dashboard
   **Zuno Platform / AI models & serving**, last 1 hour, rows **vLLM serving** and **GPU (DCGM)** open.
 - [ ] Optional, 15-minute version: the OpenShift console `https://console-openshift-console.apps.demo333.startx.fr` as
@@ -101,8 +125,16 @@ Other identities:
   Their content was not checked.
 - [ ] Open the [failover drill evidence](../../../roadmap/evidence/adr-0536-node-failover-drill.md) and the
   [24 GB slice bench](../../../roadmap/evidence/model-bench-24gb-slice-2026-10-25.md).
-- [ ] Known on screen, not a failure: `oc get clusterpolicy` may say `notReady` (on 2026-11-13: a reconcile timeout).
-  If both nodes advertise their slices, serving is fine.
+- Known on screen, not a failure: `oc get clusterpolicy` may say `notReady` (on 2026-11-13: a reconcile timeout). If
+  both nodes advertise their slices, serving is fine.
+
+### Stop
+
+Nothing to do. Close the terminal and the browser tabs.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
