@@ -68,19 +68,55 @@ The scenario pages name a few more accounts; their Personas sections say which.
 | 0:53 | Prove | [Evaluation with TrustyAI and EvalHub](../scenarios/rhoai/evaluation-trustyai-evalhub.md#5-minute-version), 5-minute version (15-minute version in the 90-minute run) | |
 | 0:58 | Close and questions | Repeat the message. Then, if asked, show how the same models serve the experiences (one slide of Appendix A of the [many-experiences workshop](../five-experiences.md#appendix-a---hld)). | |
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Run once the "Before you start" checklist of every scenario in the agenda. The items they share:
-  - [ ] Sign in to OpenShift once as **ai-dev-01**, **ai-ops-01** and **paas-ops-01** before the session. Their
-    OpenShift groups are created at first sign-in.
-  - [ ] Open the RHOAI dashboard (`https://rh-ai.apps.demo333.startx.fr`) in one browser profile per persona.
-  - [ ] Open a terminal at the repository root, logged in with `oc` as **paas-ops-01**.
-  - [ ] Open Grafana as **ai-ops-01**. Open the OpenShift console, **Observe, Dashboards**, for the RHOAI and llm-d
-    dashboards.
-- [ ] Check that the local models are Ready: `oc get llminferenceservice -n zuno-ai-run`. The MaaS key and the
-  playground need gpt-oss-20b.
+`make demo use rhoai-end-to-end` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
+version its agenda row names. One typed guard, `DEMO_CONFIRM=rhoai-end-to-end`, covers the workshop. Each section below says
+only what is the workshop's own, or "Nothing to do.".
+The 90-minute variant (the 15-minute versions of the playground and evaluation blocks) is out of scope: no action of
+this lifecycle prepares or checks it.
+
+### Status
+
+The local models must be Ready: `oc get llminferenceservice -n zuno-ai-run`. The MaaS key and the playground need gpt-oss-20b. The scenarios' statuses are those of [Model catalog and registry](../scenarios/rhoai/model-catalog-registry.md#presenter-lifecycle), [Model serving with llm-d on MIG](../scenarios/rhoai/model-serving-llmd-mig.md#presenter-lifecycle), [External models](../scenarios/rhoai/external-models.md#presenter-lifecycle), [MaaS portal and API keys](../scenarios/rhoai/maas-portal-api-keys.md#presenter-lifecycle), [GenAI playground](../scenarios/rhoai/genai-playground.md#presenter-lifecycle), [LoRA pipeline](../scenarios/rhoai/lora-pipeline-mlflow-kueue.md#presenter-lifecycle), [Evaluation](../scenarios/rhoai/evaluation-trustyai-evalhub.md#presenter-lifecycle), in that order.
+
+### Check
+
+No scenario of this workshop has a golden-path probe or a browser check, so the merged lists are empty. Each
+scenario's Check runs reads only: rehearse every block on the day. Run `make demo golden-path` before the session
+anyway: its Open WebUI moment proves that a local model answers. When one block is red, skip that block and say what it
+would have shown, as [If something goes wrong](#if-something-goes-wrong) says.
+
+### Install
+
+Nothing to do.
+
+### Start
+
+The scenarios' Start sections already say how to sign in to each product. Only what they share is the workshop's own:
+
+- [ ] Sign in to OpenShift once as **ai-dev-01**, **ai-ops-01** and **paas-ops-01** before the session. Their
+  OpenShift groups are created at first sign-in.
+- [ ] Open the RHOAI dashboard (`https://rh-ai.apps.demo333.startx.fr`) in one browser profile per persona.
+- [ ] Open a terminal at the repository root, logged in with `oc` as **paas-ops-01**.
+- [ ] Open Grafana as **ai-ops-01**. Open the OpenShift console, **Observe, Dashboards**, for the RHOAI and llm-d
+  dashboards.
 - [ ] Do not start a pipeline run or an evaluation job on stage. The pipeline and evaluation blocks show past runs;
   starting one is a cluster change, made only in a rehearsal.
+- Changing unit: the [MaaS portal scenario](../scenarios/rhoai/maas-portal-api-keys.md#presenter-lifecycle) creates no key in Start; you create it live at 1:00, in the
+  portal. The single typed guard `DEMO_CONFIRM=rhoai-end-to-end` covers the workshop. The
+  [LoRA pipeline scenario](../scenarios/rhoai/lora-pipeline-mlflow-kueue.md#presenter-lifecycle) has one optional action, a human one: see its Start.
+
+### Stop
+
+Nothing to do. The file revokes nothing: revoke by hand, in the portal, **API keys**, the key created live in the MaaS
+block, and unset `MAAS_API_KEY` in the terminal. Then close the browser profiles and terminals.
+
+### Uninstall
+
+Nothing to do.
 
 ## If time runs short
 
