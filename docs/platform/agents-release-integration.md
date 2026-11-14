@@ -67,7 +67,7 @@ to roll while the mirror lacks the locked digest (`ansible/tasks/okf_mirror_hold
 
 Every reader dispatches on the document version with the same table
 ([ADR-0615](../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) clause 5):
-profile 1.0, or legacy v0.2/v0.3 until 2026-12-01. The conformance cases shipped in the corp artifact keep the readers
+profile 1.0, or legacy v0.2/v0.3 until the unifai-operator 0.2 line (WP-268). The conformance cases shipped in the corp artifact keep the readers
 aligned.
 
 ## Rolling a promotion

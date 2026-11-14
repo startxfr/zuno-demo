@@ -45,7 +45,7 @@ deploy the profile in one go, even at the cost of a new UnifAI operator release 
 upstream provenance and trust fields, and a generated root `index.md`. The Zuno version moves to `zuno.profile`, and the
 profile is frozen. Every bundle is migrated and cleaned, and the documentation is rewritten in each repository. The
 profile ships as zuno-demo-agents v1.0.0 with unifai-operator v0.1.71 and is deployed on demo333. Legacy `v0.2` and
-`v0.3` documents are refused from 2026-12-01.**
+`v0.3` documents are refused from the unifai-operator 0.2 line (amended 2026-11-14, see clause 13).**
 
 1. **Upstream is the base.** The base specification is upstream OKF 0.2 ([SPEC.md](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)).
    The Zuno profile adds the `zuno` block and the constraints of this record, and nothing else. Where this record and
@@ -77,7 +77,7 @@ profile ships as zuno-demo-agents v1.0.0 with unifai-operator v0.1.71 and is dep
 
    | `okf_version` | `zuno.profile` | Result |
    |---|---|---|
-   | `"v0.2"` or `"v0.3"` | absent | Legacy document, legacy schema. Readable until 2026-12-01 (clause 13). |
+   | `"v0.2"` or `"v0.3"` | absent | Legacy document, legacy schema. Readable until the operator 0.2 line (clause 13). |
    | `"0.2"` | `"1.0"` | Profile 1.0 schema |
    | `"0.2"` | absent or another value | Refused: `unsupported zuno.profile` |
    | anything else, including the unquoted YAML number `0.2` | — | Refused: `unsupported okf_version` |
@@ -133,10 +133,13 @@ profile ships as zuno-demo-agents v1.0.0 with unifai-operator v0.1.71 and is dep
 
     After step 3, every existing `UnifaiAgentBundle` must stay Ready on its current digest. The CRD does not change,
     which keeps an OLM rollback to 0.1.69 possible.
-13. **Legacy documents are refused from 2026-12-01.** Every reader reads `v0.2` and `v0.3` documents until then. The
-    weekly operator release of 2026-11-27 and the zuno-demo readers then refuse them (WP-268). They are pinned on
-    2026-12-01 with the owner's go, before the operator's 0.1 line freezes. This replaces ADR-0579 clause 6 as
-    amended on 2026-11-05.
+13. **Legacy documents are refused from the unifai-operator 0.2 line.** The operator's 0.1 line keeps reading `v0.2`
+    and `v0.3` documents for as long as it lives, and so do the zuno-demo readers. The operator's 0.2 line and the
+    readers refuse them together (WP-268), not before the 0.1 freeze of 2026-12-01 and the 0.2 promotion planned for
+    2026-12-15 by the fork's calendar. The date is set with the owner's go. The readers refuse legacy documents only
+    once the lock holds a profile 1.0 release. This replaces ADR-0579 clause 6 as amended on 2026-11-05.
+    *Amended 2026-11-14 by the owner:* the first text refused them from 2026-12-01, with the operator's weekly release
+    of 2026-11-27. The owner kept the 0.1 line compatible instead.
 
 ## Alternatives considered
 
@@ -192,7 +195,7 @@ The internal Quay holds every release before it is rolled (ADR-0612). Other sess
 | [WP-265](../roadmap/work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | zuno-demo-agents | Conversion of every bundle, platform-neutral prose, READMEs, scaffold |
 | [WP-266](../roadmap/work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | zuno-demo-agents | Tool and rag notes for the active agents, the 12 missing prompts, their evaluation |
 | [WP-267](../roadmap/work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | zuno-demo | Release v1.0.0, promotion and deployment on demo333, the platform integration page |
-| [WP-268](../roadmap/work-packages/wp-268-refuse-legacy-okf-documents-from-2026-12-01.md) | both + fork | Refusal of `v0.2` and `v0.3` documents, from the 2026-11-27 operator release |
+| [WP-268](../roadmap/work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | both + fork | Refusal of `v0.2` and `v0.3` documents, with the operator's 0.2 line (date set with the owner) |
 
 ## Resources
 

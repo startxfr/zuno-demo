@@ -1140,7 +1140,7 @@ release scripts or the operator types. No new ADR: the records that govern the r
 ADR-0615: an audit of 2026-11-14 scored the OKF use of `zuno-demo-agents` 13/20. The decision aligns the documents with
 upstream OKF 0.2, freezes the Zuno profile as 1.0, migrates and cleans every bundle, and rewrites the documentation in
 each repository. Readers ship first, then the operator v0.1.71, then zuno-demo-agents v1.0.0 and its promotion; each live
-step waits for the owner's go. Legacy documents are refused from 2026-12-01 (WP-268).
+step waits for the owner's go. Legacy documents are refused with the unifai-operator 0.2 line (WP-268, amended 2026-11-14).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
@@ -1150,7 +1150,7 @@ step waits for the owner's go. Legacy documents are refused from 2026-12-01 (WP-
 | WP-265 | [wp-265](work-packages/wp-265-migrate-and-clean-every-okf-bundle-to-profile-1-0.md) | 0615 | WP-262 | Repo work merged | none until the v1.0.0 release (WP-267) |
 | WP-266 | [wp-266](work-packages/wp-266-complete-tool-and-rag-notes-and-task-prompts.md) | 0615 | WP-262, WP-265 | Operator pending | evaluate the new prompts of tekos, arkos and comage on a canary or through the acceptance gate |
 | WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Not started | release pull request approval, promotion merge, mirror, `make d2 install mcp` and `unifai` (the owner's go for each) |
-| WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-from-2026-12-01.md) | 0615 | WP-267 | Not started | dated: operator change before the weekly release of 2026-11-27, pin on 2026-12-01 (the owner's go) |
+| WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | with the unifai-operator 0.2 line, not before the 0.1 freeze of 2026-12-01 (date set with the owner) |
 
 ### OKF stream phases
 
@@ -1297,6 +1297,7 @@ moving.
 ## Change log
 
 - 2026-11-14 — WP-264 Repo work merged: the operator patch is on the fork `devel` as 5f55e4e91 (envtest green). Remaining: the canary on that operator, the manual cut of v0.1.71, the copy into Quay and the pin. The canary e2e pulls a legacy-format artifact, so it proves the non-regression of v0.2/v0.3 reading, not profile 1.0 on a cluster (that needs a signed profile 1.0 artifact, WP-267).
+- 2026-11-14 — ADR-0615 clause 13 amended by the owner: the unifai-operator 0.1 line keeps reading legacy v0.2/v0.3 OKF documents; WP-268 (renamed, was "from 2026-12-01") refuses them with the operator's 0.2 line, not before the 0.1 freeze of 2026-12-01, at a date set with the owner. The zuno-demo-agents docs say the same (PR #55).
 - 2026-11-14 — ADR-0615 progress: WP-262 and WP-265 Repo work merged (zuno-demo-agents PRs #51 and #52), WP-263 Operator pending (readers pushed, five images rebuilt and rolled with the owner's go, golden path 13/13 before and after; `make d2 check agents` is blocked by a pre-existing gap, the locked v0.14.4 was never copied into the internal Quay), WP-264 Repo work in review (operator patch handed to the fork owner), WP-266 Operator pending (prompt evaluation).
 - 2026-11-14 — ADR-0615 and WP-262 to WP-268 added (Phase 55, v0.17), Accepted / Not started, by the user's decisions of the day: the Zuno OKF profile 1.0 aligned with upstream OKF 0.2 (Google Cloud), frozen, every bundle migrated and cleaned, documentation per repository, zuno-demo-agents v1.0.0 with unifai-operator v0.1.71, legacy documents refused from 2026-12-01. ADR-0038, ADR-0513 and ADR-0579 are superseded in part. WP-255 to WP-259 move to Repo work merged: their pages shipped in zuno-demo-agents v0.14.4 (commits c7e4ba2, e7170d0, ef03a67, 21c821e, f908eb3); their canary and unifai-compare proofs remain.
 - 2026-11-11 — WP-248 added (Phase 53, v0.17), Not started: replace the zot OKF mirror with an internal Red Hat Quay that holds every zuno image and a declared selection of public `quay.io` images, with a dedicated S3 bucket provisioned by Ansible; the owner's decision of the day. A new ADR follows its measurement gate.

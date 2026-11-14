@@ -3,7 +3,7 @@
 - **State:** Repo work merged (2026-11-14: applied on the fork `devel` as 5f55e4e91; envtest green; waits for the canary, the manual cut of v0.1.71, the copy into Quay and the pin)
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 4, 5, 7, 11, 12), [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md)
 - **Depends on:** WP-262 (the frozen schemas)
-- **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md), [WP-268](wp-268-refuse-legacy-okf-documents-from-2026-12-01.md)
+- **Related:** [WP-267](wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md), [WP-268](wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md)
 - **Target repository:** `startxfr/UnifAI` (the startx fork, `fork/unifai-operator`). This box cannot push to it, so a
   patch is handed to the fork owner session, which applies it on `devel` with the owner's explicit go.
 - **Estimated files touched:** about 25 in the fork: `internal/okf/schema.go`, `internal/okf/schema/`, `internal/okf/bundle.go`, testdata, tests, `hack/sync-okf-schemas.sh`, `docs/okf-agent-bundles.md`, `README.md`
@@ -52,4 +52,4 @@ repository, and it reads `provenance.maintainer` (ADR-0615 F13). A profile 1.0 b
 
 ## Out of scope
 
-- Refusing legacy documents (WP-268, in the 2026-11-27 weekly release).
+- Refusing legacy documents (WP-268, in the operator's 0.2 line; the 0.1 line stays compatible).

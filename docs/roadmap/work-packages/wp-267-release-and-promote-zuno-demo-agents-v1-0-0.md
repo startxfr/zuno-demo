@@ -3,7 +3,7 @@
 - **State:** Not started
 - **ADRs:** [ADR-0615](../../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (clauses 11, 12), [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md), [ADR-0612](../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md)
 - **Depends on:** WP-263, WP-264, WP-265 (WP-266 or its cut line)
-- **Related:** [WP-268](wp-268-refuse-legacy-okf-documents-from-2026-12-01.md)
+- **Related:** [WP-268](wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md)
 - **Target repository:** this one, plus the release pull request in `startxfr/zuno-demo-agents`
 - **Estimated files touched:** `platform/okf/agents.lock` and the generated files (through the promotion pull request); a new `docs/platform/agents-release-integration.md`; `docs/agents/okf-workflow.md`
 
