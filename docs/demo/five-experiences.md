@@ -72,21 +72,59 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 The [world model](world-model.md) is not part of the agenda while it is not show-ready. Mention it as the next
 experience, or show its recording labelled as recorded, as its page describes.
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Run once the "Before you start" checklist of every scenario in the agenda. The items they share:
-  - [ ] One browser profile per persona, signed in before the session: **consultant-02**, **sale-01** and
-    **ai-ops-01**. The Blender workstation is signed in as **ai-dev-01** during its preflight
-    ([Blender, Appendix C](blender-3d.md#appendix-c---setup)).
-  - [ ] **sale-01** and **paas-ops-01** have signed in to OpenShift at least once, because their OpenShift groups are
-    created at first sign-in.
-  - [ ] OpenClaw's own UI passwords are read before the session from the Secret `openclaw-ui` of each persona
-    namespace, never on screen. Dify's administrator password is in Vault `zuno/dify/admin`.
-  - [ ] Grafana is open as **ai-ops-01** on the dashboard **Zuno Platform / Five experiences**, last 1 hour,
-    `client` = All.
-  - [ ] A terminal is logged in with `oc` as **paas-ops-01**.
-- [ ] The probes listed in the status banner passed within the last hour.
-- [ ] The local models are Ready: `oc get llminferenceservice -n zuno-ai-run`.
+`make demo use five-experiences` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
+and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
+version its agenda row names. One typed guard, `DEMO_CONFIRM=five-experiences`, covers the workshop. Each section below says
+only what is the workshop's own, or "Nothing to do.".
+
+### Status
+
+The local models must be Ready: `oc get llminferenceservice -n zuno-ai-run`. The scenarios' statuses are those of
+[UnifAI agents](scenarios/experiences/unifai-agents.md#presenter-lifecycle), [Open WebUI](scenarios/experiences/open-webui.md#presenter-lifecycle), [OpenClaw](scenarios/experiences/openclaw.md#presenter-lifecycle), [Dify](scenarios/experiences/dify.md#presenter-lifecycle), [kagent](scenarios/experiences/kagent.md#presenter-lifecycle), [OpenShift Lightspeed](scenarios/experiences/lightspeed.md#presenter-lifecycle) and [Blender](blender-3d.md#presenter-lifecycle), in that order.
+
+### Check
+
+The merged probes are `ONLY=unifai-tekos,open-webui,zuno-code,openclaw,dify,tools,kagent,lightspeed,blender make demo golden-path`.
+The inline block "Same rules, one dashboard" adds the probe `guardrails` (the prompt of its 4:00 step). The merged
+browser run covers `unifai`, `open-webui`, `openclaw`, `dify` and `kagent`. All of them must have passed within the
+last hour. When one block is red, skip that block and say what it would have shown, as
+[If something goes wrong](#if-something-goes-wrong) says. Lightspeed and Blender are optional: skip them first.
+
+### Install
+
+Nothing to do. The only install of the agenda is the Blender add-on on the presenter's workstation: see [Blender](blender-3d.md#presenter-lifecycle).
+
+### Start
+
+The scenarios' Start sections already warm the models and say how to sign in to each product. Only what they share
+is the workshop's own:
+
+- [ ] One browser profile per persona, signed in before the session: **consultant-02**, **sale-01** and
+  **ai-ops-01**. The Blender workstation is signed in as **ai-dev-01** during its preflight
+  ([Blender, Start](blender-3d.md#start)).
+- [ ] **sale-01** and **paas-ops-01** have signed in to OpenShift at least once, because their OpenShift groups are
+  created at first sign-in.
+- [ ] OpenClaw's own UI passwords are read before the session from the Secret `openclaw-ui` of each persona
+  namespace, never on screen. Dify's administrator password is in Vault `zuno/dify/admin`.
+- [ ] Grafana is open as **ai-ops-01** on the dashboard **Zuno Platform / Five experiences**, last 1 hour,
+  `client` = All.
+- [ ] A terminal is logged in with `oc` as **paas-ops-01**.
+- [ ] Dify stays open in **consultant-02**'s profile for the 4:00 step of "Same rules, one dashboard".
+- Every block plays its 5-minute version: skip the "15-minute version" items of the scenarios.
+- None of the seven scenarios has a changing unit in its Start or Stop. If one gets one, the single guard
+  `DEMO_CONFIRM=five-experiences` covers the workshop.
+
+### Stop
+
+Nothing to do. The scenarios' Stop sections close their browser profiles and terminals, and Blender's signs out of the
+add-on; close the Grafana profile too.
+
+### Uninstall
+
+Nothing to do. The only removal of the agenda is the Blender add-on on the presenter's workstation: see [Blender](blender-3d.md#presenter-lifecycle).
 
 ## Same rules, one dashboard
 
