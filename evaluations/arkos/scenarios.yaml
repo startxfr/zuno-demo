@@ -205,3 +205,17 @@ scenarios:
       For the architecture testimonial I am drafting, ask the technical consultant what the difference
       is between a Route and an Ingress on OpenShift, and include that answer in your reply.
     expect_any: ["route", "ingress"]
+
+  - id: 22
+    title: A code request on C3 data is served by gpt-oss-20b on the local GPUs (arkos write-code)
+    type: chat_routing
+    # The C3 half of the coding pair (tekos scenario 21 is the Codestral half). Arkos is C3, so its write-code
+    # task runs on local models only, gpt-oss-20b first (agents v1.0.1 policies/model-routing). Every model
+    # call of the turn (plan, draft and write stages) must be gpt-oss-20b at C3; Codestral is never eligible.
+    persona: consultant-01
+    workflow: arkos-write-code
+    task: write-code
+    message: Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.
+    expect_providers: [local-gpt-oss-maas, local-gpt-oss]
+    expect_classification: C3
+    timeout_seconds: 240

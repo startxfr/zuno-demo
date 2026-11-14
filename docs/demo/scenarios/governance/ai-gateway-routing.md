@@ -99,7 +99,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Terminal: `oc get configmap ai-gateway-model-routing -n zuno-ai-run -o yaml` | "One entry per agent or experience and per task. The order only reorders what the classification allows; it can never add a provider." | `open-webui`/`chat`: `local-gpt-oss-maas`, `local-gpt-oss`. `open-webui`/`code`: `mistral-codestral`, not strict. `arkos`/`write-code`: Codestral with `strict: true`. `tekos`/`find-relevant-docs`: a `preferred` and a `fallback` list. |
+| 5:00 | Terminal: `oc get configmap ai-gateway-model-routing -n zuno-ai-run -o yaml` | "One entry per agent or experience and per task. The order only reorders what the classification allows; it can never add a provider." | `open-webui`/`chat`: `local-gpt-oss-maas`, `local-gpt-oss`. `open-webui`/`code`: `mistral-codestral`, not strict. `arkos`/`write-code`: `local-gpt-oss-maas`, `local-gpt-oss`, then `local-maas`, `local`, local only at every level. `tekos`/`find-relevant-docs`: a `preferred` and a `fallback` list. |
 | 6:30 | Open the agents release: [experience-clients/open-webui/tasks/code.md](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/open-webui/tasks/code.md), then [policies/model-routing/model-routing-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/model-routing/model-routing-policy.yaml) | "The owner of a task declares roles, here `code`. The corporate policy holds the ordered lists. The platform generates the table from the signed release; nobody edits it by hand." | `zuno.models.preferred: [code]` in the task. `preferred:`, `fallback:` and `local_only_for:` entries in the policy. |
 | 8:00 | Point at the `local_only_for: [C1, C2, C3]` lines | "Tekos answers from Confluence and the technical documentation. For those tasks, no external model at any level: if no local model answers, the task fails instead of sending the context out." | `local_only_for` on Tekos `answer-technical-question` and `find-relevant-docs`, Arkos `draft-architecture-testimonial` and `workshop-presentation`, Naveo. |
 | 9:00 | Open [`platform/ai-gateway/provider-routing.yaml`](../../../../platform/ai-gateway/provider-routing.yaml) | "Fourteen providers. Each local model has two entries: through MaaS first, then direct. Each declares its role, the levels it may serve, its timeout, and the model object whose readiness the gateway watches." | Roles `default`, `quality`, `reasoning`, `specialized`, `code`, `reasoning-external`, `general-external`. `inference_service:` on the 8 local entries; `timeout_seconds` 180 through MaaS, 60 direct. |
@@ -108,6 +108,18 @@ Run the 5-minute version, then:
 | 12:15 | Tempo search UI: service `ai-gateway`, operation `model_call`, tags `zuno.task=code zuno.client=open-webui`, last 15 minutes | "Each call is traced with the provider and whether it ran on our GPUs or outside." | The span of the 5-minute question: `zuno.provider=mistral-codestral`, `zuno.model_kind=saas`, `zuno.classification=C1`, `zuno.model=codestral-latest`. |
 | 13:00 | Show the WP-194 evidence, table T5 | "We broke Codestral on purpose on 2026-11-05. The user got a normal answer from the local model, in the same trace, about one second after the failure. The routing decision of such a call names `local-maas`, with `fallback_used: true` and `fallback_from: mistral-codestral`. UnifAI reads it from `GET /v1/routing-decisions/{request_id}`." | Two traces: `mistral-codestral` error `Invalid model` in under a second, then `local-maas` ok in 40 to 66 s. |
 | 14:15 | Close | Repeat the message. | |
+
+### The coding pair: C1 and C3
+
+Optional, 3 minutes, once agents v1.0.1 is promoted. The same code request goes to two agents. The level belongs to
+the task, and the level decides the model: Tekos works on C1 data, Arkos on C3 customer architecture. Not rehearsed
+yet; scenarios tekos 21 and arkos 22 (`chat_routing`) prove the same thing in the acceptance gate.
+
+| Do | Say | You should see |
+|---|---|---|
+| UnifAI as **consultant-01**, workspace `agent-tekos`, workflow `tekos-write-code`, ask: `Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.` | "Tekos works on public and internal data, C1. A code request goes to the best code model, Mistral Codestral." | A NetworkPolicy manifest in a few seconds. |
+| Workspace `agent-arkos`, workflow `arkos-write-code`, same request | "Arkos works on our customers' architecture, C3. The same request never leaves our GPUs: gpt-oss-20b answers." | The same kind of manifest, a little slower (plan, draft and write stages). |
+| Tempo search UI: service `ai-gateway`, operation `model_call`, tag `zuno.task=write-code`, last 15 minutes | "Same request, two levels, two models. Nobody chose the model: the level of the task did." | Tekos: `zuno.provider=mistral-codestral`, `zuno.model_kind=saas`, `zuno.classification=C1`. Arkos: `zuno.provider=local-gpt-oss-maas`, `zuno.model=gpt-oss-20b`, `zuno.model_kind=local`, `zuno.classification=C3`. |
 
 ## If something goes wrong
 
@@ -135,7 +147,9 @@ Run the 5-minute version, then:
 - **The routing decision lives 120 seconds** in Redis and names the serving provider and the first candidate. It does
   not list the skipped candidates: those are only on the counter `zuno_model_candidates_skipped`.
 - **Arkos writes code on local models.** Arkos is floored at C3, where Codestral is not eligible. Since agents v1.0.1
-  its `write-code` task runs on the local models only, the quality model first. Codestral serves Tekos and "Zuno Code".
+  its `write-code` task runs on the local models only, gpt-oss-20b first. Codestral serves Tekos and "Zuno Code". The
+  level belongs to the task, not to the question: the same Arkos task cannot run at C2 for one request and C3 for
+  another.
 - **The skip of a down model is told, not shown.** Showing it live needs a model taken down. It was proven on demo333
   on 2026-11-03 (WP-188): models skipped while not ready, served again without a gateway restart.
 

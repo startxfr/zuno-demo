@@ -131,11 +131,12 @@ def test_tasks_that_do_not_read_confluence_keep_their_external_providers() -> No
 def test_arkos_write_code_is_served_locally_at_every_level() -> None:
     """Agents v1.0.1: arkos write-code was pinned strictly to mistral-codestral (ADR-0417), which is C1/C2 only,
     while Arkos is floored at C3 (ADR-0565), so every call failed closed. Its chain is now local only, at every
-    level, and must hold at least one candidate at C3, the level every Arkos call carries."""
+    level, with gpt-oss-20b first: the C3 half of the coding pair, whose C1 half is tekos write-code on
+    Codestral (the test above)."""
     external = {c.name for c in RoutingTable(_PROVIDER_ROUTING_PATH).candidates_for("C1") if getattr(c, "kind", "") == "saas"}
     for level in ("C1", "C2", "C3"):
         names = [c.name for c in _candidates("arkos", "write-code", level)]
-        assert names, level
+        assert names[:2] == ["local-gpt-oss-maas", "local-gpt-oss"], (level, names)
         assert not (set(names) & external), (level, set(names) & external)
 
 

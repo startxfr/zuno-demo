@@ -119,7 +119,8 @@ Run the 5-minute version, then:
   the trace span and in the routing decision only.
 - **The probe is a synthetic call** ("Say OK." with a forged C1 header). It is not a real Arkos conversation in UnifAI.
 - **Arkos writes code locally.** Its `write-code` task is floored at C3 and, since agents v1.0.1, runs on the local
-  models only. Codestral is never a candidate for it.
+  models only, gpt-oss-20b first. Codestral is never a candidate for it. The same request to Tekos `write-code` (C1)
+  goes to Codestral: see the coding pair in the [routing scenario](./ai-gateway-routing.md#the-coding-pair-c1-and-c3).
 - **Guardrails run in observe mode at every level.** They record; they do not block.
 - **Failing closed has a cost.** With the GPU nodes down, C3 work stops. That is the intended trade-off.
 
