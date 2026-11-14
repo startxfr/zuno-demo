@@ -81,24 +81,60 @@ Other identities:
 - The MCP servers never see the user's token. For each call they get a short-lived assertion signed by the gateway,
   bound to the tool and its arguments (`MCP_OUTBOUND_IDENTITY=assertion` on demo333).
 
-## Before you start
+## Presenter lifecycle
 
-- [ ] Golden-path probes `tools` and `open-webui` passed within the last hour (`ONLY=tools,open-webui make demo
-  golden-path`), see [golden-path.md](../../golden-path.md).
-- [ ] Browser profiles, signed in to `https://open-webui.apps.demo333.startx.fr` with **Continue with Keycloak**:
+`make demo use mcp-tools-by-group 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+Each section below is printed after its action's Ansible file (`ansible/demos/mcp-tools-by-group/<action>.yml`) has
+run, and says what is left to the presenter. No action of this demo changes the cluster.
+
+### Status
+
+Nothing to do. The file reads the Applications `zuno-mcp-d0`/`-d1`, `zuno-mcp-confluence-d0`/`-d1` and
+`zuno-mcp-k8s-d0`/`-d1`, the Deployments `mcp-gateway` and `open-webui`, the MCP servers `confluence-mcp`, `k8s-mcp`,
+`git-forge-mcp`, `aap-mcp` and `diagram-render`, the ExternalSecret `zuno-tool-marker-key`, the gateway environment
+(`AGENT_ENTITLEMENT_EVERY_CALL`, `AGENT_CHAIN_VERIFY`, `MCP_FRONTDOOR_CAPABILITIES`), Grafana and the local models.
+If one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
+
+### Check
+
+Nothing to do when it passes. It runs the golden-path probes `tools` and `open-webui` (see
+[golden-path.md](../../golden-path.md)): the 5-minute version also uses Open WebUI. The probe `tools` makes one
+Confluence search through the gateway's REST door, as **consultant-01** with a token of the Keycloak client
+`zuno-evaluations`. The 5:00 row of the 15-minute version runs `ONLY=tools make demo golden-path` again on stage: a
+read. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+
+### Install
+
+Nothing to do. The mcp-gateway and the MCP servers are part of the shared platform: the file only verifies them.
+
+### Start
+
+Nothing is prepared by the file. What only a person does:
+
+- [ ] Browser profiles, signed in to `https://open-webui.apps.demo333.startx.fr` with **Continue with Keycloak**
+  (password in Vault, `keycloak/demo-personas`):
   - profile 1: **sale-01**;
   - profile 2: **consultant-02**;
   - profile 3, optional, 15-minute version: **finance-01**.
 - [ ] Start a **new chat** in each profile. Chats created before 2026-11-03 keep their tool switch off.
 - [ ] Warm the model: send one short question in profile 2 before the audience arrives.
 - [ ] 15-minute version:
-  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01**;
+  - [ ] a terminal at the repository root, logged in with `oc` as **paas-ops-01**. If `status` reported that the
+    group `ocp-paas-ops` is missing, sign **paas-ops-01** in once to the OpenShift console first;
   - [ ] Grafana as **ai-ops-01**, dashboard **Zuno Platform / Five experiences**, time range last 1 hour;
   - [ ] the agents release open at
     [`policies/tools/tool-policy.yaml`](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/tools/tool-policy.yaml)
     and [`experience-clients/open-webui/tasks/chat.md`](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/open-webui/tasks/chat.md).
-- [ ] Known on screen: a Drive or Gmail tool call shows a red cross. No Google Workspace tenant is connected, so the
-  gateway refuses it (`delegated_credential_missing`). Say it is the delegation rule, not a failure.
+- Known on screen, not a failure: a Drive or Gmail tool call shows a red cross. No Google Workspace tenant is
+  connected, so the gateway refuses it (`delegated_credential_missing`). Say it is the delegation rule.
+
+### Stop
+
+Nothing to do. Close the browser profiles and the terminal.
+
+### Uninstall
+
+Nothing to do.
 
 ## 5-minute version
 
