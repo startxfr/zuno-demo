@@ -58,6 +58,9 @@ ALLOWED = [
     "make d3 check agents",
     "make d3 admit agents",
     "make d3 admit agents RELEASE=v1.0.1",
+    "oc get externalsecrets -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c",
+    "oc get pods -o json | jq '.items[] | select(.status.restartCount > 1 and .x < 3) | `x`'",
+    "curl -s -o /dev/null -w '%{http_code}\\n' https://example.invalid/v1/models",
 ]
 
 DENIED = {
@@ -104,6 +107,13 @@ DENIED = {
     "oc get pods | awk '{system(\"id\")}'": "awk",
     "oc get pods | awk '{print > \"f\"}'": "awk",
     "oc get pods -n <namespace>": "placeholder",
+    "oc describe node <a node of the 1:00 step> | grep nvidia.com/": "placeholder",
+    "curl -s https://<route>/v1/models": "placeholder",
+    "oc get pods -n $NS": "variable $NS is not set by the step",
+    "curl -s $MAAS/v1/models": "variable $MAAS is not set by the step",
+    "oc get pods -o json | jq \"$(id)\"": "substitution",
+    "oc get pods -o json | jq \"`id`\"": "backtick",
+    "curl -s -o out.txt https://x": "GET only",
     "oc get pods -o json | jq '$ENV'": "environment",
     "oc get pods -o json | jq -n 'env.HOME'": "environment",
     "oc get pods -o json | jq --rawfile f /etc/passwd '.'": "local files",
@@ -194,6 +204,46 @@ class MakeVerbsRunLocally(unittest.TestCase):
         self.assertEqual(argv[2:], ["list"])
 
 
+class Variables(unittest.TestCase):
+    def test_resolved_from_the_step(self):
+        p = r.plan("curl -s -o /dev/null -w '%{http_code}' $MAAS/v1/models", ROOT,
+                   variables={"MAAS": "https://maas.apps.example.invalid"})
+        self.assertIn("https://maas.apps.example.invalid/v1/models", p.pipeline[0])
+        self.assertEqual(p.secrets, [])
+        self.assertIn("$MAAS", p.display)
+
+    def test_single_quotes_keep_dollars_literal(self):
+        self.assertEqual(r.variables_of("oc get x | awk '{print $1, $(NF-1)}'"), [])
+        self.assertEqual(r.variables_of("curl -H \"Authorization: Bearer $MAAS_API_KEY\" $MAAS/v1"),
+                         ["MAAS", "MAAS_API_KEY"])
+
+    def test_values_are_arguments_never_shell(self):
+        p = r.plan("oc get pods -n $NS", ROOT, variables={"NS": "x; rm -rf /"})
+        self.assertEqual(p.pipeline, [["oc", "get", "pods", "-n", "x; rm -rf /"]])
+
+    def test_a_variable_cannot_smuggle_a_secret_read(self):
+        ok, reason = r.check("oc get $KIND -n x", {"KIND": "secrets"})
+        self.assertFalse(ok)
+        self.assertIn("Secret", reason)
+
+    def test_credential_values_are_masked(self):
+        key = "sk-not-a-real-key-5678"
+        plan = r.plan("curl -s -H \"Authorization: Bearer $MAAS_API_KEY\" https://example.invalid", ROOT,
+                      variables={"MAAS_API_KEY": key})
+        self.assertEqual(plan.secrets, [key])
+        echo = r.Plan(plan.display, [[sys.executable, "-c", "import sys; print(sys.argv[1])", key]],
+                      secrets=plan.secrets)
+        result = r.run_plan(echo, cwd=ROOT)
+        self.assertNotIn(key, result.output + result.log)
+        self.assertIn("***", result.output)
+
+    def test_environment_variables_for_run_reads(self):
+        with mock.patch.dict("os.environ", {"ZUNO_DEMO_VARS": '{"MAAS": "https://m", "N": null}'}):
+            self.assertEqual(r.env_variables(), {"MAAS": "https://m"})
+        with mock.patch.dict("os.environ", {"ZUNO_DEMO_VARS": "not json"}):
+            self.assertEqual(r.env_variables(), {})
+
+
 class StripWatchFlags(unittest.TestCase):
     def test_watch_and_follow_are_stripped(self):
         self.assertEqual(r.strip_watch_flags("oc get llminferenceservice -n zuno-ai-run -w"),
@@ -203,11 +253,13 @@ class StripWatchFlags(unittest.TestCase):
         self.assertEqual(r.strip_watch_flags("oc get pods --watch | tail -f"),
                          ("oc get pods | tail", ["--watch", "-f"]))
 
-    def test_other_refusals_stay_refused(self):
-        with self.assertRaises(r.Denied):
-            r.strip_watch_flags("oc get -f pod.yaml")
-        with self.assertRaises(r.Denied):
-            r.strip_watch_flags("oc delete pod x -w")
+    def test_never_raises_and_the_caller_judges(self):
+        self.assertEqual(r.strip_watch_flags("oc get -f pod.yaml"), ("oc get -f pod.yaml", []))
+        self.assertEqual(r.strip_watch_flags("oc delete pod x -w"), ("oc delete pod x -w", []))
+        self.assertEqual(r.strip_watch_flags("oc get pods `id` -w"), ("oc get pods `id` -w", []))
+        stripped, flags = r.strip_watch_flags("oc get externalsecrets -A -w | awk '{print $(NF-1)}'")
+        self.assertEqual((stripped, flags), ("oc get externalsecrets -A | awk '{print $(NF-1)}'", ["-w"]))
+        self.assertTrue(r.check(stripped)[0])
 
 
 class Runner(unittest.TestCase):

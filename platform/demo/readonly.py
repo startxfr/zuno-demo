@@ -63,6 +63,7 @@ class Plan:
     env: Dict[str, str] = field(default_factory=dict)
     timeout: int = READ_TIMEOUT
     needs_token: bool = False
+    secrets: List[str] = field(default_factory=list)      # variable values masked in everything printed
 
 
 @dataclass
@@ -86,21 +87,95 @@ def _tokens(segment_text: str) -> List[str]:
     return list(lexer)
 
 
-def tokenize(command: str) -> List[List[str]]:
-    """Pipeline segments of a command; raise Denied on anything a shell would interpret beyond a plain pipe."""
+VAR_PLACEHOLDER = "__ZUNO_VAR_{}__"
+VAR_RE = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*|[0-9])")
+SECRET_VAR_RE = re.compile(r"KEY|TOKEN|PASSWORD|PASSWD|SECRET", re.IGNORECASE)
+PLACEHOLDER_RE = re.compile(r"<[A-Za-z0-9_][^<>]*>")
+
+
+def _quote_states(text: str) -> List[Optional[str]]:
+    """The quote around each character as a shell would read it: None, "'" or '"' (a backslash outside single
+    quotes escapes the next character, which then counts as quoted by '\\')."""
+    states: List[Optional[str]] = []
+    quote: Optional[str] = None
+    escaped = False
+    for ch in text:
+        if escaped:
+            states.append("\\")
+            escaped = False
+            continue
+        if quote == "'":
+            states.append(quote)
+            if ch == "'":
+                quote = None
+            continue
+        if ch == "\\":
+            states.append(quote)
+            escaped = True
+            continue
+        if ch in ("'", '"'):
+            if quote is None:
+                quote = ch
+            elif quote == ch:
+                quote = None
+            states.append(ch)
+            continue
+        states.append(quote)
+    return states
+
+
+def prepare(command: str) -> Tuple[str, List[str]]:
+    """(text ready to tokenize, the $NAME variables it uses).
+
+    Single quotes keep everything literal, as in a shell: `awk '{print $(NF-1)}'` is fine. Outside them, a command
+    substitution or backticks are refused (only $(oc whoami -t) is resolved, in this process), a `<...>` placeholder
+    is refused, and each `$NAME` becomes a marker resolved from the step's variables.
+    """
     text = command.strip()
     if text.startswith("`") and text.endswith("`") and text.count("`") == 2:
         text = text[1:-1].strip()
     text = re.sub(r"\\\r?\n\s*", " ", text)
     if not text:
         raise Denied("empty command")
-    if "`" in text:
-        raise Denied("backticks are refused")
     text = text.replace(TOKEN_EXPR, TOKEN_PLACEHOLDER)
-    if "$(" in text or "${" in text:
-        raise Denied("command substitution is refused (only $(oc whoami -t) is resolved)")
-    if re.search(r"<[A-Za-z][\w .-]*>", text):
+    states = _quote_states(text)
+    unquoted_single = "".join(ch if st != "'" else " " for ch, st in zip(text, states))
+    for i, ch in enumerate(text):
+        if states[i] in ("'", "\\"):
+            continue
+        if ch == "`":
+            raise Denied("backticks are refused")
+        if text.startswith("$(", i) or text.startswith("${", i):
+            raise Denied("command substitution is refused (only $(oc whoami -t) is resolved)")
+    if PLACEHOLDER_RE.search(unquoted_single):
         raise Denied("the command holds a placeholder (<...>) to fill in")
+    names: List[str] = []
+    out = []
+    i = 0
+    while i < len(text):
+        m = VAR_RE.match(text, i) if states[i] not in ("'", "\\") else None
+        if m:
+            names.append(m.group(1))
+            out.append(VAR_PLACEHOLDER.format(m.group(1)))
+            i = m.end()
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out), names
+
+
+def variables_of(command: str) -> List[str]:
+    """The $NAME variables a command needs from its step (empty when it cannot be parsed)."""
+    try:
+        return sorted(set(prepare(command)[1]))
+    except Denied:
+        return []
+
+
+def tokenize(command: str) -> List[List[str]]:
+    """Pipeline segments of a command; raise Denied on anything a shell would interpret beyond a plain pipe.
+    Variables stay as markers; plan() resolves them."""
+    text, _ = prepare(command)
     try:
         tokens = _tokens(text)
     except ValueError as exc:
@@ -124,6 +199,21 @@ def tokenize(command: str) -> List[List[str]]:
     if any(not s for s in segments):
         raise Denied("an empty pipeline segment")
     return segments
+
+
+def resolve_variables(segments: List[List[str]], names: List[str], variables: Dict[str, str]) -> List[List[str]]:
+    for name in names:
+        if name not in variables or variables[name] in (None, ""):
+            raise Denied(f"variable ${name} is not set by the step")
+    resolved = []
+    for segment in segments:
+        new = []
+        for token in segment:
+            for name in set(names):
+                token = token.replace(VAR_PLACEHOLDER.format(name), str(variables[name]))
+            new.append(token)
+        resolved.append(new)
+    return resolved
 
 
 def _flag_value(args: List[str], names: Tuple[str, ...]) -> Optional[str]:
@@ -246,7 +336,15 @@ def check_curl(argv: List[str]) -> None:
     method = _flag_value(args, ("-X", "--request"))
     if method is not None and method.upper() not in ("GET", "HEAD"):
         raise Denied(f"curl {method} is refused (GET only)")
-    for arg in args:
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in ("-o", "--output") and i + 1 < len(args) and args[i + 1] == "/dev/null":
+            i += 2
+            continue
+        if arg in ("-o/dev/null", "--output=/dev/null"):
+            i += 1
+            continue
         flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
         if flag in CURL_DENIED or (not arg.startswith("--") and arg[:2] in CURL_DENIED and len(arg) > 2
                                    and arg[:2] in ("-d", "-F", "-T", "-o", "-O", "-K", "-c", "-D", "-x", "-Q")):
@@ -256,6 +354,7 @@ def check_curl(argv: List[str]) -> None:
         scheme = re.match(r"^([A-Za-z][A-Za-z0-9+.-]*)://", arg)
         if scheme and scheme.group(1).lower() not in ("http", "https"):
             raise Denied(f"curl {scheme.group(1)}:// is refused (http and https only)")
+        i += 1
 
 
 def plan_make(env_prefix: Dict[str, str], argv: List[str], display: str, root: pathlib.Path) -> Plan:
@@ -288,11 +387,18 @@ def plan_make(env_prefix: Dict[str, str], argv: List[str], display: str, root: p
     raise Denied(f"`make {' '.join(args)}` is not a read the allowlist knows")
 
 
-def plan(command: str, root: Optional[pathlib.Path] = None) -> Plan:
-    """Check a command against the allowlist and return how to run it, or raise Denied."""
+def plan(command: str, root: Optional[pathlib.Path] = None, variables: Optional[Dict[str, str]] = None) -> Plan:
+    """Check a command against the allowlist and return how to run it, or raise Denied.
+
+    `variables`: the step's $NAME values (demo.yml `env:`, the step's `demo_env`, a command's `env:`). A value whose
+    name looks like a credential (KEY, TOKEN, PASSWORD, SECRET) is masked in the output.
+    """
     root = root or ENGINE_ROOT
+    variables = variables or {}
     display = command.strip().strip("`").strip()
-    segments = tokenize(command)
+    names = prepare(command)[1]
+    segments = resolve_variables(tokenize(command), names, variables)
+    secrets = [str(variables[n]) for n in set(names) if SECRET_VAR_RE.search(n) and len(str(variables[n])) >= 4]
     head = segments[0]
     env_prefix: Dict[str, str] = {}
     while head and re.match(r"^[A-Z_][A-Z0-9_]*=", head[0]):
@@ -306,6 +412,8 @@ def plan(command: str, root: Optional[pathlib.Path] = None) -> Plan:
     if program == "make":
         if len(segments) > 1:
             raise Denied("a make verb is not piped")
+        if names:
+            raise Denied("a make verb takes no $variables")
         return plan_make(env_prefix, head, display, root)
     if env_prefix:
         raise Denied("environment assignments are refused")
@@ -322,7 +430,7 @@ def plan(command: str, root: Optional[pathlib.Path] = None) -> Plan:
     needs_token = any(TOKEN_PLACEHOLDER in arg for seg in segments for arg in seg)
     if needs_token and program != "curl":
         raise Denied("$(oc whoami -t) is resolved only inside a curl command")
-    return Plan(display, segments, needs_token=needs_token)
+    return Plan(display, segments, needs_token=needs_token, secrets=secrets)
 
 
 WATCH_FLAGS = {
@@ -337,14 +445,18 @@ def strip_watch_flags(command: str) -> Tuple[str, List[str]]:
     """(command without its watch/follow flags, the flags removed), for a Do command refused only for them.
 
     The step file then holds the result as `cmd` and the cell's command as `page_text`: it runs once, as a snapshot
-    (reorg decision 2026-11-14). Raises Denied when the stripped command is still refused, or when nothing was
-    stripped from a refused command.
+    (reorg decision 2026-11-14). Never raises: a command it cannot parse comes back unchanged with no flags, and the
+    caller judges the result with check().
     """
     text = command.strip()
     if text.startswith("`") and text.endswith("`") and text.count("`") == 2:
         text = text[1:-1].strip()
+    try:
+        segments = tokenize(text)
+    except Denied:
+        return text, []
     removed: List[str] = []
-    for segment in tokenize(text):
+    for segment in segments:
         program = segment[0]
         verb = _oc_verb(segment)[0] if program == "oc" else ""
         for flag in WATCH_FLAGS.get((program, verb), ()):
@@ -352,14 +464,12 @@ def strip_watch_flags(command: str) -> Tuple[str, List[str]]:
                 removed.append(flag)
     for flag in removed:
         text = re.sub(r"(?<!\S)" + re.escape(flag) + r"(?!\S)", "", text, count=1)
-    text = re.sub(r"[ \t]{2,}", " ", text).strip()
-    plan(text)
-    return text, removed
+    return re.sub(r"[ \t]{2,}", " ", text).strip(), removed
 
 
-def check(command: str) -> Tuple[bool, str]:
+def check(command: str, variables: Optional[Dict[str, str]] = None) -> Tuple[bool, str]:
     try:
-        plan(command)
+        plan(command, variables=variables)
     except Denied as exc:
         return False, str(exc)
     return True, ""
@@ -442,35 +552,55 @@ def run_plan(p: Plan, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LI
     if stderr_text.strip():
         text = (text.rstrip("\n") + "\n" if text.strip() else "") + stderr_text
     text = _mask(text, token)
+    for secret in p.secrets:
+        text = _mask(text, secret)
     all_lines = text.rstrip("\n").split("\n") if text.strip() else []
     truncated = len(all_lines) > lines
     shown = "\n".join(all_lines[:lines])
     return Result(p.display, rc, shown, truncated, log=text)
 
 
-def run(command: str, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LINES) -> Result:
+def run(command: str, cwd: Optional[pathlib.Path] = None, lines: int = OUTPUT_LINES,
+        variables: Optional[Dict[str, str]] = None) -> Result:
     try:
-        p = plan(command)
+        p = plan(command, variables=variables)
     except Denied as exc:
         return Result(command.strip().strip("`"), 2, f"REFUSED: {exc}", refused=True)
     return run_plan(p, cwd=cwd, lines=lines)
+
+
+def env_variables() -> Dict[str, str]:
+    """The step's variables as run_reads.yml passes them: ZUNO_DEMO_VARS, a JSON object, in the environment (never
+    on the command line, where a key would show in the process list)."""
+    raw = os.environ.get("ZUNO_DEMO_VARS", "")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    return {str(k): str(v) for k, v in data.items() if v is not None} if isinstance(data, dict) else {}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Check or run a read-only demo command without a shell.")
     sub = parser.add_subparsers(dest="mode", required=True)
     c = sub.add_parser("check")
+    c.add_argument("--var", action="append", default=[], metavar="NAME=VALUE")
     c.add_argument("command")
     r = sub.add_parser("run")
     r.add_argument("--json", action="store_true", help="print one JSON object (used by ansible/demos/_lib)")
     r.add_argument("--lines", type=int, default=OUTPUT_LINES)
+    r.add_argument("--var", action="append", default=[], metavar="NAME=VALUE")
     r.add_argument("command")
     args = parser.parse_args(argv)
+    variables = env_variables()
+    variables.update(dict(v.split("=", 1) for v in args.var if "=" in v))
     if args.mode == "check":
-        ok, reason = check(args.command)
+        ok, reason = check(args.command, variables)
         print("allowed" if ok else f"REFUSED: {reason}")
         return 0 if ok else 2
-    result = run(args.command, lines=args.lines)
+    result = run(args.command, lines=args.lines, variables=variables)
     if args.json:
         print(json.dumps(result.to_dict()))
         return 0
