@@ -5,7 +5,7 @@
 > ([WP-208](../roadmap/work-packages/wp-208-five-experiences-demonstration.md)) and in moment 1 of the
 > [2026-11-09 demonstration](demo-day-2026-11-09.md).
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw,dify,kagent,lightspeed,blender,guardrails make demo golden-path`.
+> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw,dify,tools,kagent,lightspeed,blender,guardrails make demo golden-path`.
 > **Duration:** 55 minutes, presenter-led (45 minutes with the short cut). **Audience:** mixed; every block plays its
 > 5-minute version.
 > **Personas:** see [Personas](#personas).

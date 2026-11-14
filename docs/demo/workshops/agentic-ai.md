@@ -3,7 +3,7 @@
 > **Status:** Built from seven scenarios, linked in the agenda. Not rehearsed as a whole. Each
 > block keeps the status of its scenario page.
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty make demo golden-path`. The live RAG
+> `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty,trace make demo golden-path`. The live RAG
 > block has no probe: rehearse it the same day.
 > **Duration:** 60 minutes, presenter-led. **Audience:** technical and business; the delegation block plays its
 > 15-minute version, the others their 5-minute version.
