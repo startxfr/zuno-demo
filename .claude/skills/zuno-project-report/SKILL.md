@@ -5,7 +5,7 @@ description: Generate "Zuno Atlas", the private HTML project report for zuno-dem
 
 # zuno-project-report
 
-Builds one self-contained HTML page (French, light/dark themes, no external data) and publishes it as a **private Artifact**.
+Builds one self-contained HTML page (English, light/dark themes, no external data) and publishes it as a **private Artifact**.
 Never commit the output: the repos are public and the page carries cluster consumption figures.
 
 ## Run
@@ -32,13 +32,13 @@ Never commit the output: the repos are public and the page carries cluster consu
   - When `build_comps.py` lists unmatched pods in a zuno-owned namespace, add or extend a component.
   - Descriptions are written from the ADRs and ops notes, not generated. Check a claim in the repo before adding one.
   - Layers: fnd, sec, data, obs, ai, gw, exp, ops (colours fixed in the template, one per layer).
-- **`goals` and `order` in `build_data.py`**: one French sentence per version band. Add a line when a new band appears in `docs/adr/README.md`.
+- **`goals` and `order` in `build_data.py`**: one English sentence per version band. Add a line when a new band appears in `docs/adr/README.md`.
 - **`isPlanned` in `assets/template.html`**: currently `b==='v0.17'`. Update when a band starts or closes.
 - **Request-flow steps** (`FLOW` in the template) mirror the governed chain Keycloak → UnifAI → AI Gateway → Kuadrant → MaaS → models → MCP gateway → MCP servers → tracing.
 
 ## Known limits
 
-- WP → band assignment uses the first non-retired ADR cited by the WP; WPs with no ADR go to "Hors bande".
+- WP → band assignment uses the first non-retired ADR cited by the WP; WPs with no ADR go to "No band".
 - ADR "created" curve uses the ADR `**Date:**`; WP "done" curve needs a date in the WP State line (about 220 of 261 have one).
 - Used CPU is a 6 h average, memory is instantaneous. Both change from run to run.
 - Fonts come from Google Fonts (the only host the Artifact CSP allows).
