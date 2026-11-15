@@ -1,6 +1,9 @@
 # Scenario: KServe and llm-d - local models on MIG GPU slices
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-serving-llmd-mig`: the 5-minute version PASS at
+> 09:30 (11 units, 38 s); the 15-minute version PASS at 09:33 (20 units, 52 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
 > `zuno-models-d0` and `zuno-models-d1` Synced and Healthy; the four `LLMInferenceService` (`gpt-oss-20b`,
 > `qwen35-9b`, `qwen35-9b-wesh`, `qwen36-27b-instruct`) and the `InferenceService` `embeddings` Ready; two GPU nodes
 > `g7e.4xlarge` (MachineSet `zuno-gpu-a`, 2 replicas, both in eu-central-1a), MIG `all-balanced` applied

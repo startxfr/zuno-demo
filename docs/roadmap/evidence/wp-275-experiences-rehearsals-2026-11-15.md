@@ -34,6 +34,8 @@ Session `zuno-demo-reorg` ran these rehearsals on demo333 with the owner's named
 - No unit of these six demos is a changing unit: every action is a read or has nothing to run. No go was needed beyond
   the owner's go to run the rehearsals.
 
+- **Replay of 2026-11-15, 14:39 to 15:12, at checkout d105538f.** `dify` 5 (143904) and 15 (144204); `kagent` 5 (144456) and 15 (144758); `lightspeed` 5 (145039) and 15 (145334); `openclaw` 5 (145651) and 15 (150014); `open-webui` 5 (150304) and 15 (150601); `unifai-agents` 5 (150857) and 15 (151205). All 12 are PASS (11 to 21 units, 33 to 73 s). Every report ends with `RESULT: PASS`, run with the fixed `status` check (it fails on a dead Argo CD or a stale reconciliation) and, from 10:30, the ordered probe queue. The tables below stay as the history of the first run.
+
 ## Dify
 
 ### 5-minute version

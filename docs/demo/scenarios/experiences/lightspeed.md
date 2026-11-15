@@ -1,6 +1,9 @@
 # Scenario: OpenShift Lightspeed - the console assistant served by MaaS
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12 (22:50 to 22:55
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lightspeed`: the 5-minute version PASS at 14:50 (11
+> units, 33 s); the 15-minute version PASS at 14:53 (19 units, 47 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 (22:50 to 22:55
 > UTC): Applications `zuno-lightspeed-d0`/`-d1` and `zuno-lightspeed-config-d0`/`-d1` Synced and Healthy, operator
 > `lightspeed-operator.v2.0.1` Succeeded (channel `stable`, Automatic), `OLSConfig` provider `rhoai_vllm` on
 > `https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1`, `gpt-oss-20b` Ready,

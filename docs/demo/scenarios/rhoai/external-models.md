@@ -1,6 +1,9 @@
 # Scenario: RHOAI external models - SaaS models published through MaaS, callable by the router only
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse external-models`: the 5-minute version PASS at 09:02
+> (11 units, 38 s); the 15-minute version PASS at 09:05 (20 units, 50 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
 > `zuno-models-d0`/`-d1` and `zuno-llm-d1` Synced and Healthy; ExternalModels (`maas.opendatahub.io`) `mistral-large`
 > (provider `mistral`, target `mistral-large-4`, endpoint `api.mistral.ai`) and `gpt-oss-120b-ovhcloud` (provider
 > `openai-compatible`, target `gpt-oss-120b`, endpoint `oai.endpoints.kepler.ai.cloud.ovh.net`), phase `Migrated`,

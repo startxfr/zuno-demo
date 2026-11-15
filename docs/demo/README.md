@@ -72,69 +72,70 @@ shows what it will change and asks you to type the demo id.
 - **Not show-ready**: a named reason prevents it today (for example, the GPU node of the world model is off).
 - **Page**:
   - **written**: in the new format;
+- **Rehearsed on 2026-11-15**: the result of the latest valid `make demo rehearse` report for each version, from the evidence file named in the page's status banner. A PASS says the files and the page play; it does not say "show-ready" (see the banner of each page).
 
 ## Scenarios
 
 ### Experiences: the clients of one governed backend
 
-| Scenario | Shows | Personas | Golden-path probe | Page |
-|---|---|---|---|---|
-| [Open WebUI](scenarios/experiences/open-webui.md) | SSO, "Zuno" and "Zuno Code" models, tools by group | sale-01, consultant-02, ai-ops-01 | `open-webui`, `zuno-code` | written (wave 0) |
-| [OpenClaw](scenarios/experiences/openclaw.md) | One assistant per persona, two sign-ins, token injected by the egress proxy, Confluence for consultant-02 and not for sale-01 | consultant-02, sale-01, ai-ops-01 | `openclaw` | written (wave 1) |
-| [Dify](scenarios/experiences/dify.md) | The three imported apps (agent, chatflow, workflow), the External Knowledge adapter, every call made as consultant-02 through the token proxy | consultant-02, ai-ops-01, paas-ops-01 | `dify` | written (wave 1) |
-| [kagent](scenarios/experiences/kagent.md) | Cluster diagnosis with five governed read-only tools, a Secret read refused, acting as ai-ops-01 through the token proxy | ai-ops-01, paas-ops-01 | `kagent` | written (wave 1) |
-| [OpenShift Lightspeed](scenarios/experiences/lightspeed.md) | The console assistant on a local model through MaaS, cluster reads with the user's own rights, Zuno tools through the mcp-gateway | consultant-02, sale-01, paas-ops-01 (only `consultant`, `sales` and cluster-admins may open the chat) | `lightspeed` | written (wave 1) |
-| [UnifAI agents](scenarios/experiences/unifai-agents.md) | Workspaces from Keycloak groups, Tekos from the signed release, cluster tools for ai-ops-01 only, starters and templates | consultant-02, ai-ops-01 | `unifai-tekos` (the cluster-tools contrast has no probe) | written (wave 1) |
-| [UnifAI live RAG](unifai-live-rag.md) | Upload (docling, qwen3-embedding, Qdrant), cited answers, isolation from team workflows and from another persona, optional Confluence resync | consultant-01, sale-01 | none (rehearse first) | written (wave 1) |
-| [Blender 3D](blender-3d.md) | A sentence becomes editable Blender objects on a local model, behind the workstation entry and the C3 client floor | ai-dev-01, ai-ops-01, paas-ops-01 | `blender` | written (wave 1) |
-| [World model](world-model.md) | Walk into a generated world and change it, prompts screened, on an on-demand GPU node | ai-ops-01, paas-ops-01 | `world-model` (not show-ready: no GPU node) | written (wave 1) |
+| Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|---|
+| [Open WebUI](scenarios/experiences/open-webui.md) | SSO, "Zuno" and "Zuno Code" models, tools by group | sale-01, consultant-02, ai-ops-01 | `open-webui`, `zuno-code` | written (wave 0) | 5: PASS, 15: PASS |
+| [OpenClaw](scenarios/experiences/openclaw.md) | One assistant per persona, two sign-ins, token injected by the egress proxy, Confluence for consultant-02 and not for sale-01 | consultant-02, sale-01, ai-ops-01 | `openclaw` | written (wave 1) | 5: PASS, 15: PASS |
+| [Dify](scenarios/experiences/dify.md) | The three imported apps (agent, chatflow, workflow), the External Knowledge adapter, every call made as consultant-02 through the token proxy | consultant-02, ai-ops-01, paas-ops-01 | `dify` | written (wave 1) | 5: PASS, 15: PASS |
+| [kagent](scenarios/experiences/kagent.md) | Cluster diagnosis with five governed read-only tools, a Secret read refused, acting as ai-ops-01 through the token proxy | ai-ops-01, paas-ops-01 | `kagent` | written (wave 1) | 5: PASS, 15: PASS |
+| [OpenShift Lightspeed](scenarios/experiences/lightspeed.md) | The console assistant on a local model through MaaS, cluster reads with the user's own rights, Zuno tools through the mcp-gateway | consultant-02, sale-01, paas-ops-01 (only `consultant`, `sales` and cluster-admins may open the chat) | `lightspeed` | written (wave 1) | 5: PASS, 15: PASS |
+| [UnifAI agents](scenarios/experiences/unifai-agents.md) | Workspaces from Keycloak groups, Tekos from the signed release, cluster tools for ai-ops-01 only, starters and templates | consultant-02, ai-ops-01 | `unifai-tekos` (the cluster-tools contrast has no probe) | written (wave 1) | 5: PASS, 15: PASS |
+| [UnifAI live RAG](unifai-live-rag.md) | Upload (docling, qwen3-embedding, Qdrant), cited answers, isolation from team workflows and from another persona, optional Confluence resync | consultant-01, sale-01 | none (rehearse first) | written (wave 1) | 5: PASS, 15: PASS |
+| [Blender 3D](blender-3d.md) | A sentence becomes editable Blender objects on a local model, behind the workstation entry and the C3 client floor | ai-dev-01, ai-ops-01, paas-ops-01 | `blender` | written (wave 1) | 5: PASS, 15: PASS (install, uninstall not rehearsed) |
+| [World model](world-model.md) | Walk into a generated world and change it, prompts screened, on an on-demand GPU node | ai-ops-01, paas-ops-01 | `world-model` (not show-ready: no GPU node) | written (wave 1) | 5: PASS, 15: PASS (not show-ready; the files and the page only) |
 
 ### Governance of the backend
 
-| Scenario | Shows | Personas | Golden-path probe | Page |
-|---|---|---|---|---|
-| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (wave 0) |
-| [Model routing and fallback](scenarios/governance/ai-gateway-routing.md) | "Zuno Code" to Codestral first, preferred and fallback lists per task, `local_only_for`, unready models skipped with an immediate 503, the routing decision API | sale-01, ai-ops-01, paas-ops-01 | `zuno-code` | written (wave 2) |
-| [Guardrails](scenarios/governance/guardrails.md) | A prompt injection detected in observe mode through Dify, the TrustyAI dashboard, the mode per classification level, what blocking would do | consultant-02, ai-ops-01, paas-ops-01 | `guardrails` | written (wave 2) |
-| [One budget per persona](scenarios/governance/quotas.md) | One token budget per persona across the experiences, the 2026-11-03 evidence, MaaS budgets versus persona budgets, fail-closed classes, the per-turn ceiling | sale-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 2) |
-| [MCP tools by group](scenarios/governance/mcp-tools-by-group.md) | The same question from two personas, two tool sets, the five checks, signed markers, the delegated-credential refusal, one audit | sale-01, consultant-02, finance-01, ai-ops-01, paas-ops-01 | `tools`, `open-webui` | written (wave 2) |
-| [A2A delegation with approval](scenarios/governance/a2a-delegation-approval.md) | Arkos asks Tekos for a cluster audit with consultant-02's identity, a human approves in UnifAI, the AAP job link, expiry, limits on depth, cycles and budget, the trace | consultant-02, ai-ops-01, paas-ops-01 | `delegation-approval` (the probe proves the request and a refusal; rehearse the approval, the job and the trace) | written (wave 2) |
-| [Identity and personas](scenarios/governance/identity-personas.md) | One Keycloak account, three group dimensions, the same group opening a workspace and a tool set, OpenShift groups at first sign-in, service accounts, negative fixtures | consultant-02, sale-01, paas-ops-01 | none (rehearse first) | written (wave 2) |
+| Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|---|
+| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (wave 0) | 5: PASS, 15: PASS |
+| [Model routing and fallback](scenarios/governance/ai-gateway-routing.md) | "Zuno Code" to Codestral first, preferred and fallback lists per task, `local_only_for`, unready models skipped with an immediate 503, the routing decision API | sale-01, ai-ops-01, paas-ops-01 | `zuno-code` | written (wave 2) | 5: PASS, 15: PASS |
+| [Guardrails](scenarios/governance/guardrails.md) | A prompt injection detected in observe mode through Dify, the TrustyAI dashboard, the mode per classification level, what blocking would do | consultant-02, ai-ops-01, paas-ops-01 | `guardrails` | written (wave 2) | 5: PASS, 15: PASS |
+| [One budget per persona](scenarios/governance/quotas.md) | One token budget per persona across the experiences, the 2026-11-03 evidence, MaaS budgets versus persona budgets, fail-closed classes, the per-turn ceiling | sale-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 2) | 5: PASS, 15: PASS |
+| [MCP tools by group](scenarios/governance/mcp-tools-by-group.md) | The same question from two personas, two tool sets, the five checks, signed markers, the delegated-credential refusal, one audit | sale-01, consultant-02, finance-01, ai-ops-01, paas-ops-01 | `tools`, `open-webui` | written (wave 2) | 5: PASS, 15: PASS |
+| [A2A delegation with approval](scenarios/governance/a2a-delegation-approval.md) | Arkos asks Tekos for a cluster audit with consultant-02's identity, a human approves in UnifAI, the AAP job link, expiry, limits on depth, cycles and budget, the trace | consultant-02, ai-ops-01, paas-ops-01 | `delegation-approval` (the probe proves the request and a refusal; rehearse the approval, the job and the trace) | written (wave 2) | 5: PASS, 15: PASS |
+| [Identity and personas](scenarios/governance/identity-personas.md) | One Keycloak account, three group dimensions, the same group opening a workspace and a tool set, OpenShift groups at first sign-in, service accounts, negative fixtures | consultant-02, sale-01, paas-ops-01 | none (rehearse first) | written (wave 2) | 5: PASS, 15: PASS |
 
 ### Red Hat OpenShift AI and models
 
-| Scenario | Shows | Personas | Golden-path probe | Page |
-|---|---|---|---|---|
-| [MaaS portal and API keys](scenarios/rhoai/maas-portal-api-keys.md) | A self-service key on a group subscription, token limits, revocation | ai-dev-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 0) |
-| [GenAI playground](scenarios/rhoai/genai-playground.md) | The ready-made playground: chat on gpt-oss-20b through MaaS, a document answered with a citation, MCP tools with the user's own OpenShift token (9 tools for `ocp-ai-ops`, 0 for `ocp-ai-dev`) | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
-| [Model serving with llm-d on MIG](scenarios/rhoai/model-serving-llmd-mig.md) | Five models on MIG slices of two 96 GB cards, the GPU quota and its wedged rollouts, hardware profiles, autoscaling, the scale-from-zero training node, the failover drill | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) |
-| [External models](scenarios/rhoai/external-models.md) | Mistral Large and OVHcloud gpt-oss-120b published as ExternalModels, subscribed by the ai-gateway only, the `ipp-managed` label trap, C1/C2 eligibility, SaaS still called directly by the gateway | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) |
-| [Model catalog and registry](scenarios/rhoai/model-catalog-registry.md) | Red Hat's curated catalog, the dashboard route trap, a registry gated on the evaluation | ai-dev-01, paas-ops-01, ai-ops-01 | none (not show-ready: no model registry on demo333; the catalog part can be rehearsed) | written (wave 3) |
-| [LoRA pipeline with MLflow](scenarios/rhoai/lora-pipeline-mlflow-kueue.md) | A past pipeline run, the TrainJob on a scale-from-zero GPU node, MLflow tracking, the adapter registered and served (recorded evidence), the packed LoRA module trap | ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
-| [Evaluation with TrustyAI and EvalHub](scenarios/rhoai/evaluation-trustyai-evalhub.md) | RAGAS and Garak scores on the TrustyAI dashboard, 20 scenarios per agent at 75%, EvalHub and its RBAC, Kueue admitting the evaluation Jobs, LMEvalJobs off on 3.6 EA | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) |
+| Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|---|
+| [MaaS portal and API keys](scenarios/rhoai/maas-portal-api-keys.md) | A self-service key on a group subscription, token limits, revocation | ai-dev-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 0) | 5: PASS, 15: PASS |
+| [GenAI playground](scenarios/rhoai/genai-playground.md) | The ready-made playground: chat on gpt-oss-20b through MaaS, a document answered with a citation, MCP tools with the user's own OpenShift token (9 tools for `ocp-ai-ops`, 0 for `ocp-ai-dev`) | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) | 5: PASS, 15: PASS |
+| [Model serving with llm-d on MIG](scenarios/rhoai/model-serving-llmd-mig.md) | Five models on MIG slices of two 96 GB cards, the GPU quota and its wedged rollouts, hardware profiles, autoscaling, the scale-from-zero training node, the failover drill | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) | 5: PASS, 15: PASS |
+| [External models](scenarios/rhoai/external-models.md) | Mistral Large and OVHcloud gpt-oss-120b published as ExternalModels, subscribed by the ai-gateway only, the `ipp-managed` label trap, C1/C2 eligibility, SaaS still called directly by the gateway | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 3) | 5: PASS, 15: PASS |
+| [Model catalog and registry](scenarios/rhoai/model-catalog-registry.md) | Red Hat's curated catalog, the dashboard route trap, a registry gated on the evaluation | ai-dev-01, paas-ops-01, ai-ops-01 | none (not show-ready: no model registry on demo333; the catalog part can be rehearsed) | written (wave 3) | 5: PASS, 15: PASS (catalog reads only) |
+| [LoRA pipeline with MLflow](scenarios/rhoai/lora-pipeline-mlflow-kueue.md) | A past pipeline run, the TrainJob on a scale-from-zero GPU node, MLflow tracking, the adapter registered and served (recorded evidence), the packed LoRA module trap | ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) | 5: PASS, 15: PASS |
+| [Evaluation with TrustyAI and EvalHub](scenarios/rhoai/evaluation-trustyai-evalhub.md) | RAGAS and Garak scores on the TrustyAI dashboard, 20 scenarios per agent at 75%, EvalHub and its RBAC, Kueue admitting the evaluation Jobs, LMEvalJobs off on 3.6 EA | ai-ops-01, ai-dev-01, paas-ops-01 | none (rehearse first) | written (wave 3) | 5: PASS, 15: PASS |
 
 ### Foundation and trust
 
-| Scenario | Shows | Personas | Golden-path probe | Page |
-|---|---|---|---|---|
-| [GitOps and Day 0-3](scenarios/foundation/gitops-day0-3.md) | `make dN verb component` and its four days, which verbs are read-only, the Argo CD Applications on `devel`, the known-good and drift checks, the golden path, freeze and canary rules | paas-ops-01 | none (rehearse first) | written (wave 4) |
-| [Signed agent release (OKF)](scenarios/foundation/okf-signed-agent-release.md) | An agent's sheet in its own repository, one digest in `agents.lock`, `okf-fetch` VERIFIED from the internal Quay, offline admission, promotion by pull request, revocation | paas-ops-01 | none (rehearse first) | written (wave 4) |
-| [Image signing and admission](scenarios/foundation/image-signing-admission.md) | RHTAS in the cluster, image policies in enforce mode, images pinned by digest and pulled from Quay through mirror sets, the verify Job and the release ledger, the mirror-set drain trap | paas-ops-01 | none (rehearse first) | written (wave 4) |
-| [Vault and PKI](scenarios/foundation/vault-pki.md) | Vault on Raft with KMS auto-unseal and TLS, ExternalSecrets in every namespace, Let's Encrypt and Vault-issued certificates, Transit signing for the gateways | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) |
-| [Service mesh and Kiali](scenarios/foundation/service-mesh-kiali.md) | STRICT mTLS, short-lived SPIFFE identities from Vault PKI, injection versus allowlist, the MaaS gateway on the same mesh, the Kiali graph | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) |
-| [Observability and traces](scenarios/foundation/observability-trace.md) | A Tekos turn found in Tempo with its span tags, the Run Trace dashboard, usage and cost per experience, the collector pipeline, two counting traps, Perses in the console | consultant-02, ai-ops-01, paas-ops-01 | `trace` (with `unifai-tekos`) | written (wave 4) |
-| [AAP audited operations](scenarios/foundation/aap-audited-operations.md) | Job templates and workflows from Git, reader versus ops rights in the AAP UI, a check job and its pod, the agents' audit tools and their rate limit | consultant-03, consultant-02, paas-ops-01 | none (rehearse first) | written (wave 4) |
+| Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|---|
+| [GitOps and Day 0-3](scenarios/foundation/gitops-day0-3.md) | `make dN verb component` and its four days, which verbs are read-only, the Argo CD Applications on `devel`, the known-good and drift checks, the golden path, freeze and canary rules | paas-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
+| [Signed agent release (OKF)](scenarios/foundation/okf-signed-agent-release.md) | An agent's sheet in its own repository, one digest in `agents.lock`, `okf-fetch` VERIFIED from the internal Quay, offline admission, promotion by pull request, revocation | paas-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
+| [Image signing and admission](scenarios/foundation/image-signing-admission.md) | RHTAS in the cluster, image policies in enforce mode, images pinned by digest and pulled from Quay through mirror sets, the verify Job and the release ledger, the mirror-set drain trap | paas-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
+| [Vault and PKI](scenarios/foundation/vault-pki.md) | Vault on Raft with KMS auto-unseal and TLS, ExternalSecrets in every namespace, Let's Encrypt and Vault-issued certificates, Transit signing for the gateways | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
+| [Service mesh and Kiali](scenarios/foundation/service-mesh-kiali.md) | STRICT mTLS, short-lived SPIFFE identities from Vault PKI, injection versus allowlist, the MaaS gateway on the same mesh, the Kiali graph | paas-ops-01, ai-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
+| [Observability and traces](scenarios/foundation/observability-trace.md) | A Tekos turn found in Tempo with its span tags, the Run Trace dashboard, usage and cost per experience, the collector pipeline, two counting traps, Perses in the console | consultant-02, ai-ops-01, paas-ops-01 | `trace` (with `unifai-tekos`) | written (wave 4) | 5: PASS, 15: PASS |
+| [AAP audited operations](scenarios/foundation/aap-audited-operations.md) | Job templates and workflows from Git, reader versus ops rights in the AAP UI, a check job and its pod, the agents' audit tools and their rate limit | consultant-03, consultant-02, paas-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
 
 ## Workshops (presenter-led)
 
-| Workshop | Built from | Duration | Page |
-|---|---|---|---|
-| [One backend, three experiences](three-experiences.md) | UnifAI, Open WebUI, OpenClaw, then one dashboard block (backend, routing, one budget) | 30 min | written (wave 1) |
-| [One governed backend, many experiences](five-experiences.md) | UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget) | 45-55 min | written (wave 1) |
-| [Sovereign and governed AI](workshops/sovereign-governed-ai.md) | Identity, tools, sovereignty, routing, guardrails, budget, then the trace | 45 min | written (wave 2) |
-| [Agentic AI](workshops/agentic-ai.md) | UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty | 60 min | written (wave 2) |
-| [RHOAI end to end](workshops/rhoai-end-to-end.md) | Catalog, serving, external models, MaaS key, playground, LoRA pipeline, evaluation | 70-90 min | written (wave 3) |
-| [Trusted platform and operations](workshops/trusted-platform-ops.md) | GitOps, signed images, signed agents, Vault, mesh, observability (15-minute version), AAP | 60 min | written (wave 4) |
+| Workshop | Built from | Duration | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|
+| [One backend, three experiences](three-experiences.md) | UnifAI, Open WebUI, OpenClaw, then one dashboard block (backend, routing, one budget) | 30 min | written (wave 1) | workshop: PASS |
+| [One governed backend, many experiences](five-experiences.md) | UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget) | 45-55 min | written (wave 1) | workshop: PASS (blender-3d install, uninstall not rehearsed) |
+| [Sovereign and governed AI](workshops/sovereign-governed-ai.md) | Identity, tools, sovereignty, routing, guardrails, budget, then the trace | 45 min | written (wave 2) | workshop: PASS |
+| [Agentic AI](workshops/agentic-ai.md) | UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty | 60 min | written (wave 2) | workshop: PASS |
+| [RHOAI end to end](workshops/rhoai-end-to-end.md) | Catalog, serving, external models, MaaS key, playground, LoRA pipeline, evaluation | 70-90 min | written (wave 3) | workshop: PASS |
+| [Trusted platform and operations](workshops/trusted-platform-ops.md) | GitOps, signed images, signed agents, Vault, mesh, observability (15-minute version), AAP | 60 min | written (wave 4) | workshop: PASS |
 
 **Two-hour combinations:**
 - sovereign and governed AI, then agentic AI;

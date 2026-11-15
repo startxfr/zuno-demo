@@ -1,6 +1,10 @@
 # Scenario: RHOAI model catalog and model registry - from a curated model to a recorded version
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: in
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-catalog-registry`: the 5-minute version PASS at
+> 09:25 (11 units, 30 s); the 15-minute version PASS at 09:28 (19 units, 47 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). This PASS is not show-ready for the
+> registry: demo333 has no ModelRegistry instance, so only the catalog reads were exercised and the registry part is
+> told. Prerequisites checked read-only on demo333 on 2026-11-13: in
 > `rhoai-model-registries`, Deployments `model-catalog` and `model-catalog-postgres` 1/1, the `Catalog` `catalog`
 > Available, Route `model-catalog-https` (`model-catalog.apps.demo333.startx.fr`, reencrypt), ConfigMap
 > `default-catalog-sources` with three model sources (Red Hat AI, Red Hat AI validated, Other) and

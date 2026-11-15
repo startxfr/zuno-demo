@@ -1,6 +1,9 @@
 # Scenario: Keycloak - one identity, groups drive every entitlement
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (about 00:20 CET):
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse identity-personas`: the 5-minute version PASS at 02:33
+> (12 units, 46 s); the 15-minute version PASS at 08:32 (21 units, 117 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 CET):
 > Applications `zuno-keycloak-d0`/`-d1`, `zuno-openshift-oauth-d0`/`-d1`, `zuno-openshift-rbac-groups-d0`/`-d1`,
 > `zuno-open-webui-d1` and `zuno-unifai-d0`/`-d1` Synced and Healthy. Keycloak CR `zuno` (built-in instance, internal
 > mode) with pod `zuno-0` Running; KeycloakRealmImport `zuno-realm` Done; Jobs `zuno-keycloak-client-reconcile` and

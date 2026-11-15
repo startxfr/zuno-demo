@@ -1,6 +1,9 @@
 # Scenario: ai-gateway - guardrails on every model call
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse guardrails`: the 5-minute version PASS at 15:15 (11
+> units, 46 s); the 15-minute version PASS at 15:18 (20 units, 56 s). Evidence:
+> [WP-273](../../../roadmap/evidence/wp-273-guardrails-rehearsal-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
 > `zuno-trustyai-config-d0`/`-d1`, `zuno-ai-gateway-d0`/`-d1`, `zuno-dify-d1` and `zuno-token-proxy-dify-d1` Synced and
 > Healthy; `NemoGuardrails/zuno-guardrails` phase `Ready` (config `zuno-observe`, ConfigMap `zuno-nemo-rails-observe`);
 > Deployments `zuno-guardrails` and `zuno-guardrails-smoke` 1/1 in `zuno-ai-run`, their pods recreated about 108

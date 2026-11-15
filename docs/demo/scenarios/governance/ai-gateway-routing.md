@@ -1,6 +1,9 @@
 # Scenario: ai-gateway - model routing and fallback
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-routing`: the 5-minute version PASS at
+> 02:21 (11 units, 96 s); the 15-minute version PASS at 02:24 (20 units, 44 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
 > `zuno-ai-gateway-d0`/`-d1`, `zuno-llm-d1` and `zuno-open-webui-d1` Synced and Healthy; Deployment `ai-gateway` 1/1;
 > gateway environment `MODEL_TASK_ALIASES=zuno-code=code:Zuno Code`, `MODEL_READINESS_ENABLED=true`,
 > `CIRCUIT_BREAKER_ENABLED=true`, `CIRCUIT_OPEN_SECONDS=60`,

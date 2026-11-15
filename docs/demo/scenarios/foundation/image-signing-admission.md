@@ -1,6 +1,9 @@
 # Scenario: Supply chain - signed images, admission policy and the internal Quay
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: `Securesign`
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse image-signing-admission`: the 5-minute version PASS at
+> 09:45 (11 units, 38 s); the 15-minute version PASS at 09:48 (21 units, 55 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: `Securesign`
 > `zuno-securesign` `Ready` in `zuno-rhtas` (`rhtas-operator.v1.5.1`), routes `fulcio-server`, `rekor-server`, `tuf` and
 > `console-ui` on `*-zuno-rhtas.apps.demo333.startx.fr`, nine RHTAS pods Running; `policy-controller-operator.v1.1.2`,
 > Deployment `zuno-policy-controller-webhook` 1/1, webhook `policy.rhtas.com` with `failurePolicy: Ignore` and a 10 s

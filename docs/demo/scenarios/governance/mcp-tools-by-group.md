@@ -1,6 +1,9 @@
 # Scenario: mcp-gateway - the same tools for every experience, filtered by who you are
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse mcp-tools-by-group`: the 5-minute version PASS at
+> 08:35 (12 units, 32 s); the 15-minute version PASS at 08:38 (22 units, 46 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
 > `zuno-mcp-d0`/`-d1`, `zuno-mcp-confluence-d0`/`-d1` and `zuno-mcp-k8s-d0`/`-d1` Synced and Healthy; Deployment
 > `mcp-gateway` 1/1 (its pod was 33 minutes old at the check), reading the agents release `okf-corp@sha256:2918e463…`
 > (release 0.14.3) from the internal Quay; gateway environment `AGENT_ENTITLEMENT_EVERY_CALL=true`,

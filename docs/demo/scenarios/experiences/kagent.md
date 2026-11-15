@@ -1,6 +1,9 @@
 # Scenario: kagent - a read-only cluster operations assistant
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse kagent`: the 5-minute version PASS at 14:44 (11 units,
+> 41 s); the 15-minute version PASS at 14:47 (21 units, 52 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12: Applications
 > `zuno-kagent-d0`, `zuno-kagent-d1`, `zuno-token-proxy-kagent-d1`, `zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1` Synced and
 > Healthy; in `zuno-kagent` the Deployments `kagent-controller`, `kagent-ui`, `kagent-front-door`, `zuno-sre` and
 > `zuno-token-proxy` 1/1 (kagent 0.10.4, running the pinned digests); Agent `zuno-sre` Declarative, Accepted and Ready;

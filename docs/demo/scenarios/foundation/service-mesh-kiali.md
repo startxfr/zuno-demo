@@ -1,6 +1,9 @@
 # Scenario: Service mesh - mutual TLS, workload identity and the Kiali graph
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:30
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse service-mesh-kiali`: the 5-minute version PASS at
+> 15:29 (11 units, 111 s); the 15-minute version PASS at 10:27 (20 units, 115 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` runs the whole golden path
+> (read-only). Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:30
 > UTC): Applications `zuno-service-mesh-d0`/`-d1`, `zuno-kiali-d0`/`-d1`, `zuno-mesh-monitoring-d0`/`-d1`,
 > `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1` Synced and Healthy. Operator `servicemeshoperator3.v3.5.0`;
 > `Istio` `default` Healthy (Istio 1.30.3, one revision); `IstioCNI` Healthy on all 7 nodes; `istiod` 1/1 (HPA 1 to 5);

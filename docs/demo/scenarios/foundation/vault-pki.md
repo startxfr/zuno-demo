@@ -1,6 +1,9 @@
 # Scenario: Vault and PKI - secrets and certificates without static credentials
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (about 00:20 UTC):
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
+> units, 35 s); the 15-minute version PASS at 10:06 (21 units, 53 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 UTC):
 > Applications `zuno-vault-d0`/`-d1`, `zuno-external-secrets-d0`/`-d1` and `zuno-cert-manager-d0`/`-d1` Synced and
 > Healthy. Pod `zuno-vault-0` 1/1 Running, Vault 1.17.2, labels `vault-sealed=false`, `vault-active=true`,
 > `vault-initialized=true`. The pod was recreated at 21:27:55Z on 2026-11-12, during the master cordon, and came back

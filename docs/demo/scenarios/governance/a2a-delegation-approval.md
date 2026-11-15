@@ -1,6 +1,9 @@
 # Scenario: a2a-gateway - agent-to-agent delegation with a human approval
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (about 00:20 CET):
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse a2a-delegation-approval`: the 5-minute version PASS at
+> 02:17 (12 units, 53 s); the 15-minute version PASS at 08:41 (21 units, 72 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 CET):
 > Applications `zuno-a2a-gateway-d0`/`-d1`, `zuno-unifai-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
 > Deployment `a2a-gateway` 1/1, reading agents release v0.14.3 (`okf-corp@sha256:2918e463…`) and signing the agent
 > chain through Vault Transit (`AGENT_CHAIN_SIGNER=transit`); its pod, and the `mcp-gateway` pod, had restarted about

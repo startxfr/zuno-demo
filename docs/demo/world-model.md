@@ -1,6 +1,12 @@
 # Scenario: World model - walk into a generated world on an on-demand GPU
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12: namespace
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse world-model`: the 5-minute version PASS at 10:50 (12
+> units, 22 s), 1 skipped (`install`); the 15-minute version PASS at 10:52 (21 units, 32 s), 1 skipped (`install`).
+> Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md). This PASS is not
+> show-ready: the demo is switched off (`zuno_world_model_enabled` is `false`), there is no GPU node and the application
+> is not installed, so `check` passed on the dashboard and on a probe that reports the demo as `roadmap`, not on a
+> world. It proves the files and the page play, not the demo. Prerequisites checked read-only on demo333 on 2026-11-12:
+> namespace
 > `zuno-world-model` present with no pods and no world-model Application installed (quota `requests.nvidia.com/gpu`
 > 0/1, SecretStore `vault` Valid); no world-model GPU node. The six world-model MachineSets (g7e.2xlarge, g7e.4xlarge
 > and g7e.8xlarge in eu-central-1a and 1b) each had a Machine in `Provisioning` at 22:46 UTC, refused by AWS with

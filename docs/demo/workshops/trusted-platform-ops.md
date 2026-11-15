@@ -1,6 +1,8 @@
 # Workshop: Trusted platform and operations
 
-> **Status:** Built from seven scenarios, linked in the agenda. Not rehearsed as a whole. Each block keeps the status of
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse trusted-platform-ops`: PASS at 11:38 (94 units, 725 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
 > its scenario page.
 > **Show-ready:** only the observability block has a golden-path probe (`trace`). Run `make demo golden-path` before the
 > session, and rehearse every other block the same day.

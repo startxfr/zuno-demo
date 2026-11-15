@@ -1,6 +1,9 @@
 # Scenario: GitOps and Day 0-3 - the install and operations contract
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:45
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse gitops-day0-3`: the 5-minute version PASS at 09:38 (11
+> units, 127 s); the 15-minute version PASS at 09:43 (22 units, 151 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (00:10 to 00:45
 > UTC): 114 Argo CD Applications in `openshift-gitops`, all tracking `devel`: 106 `zuno-*` from `startxfr/zuno-demo`
 > and 8 `startx-cluster-*` from `startxfr/helm-repository`. 111 were Synced and Healthy. `startx-cluster-auth` and
 > `startx-cluster-infra-config` were OutOfSync and Healthy (no self-heal; the same pair was OutOfSync on 2026-11-04).

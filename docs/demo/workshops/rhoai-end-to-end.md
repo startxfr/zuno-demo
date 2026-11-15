@@ -1,6 +1,8 @@
 # Workshop: RHOAI end to end
 
-> **Status:** Built from seven scenarios, linked in the agenda. Not rehearsed as a whole. Each block keeps the status of
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse rhoai-end-to-end`: PASS at 11:12 (105 units, 262 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
 > its scenario page.
 > **Show-ready:** none of these blocks has a golden-path probe. Rehearse every block on the day, and run
 > `make demo golden-path` before the session anyway: its Open WebUI moment proves that a local model answers.

@@ -1,7 +1,10 @@
 # Workshop: One governed backend, many experiences
 
-> **Status:** Built from seven experience scenarios, linked in the agenda, and one inline block. Not rehearsed as a
-> whole in this format. Each block keeps the status of its scenario page. A first version was shown live on 2026-11-07
+> **Status:** Built from seven experience scenarios, linked in the agenda, and one inline block. Rehearsed as a whole on
+> 2026-11-15 through `make demo rehearse five-experiences`: PASS at 11:05 (94 units, 269 s), 2 skipped
+> (`install:blender-3d`, `uninstall:blender-3d`). Evidence:
+> [WP-280](../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of its scenario
+> page. A first version was shown live on 2026-11-07
 > ([WP-208](../roadmap/work-packages/wp-208-five-experiences-demonstration.md)) and in moment 1 of the
 > [2026-11-09 demonstration](demo-day-2026-11-09.md).
 > **Show-ready:** only if every probe of its blocks passed within the last hour:

@@ -1,6 +1,9 @@
 # Scenario: Ansible Automation Platform - audited operations
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:45
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse aap-audited-operations`: the 5-minute version PASS at
+> 10:15 (11 units, 386 s); the 15-minute version PASS at 10:23 (21 units, 389 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` launches one read-only AAP
+> job and takes about six minutes. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:45
 > UTC): Applications `zuno-aap-d0`/`-d1`, `zuno-aap-config-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
 > `AnsibleAutomationPlatform` `aap` at version 2.7.20261019, `Running` and `Successful`, controller 4.8.13, operator CSV
 > `aap-operator.v2.7.0-0.1794269743`; Route `aap.apps.demo333.startx.fr`; 17 `JobTemplate` and 8 `WorkflowTemplate`

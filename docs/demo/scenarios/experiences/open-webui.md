@@ -1,6 +1,9 @@
 # Scenario: Open WebUI - a familiar chat on governed models and tools
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse open-webui`: the 5-minute version PASS at 15:03 (11
+> units, 40 s); the 15-minute version PASS at 15:06 (19 units, 47 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12:
 > Application `zuno-open-webui-d1` Synced and Healthy, Deployment `open-webui` 1/1 (image 0.12.5 pinned by digest),
 > route `open-webui.apps.demo333.startx.fr`, both ExternalSecrets synced, `open-webui` listed in the ai-gateway's
 > experience clients.

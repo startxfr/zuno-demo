@@ -1,12 +1,12 @@
 # WP-278: what was tested (2026-11-15)
 
-Rehearsal of the foundation demos through `make demo`, in both versions, on 2026-11-15 between 09:38 and 10:35 (the times of the reports).
+Rehearsal of the foundation demos through `make demo`, in both versions, on 2026-11-15 between 09:38 and 15:29 (the times of the reports).
 
 Session `zuno-demo-reorg-demo333` ran these rehearsals on demo333 with the owner's named go for each, given in the demo333 session, from the checkout `phase56-integ-c, fixed at commit 68ed5a62`. "PASS (nothing to run)" means the step's Ansible file has nothing to run: the row is played by the presenter. The seconds are the engine's own timing of each unit; the total is the time between the start of the log and the report.
 
 ## Result
 
-13 of 14 rehearsals are in this file; every one ends with `RESULT: PASS`.
+14 of 14 rehearsals are in this file; every one ends with `RESULT: PASS`.
 
 | Demo | 5-minute | 15-minute |
 |---|---|---|
@@ -14,7 +14,7 @@ Session `zuno-demo-reorg-demo333` ran these rehearsals on demo333 with the owner
 | `image-signing-admission` | PASS, 11 units, 38 s | PASS, 21 units, 55 s |
 | `okf-signed-agent-release` | PASS, 11 units, 33 s | PASS, 20 units, 80 s |
 | `vault-pki` | PASS, 11 units, 35 s | PASS, 21 units, 53 s |
-| `service-mesh-kiali` | not rehearsed: the owner's go of 2026-11-15 covered the 15-minute version | PASS, 20 units, 115 s |
+| `service-mesh-kiali` | PASS, 11 units, 111 s | PASS, 20 units, 115 s |
 | `observability-trace` | PASS, 11 units, 117 s | PASS, 20 units, 64 s |
 | `aap-audited-operations` | PASS, 11 units, 386 s | PASS, 21 units, 389 s |
 
@@ -28,7 +28,8 @@ Session `zuno-demo-reorg-demo333` ran these rehearsals on demo333 with the owner
 - **`aap-audited-operations` has a changing unit, run with the owner's named go.** `start` launches one read-only AAP job
   (`zuno-day0-check`) per run and waits for it: about 6 minutes.
 - **`service-mesh-kiali`: `start` runs the whole golden path.** It is read-only and not a changing unit; it was run with the
-  owner's named go. Only the 15-minute version was rehearsed: the owner's go covered that version only, and the 5-minute version is not rehearsed yet. 13 of the 14 versions are rehearsed and PASS, counting the replays.
+  owner's named go. The 15-minute version ran in the first batch (102746). The owner's go for the 5-minute version came
+  later: report 152936 (111 s) at checkout d105538f, PASS. All 14 versions are now rehearsed and PASS, counting the replays.
 - **Finding: `observability-trace` failed on `check` in both versions (09:51 and 09:54).** The engine flushed the queued
   probes in queue order: `trace` ran before `unifai-tekos`, whose run id `trace` reads. The platform was fine: demo333 ran
   the probe by hand in both orders at 10:11. The fix is in two commits: 602b9e24 (queue the probes in the probe script's
@@ -257,7 +258,21 @@ What remains manual on stage:
 
 ### 5-minute version
 
-Not rehearsed: the owner's go of 2026-11-15 covered the 15-minute version.
+11 units, 111 seconds in all. Changing units: none (every action is a read or has nothing to run). Steps not run: none.
+
+| Unit | Result | Seconds |
+|---|---|---|
+| status | PASS | 9.0 |
+| check | PASS | 16.0 |
+| install | PASS (nothing to run) | 1.0 |
+| start | PASS | 73.0 |
+| 0:00 | PASS | 1.0 |
+| 1:00 | PASS | 1.0 |
+| 2:15 | PASS | 2.0 |
+| 3:15 | PASS (nothing to run) | 0.0 |
+| 4:15 | PASS (nothing to run) | 0.0 |
+| stop | PASS (nothing to run) | 0.0 |
+| uninstall | PASS (nothing to run) | 0.0 |
 
 ### 15-minute version
 

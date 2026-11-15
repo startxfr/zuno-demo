@@ -12,6 +12,8 @@ Unlike `guardrails`, this demo changes shared state: `start` and `stop` act on c
 
 These rehearsals ran before the incident of 2026-11-15 (01:38) with the earlier `status`, which read the stored Application statuses and did not fail on a dead Argo CD or a stale reconciliation. Their `status` units show that the Applications were Healthy at the last reconciliation. The check was fixed later the same night.
 
+**Replay of 2026-11-15, 15:21 to 15:27, at checkout d105538f.** `unifai-live-rag` 5 (152127, 11 units, 73 s) and 15 (152534, 21 units, 117 s). Every report ends with `RESULT: PASS`, run with the fixed `status` check (it fails on a dead Argo CD or a stale reconciliation) and, from 10:30, the ordered probe queue. They ran with the owner's named go (`start` and `stop` change consultant-01's Personal documents); the optional 9:30 row of the 15-minute version is SKIPPED (mutating) by design, and consultant-01's library was checked empty after the run. The tables below stay as the history of the first run.
+
 ## Result
 
 Both rehearsals end with `RESULT: PASS`. In the 15-minute version, one unit is `SKIPPED (mutating)`: the optional

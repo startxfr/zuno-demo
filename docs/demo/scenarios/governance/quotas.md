@@ -1,6 +1,10 @@
 # Scenario: ai-gateway - one token budget per persona across the experiences
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse quotas`: the 5-minute version PASS at 08:44 (10 units,
+> 37 s); the 15-minute version PASS at 08:47 (19 units, 47 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Its `start` spends token budget and is
+> not undone (sale-01's budget was spent twice in the rehearsals). Prerequisites checked read-only on demo333 on
+> 2026-11-13: Applications
 > `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1` Synced and Healthy; Deployment `ai-gateway` 1/1 with
 > `QUOTA_LEDGER_STORE=redis`, `REDIS_ADDR` on `zuno-redis-master.zuno-auth`, `QUOTA_FAIL_MODES_ENFORCED=true`,
 > `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `MAAS_GATEWAY_IDENTITY=true`,

@@ -1,6 +1,9 @@
 # Scenario: RHOAI GenAI playground - chat, a cited document and governed MCP tools
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse genai-playground`: the 5-minute version PASS at 09:08
+> (11 units, 42 s); the 15-minute version PASS at 09:11 (20 units, 53 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
 > `zuno-openshift-ai-d0`/`-d1`, `zuno-mcp-d1` and `zuno-models-d1` Synced and Healthy; in `zuno-playground`, OGXServer
 > `lsd-genai-playground` `Ready` without a `spec.tls` block, its pod 1/1 with 0 restarts and 9 ReplicaSets (no
 > growth), `genai-pgvector` 1/1 on the Bound 5Gi claim `genai-pgvector-storage`, ExternalSecret

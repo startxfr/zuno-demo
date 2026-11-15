@@ -1,6 +1,8 @@
 # Workshop: Agentic AI
 
-> **Status:** Built from seven scenarios, linked in the agenda. Not rehearsed as a whole. Each
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse agentic-ai`: PASS at 11:49 (96 units, 348 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each
 > block keeps the status of its scenario page.
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
 > `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty,trace make demo golden-path`. The live RAG

@@ -1,6 +1,9 @@
 # Scenario: Observability - one turn traced, every call counted
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse observability-trace`: the 5-minute version PASS at
+> 10:32 (11 units, 117 s); the 15-minute version PASS at 10:35 (20 units, 64 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
 > `zuno-observability-d0`/`-d1`, `zuno-tempo-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-perses-d1` Synced and
 > Healthy; OpenTelemetryCollector `zuno-otel-collector` 1/1 (0.158.0), traces exported to `debug`, `otlp/tempo` and
 > `otlp/rhoai`, metrics to `debug` and `prometheus`; ServiceMonitor `zuno-otel-collector-metrics` selecting the base

@@ -1,6 +1,10 @@
 # Scenario: RHOAI pipelines - from a dataset to a fine-tuned LoRA adapter
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lora-pipeline-mlflow-kueue`: the 5-minute version PASS
+> at 09:14 (12 units, 30 s); the 15-minute version PASS at 09:17 (21 units, 48 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). The optional run of the day before (`make
+> d3 run mlops`) is a changing unit that `make demo` does not declare and the rehearsal did not run. Prerequisites
+> checked read-only on demo333 on 2026-11-13:
 > - `DataSciencePipelinesApplication/mlops-dspa` in `zuno-mlops`: `APIServerReady=True` but `Ready=False`. Its
 >   workflow controller was in CrashLoopBackOff (15 restarts in 69 minutes), so a new run would not execute.
 > - Route `ds-pipeline-mlops-dspa-zuno-mlops.apps.demo333.startx.fr`.

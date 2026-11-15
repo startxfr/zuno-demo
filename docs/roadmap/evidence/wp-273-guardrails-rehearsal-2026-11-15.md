@@ -10,6 +10,8 @@ own timing of each unit.
 
 These rehearsals ran before the incident of 2026-11-15 (01:38) with the earlier `status`, which read the stored Application statuses and did not fail on a dead Argo CD or a stale reconciliation. Their `status` units show that the Applications were Healthy at the last reconciliation. The check was fixed later the same night.
 
+**Replay of 2026-11-15, 15:15 to 15:18, at checkout d105538f.** `guardrails` 5 (151500, 11 units, 46 s) and 15 (151805, 20 units, 56 s). Every report ends with `RESULT: PASS`, run with the fixed `status` check (it fails on a dead Argo CD or a stale reconciliation) and, from 10:30, the ordered probe queue. The tables below stay as the history of the first run.
+
 ## Result
 
 Both rehearsals end with `RESULT: PASS`. No action of this demo changes the cluster.

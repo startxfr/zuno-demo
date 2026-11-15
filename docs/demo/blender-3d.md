@@ -1,6 +1,9 @@
 # Scenario: Blender add-on - a sentence becomes editable 3D objects on a local model
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12: Route
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse blender-3d`: the 5-minute version PASS at 10:44 (13
+> units, 42 s), 2 skipped (`install`, `uninstall`); the 15-minute version PASS at 10:47 (23 units, 51 s), 2 skipped
+> (`install`, `uninstall`). Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md).
+> Prerequisites checked read-only on demo333 on 2026-11-12: Route
 > `zuno-agent-gateway-workstation-ai-gateway` (`ai-gateway.apps.demo333.startx.fr`, reencrypt), HTTPRoute
 > `ai-gateway-workstation` (`POST /v1/chat/completions`, `GET /v1/models`), AuthPolicy `ai-gateway-workstation-jwt`
 > (issuer `https://keycloak.apps.demo333.startx.fr/realms/zuno`, `azp` `blender`, group `/ocp-ai-dev`) and

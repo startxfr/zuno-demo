@@ -1,6 +1,9 @@
 # Scenario: ai-gateway - data classification keeps sovereign data on local models
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-sovereignty`: the 5-minute version PASS at
+> 10:38 (11 units, 54 s); the 15-minute version PASS at 10:41 (19 units, 57 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12:
 > Applications `zuno-ai-gateway-d0`/`-d1` Synced and Healthy, Deployment `ai-gateway` 1/1, ConfigMap
 > `ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), gateway environment
 > `CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED=true`, `CIRCUIT_BREAKER_ENABLED=true`, Tempo

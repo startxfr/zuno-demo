@@ -1,6 +1,10 @@
 # Scenario: UnifAI - live RAG on your own documents
 
-> **Status:** Not rehearsed in this format. The upload and the Confluence resync last ran live in the browser on
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-live-rag`: the 5-minute version PASS at 15:21
+> (11 units, 73 s); the 15-minute version PASS at 15:25 (21 units, 117 s), 1 skipped (`9:30`). Evidence:
+> [WP-274](../roadmap/evidence/wp-274-unifai-live-rag-rehearsal-2026-11-15.md). Its `start` replaces consultant-01's
+> Personal documents with the two demo files and its `stop` removes them. The upload and the Confluence resync last ran
+> live in the browser on
 > 2026-11-05 ([WP-200](../roadmap/work-packages/wp-200-show-the-unifai-rag-working-live.md)). Prerequisites checked
 > read-only on demo333 on 2026-11-12 at 22:50 UTC: UnifaiStack `unifai` Ready (images v0.1.69), pods `docling-serve`,
 > `unifai-rag-server`, `unifai-rag-celery`, `qdrant`, `mongodb` and `rabbitmq` Running, InferenceService `embeddings`

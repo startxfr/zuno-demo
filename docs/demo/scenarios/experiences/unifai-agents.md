@@ -1,6 +1,9 @@
 # Scenario: UnifAI - governed agents in team and personal workspaces
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12 at 22:50 UTC:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-agents`: the 5-minute version PASS at 15:08 (11
+> units, 46 s); the 15-minute version PASS at 15:12 (21 units, 58 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 at 22:50 UTC:
 > Applications `zuno-unifai-d0`/`-d1` Synced and Healthy, UnifaiStack `unifai` Ready (images v0.1.69, operator CSV
 > `unifai-operator.v0.1.69` Succeeded), the 14 stack pods Running, the 11 UnifaiTeams Ready (`agent-tekos` included),
 > UnifaiAgentBundle `tekos` Ready and verified (4 tasks, 17 objects), the 45 UnifaiWorkflows Ready (`tekos` and the

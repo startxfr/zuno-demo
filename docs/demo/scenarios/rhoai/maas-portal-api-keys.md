@@ -1,6 +1,9 @@
 # Scenario: RHOAI Models-as-a-Service - a self-service API key with a governed budget
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12: DSC
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse maas-portal-api-keys`: the 5-minute version PASS at
+> 09:19 (11 units, 30 s); the 15-minute version PASS at 09:22 (18 units, 40 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-12: DSC
 > `ModelsAsAServiceReady=True` and `MaaSConsumerPortalAvailable=True`, Deployments `maas-api`, `maas-ui`,
 > `maas-consumer-portal` and `kube-auth-proxy` available, Gateway `maas-default-gateway` with its external listener
 > `maas.apps.demo333.startx.fr`, MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` Active,

@@ -1,6 +1,9 @@
 # Scenario: OpenClaw - one personal assistant per persona
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12 (22:50 UTC):
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse openclaw`: the 5-minute version PASS at 14:56 (11
+> units, 68 s); the 15-minute version PASS at 15:00 (20 units, 73 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 (22:50 UTC):
 > Applications `zuno-openclaw-d0`/`-d1` Synced and Healthy. In both persona namespaces: CSV
 > `claw-operator.v0.0.227-commit-f5aa592` Succeeded, `Claw` `assistant` Ready on the pinned OpenClaw digest,
 > Deployments `assistant`, `assistant-proxy` and `front-door` 1/1, Route `front-door` admitted and the operator's Route

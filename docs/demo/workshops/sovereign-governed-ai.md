@@ -1,6 +1,8 @@
 # Workshop: Sovereign and governed AI
 
-> **Status:** Built from six scenarios, linked in the agenda, plus two steps of a seventh. Not rehearsed as a whole.
+> **Status:** Built from six scenarios, linked in the agenda, plus two steps of a seventh. Rehearsed as a whole on
+> 2026-11-15 through `make demo rehearse sovereign-governed-ai`: PASS at 11:17 (77 units, 225 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md).
 > Each block keeps the status of its scenario page.
 > **Show-ready:** only if every probe of its blocks passed within the last hour:
 > `ONLY=open-webui,tools,sovereignty,unifai-tekos,trace,zuno-code,guardrails make demo golden-path` (`trace` looks

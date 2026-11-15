@@ -1,6 +1,9 @@
 # Scenario: Dify - a no-code canvas on the governed backend
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-12: Applications
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse dify`: the 5-minute version PASS at 14:39 (11 units,
+> 42 s); the 15-minute version PASS at 14:42 (20 units, 50 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12: Applications
 > `zuno-dify-d1`, `zuno-dify-knowledge-d1` and `zuno-token-proxy-dify-d1` Synced and Healthy; in `zuno-dify` the
 > Deployments `dify-api`, `-worker`, `-beat`, `-web`, `-plugin-daemon`, `-nginx`, `-front-door`, `zuno-token-proxy` and
 > `zuno-dify-knowledge` 1/1 (Dify 1.17.0 pinned by digest) and `dify-redis-master` 1/1; route

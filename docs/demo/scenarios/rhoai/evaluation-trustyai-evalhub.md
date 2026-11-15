@@ -1,6 +1,9 @@
 # Scenario: RHOAI TrustyAI - evaluating models and agents before they change
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse evaluation-trustyai-evalhub`: the 5-minute version
+> PASS at 08:53 (12 units, 124 s); the 15-minute version PASS at 08:59 (22 units, 140 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13:
 > - **0 LMEvalJobs** on the cluster and no `lmeval-hf-cache` PVC: `lmEval.enabled: false` since 2026-11-05 (see
 >   [Limits](#limits)).
 > - `EvalHub/zuno-evalhub` in `zuno-ai-run`: `Ready=True`. Active collections `standard-llm-evals-v1`,

@@ -1,6 +1,10 @@
 # Scenario: OKF agents release - agents signed in their own repository, admitted by digest
 
-> **Status:** Not rehearsed in this format. Prerequisites checked read-only on demo333 on 2026-11-13:
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse okf-signed-agent-release`: the 5-minute version PASS
+> at 09:57 (11 units, 33 s); the 15-minute version PASS at 10:00 (20 units, 80 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). `platform/okf/agents.lock` now pins
+> release v1.0.1. The release names, digests and agent versions in the older check below are those of v0.14.3 on
+> 2026-11-13 and are not repeated by the rehearsal reports. Prerequisites checked read-only on demo333 on 2026-11-13:
 > [`platform/okf/agents.lock`](../../../../platform/okf/agents.lock) pins release v0.14.3,
 > `quay.io/zuno/okf-corp@sha256:2918e463...`, and `admit_okf_bundle.py latest` names the same release as the newest on
 > `quay.io`; `make d3 admit agents`, run from the workstation (no cluster access), printed 13 warnings about knowledge
