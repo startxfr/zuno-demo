@@ -1,0 +1,24 @@
+---
+# lightspeed: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE the first
+# take: tune it with `make demo gif lightspeed` once a take exists.
+# `make demo record lightspeed` takes the 5-minute version as consultant-02 in the OpenShift console
+# (evaluations/browser/walkthroughs/lightspeed.mjs).
+# Markers written by the walkthrough, in order: login, console, panel, q1-sent, q1-done, q2-done, q3-done, end.
+# The three answers are live model answers, and the 2:00 and 3:15 prompts are untested on the page: no caption
+# quotes or promises an answer, and the motion moments use `fit`. Review q2-done.png and q3-done.png before any cut.
+record_notice: >-
+  a recorded browser session as consultant-02 in the OpenShift console: 3 real Lightspeed answers on the one
+  Lightspeed subscription (200,000 tokens per hour, shared by every console user and the probe); the conversation
+  it creates is deleted at the end, and the take fails if consultant-02's conversations differ before and after;
+  the sign-in is an OpenShift console session of consultant-02; traces and metrics of the answers remain, as for
+  any use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account"}
+  - {still: panel, hold: 4, step: "0:00", caption: "0:00  The console's own assistant, on our own model"}
+  - {from: q1-sent, to: q1-done, fit: 8, hold: 4, step: "0:45", caption: "0:45  Answered from the documentation of this version"}
+  - {from: q1-done, to: q2-done, fit: 9, hold: 4, step: "2:00", caption: "2:00  It reads the live cluster with my own rights"}
+  - {from: q2-done, to: q3-done, fit: 9, hold: 4, step: "3:15", caption: "3:15  Asked about a namespace I may not see"}
+  - {still: end, hold: 5, step: "4:15", caption: "It sees only what the person asking may see"}

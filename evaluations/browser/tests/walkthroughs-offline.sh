@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag) and of the
-# shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs and
-# tests/fake-unifai.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
+# WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
+# lightspeed) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
 # test of the recorder itself.
 #   evaluations/browser/tests/walkthroughs-offline.sh            every demo
-#   ONLY=kagent evaluations    /browser/tests/walkthroughs-offline.sh   one demo
+#   ONLY=lightspeed evaluations/browser/tests/walkthroughs-offline.sh   one demo
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
@@ -24,6 +24,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
+lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -144,6 +145,57 @@ out="$(unifai u-refused FAKE_REFUSE_DELETE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "unifai: a refused delete fails the take and names the session" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the session of consultant-01-my-documents (.*) was NOT deleted from consultant-01.s Agentic Chats' <<<\"\$0\"" "$out"
 expect "unifai: markers.json says not cleaned, one more session owned" markers u-refused '
+assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same": False} and len(names) == 8, m
+'
+fi
+if wanted lightspeed; then
+echo "== lightspeed"
+out="$(lightspeed l-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "lightspeed: a scout creates no conversation and dismisses nothing" grep -q 'left: {"conversations":1,"dismissed":0}' <<<"$out"
+expect "lightspeed: scout.json reports every guess and the plugin's requests" scouted l-scout '
+assert list(steps) == ["enter", "owned", "conversations-api", "console", "panel", "closed"], list(steps)
+api = steps["conversations-api"]
+assert api["status"] == 200 and api["count"] == 1 and api["top_keys"] == ["conversations"] and api["csrf_cookie"] is True, api
+assert api["conversation_keys"] == ["conversation_id", "topic_summary", "last_message_timestamp"], api
+assert steps["console"]["dialog_on_screen"] is False and steps["console"]["button_selector"] == "[data-test=\x27ols-plugin__popover-button\x27]", steps["console"]
+p = steps["panel"]
+assert p["input_selector"] == ".ols-plugin__popover textarea" and p["earlier_answers"] == 0 and p["panel_selector"], p
+assert any(r.startswith("POST ") and r.endswith("/ols/authorized") for r in p["requests_seen"]), p["requests_seen"]
+assert steps["closed"]["conversations"] == 1
+assert "a topic" not in json.dumps(s), "a conversation topic reached scout.json"
+'
+out="$(lightspeed l-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "lightspeed: its conversation is gone, the earlier one is kept" grep -q 'left: {"conversations":1,"dismissed":0}' <<<"$out"
+expect "lightspeed: the log carries the three answers for the page" bash -c "grep -q 'answer 2 (.*): The pods running in zuno-ai-run' <<<\"\$0\" && grep -q 'answer 3 (.*): You do not have permission' <<<\"\$0\"" "$out"
+expect "lightspeed: markers.json follows the contract" markers l-pass '
+assert names == ["login", "console", "panel", "q1-sent", "q1-done", "q2-done", "q3-done", "end"], names
+assert m["persona"] == "consultant-02" and m["motion_from"] == "console" and m["status"] == "pass", m
+assert len(m["created"]) == 1 and m["created"][0]["kind"] == "conversation" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(lightspeed l-safety FAKE_SAFETY=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: the safety-inspection warning fails the take at once" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL answer 1 was refused or failed: Lightspeed stopped on its safety inspection' <<<\"\$0\"" "$out"
+expect "lightspeed: its conversation is deleted all the same" markers l-safety '
+assert names[-1] == "q1-sent" and m["cleaned"] is True and m["owned"]["same"] is True, m
+'
+out="$(lightspeed l-quota FAKE_QUOTA=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: a refused first question fails at once, nothing created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL answer 1 was refused or failed: HTTP 429 from Lightspeed$' <<<\"\$0\"" "$out"
+expect "lightspeed: nothing to clean, the same conversations owned" markers l-quota '
+assert m["created"] == [] and m["cleaned"] is None and m["owned"]["same"] is True and m["markers"][-1]["t"] < 30, m
+'
+out="$(lightspeed l-tour FAKE_TOUR=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: a dialog over the console stops the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL a dialog covers the console' <<<\"\$0\" && grep -q '\"dismissed\":0' <<<\"\$0\"" "$out"
+out="$(lightspeed l-refused FAKE_REFUSE_DELETE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lightspeed: a refused delete fails the take and names the conversation" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the conversation .* was NOT deleted from consultant-02.s Lightspeed history: DELETE answered HTTP 403' <<<\"\$0\"" "$out"
+expect "lightspeed: markers.json says not cleaned, one more conversation owned" markers l-refused '
 assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same": False} and len(names) == 8, m
 '
 fi
