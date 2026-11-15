@@ -70,15 +70,17 @@ has run, and says what is left to the presenter. No action of this demo changes 
 
 ### Status
 
-Nothing to do. The file reads the deployments `model-catalog` and `model-catalog-postgres` in `rhoai-model-registries`
-(both 1/1) and the registry: `oc get modelregistries.modelregistry.opendatahub.io -A`. On 2026-11-13 it answered
-`No resources found`. The demo is **not show-ready** while no `ModelRegistry` exists: the registry part can only be
+Nothing to do. The file reads the Applications `zuno-openshift-ai-d0`, `zuno-openshift-ai-d1`, `zuno-mlops-d0`,
+`zuno-mlops-d1` and `zuno-models-d1`, the workloads `model-catalog` and `model-catalog-postgres` in
+`rhoai-model-registries` (both 1/1) and `model-registry-ui` in `redhat-ods-applications`, and the registry:
+`oc get modelregistries.modelregistry.opendatahub.io -A`. That read is not asserted: it fails only if the CRD is gone. On
+2026-11-13 it answered `No resources found`. The demo is **not show-ready** while no `ModelRegistry` exists: the registry part can only be
 told. If a registry exists by then, this page is out of date: check it again before the session.
 
 ### Check
 
 There is no golden-path probe for the catalog part: rehearse it the same day. The file runs reads only: the `Catalog`
-`catalog` (Available), the Route `model-catalog-https`, the ConfigMaps `default-catalog-sources` and
+`catalog` (`Available`), the Route `model-catalog-https`, the ConfigMaps `default-catalog-sources` and
 `model-catalog-sources`, the RoleBinding `model-catalog-authenticated` and the HTTPRoute `zuno-portal-dashboard`. The
 registry part has nothing to prove and stays "not show-ready" until a `ModelRegistry` exists. The dashboard must load
 at `/`, not as an empty 404: that is the host-name route trap (see
@@ -86,7 +88,7 @@ at `/`, not as an empty 404: that is the host-name route trap (see
 
 ### Install
 
-Nothing to do. The catalog and the registry component are part of the shared platform: the file only verifies them.
+Nothing to do. The catalog and the registry component are part of the shared platform: the file runs nothing, and Status and Check verify them.
 
 ### Start
 

@@ -77,26 +77,30 @@ and says what is left to the presenter. No action of this demo changes the clust
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-models-d0`, `zuno-models-d1` and `zuno-llm-d1`, the `maas-controller`
-pod in `redhat-ods-applications` (it was crash-looping on 2026-11-13: check it with
-`oc get pods -n redhat-ods-applications | grep maas-controller`), `payload-processing` in `openshift-ingress` and the
-Deployment `ai-gateway`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
+workload in `redhat-ods-applications` (it was crash-looping on 2026-11-13: check it with
+`oc get pods -n redhat-ods-applications | grep maas-controller`), `payload-processing` in `openshift-ingress` and
+`ai-gateway` in `zuno-ai-run`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
 nothing.
 
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the two
-ExternalModels (`oc get externalmodels.maas.opendatahub.io,maasmodelrefs -n zuno-ai-run`: phase `Migrated` for the two
-ExternalModels and `Ready` for the six model refs), the MaaSModelRefs, the MaaSSubscriptions and the MaaSAuthPolicies.
-If a model ref is not `Ready` or a subscription not `Active`, see [If something goes wrong](#if-something-goes-wrong).
+ExternalModels `mistral-large` and `gpt-oss-120b-ovhcloud` (phase `Migrated`), the six MaaSModelRefs `mistral-large`,
+`gpt-oss-120b-ovhcloud`, `gpt-oss-20b`, `qwen35-9b`, `qwen35-9b-wesh` and `qwen36-27b-instruct` (`Ready`), and, for the
+two SaaS models, the MaaSSubscriptions `mistral-large-ai-gateway` and `gpt-oss-120b-ovhcloud-ai-gateway` (`Ready`), the
+MaaSAuthPolicies `mistral-large-entitlement` and `gpt-oss-120b-ovhcloud-entitlement` (`Ready`), the
+TokenRateLimitPolicies `maas-trlp-mistral-large` and `maas-trlp-gpt-oss-120b-ovhcloud` (`Enforced`) and the
+ExternalSecrets `llm-provider-mistral-maas` and `llm-provider-ovhcloud-maas` (`Ready`). The ExternalProviders are not
+read. If a model ref, a subscription or an auth policy is not `Ready`, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
-Nothing to do. The SaaS models are part of the shared platform: the file only verifies them.
+Nothing to do. The SaaS models are part of the shared platform: the file runs nothing, and Status and Check verify them.
 
 ### Start
 
-The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) from the MaaS route, ending in
-`/zuno-ai-run`. The presenter no longer exports it. What only a person does:
+The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) from the cluster base domain (demo.yml:
+`https://maas.<cluster domain>/zuno-ai-run`), not from a read of the MaaS Route. The presenter no longer exports it. What only a person does:
 
 - [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
   never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the

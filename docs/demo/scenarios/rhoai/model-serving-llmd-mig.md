@@ -92,23 +92,24 @@ run, and says what is left to the presenter. No action of this demo changes the 
 
 ### Status
 
-Nothing to do. The file reads the Applications `zuno-models-d0` and `zuno-models-d1`, the four `LLMInferenceService`
-and the `InferenceService` `embeddings` in `zuno-ai-run` (five `READY True`; a model restarted in the last 15 minutes
-may still be loading, see [If something goes wrong](#if-something-goes-wrong)), the two GPU nodes and the
-ResourceQuota `zuno-ai-run-gpu-cap`. If one is missing or not Ready, stop and tell the platform owner: this demo
+Nothing to do. The file reads the Applications `zuno-models-d0` and `zuno-models-d1`, the four `LLMInferenceService` `gpt-oss-20b`, `qwen35-9b`, `qwen35-9b-wesh` and
+`qwen36-27b-instruct` and the `InferenceService` `embeddings` in `zuno-ai-run` (five `READY True`; a model restarted in the last 15 minutes
+may still be loading, see [If something goes wrong](#if-something-goes-wrong)), the two GPU nodes
+(`oc get nodes -l nvidia.com/mig.config.state=success`) and the ResourceQuota `zuno-ai-run-gpu-cap` (it must exist). If one is missing or not Ready, stop and tell the platform owner: this demo
 installs nothing.
 
 ### Check
 
-There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only, among them a look
-for a wedged rollout: `oc get rs -n zuno-ai-run | grep -e kserve -e predictor`. A model line with `DESIRED 1` and
+There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the same
+five `Ready` models, the HardwareProfiles `mig-1g-24gb` and `mig-2g-48gb` in `redhat-ods-applications`, the ScaledObject
+`gpt-oss-20b-kserve-keda` (`Ready`), and a look for a wedged rollout, shown and never failed: `oc get rs -n zuno-ai-run | grep -e kserve -e predictor`. A model line with `DESIRED 1` and
 `CURRENT 0` is a rollout the quota refused; the model still serves on its old pod. On 2026-11-13 `gpt-oss-20b` had
 one. Decide with the cluster owner the day before: leave it and show it at 9:45, or have the owner run
 `make d2 reconcile models` (the model is down for a few minutes). It is never run by the step file and never on stage.
 
 ### Install
 
-Nothing to do. The models, the GPU operator and the quota are part of the shared platform: the file only verifies them.
+Nothing to do. The models, the GPU operator and the quota are part of the shared platform: the file runs nothing, and Status and Check verify them.
 
 ### Start
 

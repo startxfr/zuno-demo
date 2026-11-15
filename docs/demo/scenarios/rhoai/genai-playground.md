@@ -79,24 +79,32 @@ and says what is left to the presenter. No action of this demo changes the clust
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-openshift-ai-d0`, `zuno-openshift-ai-d1`, `zuno-mcp-d1` and
-`zuno-models-d1`, the OGXServer `lsd-genai-playground` and `genai-pgvector` in `zuno-playground`, and the
-`LLMInferenceService` `gpt-oss-20b` in `zuno-ai-run` (`READY True`). If one is missing or not Healthy, stop and tell
+`zuno-models-d1`, the OGXServer `lsd-genai-playground` (phase `Ready`) and the workload `genai-pgvector` in
+`zuno-playground`, the workloads `mcp-gateway` in `zuno-ai-run` and `maas-consumer-portal`, `gen-ai-ui`, `maas-ui`,
+`rhods-dashboard` and `maas-controller` in `redhat-ods-applications`, and the `LLMInferenceService` `gpt-oss-20b` in
+`zuno-ai-run` (`READY True`). If one is missing or not Healthy, stop and tell
 the platform owner: this demo installs nothing.
 
-The DataScienceCluster `zuno-dsc` shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The cause is the parked GuardrailsOrchestrator `zuno-guardrails-smoke`, in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
 
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the OGXServer
-(`Ready`), `genai-pgvector` (1/1), the `zuno-mcp-gateway` entry of the ConfigMap `gen-ai-aa-mcp-servers`, and the DSC
-conditions `MaaSConsumerPortalAvailable`, `OGXReady` and `ModelsAsAServiceReady`. Two items were unhealthy on
+`lsd-genai-playground` (`Ready`), the ExternalSecret `genai-pgvector-credentials` (`Ready`), the workloads `genai-pgvector`
+(1/1) and `maas-controller`, the `zuno-mcp-gateway` entry of the ConfigMap `gen-ai-aa-mcp-servers`
+(`oc get configmap gen-ai-aa-mcp-servers -n redhat-ods-applications -o jsonpath='{.data}' | grep zuno-mcp-gateway`),
+the DSC `zuno-dsc` conditions `MaaSConsumerPortalAvailable`, `OGXReady` and `ModelsAsAServiceReady`, the HTTPRoutes
+`zuno-portal-genai`, `zuno-portal-dashboard` (both in `redhat-ods-applications`) and `zuno-portal-oauth-callback` (in
+`openshift-ingress`) (parents `Accepted`), the MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `gpt-oss-20b-ocp-ai-ops` and
+`gpt-oss-20b-ocp-paas-ops`, and the `LLMInferenceService` `gpt-oss-20b`, `qwen35-9b`, `qwen35-9b-wesh` and
+`qwen36-27b-instruct` (all `Ready`). It does not read the DSC `Ready` condition. Two items were unhealthy on
 2026-11-13: the `maas-controller` pod (`oc get pods -n redhat-ods-applications | grep maas-controller`) and the DSC
 `Ready` condition (`oc get dsc -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].message}'`). Read both
 before any session. Their effect on the playground was not tested.
 
 ### Install
 
-Nothing to do. The playground is part of the shared platform: the file only verifies it.
+Nothing to do. The playground is part of the shared platform: the file runs nothing, and Status and Check verify it.
 
 ### Start
 

@@ -87,19 +87,19 @@ Nothing to do. The file reads read-only: the `EvalHub` `zuno-evalhub` in `zuno-a
 and the instance Ready), and the GrafanaDashboard `trustyai`. If one is missing, stop and tell the platform owner:
 this demo installs nothing.
 
-The DataScienceCluster `zuno-dsc` shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The cause is the parked GuardrailsOrchestrator `zuno-guardrails-smoke`, in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
 
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the EvalHub
-`Ready`, its route `zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr` and the RoleBinding `zuno-evalhub-user`, and the
+`Ready`, its Route `zuno-evalhub` (host zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr, admitted) and the RoleBinding `zuno-evalhub-user`, and the
 last `Complete` Jobs `garak-smoke`, `garak-security`, `ragas-eval` and `zuno-acceptance-gate-tekos`. It also expects
-0 LMEvalJobs: they are off on RHOAI 3.6 EA (see [Limits](#limits)). If the DSC or `TrustyAIReady` is False, see
+0 LMEvalJobs (the read `oc get lmevaljobs -A`, which fails if the CRD is gone): they are off on RHOAI 3.6 EA (see [Limits](#limits)). If the DSC or `TrustyAIReady` is False, see
 [If something goes wrong](#if-something-goes-wrong). Do not start an evaluation to make a check pass.
 
 ### Install
 
-Nothing to do. TrustyAI and EvalHub are part of the shared platform: the file only verifies them.
+Nothing to do. TrustyAI and EvalHub are part of the shared platform: the file runs nothing, and Status and Check verify them.
 
 ### Start
 

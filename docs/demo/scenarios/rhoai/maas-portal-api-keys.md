@@ -64,21 +64,23 @@ the API key live, in the portal, at row 1:00, and that is the proof of the demo.
 ### Status
 
 Nothing to do. The file reads the DSC conditions `ModelsAsAServiceReady` and `MaaSConsumerPortalAvailable`, the
-deployments `maas-api`, `maas-ui`, `maas-consumer-portal` and `kube-auth-proxy`, and the Gateway
-`maas-default-gateway`. If one is missing or not ready, stop and tell the platform owner: this demo installs nothing.
+workloads `maas-api`, `maas-ui`, `maas-consumer-portal` and `kube-auth-proxy`, and the Gateway
+`maas-default-gateway` in `openshift-ingress` (`Programmed`), and the Route `maas-gateway-route`. `maas-api` is in `redhat-ai-gateway-infra`, `maas-ui` and `maas-consumer-portal` in `redhat-ods-applications`, `kube-auth-proxy` in
+`openshift-ingress`. If one is missing or not ready, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the MaaS
-conditions of the DSC, the MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` (Active), the
-AuthPolicy `maas-gateway-auth` (Enforced), and `gpt-oss-20b` Ready
+conditions of the DSC `zuno-dsc` (`ModelsAsAServiceReady`, `MaaSConsumerPortalAvailable`), the Gateway
+`maas-default-gateway` (`Programmed`), the MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops`
+(`Ready`), the AuthPolicy `maas-gateway-auth` (`Enforced`), and the `LLMInferenceService` `gpt-oss-20b` `Ready`
 (`oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`). The three human subscriptions cover this model only: when
 it is not Ready, a key has nothing to call (on 2026-11-12 it was not Ready). See
 [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
-Nothing to do. MaaS is part of the shared platform: the file only verifies it.
+Nothing to do. MaaS is part of the shared platform: the file runs nothing, and Status and Check verify it.
 
 ### Start
 
@@ -91,7 +93,9 @@ The file creates no key: the key made live at row 1:00 is the demo. What only a 
   `keycloak/demo-personas`.
 - [ ] A terminal with `curl`, large font. Paste the key into a variable without showing it:
   `read -rs MAAS_API_KEY && export MAAS_API_KEY`.
-- [ ] Set the endpoint: `export MAAS=https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b`.
+- [ ] The endpoint `$MAAS` (`https://maas.<cluster domain>/zuno-ai-run/gpt-oss-20b`, set in demo.yml) is resolved by the step
+  file for row 2:15. Rows 3:00 and 12:00 are run by hand: export it first with the same value (demo333:
+  `export MAAS=https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b`).
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, and Grafana as **ai-ops-01**, dashboard
   **Mesh & gateway** (the Authorino and Limitador panels).
 

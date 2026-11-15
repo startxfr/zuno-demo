@@ -85,27 +85,31 @@ and it is a human one: see [Start](#start).
 
 ### Status
 
-Nothing to do. The file reads the DSPA `mlops-dspa` in `zuno-mlops`, the `MLflow` `mlflow` and the deployments
+Nothing to do. The file reads the DSPA `mlops-dspa` in `zuno-mlops` (condition `APIServerReady`, not `Ready`), its Route
+`ds-pipeline-mlops-dspa`, the `MLflow` `mlflow` (`Available`) and the deployments
 `kubeflow-trainer-controller-manager` and `model-registry-operator-controller-manager` in `redhat-ods-applications`,
 and `jobset-controller-manager` in `openshift-jobset-operator`. All three controllers were 0/1 on 2026-11-13: tell
 the platform owner and do not start a run. If something else is missing, stop: this demo installs nothing.
 
-The DataScienceCluster `zuno-dsc` shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The cause is the parked GuardrailsOrchestrator `zuno-guardrails-smoke`, in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
 
 ### Check
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only:
-- the DSPA: `APIServerReady=True` is what the run list needs. **`Ready=False` is a known failure of 2026-11-13**:
-  `WorkflowControllerReady=False`, its workflow controller was crash-looping, so a new run would not execute. The page
+- the DSPA `mlops-dspa`: the file asserts `APIServerReady=True`, which is what the run list needs. **It does not assert
+  `Ready`, on purpose: `Ready=False` is a known failure of 2026-11-13**
+  (`WorkflowControllerReady=False`, its workflow controller was crash-looping), so a new run would not execute. The page
   shows past runs only, so the 5-minute version can be played with it. Say it if asked;
 - the TrainJob evidence (`trainjob_evidence`): the TrainJob `lora-comage-4c28m` is `Complete`;
-- MLflow: `status.address.url` ends in `/mlflow`.
+- MLflow `mlflow` is `Available` and its `status.address.url` ends in `/mlflow`
+  (`oc get mlflow mlflow -o jsonpath='{.status.address.url}' | grep /mlflow$`);
+- the Kueue ClusterQueue `default` is `Active` and the `LLMInferenceService` `qwen35-9b` in `zuno-ai-run` is `Ready`.
 
 If the DSPA, the Trainer or JobSet controllers are down, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
-Nothing to do. Pipelines, MLflow and Kueue are part of the shared platform: the file only verifies them.
+Nothing to do. Pipelines, MLflow and Kueue are part of the shared platform: the file runs nothing, and Status and Check verify them.
 
 ### Start
 
