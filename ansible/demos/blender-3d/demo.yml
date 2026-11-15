@@ -7,5 +7,8 @@ probes: ["blender"]
 browser: []
 # Units that change the cluster, `<action>: "what it changes"`: the guard prints it and asks for the demo id
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
-mutations: {}
+addon: "Blender add-on (workstation)"
+mutations:
+  install: "Workstation only: installs or updates the Zuno 3D add-on in the Blender user add-on folder (nothing on the cluster)"
+  uninstall: "Workstation only: removes the Zuno 3D add-on from the Blender user add-on folders (the platform entry stays)"
 steps: {}

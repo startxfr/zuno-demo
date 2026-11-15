@@ -1,7 +1,8 @@
 """`make demo rehearse <id> 5|15`: the whole sequence without pauses, with a report (ADR-0616 clause 11, WP-270).
 
 status, check, install, start, every step, stop, uninstall, in one runner playbook run. A step the manifest declares
-changing is never run: it is recorded `SKIPPED (mutating)`, optional or not. The report goes to
+changing is never run: it is recorded `SKIPPED (mutating)`, optional or not. An action the manifest lists under
+`not_rehearsed:` (world-model's install: ADR-0616 clause 11) is recorded `SKIPPED` with its reason. The report goes to
 `~/.cache/zuno/demo/rehearsals/<id>-<version>-<date>.md` and ends with `RESULT: PASS` or `RESULT: FAIL`. The session is
 never touched.
 """
@@ -24,7 +25,11 @@ def plan_units(page: Page, version: str, demo_dir: pathlib.Path, manifest: dict)
     to_run: List[Unit] = []
     decided: List[UnitResult] = []
     order = ["status", "check", "install", "start"]
+    not_rehearsed = (manifest or {}).get("not_rehearsed") or {}
     for action in order:
+        if action in not_rehearsed:
+            decided.append(UnitResult(action, "skipped", messages=[f"not rehearsed: {not_rehearsed[action]}"]))
+            continue
         _add(action, f"{action}.yml", "action", demo_dir, to_run, decided)
     mutating = guard.mutating_steps(manifest)
     for step in page.steps(version):
@@ -33,6 +38,9 @@ def plan_units(page: Page, version: str, demo_dir: pathlib.Path, manifest: dict)
             continue
         _add(step.time, f"steps/{step.file_name}", "step", demo_dir, to_run, decided)
     for action in ("stop", "uninstall"):
+        if action in not_rehearsed:
+            decided.append(UnitResult(action, "skipped", messages=[f"not rehearsed: {not_rehearsed[action]}"]))
+            continue
         _add(action, f"{action}.yml", "action", demo_dir, to_run, decided)
     return to_run, decided
 
@@ -61,7 +69,7 @@ def report(page: Page, version: str, results: List[UnitResult], run: Optional[Ru
     they change; `confirmed`: the demo id that confirmed them (typed or DEMO_CONFIRM)."""
     passed = not any(r.failed for r in results) and not (run and run.error)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    skipped = [r.name for r in results if r.status == "skipped"]
+    skipped = [r.name for r in results if r.status == "skipped" and not r.messages]
     if changing:
         units = "; ".join(f"{unit} ({guard.mutation_summary(value)})" for unit, value in changing.items())
         changes = f"- Changing units, confirmed by `{confirmed or '?'}`: {units}"
@@ -83,7 +91,8 @@ def report(page: Page, version: str, results: List[UnitResult], run: Optional[Ru
         detail = "; ".join(filter(None, [r.error] + r.messages + [
             f"{c.get('cmd')} -> exit {c.get('rc')}" for c in r.commands if c.get("rc") not in (0, None)] + [
             f"{c.get('id')} FAIL" for c in r.checks if c.get("passed") not in (True, "True", "true")]))
-        status = {"ok": "PASS", "nothing": "PASS (nothing to run)", "skipped": "SKIPPED (mutating)",
+        status = {"ok": "PASS", "nothing": "PASS (nothing to run)",
+                  "skipped": "SKIPPED" if r.messages else "SKIPPED (mutating)",
                   "missing": "FAIL (missing)", "failed": "FAIL"}.get(r.status, r.status)
         cell = detail.replace("|", "\\|")
         lines.append(f"| {r.name} | {status} | {r.seconds:.1f} | {cell} |")

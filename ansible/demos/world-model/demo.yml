@@ -7,5 +7,10 @@ probes: ["world-model"]
 browser: []
 # Units that change the cluster, `<action>: "what it changes"`: the guard prints it and asks for the demo id
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
+addon: "GPU node and application (owner, by hand)"
 mutations: {}
+# Never run by `make demo rehearse` (ADR-0616 clause 11): the rehearsal covers status, check, the read-only steps,
+# stop and the no-op uninstall.
+not_rehearsed:
+  install: "it refuses while the demo is switched off, and the owner creates the GPU node by hand"
 steps: {}

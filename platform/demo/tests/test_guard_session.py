@@ -127,6 +127,24 @@ class Guards(TempHome):
         self.assertEqual(guard.step_meta(manifest, "0:00"), {})
 
 
+class NotRehearsed(unittest.TestCase):
+    def test_an_action_listed_not_rehearsed_is_skipped_with_its_reason(self):
+        import catalogue
+        import rehearse
+        page = catalogue.load_page(FIXTURES / "docs/demo/scenarios/fixture/fixture-demo.md", "scenario", "fixture")
+        demo_dir = FIXTURES / "ansible/demos/fixture-demo"
+        manifest = {"not_rehearsed": {"install": "the owner creates the node by hand"}}
+        to_run, decided = rehearse.plan_units(page, "5", demo_dir, manifest)
+        self.assertNotIn("install", [u.name for u in to_run])
+        self.assertIn("uninstall", [u.name for u in to_run])
+        skipped = [d for d in decided if d.name == "install"][0]
+        self.assertEqual(skipped.status, "skipped")
+        text, passed = rehearse.report(page, "5", rehearse.merge(page, "5", None, decided + [
+            rehearse.UnitResult(u.name, "ok") for u in to_run]), None)
+        self.assertIn("| install | SKIPPED | 0.0 | not rehearsed: the owner creates the node by hand |", text)
+        self.assertTrue(passed)
+
+
 class PresenterRun(TempHome):
     """Runs the command line on the fixture catalogue, as a subprocess without a terminal."""
 
