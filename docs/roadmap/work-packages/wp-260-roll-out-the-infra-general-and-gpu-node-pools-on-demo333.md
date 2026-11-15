@@ -186,6 +186,20 @@ The uninstall timed out after 600 s because the Argo CD controller died in the m
    nothing. The registry `Config` and the GitopsService are now tracked by zuno-machines-d0 only, and the registry pods
    are back on the infra nodes.
 
-**Still open: rebuilding the internal images.** It is left for the next morning, with its own go. Until then, no pod
-that runs an internal-registry image may restart. On 2026-11-15 they ran in zuno-ai-build, zuno-ai-run, zuno-auth,
-zuno-data, zuno-dify, zuno-kagent, zuno-monitoring and zuno-vault: 27 containers, 137 ImageStreams, 20 BuildConfigs.
+**Rebuilding the internal images (02:41-03:23, owner's go).**
+- **What was lost.** Only images built in the cluster. The imported tags (vault, bitnami-redis, postgres,
+  bitnami-kubectl) use `referencePolicy: Local`, and the registry still served them through pullthrough. The images of
+  the 20 BuildConfigs were gone (`manifest unknown`). Ten Deployments ran them with `imagePullPolicy: Always`, so any
+  restart would have failed: a2a-gateway, aap-mcp, ai-gateway, confluence-mcp, diagram-render, git-forge-mcp,
+  mcp-gateway, zuno-dify-knowledge and the two zuno-token-proxy. None restarted before the rebuild.
+- **Source.** The owner chose to rebuild from devel (68ed5a62) rather than from each image's last built commit. Since
+  their last build, five components had only the ADR-0603 M20 hashed-lock installs, trustyai-eval had several commits
+  since 2026-10-23, and the AAP execution environment had one commit.
+- **Order.** Each build was a roll: `make d1 build supply-chain-signer`, `make d1 build ai-gateway`,
+  `make d2 build mcp` (mcp-gateway, diagram-render, a2a-gateway and the four MCP servers), then token-proxy,
+  dify-knowledge, trustyai-eval, mlops, and `make d1 build aap-execution-environment`.
+- **Result.** Every Deployment rolled to its new digest through its image trigger. No pod had a pull error, and every
+  internal image that a pod referenced resolved. `make d2 check supply-chain`: 12 of 12 verified (keyless, RHTAS).
+  `make demo golden-path`: PASS, 13 moments. Argo CD: 112 of 114 Synced/Healthy, as before the incident.
+- **Not rebuilt.** agent-bff, agent-frontend, agent-runtime and aiagent-operator (ref main, last built at v0.3.0, used
+  by no workload), and the two world-model images (the demo is off). Their tags stay empty until a build needs them.
