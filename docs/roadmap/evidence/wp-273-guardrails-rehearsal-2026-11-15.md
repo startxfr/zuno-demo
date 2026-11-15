@@ -8,6 +8,8 @@ session. The commands ran from the integration worktree `phase56-integ` at commi
 means the step's Ansible file has nothing to run: the row is played by the presenter. The seconds are the engine's
 own timing of each unit.
 
+These rehearsals ran before the incident of 2026-11-15 (01:38) with the earlier `status`, which read the stored Application statuses and did not fail on a dead Argo CD or a stale reconciliation. Their `status` units show that the Applications were Healthy at the last reconciliation. The check was fixed later the same night.
+
 ## Result
 
 Both rehearsals end with `RESULT: PASS`. No action of this demo changes the cluster.

@@ -10,6 +10,8 @@ own timing of each unit.
 
 Unlike `guardrails`, this demo changes shared state: `start` and `stop` act on consultant-01's Personal documents.
 
+These rehearsals ran before the incident of 2026-11-15 (01:38) with the earlier `status`, which read the stored Application statuses and did not fail on a dead Argo CD or a stale reconciliation. Their `status` units show that the Applications were Healthy at the last reconciliation. The check was fixed later the same night.
+
 ## Result
 
 Both rehearsals end with `RESULT: PASS`. In the 15-minute version, one unit is `SKIPPED (mutating)`: the optional
