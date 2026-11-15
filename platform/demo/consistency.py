@@ -21,8 +21,9 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   contract's order (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status
   last), no ADR or WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter
   lifecycle, and the `> **Status:**` banner under `## Page status` only;
-- demo.yml `record: {kind, allow}` (ADR-0618): kind browser (a walkthrough) or terminal; each `allow` entry is a Do
-  command of the 5-minute version, never a command the capture never types, and only on a terminal take;
+- demo.yml `record: {kind, allow, cols, rows}` (ADR-0618): kind browser (a walkthrough) or terminal; each `allow`
+  entry is a Do command of the 5-minute version, never a command the capture never types; `allow`, `cols` and `rows`
+  only on a terminal take, the size within capture.window()'s bounds;
 - a published GIF `docs/assets/img/demo/<id>.gif` belongs to a catalogue demo, is at most 8 MB, and is embedded as the
   last line of that demo's Introduction (and only there); a page embeds no other demo's GIF.
 Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
@@ -192,34 +193,37 @@ def lifecycle_problems(page: catalogue.Page, rel: str) -> List[str]:
 
 
 TAKE_KINDS = ("browser", "terminal")
+TERMINAL_SIZE = ("cols", "rows")       # the capture's window; capture.window() holds the one rule (bounds, defaults)
 
 
-def _capture_never():
-    """capture.py's `never(command)`: the commands no `record.allow` can open (ADR-0618 clause 7). None when the
-    capture driver is absent from this tree."""
+def _capture():
+    """evaluations/browser/terminal/capture.py as a module: its `never(command)` (the commands no `record.allow` can
+    open, ADR-0618 clause 7) and `window(record)` (the terminal's size rule). None when it is absent from this tree."""
+    if "zuno_capture" in sys.modules:
+        return sys.modules["zuno_capture"]
     path = catalogue.ENGINE_ROOT / "evaluations" / "browser" / "terminal" / "capture.py"
     if not path.is_file():
         return None
     import importlib.util
     spec = importlib.util.spec_from_file_location("zuno_capture", str(path))
     module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault("zuno_capture", module)       # its dataclasses look their module up while it loads
+    sys.modules["zuno_capture"] = module                 # its dataclasses look their module up while it loads
     spec.loader.exec_module(module)  # type: ignore[union-attr]
-    return module.never
+    return module
 
 
 def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict, root: pathlib.Path) -> List[str]:
-    """demo.yml `record: {kind, allow}` (ADR-0618 clause 7, WP-287): the kind of take, and the commands a terminal take
-    may type beyond the read-only allowlist, each one a Do command of the 5-minute version, never an always-refused
-    one."""
+    """demo.yml `record: {kind, allow, cols, rows}` (ADR-0618 clause 7, WP-287): the kind of take, the commands a
+    terminal take may type beyond the read-only allowlist (each a Do command of the 5-minute version, never an
+    always-refused one), and the terminal's size when a table needs more than 100x30."""
     rel = f"ansible/demos/{entry.id}/demo.yml"
     record = manifest.get("record")
     if record is None:
         return []
     if not isinstance(record, dict):
-        return [f"{rel}: `record` must be a mapping {{kind, allow}}"]
+        return [f"{rel}: `record` must be a mapping {{kind, allow, cols, rows}}"]
     found = []
-    unknown = sorted(set(record) - {"kind", "allow"})
+    unknown = sorted(set(record) - {"kind", "allow"} - set(TERMINAL_SIZE))
     if unknown:
         found.append(f"{rel}: `record` has unknown key(s) {', '.join(unknown)}")
     kind = record.get("kind", "browser")
@@ -232,10 +236,17 @@ def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict
             found.append(f"{rel}: a browser take needs evaluations/browser/walkthroughs/{entry.id}.mjs")
         if allow:
             found.append(f"{rel}: `record.allow` is for a terminal take; a browser take types nothing")
+        for key in TERMINAL_SIZE:
+            if key in record:
+                found.append(f"{rel}: `record.{key}` is for a terminal take; a browser take has its walkthrough's "
+                             "viewport")
+    capture = _capture() if kind == "terminal" else None
+    if capture is not None:
+        found += [f"{rel}: {problem}" for problem in capture.window(record)[2]]
     if not isinstance(allow, list) or not all(isinstance(a, str) for a in allow):
         return found + [f"{rel}: `record.allow` must be a list of commands"]
     commands = {readonly.strip_watch_flags(c)[0] for step in page.steps("5") for c in catalogue.do_commands(step.do)}
-    never = _capture_never() if kind == "terminal" and allow else None
+    never = capture.never if capture is not None and allow else None
     for command in allow:
         if command not in commands:
             found.append(f"{rel}: `record.allow` names `{command}`, which is not a Do command of the 5-minute version")

@@ -252,6 +252,9 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
         reasons.append("`target_seconds` must be [min, max] in seconds")
         target = [40, 60]
     height = int(round(width * vh / vw / 2.0)) * 2
+    if vh > vw:
+        reasons.append(f"the take's viewport is {vw}x{vh}, taller than wide: a GIF frame stays landscape (for a "
+                       "terminal take, fewer `record.rows` or more `record.cols`)")
 
     raw = cut.get("moments")
     if not isinstance(raw, list) or not raw:

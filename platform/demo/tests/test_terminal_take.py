@@ -146,6 +146,16 @@ class TerminalMarkers(unittest.TestCase):
                 gif.plan("fixture-demo", self.cut(), self.markers(**changes), ["0:00"])
             self.assertIn("creates nothing", ctx.exception.reasons[0])
 
+    def test_another_terminal_size_keeps_the_width_and_the_ratio(self):
+        p = gif.plan("fixture-demo", self.cut(), self.markers(viewport={"width": 1760, "height": 1080}), ["0:00"])
+        self.assertEqual((p.width, p.height, p.out_height), (960, 590, 646))
+        argv = " ".join(gif.ffmpeg_argv(p, self.markers(), "x.gif"))
+        self.assertIn("scale=960:590:flags=lanczos", argv)
+        self.assertIn("pad=960:646:0:0", argv)
+        with self.assertRaises(gif.CutError) as ctx:
+            gif.plan("fixture-demo", self.cut(), self.markers(viewport={"width": 800, "height": 1200}), ["0:00"])
+        self.assertIn("taller than wide", ctx.exception.reasons[0])
+
     def test_an_unknown_kind_and_a_browser_take_without_owned(self):
         with self.assertRaises(gif.CutError) as ctx:
             gif.plan("fixture-demo", self.cut(), self.markers(kind="video"), ["0:00"])
@@ -204,6 +214,16 @@ class RecordKey(FixtureRoot):
         self.assertTrue(any("`record.allow` is for a terminal take" in p for p in found), found)
         self.edit('record:\n  kind: terminal\n  colour: red\n')
         self.assertIn("unknown key(s) colour", self.record_problems()[0])
+
+    def test_the_terminal_size(self):
+        self.edit('record:\n  kind: terminal\n  cols: 140\n  rows: 40\n')
+        self.assertEqual(self.record_problems(), [])
+        for bad in ("cols: 60", "cols: 141", "rows: 41", "cols: wide", "rows: true"):
+            self.edit(f'record:\n  kind: terminal\n  {bad}\n')
+            self.assertEqual(len(self.record_problems()), 1, bad)
+            self.assertIn("must be a whole number from", self.record_problems()[0])
+        self.edit('record:\n  kind: browser\n  cols: 140\n')
+        self.assertTrue(any("`record.cols` is for a terminal take" in p for p in self.record_problems()))
 
     def test_the_repository_has_no_record_problem(self):
         self.assertEqual([p for p in consistency.problems(ROOT) if "`record" in p], [])
@@ -294,6 +314,7 @@ class Routing(FixtureRoot):
         rc, out, err = self.run_main("record", "fixture-demo")
         self.assertEqual(rc, 2)
         self.assertIn("typed: 0:00  $ git log -1 --format=%h", out)
+        self.assertIn("a terminal of 100x30", out)
         self.assertIn("typed beyond the read-only allowlist (demo.yml record.allow): oc delete pod fixture -n fixture",
                       out)
         self.assertIn("DEMO_CONFIRM=fixture-demo", err)

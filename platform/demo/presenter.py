@@ -711,6 +711,13 @@ def cmd_scout(args: List[str]) -> int:
     return 2 if rc == 2 else 1
 
 
+def record_size(manifest: dict) -> str:
+    """The terminal size of a terminal take, `<cols>x<rows>` (demo.yml record.cols/rows; the capture's default
+    100x30)."""
+    record = manifest.get("record") if isinstance(manifest.get("record"), dict) else {}
+    return f"{record.get('cols') or 100}x{record.get('rows') or 30}"
+
+
 def take_kind(manifest: dict) -> str:
     """demo.yml `record.kind`: browser (a walkthrough) or terminal (a captured session); browser when absent."""
     record = manifest.get("record") if isinstance(manifest.get("record"), dict) else {}
@@ -764,7 +771,8 @@ def record_terminal(entry: catalogue.Entry, root: pathlib.Path, manifest: dict) 
     allow = [str(c) for c in (manifest.get("record") or {}).get("allow") or []]
     cut = gif.load_cut_list(gif.cut_list_path(entry.id))
     notices = [str(cut.get("record_notice") or "a real terminal session on the cluster with your `oc` login: the "
-                   "5-minute rows typed as the page says"), "the session is checked as text before anything is filmed"]
+                   "5-minute rows typed as the page says"), "the session is checked as text before anything is filmed",
+               f"a terminal of {record_size(manifest)}"]
     notices += [f"typed: {line}" for line in plan]
     notices.append(f"typed beyond the read-only allowlist (demo.yml record.allow): "
                    f"{', '.join(allow) if allow else 'none'}")
