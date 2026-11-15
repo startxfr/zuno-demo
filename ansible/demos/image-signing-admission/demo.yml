@@ -10,3 +10,13 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
+# The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. Every Do command
+# of the 5-minute version passes the read-only allowlist, so `allow` is empty. The window is 140x24: the widest
+# non-wrapping output is the mirror set (115 columns); `oc get securesign` prints 187 columns at any allowed width,
+# and at 140 it wraps cleanly between the Fulcio and TUF URL columns (measured on 2026-11-16). The tallest screen is
+# 12 lines (the nine policies).
+record:
+  kind: terminal
+  allow: []
+  cols: 140
+  rows: 24
