@@ -155,6 +155,11 @@ export async function scout(ctx) {
   const { page, base, domain, step, state, persona } = ctx;
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   const before = (await owuiChats(page).catch(() => [])).length;
+  // What "Accept" on the AI Disclosure notice did at the sign-in: no write expected, a sessionStorage key added.
+  await step("disclosure", async () => {
+    if (state.disclosure.writes.length) throw new Error(`"Accept" sent ${state.disclosure.writes.join(", ")}`);
+    return { ...state.disclosure };
+  });
   await step("unifai", async () => {
     await page.goto(`${base}/`);
     await waitUntil(page, { what: "UnifAI's first screen", timeoutMs: 60000, done: async () => (await firstVisible(page, [...TEAM, ...unifai.NAV.chats])) || undefined });

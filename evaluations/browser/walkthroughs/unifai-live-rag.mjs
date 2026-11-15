@@ -97,6 +97,11 @@ export async function run({ page, mark, log, state }) {
 export async function scout({ page, step, state }) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   const before = (await unifaiSessions(page).catch(() => [])).length;
+  // What "Accept" on the AI Disclosure notice did at the sign-in: no write expected, a sessionStorage key added.
+  await step("disclosure", async () => {
+    if (state.disclosure.writes.length) throw new Error(`"Accept" sent ${state.disclosure.writes.join(", ")}`);
+    return { ...state.disclosure };
+  });
   await step("home", async () => ({ url: page.url().replace(/[?#].*/, ""),
                                     nav: { documents: ((await firstVisible(page, unifai.NAV.documents)) || {}).matched || "",
                                            chats: ((await firstVisible(page, unifai.NAV.chats)) || {}).matched || "" },

@@ -106,7 +106,8 @@ echo "$out" | sed 's/^/    /'
 expect "unifai: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
 expect "unifai: a scout creates no session, ticks no row and no switch" grep -q 'left: {"sessions":1,"touched":0}' <<<"$out"
 expect "unifai: scout.json reports every guess" scouted u-scout '
-assert list(steps) == ["enter", "owned", "home", "documents", "chats", "workflows", "closed"], list(steps)
+assert list(steps) == ["enter", "owned", "disclosure", "home", "documents", "chats", "workflows", "closed"], list(steps)
+assert steps["disclosure"] == {**steps["disclosure"], "shown": True, "writes": [], "storage_added": ["session:ai-accepted"]}, steps["disclosure"]
 assert steps["owned"]["count"] == 1 and steps["home"]["nav"] == {"documents": "a[href=\x27/documents\x27]", "chats": "a[href=\x27/agentic-chats\x27]"}, steps["home"]
 assert steps["documents"]["ready"] is True and steps["documents"]["done"] == 2, steps["documents"]
 assert steps["chats"]["available_chats"] == "1" and steps["chats"]["add_selector"] and steps["chats"]["session_open"] is False, steps["chats"]
@@ -125,6 +126,12 @@ assert names == ["login", "home", "documents", "chat-new", "q1-sent", "q1-done",
 assert m["persona"] == "consultant-01" and m["motion_from"] == "home" and m["status"] == "pass", m
 assert len(m["created"]) == 1 and m["created"][0]["kind"] == "session" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
 assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(unifai u-accept FAKE_ACCEPT_POSTS=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: an Accept that writes to the server stops the take before anything is created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL \"Accept\" on the AI Disclosure notice sent POST /api1/terms/approve' <<<\"\$0\"" "$out"
+expect "unifai: stopped at the sign-in, nothing created" markers u-accept '
+assert names == ["login"] and m["created"] == [] and m["cleaned"] is None, m
 '
 out="$(unifai u-nofiles FAKE_NO_FILES=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
@@ -214,7 +221,8 @@ assert not (d / "scout.json").exists()
 for name, teams in (("consultant-02", ["agent-arkos", "agent-tekos", "consultant"]), ("sale-01", ["agent-comage", "sales"])):
     s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
     assert s["take"] == name and s["persona"] == name and s["status"] == "done" and s["refused_requests"] == [], s
-    assert list(steps) == ["enter", "owned", "unifai", "workspaces", "webui", "closed"], list(steps)
+    assert list(steps) == ["enter", "owned", "disclosure", "unifai", "workspaces", "webui", "closed"], list(steps)
+    assert steps["disclosure"]["shown"] is True and steps["disclosure"]["writes"] == [], steps["disclosure"]
     w = steps["workspaces"]
     assert w["as_the_page_says"] is True and sorted(k for k, v in w["listed"].items() if v) == sorted(teams) and w["overlay_on_screen"] is True, w
     assert steps["webui"]["chat_link_on_screen"] is False and steps["closed"]["chats"] == 1

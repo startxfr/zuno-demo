@@ -35,11 +35,23 @@ const APP = `<!doctype html><title>UnifAI (fake)</title>
 <div id="docs" hidden><h2>Document Library</h2><table>${FILES}</table></div>
 <div id="chats" hidden><span id="count"></span> <button title="Add new chat from flow" id="add">+</button>
 <div id="messages"></div><textarea id="in" hidden placeholder="Type your message..."></textarea><div id="live"></div></div>
+<div role="dialog" id="notice" hidden style="top:200px"><h3>AI Disclosure</h3><p>You are about to use a Red Hat tool that utilizes AI technology.</p>
+<input type="checkbox" id="dont-show-again" onclick="fetch('/fake/touched',{method:'POST'})"><label for="dont-show-again">Don't show message again</label>
+<button id="accept">Accept</button></div>
 <div role="dialog" id="dialog" hidden><h3>Add New Chat from Flow</h3><input placeholder="Search workflows..." id="search">
 <div id="flows"></div><button id="cancel">Cancel</button><button id="confirm">Add</button></div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
+// Like UnifAI on 2026-11-16: the "AI Disclosure" notice covers the application a moment after each sign-in, until
+// Accept; the acceptance is kept in the tab's sessionStorage. Ticking its checkbox counts as touched, and Accept
+// then writes to the server, as in UnifAI. FAKE_ACCEPT_POSTS=1 makes Accept alone write, which a take must refuse.
+if (sessionStorage.getItem("ai-accepted")) $("notice").remove();
+else setTimeout(() => { $("notice").hidden = false; }, 700);
+if ($("accept")) $("accept").onclick = () => {
+  if ($("dont-show-again").checked || __ACCEPT_POSTS__) fetch("/api1/terms/approve", { method: "POST" });
+  sessionStorage.setItem("ai-accepted", "true"); $("notice").remove();
+};
 // The Team switch and the workspace selector: screen state only, as in UnifAI. The teams are the signed-in user's.
 const USER = (document.cookie.split("; ").find((c) => c.startsWith("u=")) || "u=").slice(2);
 const TEAMS = { "consultant-02": ["agent-arkos", "agent-tekos", "consultant"], "sale-01": __SALE_TEAMS__ }[USER] || [];
@@ -112,6 +124,7 @@ http.createServer((req, res) => {
   const id = u.searchParams.get("sessionId") || "";
   if (u.pathname === "/fake/count") return json(200, { sessions: sessions.size, touched });
   if (u.pathname === "/fake/touched") { touched += 1; return json(200, {}); }
+  if (u.pathname === "/api1/terms/approve") return json(200, { approved: true });
   if (u.pathname === "/api1/auth/login") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
   if (u.pathname === "/cb") { res.writeHead(302, { "Set-Cookie": ["s=1; Path=/", `u=${encodeURIComponent(u.searchParams.get("u") || "")}; Path=/`], Location: "/" }); return res.end(); }
   if (!signed) {
@@ -150,5 +163,5 @@ http.createServer((req, res) => {
     return json(200, { success: sessions.delete(id) });
   }
   res.writeHead(200, { "Content-Type": "text/html" });
-  return res.end(APP.replace("__SALE_TEAMS__", JSON.stringify(process.env.FAKE_WRONG_TEAMS === "1" ? ["agent-comage", "sales", "consultant"] : ["agent-comage", "sales"])));
+  return res.end(APP.replace("__ACCEPT_POSTS__", process.env.FAKE_ACCEPT_POSTS === "1" ? "true" : "false").replace("__SALE_TEAMS__", JSON.stringify(process.env.FAKE_WRONG_TEAMS === "1" ? ["agent-comage", "sales", "consultant"] : ["agent-comage", "sales"])));
 }).listen(port, "127.0.0.1");

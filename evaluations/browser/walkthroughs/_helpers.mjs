@@ -316,6 +316,7 @@ export const unifai = {
   NAV: { documents: ["a[href='/documents']", "nav >> text=Documents"],                    // guess (Sidebar.tsx)
          chats: ["a[href='/agentic-chats']", "nav >> text=Agentic Chats"] },              // guess (Sidebar.tsx)
   ADD_CHAT: ["button[title='Add new chat from flow']"],                                   // guess (ExecutionTab.tsx)
+  DISCLOSURE: "AI Disclosure",                                                            // seen live 2026-11-16
   DIALOG: "[role='dialog']",                                                              // guess (Radix dialog)
   SEARCH: ["[role='dialog'] input[placeholder='Search workflows...']"],                   // guess (WorkflowsPanel.tsx)
   INPUT: ["main textarea", "textarea"],                                                   // guess (ChatInterface.tsx)
@@ -324,7 +325,7 @@ export const unifai = {
 
 // Sign in through "Login using SSO" and Keycloak, and wait for the first screen. The `login` marker is the EMPTY
 // Keycloak form; nothing is marked once the password is typed.
-export async function unifaiSignIn({ page, base, mark, keycloak }, persona) {
+export async function unifaiSignIn({ page, base, mark, keycloak, state }, persona) {
   await page.goto(`${base}/`);
   const sso = page.locator(unifai.SSO[0]).first();
   await sso.waitFor({ timeout: 30000 });
@@ -335,8 +336,41 @@ export async function unifaiSignIn({ page, base, mark, keycloak }, persona) {
   await page.waitForURL((u) => u.href.startsWith(base), { timeout: 60000 });
   const nav = await waitUntil(page, { what: "UnifAI's first screen", timeoutMs: 60000,
                                       done: async () => (await firstVisible(page, unifai.NAV.chats)) || undefined });
+  await unifaiDisclosure(page, state);
   await page.waitForTimeout(1000);
   return nav.matched;
+}
+
+// UnifAI's "AI Disclosure" notice covers the application after each sign-in (first scout, 2026-11-16). Its "Accept"
+// is clicked, as the presenter does; its checkbox "Don't show message again" is NEVER ticked. Read in the fork's
+// source (AITransparencyModal.tsx, TermsApproval.tsx, v0.1.72): Accept alone calls no API and keeps the acceptance
+// in the tab's sessionStorage; only the checkbox saves a preference on the server. It is checked all the same: the
+// requests the click sends that are not a GET, and the storage keys it adds, are kept in state.disclosure; a take
+// stops when the click wrote to the server, and a scout reports both.
+export async function unifaiDisclosure(page, state = {}) {
+  state.disclosure = { shown: false, writes: [], storage_added: [] };
+  const notice = page.locator(unifai.DIALOG).filter({ hasText: unifai.DISCLOSURE }).first();
+  // The notice comes after a call of its own: wait a few seconds for it, no longer.
+  const shown = await notice.waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+  if (!shown) return state.disclosure;
+  state.disclosure.shown = true;
+  const ticked = await notice.locator("[role='checkbox'][aria-checked='true'], input[type='checkbox']:checked").count();
+  if (ticked) throw new Error(`the "${unifai.DISCLOSURE}" notice has its checkbox ticked: a take never saves that preference`);
+  const keys = () => page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
+  const writes = (r) => { if (!["GET", "HEAD", "OPTIONS"].includes(r.method())) state.disclosure.writes.push(`${r.method()} ${new URL(r.url()).pathname}`); };
+  const before = await keys();
+  page.on("request", writes);
+  await click(notice.getByRole("button", { name: "Accept", exact: true }));
+  await notice.waitFor({ state: "hidden", timeout: 15000 });
+  await page.waitForTimeout(1500);
+  page.off("request", writes);
+  state.disclosure.storage_added = (await keys()).filter((k) => !before.includes(k));
+  if (state.disclosure.writes.length && !state.scout) {
+    throw new Error(`"Accept" on the ${unifai.DISCLOSURE} notice sent ${state.disclosure.writes.join(", ")}: it may save a preference on the server, which a take must not do`);
+  }
+  // Its toast ("Accepted ... during this session") must be gone before the first marker, or it is in the GIF.
+  await page.getByText("during this session").first().waitFor({ state: "hidden", timeout: 20000 }).catch(() => {});
+  return state.disclosure;
 }
 
 // The persona's own sessions in its Personal workspace, by id, every page of the list: [{kind: "session", id}].
