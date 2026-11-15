@@ -1,9 +1,13 @@
 ---
 # Status reads: each Argo CD Application is in its expected state, Synced and Healthy unless the entry says
 # otherwise (`any` accepts every value: the startx-cluster-* Applications share resources with the zuno ones and
-# read OutOfSync while healthy).
-# Vars: argo_apps (names, or {name, sync, health}), argo_namespace (default openshift-gitops).
-# One list of the namespace's Applications, selected by name (each k8s_info call starts a module, about 2 s).
+# read OutOfSync while healthy), AND Argo CD is alive: its application controller is ready and each Application was
+# reconciled recently. An Application's stored status stays Synced/Healthy when nothing reconciles it any more
+# (demo333, 2026-11-15: five rehearsals passed after the instance had been deleted). platform/demo/argo_health.py
+# judges; this file only reads.
+# Vars: argo_apps (names, or {name, sync, health}), argo_namespace (default openshift-gitops),
+# argo_controller (default openshift-gitops-application-controller), argo_max_age_seconds (default 1800).
+# Three reads per unit, whatever the number of Applications: the list, the controller, the ArgoCD instances.
 - name: "demo | read the Argo CD Applications"
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
@@ -13,30 +17,51 @@
   failed_when: false
   when: argo_apps | default([]) | length > 0
 
+- name: "demo | read the Argo CD application controller"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: "{{ argo_namespace | default('openshift-gitops') }}"
+    name: "{{ argo_controller | default('openshift-gitops-application-controller') }}"
+  register: _demo_argo_controller
+  failed_when: false
+  when: argo_apps | default([]) | length > 0
+
+- name: "demo | read the ArgoCD instances"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1beta1
+    kind: ArgoCD
+    namespace: "{{ argo_namespace | default('openshift-gitops') }}"
+  register: _demo_argo_instances
+  failed_when: false
+  when: argo_apps | default([]) | length > 0
+
+- name: "demo | judge the Applications (platform/demo/argo_health.py)"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/platform/demo/argo_health.py"]
+    stdin: "{{ _demo_argo_input | to_json }}"
+  vars:
+    _demo_argo_names: >-
+      {{ (argo_apps | select('string') | list) + (argo_apps | select('mapping') | map(attribute='name') | list) }}
+    _demo_argo_input:
+      wanted: "{{ argo_apps }}"
+      applications: >-
+        {{ _demo_argo.resources | default([]) | selectattr('metadata.name', 'in', _demo_argo_names) | list }}
+      statefulsets: "{{ _demo_argo_controller.resources | default([]) }}"
+      argocds: "{{ _demo_argo_instances.resources | default([]) }}"
+      max_age: "{{ argo_max_age_seconds | default(1800) }}"
+      demo_id: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+  register: _demo_argo_judged
+  changed_when: false
+  failed_when: false
+  when: argo_apps | default([]) | length > 0
+
 - name: "demo | record the Applications"
   ansible.builtin.set_fact:
-    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
-  loop: "{{ argo_apps | default([]) }}"
-  loop_control:
-    loop_var: _demo_wanted
-    label: "{{ _demo_name }}"
-  vars:
-    _demo_name: "{{ _demo_wanted.name if _demo_wanted is mapping else _demo_wanted }}"
-    _demo_want_sync: "{{ _demo_wanted.sync | default('Synced') if _demo_wanted is mapping else 'Synced' }}"
-    _demo_want_health: "{{ _demo_wanted.health | default('Healthy') if _demo_wanted is mapping else 'Healthy' }}"
-    _demo_app: >-
-      {{ _demo_argo.resources | default([]) | selectattr('metadata.name', 'equalto', _demo_name) | first
-         | default({}, true) }}
-    _demo_sync: "{{ _demo_app.status.sync.status | default('absent') }}"
-    _demo_health: "{{ _demo_app.status.health.status | default('absent') }}"
-    _demo_row:
-      agent: "{{ demo_id }}"
-      layer: "{{ demo_unit.name }}"
-      id: "argo/{{ _demo_name }}"
-      category: argo
-      passed: >-
-        {{ (_demo_app | length > 0)
-           and (_demo_want_sync == 'any' or _demo_sync == _demo_want_sync)
-           and (_demo_want_health == 'any' or _demo_health == _demo_want_health) }}
-      detail: "{{ _demo_sync }}/{{ _demo_health }}"
-      duration_ms: 0
+    demo_unit_checks: >-
+      {{ demo_unit_checks + ((_demo_argo_judged.stdout | from_json) if (_demo_argo_judged.rc | default(1)) == 0
+         else [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'argo/judgement', 'category': 'argo',
+                'passed': false, 'detail': _demo_argo_judged.stderr | default('argo_health.py failed'),
+                'duration_ms': 0}]) }}
+  when: argo_apps | default([]) | length > 0

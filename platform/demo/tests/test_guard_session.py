@@ -354,6 +354,25 @@ class EndToEnd(PresenterRun):
         self.assertIn("changes the cluster", result.unit("install:fixture-demo").error)
         self.assertFalse(pathlib.Path(self.home, ".cache/zuno/demo/fixture-demo.installed").exists())
 
+    def test_argo_apps_fail_when_argo_cd_cannot_be_read(self):
+        """_lib/argo_apps.yml end to end with no cluster (the API points at a closed local port): nothing is found, so
+        the controller is reported not running and the Application fails; no stale status can pass."""
+        root = pathlib.Path(tempfile.mkdtemp(prefix="zuno-argo-"))
+        try:
+            shutil.copytree(FIXTURES / "docs", root / "docs")
+            shutil.copytree(FIXTURES / "ansible", root / "ansible")
+            (root / "ansible/demos/fixture-demo/status.yml").write_text(
+                '- ansible.builtin.include_tasks: "{{ demo_lib }}/argo_apps.yml"\n  vars:\n'
+                '    argo_apps: ["zuno-a"]\n')
+            rc, text = self.presenter("status", "fixture-demo", env={
+                "ZUNO_DEMO_ROOT": str(root), "K8S_AUTH_HOST": "https://127.0.0.1:1", "K8S_AUTH_API_KEY": "none",
+                "K8S_AUTH_VERIFY_SSL": "false", "KUBECONFIG": "/nonexistent/kubeconfig"})
+            self.assertEqual(rc, 1, text)
+            self.assertIn("FAIL argo/application-controller: Argo CD is not running", text)
+            self.assertIn("FAIL argo/zuno-a: absent/absent", text)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
     def test_rehearse_reports(self):
         rc, text = self.presenter("rehearse", "fixture-demo", "5", env={"DEMO_CONFIRM": "fixture-demo"})
         self.assertEqual(rc, 0, text)
