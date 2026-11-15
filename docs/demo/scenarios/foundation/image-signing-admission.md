@@ -76,7 +76,7 @@ Other identities:
 
 `make demo use image-signing-admission 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/image-signing-admission/<action>.yml`) has run, and says
-what is left to the presenter. `make d2 check supply-chain` writes a Job, so it is a changing unit and no step runs it. The two `grep` commands of row 11:30 read a repository file: the step does not run them, you run them by hand in the terminal.
+what is left to the presenter. `make d2 check supply-chain` writes a Job, so it is a changing unit and no step runs it. The two `grep` commands of row 11:30 read a repository file (`platform/supply-chain/pinned-releases.yaml`): the step runs them, as an allowed read.
 
 ### Status
 
@@ -94,7 +94,7 @@ Nothing to do when it passes. It reads the `MachineConfigPools` `master` and `wo
 `ImageDigestMirrorSets` `zuno-unifai-via-registry` and `zuno-public-via-registry`, the `rhtas-operator` ClusterServiceVersion, the
 Deployment `zuno-policy-controller-webhook`, the `ClusterImagePolicies` `zuno-first-party-images` and
 `zuno-unifai-images-unifai-ui`, and the mode of every `ClusterImagePolicy` (all `enforce` but `openshift`). It never
-reads a Secret. No golden-path probe covers this page. The `grep` commands of row 11:30 are not part of Check. `make d2 check supply-chain` is not part of Check and not run by any step: it
+reads a Secret. No golden-path probe covers this page. The `grep` commands of row 11:30 are not part of Check: row 11:30 runs them. `make d2 check supply-chain` is not part of Check and not run by any step: it
 writes a ConfigMap and a Job in `zuno-ai-build`. Run it by hand before the session only with the owner's go
 (rehearsal only). On stage, show the last Job instead (row 10:30 of the 15-minute version).
 
