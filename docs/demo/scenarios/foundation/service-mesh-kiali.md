@@ -80,7 +80,7 @@ Other identities, none of which signs in on stage:
 
 `make demo use service-mesh-kiali 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/service-mesh-kiali/<action>.yml`) has run, and says
-what is left to the presenter. Start runs the probes of `make demo golden-path` to create traffic. It is read-only and allowed during a freeze, so it is not a changing unit: no demo id is typed.
+what is left to the presenter. Start runs every golden-path probe (the whole `make demo golden-path`) to create traffic. It is read-only and allowed during a freeze, so it is not a changing unit: no demo id is typed.
 
 ### Status
 
@@ -106,7 +106,7 @@ Nothing to do. The mesh is part of the shared platform: the file only verifies i
 
 ### Start
 
-The file runs the probes of `make demo golden-path`, each once, to create traffic for the Kiali graph
+The file runs every golden-path probe, each once (the whole `make demo golden-path`), to create traffic for the Kiali graph
 ([golden-path.md](../../golden-path.md)): it calls the gateways and the models, and some probes spend persona budgets.
 It is read-only and allowed during a freeze, so it is not a changing unit and needs no typed demo id. Run it in the hour before the session. What only a person does:
 
