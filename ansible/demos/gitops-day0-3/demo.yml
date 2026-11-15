@@ -12,3 +12,16 @@ mutations: {}
 # `rehearse`), `manual` rows (a command the presenter runs by hand).
 steps:
   "8:00": {"optional": true}
+# The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. Rows 1:00 and
+# 2:00 pass the read-only allowlist, so `allow` is empty. Rows 0:00 and 3:00 are `make` rows that print the
+# checkout's path, which the capture refuses; they are left out of the take (the coordinator's option 2,
+# 2026-11-16) until the help text and the Day 0 check print none. The window is 100x20: the outputs are at most 63
+# columns (2026-11-16), the typed 1:00 command wraps on two lines, the tallest screen is 6 lines.
+record:
+  kind: terminal
+  allow: []
+  cols: 100
+  rows: 20
+  skip:
+    "0:00": "`make help` prints the checkout's path"
+    "3:00": "`make d0 check argocd` prints the checkout's path and needs the vault passphrase"

@@ -1,0 +1,22 @@
+---
+# gitops-day0-3: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record gitops-day0-3` captures the 5-minute version as a real terminal session and checks it as text;
+# `make demo record gitops-day0-3 render` replays it in xterm.js and films it, then cuts it with this list. The GIF
+# stays in ~/.cache/zuno/demo/recordings/ until the owner's "go gitops-day0-3".
+# Rows 0:00 and 3:00 are left out of the take (demo.yml record.skip): no marker, no moment, and no caption speaks
+# of make. Markers written by the replay: start, 01-00-typed, 01-00-done, 02-00-typed, 02-00-done, end. Each row is
+# cut in two, the command typed then its answer, so that two rows reach 40 s without a long frozen screen. Planned
+# before the first take from the capture's typing pace (0.045 s a key, about 0.05 s measured on vault-pki): check
+# the total and the longest still after it.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: two read-only `oc get` commands on the Argo CD
+  Applications, names and states only, no Secret value; rows 0:00 and 3:00 (`make`) are not filmed
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 01-00-typed, fit: 10, hold: 5, step: "1:00", caption: "1:00  Which branch does each Application follow?"}
+  - {from: 01-00-typed, to: 01-00-done, fit: 2, hold: 5, step: "1:00", caption: "1:00  All on one Git branch, kept equal by Argo CD"}
+  - {from: 01-00-done, to: 02-00-typed, fit: 8, hold: 3, step: "2:00", caption: "2:00  Only what is not Synced and Healthy"}
+  - {from: 02-00-typed, to: 02-00-done, fit: 2, hold: 3, step: "2:00", caption: "2:00  Each exception has a name"}
+  - {still: end, hold: 5, step: "4:15", caption: "The cluster is what the Git branch says"}
