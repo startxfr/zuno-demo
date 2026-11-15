@@ -92,7 +92,7 @@ Arkos is floored at C3, so it answers on local models only.
 ### Check
 
 Nothing to do when it passes. It runs the golden-path probe `delegation-approval` (see
-[golden-path.md](../../golden-path.md)), as `eval-consultant-01`. The probe proves the request and a refusal: nothing
+[golden-path.md](../../golden-path.md)), as eval-consultant-01. The probe proves the request and a refusal: nothing
 runs. It usually takes 25 to 70 s, and about 326 s when Arkos asks a second time and nobody answers. The approval
 clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day. If it fails, see
 [If something goes wrong](#if-something-goes-wrong).

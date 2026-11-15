@@ -84,7 +84,7 @@ installs nothing.
 
 It runs the golden-path probe `unifai-tekos` and the browser check `unifai` (see [golden-path.md](../../golden-path.md)).
 The cluster-tools contrast at 3:00 has no probe and stays a rehearsal point: rehearse the cluster question as
-**ai-ops-01** the same day. Its answer depends on the live state of `zuno-ai-run`: when every pod is Running, Tekos
+**ai-ops-01** the same day. Its answer depends on the live state of zuno-ai-run: when every pod is Running, Tekos
 says so, which is still an answer from the cluster. If a check fails, see
 [If something goes wrong](#if-something-goes-wrong).
 

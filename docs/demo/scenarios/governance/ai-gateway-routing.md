@@ -85,7 +85,7 @@ local models were `READY True` on 2026-11-13.
 
 Nothing to do when it passes. It runs the golden-path probe `zuno-code` (see [golden-path.md](../../golden-path.md)).
 It asks "Write a one-line Python function that adds two numbers." with the `zuno-code` model through Open WebUI, as
-`eval-consultant-01`. If it fails, see [If something goes wrong](#if-something-goes-wrong).
+eval-consultant-01. If it fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 

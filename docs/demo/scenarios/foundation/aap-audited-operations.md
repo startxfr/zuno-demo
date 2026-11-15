@@ -111,7 +111,7 @@ nothing.
 Nothing to do when it passes. It reads the `AnsibleAutomationPlatform` `aap` (`Running` and `Successful`), its Route `aap`, the
 JobTemplates `zuno-day0-check` and `zuno-day3-test`, the WorkflowTemplate `zuno-day1-check-workflow` and the
 AnsibleProject `zuno-demo` in `zuno-aap`, the template counts, and the Deployment `aap-mcp` in `zuno-ai-run`. No golden-path probe covers this
-page: the `delegation-approval` probe rejects its approval, so it never launches an AAP job. Rehearse the page the
+page: the delegation-approval probe rejects its approval, so it never launches an AAP job. Rehearse the page the
 same day. If a read fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install

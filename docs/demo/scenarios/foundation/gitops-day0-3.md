@@ -112,7 +112,7 @@ are worth running by hand before the session:
 - [ ] `make d0 check argocd` passes the same day. It fails when the GitOps operator's pod restarted in the last 15
   minutes: on 2026-11-13 its manager had restarted 25 times in under three hours. Argo CD itself was not affected.
 - [ ] Run `make d3 check operators` and `make d3 check drift` the day before. On 2026-11-13 both would have reported
-  `elasticsearch-eck-operator-certified` and `kubevirt-hyperconverged`, installed on 2026-11-12 outside the repository
+  elasticsearch-eck-operator-certified and kubevirt-hyperconverged, installed on 2026-11-12 outside the repository
   (expected from the code and the live Subscriptions; not run for this page). Decide with the platform owner: show the
   findings as the checks at work, or have the two operators declared or removed first. Removing them is a cluster
   change, outside any freeze.

@@ -101,7 +101,7 @@ If one is missing or not Healthy, stop and tell the platform owner: this demo in
 Nothing to do when it passes. It runs the golden-path probes `tools` and `open-webui` (see
 [golden-path.md](../../golden-path.md)): the 5-minute version also uses Open WebUI. The probe `tools` makes one
 Confluence search through the gateway's REST door, as **consultant-01** with a token of the Keycloak client
-`zuno-evaluations`. The 5:00 row of the 15-minute version runs `ONLY=tools make demo golden-path` again on stage: a
+zuno-evaluations. The 5:00 row of the 15-minute version runs `ONLY=tools make demo golden-path` again on stage: a
 read. If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
