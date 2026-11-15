@@ -1,6 +1,6 @@
 # WP-277: Move the RHOAI demos to the lifecycle
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) and [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md), and the owner's go at the gate of 2026-11-16
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
@@ -46,3 +46,13 @@ For each demo below, in the order given:
 - The catalogue test passes with every demo of this brief counted as moved.
 - Each demo has a 5-minute and a 15-minute rehearsal report ending with `RESULT: PASS`, or failures the page explains.
 - Every "Nothing to do." and "Nothing to run." is deliberate.
+
+## Result (2026-11-15)
+
+Files by zuno-demo-reorg-assist, pages reviewed against them by zuno-demo-reorg-writer, rehearsals by
+zuno-demo-reorg-demo333 with the owner's go. The seven demos passed both rehearsals, 14 of 14 `RESULT: PASS`, no
+failed or skipped unit ([evidence](../evidence/wp-277-rhoai-rehearsals-2026-11-15.md)). No file of this layer changes
+the cluster: the day-before `make d3 run mlops` of `lora-pipeline-mlflow-kueue` stays an owner's action outside
+`make demo`, and the `maas-portal-api-keys` start creates no key. A PASS is not "show-ready": `model-catalog-registry`
+has no `ModelRegistry` instance on demo333, so the rehearsal covers the catalog reads and the registry part can only be
+told, as its page says.
