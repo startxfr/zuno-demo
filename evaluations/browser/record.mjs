@@ -64,7 +64,8 @@ async function load(id) {
   return walk;
 }
 
-// What every walkthrough exports: persona, viewport {width, height}, markers (the names it marks, in order),
+// What every walkthrough exports: persona (or takes [{name, persona}], one video per persona: ctx.take and
+// ctx.persona say which one is playing), viewport {width, height}, markers (the names it marks, in order),
 // motion_from (one of them: no motion segment of the cut starts before it, so a sign-in is never shown as motion),
 // changes (the settings the take may change, normally []), url(domain) (the page it starts from), enter(ctx),
 // owned(ctx) -> [{kind, id}], run(ctx), cleanup(ctx) -> true | null (throws when something may remain), scout(ctx);
@@ -72,7 +73,15 @@ async function load(id) {
 // that send a message or create something, refused in a scout unless they are a GET).
 export function shapeProblems(walk) {
   const problems = [];
-  if (typeof walk.persona !== "string" || !walk.persona) problems.push("`persona` must be a persona name");
+  if (walk.takes !== undefined) {
+    if (!Array.isArray(walk.takes) || !walk.takes.length) problems.push("`takes` must list {name, persona}");
+    else {
+      for (const t of walk.takes) {
+        if (!t || !MARKER_NAME.test(t.name || "") || typeof t.persona !== "string" || !t.persona) problems.push(`take ${JSON.stringify(t)} needs a name and a persona`);
+      }
+      if (new Set(walk.takes.map((t) => t && t.name)).size !== walk.takes.length) problems.push("take names must be unique");
+    }
+  } else if (typeof walk.persona !== "string" || !walk.persona) problems.push("`persona` must be a persona name (or `takes`, one per persona)");
   const v = walk.viewport;
   if (!v || !Number.isInteger(v.width) || !Number.isInteger(v.height)) problems.push("`viewport` needs width and height");
   if (!Array.isArray(walk.markers) || !walk.markers.length) problems.push("`markers` must list the marker names");
@@ -210,11 +219,11 @@ if (process.argv[2] === "--check") {
     else problems.push(...promptProblems(walk, fs.readFileSync(file, "utf8")));
   }
   for (const problem of problems) console.error(problem);
-  const summary = { demo: process.argv[3], persona: walk.persona, viewport: walk.viewport, markers: walk.markers,
+  const summary = { demo: process.argv[3], persona: walk.persona || "", ...(walk.takes ? { takes: walk.takes } : {}), viewport: walk.viewport, markers: walk.markers,
                     motion_from: walk.motion_from, changes: walk.changes, walkthrough_sha256: walkthroughHash(process.argv[3]) };
   if (process.argv.includes("--json")) console.log(JSON.stringify(summary));
   else {
-    console.log(`${summary.demo}: persona ${walk.persona}, ${walk.viewport.width}x${walk.viewport.height}, markers ${walk.markers.join(", ")}; motion from ${walk.motion_from}`);
+    console.log(`${summary.demo}: ${walk.takes ? "takes " + walk.takes.map((t) => `${t.name} (${t.persona})`).join(", ") : "persona " + walk.persona}, ${walk.viewport.width}x${walk.viewport.height}, markers ${walk.markers.join(", ")}; motion from ${walk.motion_from}`);
     console.log(`changes: ${walk.changes.length ? walk.changes.join(", ") : "none"}`);
     console.log(`walkthrough_sha256: ${summary.walkthrough_sha256}`);
   }
@@ -244,8 +253,9 @@ async function keycloak(page, username) {
 
 const { chromium } = await import("playwright");
 
-if (process.env.RECORD_SCOUT === "1") {
-  const report = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
+// One scout, of one take (the only one, or one persona of a walkthrough with `takes`), into `out`.
+async function scoutOne(take, out) {
+  const report = { demo: id, ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
                    walkthrough_sha256: walkthroughHash(id), changes: walk.changes, when: "", steps: [], status: "fail", detail: "" };
   const browser = await chromium.launch();
   const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport });
@@ -275,7 +285,7 @@ if (process.env.RECORD_SCOUT === "1") {
     log(`scout ${name}: ${entry.ok ? "ok" : "FAILED " + entry.error}`);
     return entry;
   };
-  const ctx = { page, domain, log, step, state: { scout: true }, mark: async () => {},
+  const ctx = { page, domain, log, step, take, persona: take.persona, state: { scout: true }, mark: async () => {},
                 keycloak: (username) => keycloak(page, username), base: process.env.RECORD_BASE_URL || walk.url(domain) };
   try {
     // The same first two phases as a take: the sign-in, then what the persona owns (its count is all a scout keeps).
@@ -296,85 +306,112 @@ if (process.env.RECORD_SCOUT === "1") {
   report.status = bad.length ? "fail" : "done";
   report.detail = bad.length ? `failed: ${bad.join(", ")}` : `${report.steps.length} steps`;
   fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify(report, null, 2) + "\n");
-  console.log(bad.length ? `SCOUT: failed ${bad.join(", ")}` : "SCOUT: done");
-  process.exit(bad.length ? 1 : 0);
+  return { code: bad.length ? 1 : 0, line: bad.length ? `failed ${bad.join(", ")}` : "done" };
 }
 
-const record = { demo: id, kind: "browser", persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
-                 motion_from: walk.motion_from, markers: [], created: [], cleaned: null,
-                 owned: { before: null, after: null, same: null }, status: "fail", detail: "" };
-const browser = await chromium.launch();
-const context = await browser.newContext({
-  ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport,
-  recordVideo: { dir: out, size: walk.viewport },
-});
-const page = await context.newPage();
-const t0 = Date.now();
-const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
+// One take, of one persona, into `out`: its own browser context, video, markers.json and PNGs.
+async function takeOne(take, out) {
+  const record = { demo: id, kind: "browser", ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
+                   motion_from: walk.motion_from, markers: [], created: [], cleaned: null,
+                   owned: { before: null, after: null, same: null }, status: "fail", detail: "" };
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport,
+    recordVideo: { dir: out, size: walk.viewport },
+  });
+  const page = await context.newPage();
+  const t0 = Date.now();
+  const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
 
-async function mark(name) {
-  const expected = walk.markers[record.markers.length];
-  if (name !== expected) throw new Error(`marker ${name} out of order: ${expected || "no marker"} was expected`);
-  const t = Math.round((Date.now() - t0) / 10) / 100;
-  await page.screenshot({ path: path.join(out, `${name}.png`) });
-  record.markers.push({ name, t, png: `${name}.png` });
-  log(`marker ${name}`);
-}
-
-const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
-const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
-let ownedBefore = null;
-const ctx = { page, domain, mark, log, state, keycloak: (username) => keycloak(page, username),
-              base: process.env.RECORD_BASE_URL || walk.url(domain) };
-const failures = [];
-try {
-  await walk.enter(ctx);
-  ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
-  record.owned.before = ownedBefore.length;
-  await walk.run(ctx);
-  const missing = walk.markers.slice(record.markers.length);
-  if (missing.length) throw new Error(`markers not reached: ${missing.join(", ")}`);
-} catch (e) {
-  failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
-  await page.screenshot({ path: path.join(out, "failed.png") }).catch(() => {});
-}
-// Pass or fail, what the take created is removed: a failed take must not leave its chat behind either.
-try {
-  const cleaned = await walk.cleanup(ctx);
-  record.cleaned = record.created.length || cleaned === true ? cleaned === true : null;
-} catch (e) {
-  record.cleaned = false;
-  failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
-}
-// The persona must own after the take exactly what it owned before it: ids only, never a title, and only in the log.
-if (ownedBefore) {
-  try {
-    const ownedAfter = await ownedIds();
-    record.owned.after = ownedAfter.length;
-    const added = ownedAfter.filter((o) => !ownedBefore.includes(o));
-    const removed = ownedBefore.filter((o) => !ownedAfter.includes(o));
-    record.owned.same = !added.length && !removed.length;
-    if (!record.owned.same) {
-      failures.push(`${walk.persona} does not own the same items after the take: ${added.length} more, ${removed.length} fewer (ids in the log)`);
-      for (const o of added) log(`owned after, not before: ${o}`);
-      for (const o of removed) log(`owned before, not after: ${o}`);
-    }
-  } catch (e) {
-    record.owned.same = false;
-    failures.push(`what ${walk.persona} owns could not be read after the take: ${String(e.message || e).split("\n")[0].slice(0, 200)}`);
+  async function mark(name) {
+    const expected = walk.markers[record.markers.length];
+    if (name !== expected) throw new Error(`marker ${name} out of order: ${expected || "no marker"} was expected`);
+    const t = Math.round((Date.now() - t0) / 10) / 100;
+    await page.screenshot({ path: path.join(out, `${name}.png`) });
+    record.markers.push({ name, t, png: `${name}.png` });
+    log(`marker ${name}`);
   }
+
+  const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
+  const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
+  let ownedBefore = null;
+  const ctx = { page, domain, mark, log, state, take, persona: take.persona, keycloak: (username) => keycloak(page, username),
+                base: process.env.RECORD_BASE_URL || walk.url(domain) };
+  const failures = [];
+  try {
+    await walk.enter(ctx);
+    ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
+    record.owned.before = ownedBefore.length;
+    await walk.run(ctx);
+    const missing = walk.markers.slice(record.markers.length);
+    if (missing.length) throw new Error(`markers not reached: ${missing.join(", ")}`);
+  } catch (e) {
+    failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
+    await page.screenshot({ path: path.join(out, "failed.png") }).catch(() => {});
+  }
+  // Pass or fail, what the take created is removed: a failed take must not leave its chat behind either.
+  try {
+    const cleaned = await walk.cleanup(ctx);
+    record.cleaned = record.created.length || cleaned === true ? cleaned === true : null;
+  } catch (e) {
+    record.cleaned = false;
+    failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
+  }
+  // The persona must own after the take exactly what it owned before it: ids only, never a title, and only in the log.
+  if (ownedBefore) {
+    try {
+      const ownedAfter = await ownedIds();
+      record.owned.after = ownedAfter.length;
+      const added = ownedAfter.filter((o) => !ownedBefore.includes(o));
+      const removed = ownedBefore.filter((o) => !ownedAfter.includes(o));
+      record.owned.same = !added.length && !removed.length;
+      if (!record.owned.same) {
+        failures.push(`${take.persona} does not own the same items after the take: ${added.length} more, ${removed.length} fewer (ids in the log)`);
+        for (const o of added) log(`owned after, not before: ${o}`);
+        for (const o of removed) log(`owned before, not after: ${o}`);
+      }
+    } catch (e) {
+      record.owned.same = false;
+      failures.push(`what ${take.persona} owns could not be read after the take: ${String(e.message || e).split("\n")[0].slice(0, 200)}`);
+    }
+  }
+  const video = page.video();
+  await context.close();
+  await browser.close();
+  try {
+    fs.renameSync(await video.path(), path.join(out, "recording.webm"));
+  } catch (e) {
+    failures.push(`no recording.webm: ${String(e.message || e).slice(0, 200)}`);
+  }
+  record.status = failures.length ? "fail" : "pass";
+  record.detail = failures.length ? failures.join("; ")
+    : `${record.markers.length} markers in ${record.markers[record.markers.length - 1].t.toFixed(1)} s`;
+  fs.writeFileSync(path.join(out, "markers.json"), JSON.stringify(record, null, 2) + "\n");
+  return { code: failures.length ? 1 : 0, line: record.status === "pass" ? "PASS" : `FAIL ${record.detail}` };
 }
-const video = page.video();
-await context.close();
-await browser.close();
-try {
-  fs.renameSync(await video.path(), path.join(out, "recording.webm"));
-} catch (e) {
-  failures.push(`no recording.webm: ${String(e.message || e).slice(0, 200)}`);
+
+// A walkthrough that films several personas exports `takes: [{name, persona}]` (ADR-0618, identity-personas): the
+// same phases are played once per entry, each in its own browser context (nothing of one sign-in reaches the next)
+// and its own sub-directory OUT/<name>/, which holds exactly what a single take leaves in OUT. OUT/takes.json lists
+// them ({demo, takes: [{name, persona, dir, status, detail}], status}); a later take is still played when an earlier
+// one failed, so one run says everything. The last line and the exit code are the whole run's.
+const takes = Array.isArray(walk.takes) && walk.takes.length ? walk.takes : [{ name: "", persona: walk.persona }];
+const scouting = process.env.RECORD_SCOUT === "1";
+const results = [];
+for (const take of takes) {
+  const dir = take.name ? path.join(out, take.name) : out;
+  fs.mkdirSync(dir, { recursive: true });
+  if (take.name) console.log(`take ${take.name} (${take.persona}): ${dir}`);
+  const result = await (scouting ? scoutOne(take, dir) : takeOne(take, dir));
+  results.push({ name: take.name, persona: take.persona, dir: take.name, status: result.code ? "fail" : (scouting ? "done" : "pass"), detail: result.line });
+  if (take.name) console.log(`take ${take.name}: ${result.line}`);
 }
-record.status = failures.length ? "fail" : "pass";
-record.detail = failures.length ? failures.join("; ")
-  : `${record.markers.length} markers in ${record.markers[record.markers.length - 1].t.toFixed(1)} s`;
-fs.writeFileSync(path.join(out, "markers.json"), JSON.stringify(record, null, 2) + "\n");
-console.log(record.status === "pass" ? "RESULT: PASS" : `RESULT: FAIL ${record.detail}`);
-process.exit(failures.length ? 1 : 0);
+const bad = results.filter((r) => r.status === "fail");
+if (takes.length > 1 || takes[0].name) {
+  fs.writeFileSync(path.join(out, "takes.json"), JSON.stringify({ demo: id, takes: results, status: bad.length ? "fail" : results[0].status }, null, 2) + "\n");
+}
+const word = scouting ? "SCOUT:" : "RESULT:";
+if (takes.length === 1 && !takes[0].name) console.log(`${word} ${results[0].detail}`);
+else if (bad.length) console.log(`${word} ${scouting ? "failed" : "FAIL"} ${bad.map((r) => `${r.name}: ${r.detail.replace(/^(FAIL|failed) /, "")}`).join("; ")}`);
+else console.log(`${word} ${scouting ? "done" : "PASS"}`);
+process.exit(bad.length ? 1 : 0);

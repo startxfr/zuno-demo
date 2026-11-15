@@ -181,6 +181,126 @@ export async function settled(page, { what, before, ignore = [], busy = [], quie
   });
 }
 
+// ---- Open WebUI: what open-webui and identity-personas share (seen live on 0.12.5, 2026-11-15) ---------------------
+export const owui = {
+  url: (domain) => `https://open-webui.${domain}`,
+  CHAT_ID: /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/,
+  // A link to an earlier chat. The collapsed sidebar of 0.12.5 keeps its buttons (the new-chat pencil stays on the
+  // rail) and may keep its chat links in the page: only a link really on screen says the list is open.
+  CHAT_LINK: "a[href^='/c/']",
+  ANSWER_TIMEOUT_MS: 180000,
+};
+
+// The assistant messages of the chat, as its API stores them: [{content, done}], oldest first; null when the
+// answer has another shape than expected.
+async function owuiAnswers(page, chatId) {
+  const got = await pageApi(page, "GET", `/api/v1/chats/${chatId}`).catch(() => null);
+  const history = got && got.status === 200 && got.body && got.body.chat && got.body.chat.history;
+  if (!history || typeof history.messages !== "object") return null;
+  return Object.values(history.messages).filter((m) => m && m.role === "assistant")
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    .map((m) => ({ content: String(m.content || ""), done: m.done === true,
+                   error: m.error ? String(m.error.content || m.error.message || m.error.detail || JSON.stringify(m.error)).slice(0, 200) : "" }));
+}
+
+// Wait until the chat holds `count` finished answers. The chat's API says so (`done`); when it cannot be read, the
+// fallback is the screen: the text of the page has not changed for five seconds. A refused model call (an `error`
+// on the message, or an error toast: HTTP 429, a quota) fails the take at once, with its message.
+export async function owuiAnswered(page, chatId, count) {
+  let unreadable = 0;
+  let last = "";
+  let stableSince = Date.now();
+  let refused = "";
+  return waitUntil(page, {
+    what: `answer ${count}`, timeoutMs: owui.ANSWER_TIMEOUT_MS,
+    failed: async () => refused,
+    done: async () => {
+      const list = await owuiAnswers(page, chatId);
+      if (list === null) unreadable += 1;
+      else {
+        refused = (list.find((m) => m.error) || {}).error || "";
+        if (refused) return undefined;
+        if (list.length >= count && list.slice(0, count).every((m) => m.done && m.content.trim())) return list[count - 1].content;
+      }
+      if (unreadable >= 5) {
+        const text = await page.locator("body").innerText();
+        if (text !== last) { last = text; stableSince = Date.now(); }
+        else if (Date.now() - stableSince >= 5000) return "";
+      }
+      return undefined;
+    },
+  });
+}
+
+export async function owuiAsk(page, prompt, state) {
+  if (state && state.scout) throw new Error("a scout never types in the chat input");
+  const input = page.locator("#chat-input");
+  await input.click();
+  await page.keyboard.type(prompt, { delay: 25 });
+  await page.keyboard.press("Enter");
+}
+
+// From a signed-in Open WebUI to the home page of a new chat, sidebar closed, sign-in toast gone. The caller has
+// set localStorage `sidebar` to "false" before the first screen (an init script), so earlier chat titles never show.
+export async function owuiHome(page, base, { changes = [] } = {}) {
+  await page.waitForSelector("#chat-input", { timeout: 60000 });
+  if (owui.CHAT_ID.test(page.url())) await page.goto(`${base}/`);   // a new chat: the home page, no chat open
+  await page.waitForSelector("#chat-input", { timeout: 60000 });
+  await page.waitForTimeout(600);   // the sidebar's own animation, when it has one
+  // The toggle is clicked only when an earlier chat is really on screen: on a sidebar already collapsed it would
+  // OPEN the list (first live take, 2026-11-15).
+  if (await onScreen(page, owui.CHAT_LINK)) {
+    const toggle = await firstVisible(page, ["#sidebar-toggle-button", "button[aria-label='Toggle Sidebar']", "button[aria-label='Close Sidebar']"]);
+    if (!toggle) throw new Error("the sidebar is open and its toggle button was not found");
+    await click(toggle, { changes });
+    await page.waitForTimeout(800);
+  }
+  if (await onScreen(page, owui.CHAT_LINK)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
+  // The sign-in toast ("You're now logged in.") must be gone before the home marker, or it is in the GIF.
+  await page.getByText("You're now logged in").first().waitFor({ state: "hidden", timeout: 20000 });
+  await page.getByText("Zuno picks the model").first().waitFor({ timeout: 30000 });
+  if (owui.CHAT_ID.test(page.url())) throw new Error("a chat is already open on the home page: the take must start from a new chat");
+  await page.waitForTimeout(1000);
+}
+
+// What the persona owns in Open WebUI: its chats, by id, every page of the list. Read in its own session; the
+// recorder compares the list after sign-in with the list after cleanup, and they must be the same.
+export async function owuiChats(page) {
+  const found = [];
+  for (let n = 1; n <= 50; n += 1) {
+    const got = await pageApi(page, "GET", `/api/v1/chats/?page=${n}`);
+    if (got.status !== 200 || !Array.isArray(got.body)) throw new Error(`the chat list could not be read (page ${n}: HTTP ${got.status})`);
+    const fresh = got.body.filter((c) => c && c.id && !found.some((f) => f.id === c.id));
+    if (!fresh.length) break;
+    found.push(...fresh.map((c) => ({ kind: "chat", id: String(c.id) })));
+  }
+  return found;
+}
+
+// Delete the chat this take created, by its id, and nothing else: true when it is gone, null when nothing was sent
+// (nothing to delete); a failure throws. Nothing sent: nothing to delete. Sent but the id
+// was never read (the address bar did not change in time): one more look at the address bar; without an id nothing is
+// deleted, and the take says a chat may remain.
+export async function owuiDeleteChat(page, state, persona, firstPrompt, log = () => {}) {
+  if (!state.sent) return null;
+  const id = state.chatId || (page.url().match(owui.CHAT_ID) || [])[1];
+  if (!id) {
+    throw new Error(`the first question was sent but the chat's id was never read: a chat titled like "${firstPrompt}" `
+      + `may remain in ${persona}'s history, check it by hand`);
+  }
+  if (!state.created.some((c) => c.id === id)) state.created.push({ kind: "chat", id });
+  const before = await pageApi(page, "GET", `/api/v1/chats/${id}`).catch(() => null);
+  const title = (before && before.body && before.body.title) || "(title not read)";
+  const gone = await pageApi(page, "DELETE", `/api/v1/chats/${id}`).catch((e) => ({ status: 0, body: String(e).slice(0, 80) }));
+  const after = await pageApi(page, "GET", `/api/v1/chats/${id}`).catch(() => ({ status: 0 }));
+  if (gone.status !== 200 || gone.body === false || after.status === 200 || after.status === 0) {
+    throw new Error(`the chat "${title}" (${id}) was NOT deleted from ${persona}'s history: DELETE answered HTTP ${gone.status}, `
+      + `a read after it HTTP ${after.status}; delete it by hand`);
+  }
+  log(`chat ${id} deleted ("${title}")`);
+  return true;
+}
+
 // ---- UnifAI: what unifai-live-rag, unifai-agents, observability-trace and a2a-delegation-approval share ----------
 //
 // Read from the fork's UI source (ui/client/src, v0.1.72) on 2026-11-15, NOT yet seen live by a scout: every selector

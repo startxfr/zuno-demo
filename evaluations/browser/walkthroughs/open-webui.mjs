@@ -10,7 +10,8 @@
 // no chat is open, so the id is the new chat's), and the delete is one call for that id to Open WebUI's own API, in
 // the page, with the persona's own session. No list is walked and no menu is clicked, so no other chat can be hit.
 // When the delete does not succeed the take fails and names the chat by its title.
-import { buttons, click, closeMenus, describe, firstVisible, newText, onScreen, pageApi as api, switches, waitUntil, wordsOnScreen } from "./_helpers.mjs";
+import { buttons, click, closeMenus, describe, firstVisible, newText, onScreen, owui, owuiAnswered, owuiAsk, owuiChats, owuiDeleteChat, owuiHome,
+         switches, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "sale-01";
 export const page = "docs/demo/scenarios/experiences/open-webui.md";
@@ -36,61 +37,6 @@ const TOOLS = ["#integration-menu-button", "button[aria-label='Integrations']"];
 const TOOLS_ROW = ["[role='menu'] [role='menuitem']", "[role='menu'] button", "[role='menu'] div"];
 const CONNECTION = "Zuno tools";   // the one entry sale-01 sees: the governed connection, with its switch on
 const TOOL_WORDS = [/drive/i, /gmail/i, /diagram/i];   // the page's three tool names: reported by scout(), see run()
-const CHAT_ID = /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
-const ANSWER_TIMEOUT_MS = 180000;
-// A link to an earlier chat. The collapsed sidebar of 0.12.5 keeps its buttons (the new-chat pencil stays on the
-// rail) and may keep its chat links in the page: only a link really on screen says the list is open.
-const CHAT_LINK = "a[href^='/c/']";
-
-// The assistant messages of the chat, as its API stores them: [{content, done}], oldest first; null when the
-// answer has another shape than expected.
-async function answers(page, chatId) {
-  const got = await api(page, "GET", `/api/v1/chats/${chatId}`).catch(() => null);
-  const history = got && got.status === 200 && got.body && got.body.chat && got.body.chat.history;
-  if (!history || typeof history.messages !== "object") return null;
-  return Object.values(history.messages).filter((m) => m && m.role === "assistant")
-    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-    .map((m) => ({ content: String(m.content || ""), done: m.done === true,
-                   error: m.error ? String(m.error.content || m.error.message || m.error.detail || JSON.stringify(m.error)).slice(0, 200) : "" }));
-}
-
-// Wait until the chat holds `count` finished answers. The chat's API says so (`done`); when it cannot be read, the
-// fallback is the screen: the text of the page has not changed for five seconds. A refused model call (an `error`
-// on the message, or an error toast: HTTP 429, a quota) fails the take at once, with its message.
-async function answered(page, chatId, count) {
-  let unreadable = 0;
-  let last = "";
-  let stableSince = Date.now();
-  let refused = "";
-  return waitUntil(page, {
-    what: `answer ${count}`, timeoutMs: ANSWER_TIMEOUT_MS,
-    failed: async () => refused,
-    done: async () => {
-      const list = await answers(page, chatId);
-      if (list === null) unreadable += 1;
-      else {
-        refused = (list.find((m) => m.error) || {}).error || "";
-        if (refused) return undefined;
-        if (list.length >= count && list.slice(0, count).every((m) => m.done && m.content.trim())) return list[count - 1].content;
-      }
-      if (unreadable >= 5) {
-        const text = await page.locator("body").innerText();
-        if (text !== last) { last = text; stableSince = Date.now(); }
-        else if (Date.now() - stableSince >= 5000) return "";
-      }
-      return undefined;
-    },
-  });
-}
-
-async function ask(page, prompt, state) {
-  if (state && state.scout) throw new Error("a scout never types in the chat input");
-  const input = page.locator("#chat-input");
-  await input.click();
-  await page.keyboard.type(prompt, { delay: 25 });
-  await page.keyboard.press("Enter");
-}
-
 // Open the tools panel: the Integrations button, then the menu's "Tools" row. Returns the selectors that matched.
 // Nothing in the panel is clicked: its entries are switches, and a click would turn sale-01's tools off.
 async function openToolsPanel(page) {
@@ -121,51 +67,26 @@ export async function enter({ page, base, mark, keycloak }) {
   await mark("login");
   await keycloak(persona);
 
-  await page.waitForSelector("#chat-input", { timeout: 60000 });
-  if (CHAT_ID.test(page.url())) await page.goto(`${base}/`);   // a new chat: the home page, no chat open
-  await page.waitForSelector("#chat-input", { timeout: 60000 });
-  await page.waitForTimeout(600);   // the sidebar's own animation, when it has one
-  // The toggle is clicked only when an earlier chat is really on screen: on a sidebar already collapsed it would
-  // OPEN the list (first live take, 2026-11-15).
-  if (await onScreen(page, CHAT_LINK)) {
-    const toggle = await firstVisible(page, ["#sidebar-toggle-button", "button[aria-label='Toggle Sidebar']", "button[aria-label='Close Sidebar']"]);
-    if (!toggle) throw new Error("the sidebar is open and its toggle button was not found");
-    await click(toggle, { changes });
-    await page.waitForTimeout(800);
-  }
-  if (await onScreen(page, CHAT_LINK)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
-  // The sign-in toast ("You're now logged in.") must be gone before the home marker, or it is in the GIF.
-  await page.getByText("You're now logged in").first().waitFor({ state: "hidden", timeout: 20000 });
-  await page.getByText("Zuno picks the model").first().waitFor({ timeout: 30000 });
-  if (CHAT_ID.test(page.url())) throw new Error("a chat is already open on the home page: the take must start from a new chat");
-  await page.waitForTimeout(1000);
+  await owuiHome(page, base, { changes });
 }
 
 // What sale-01 owns in Open WebUI: its chats, by id, every page of the list. Read in its own session; the recorder
 // compares the list after sign-in with the list after cleanup, and they must be the same.
 export async function owned({ page }) {
-  const found = [];
-  for (let n = 1; n <= 50; n += 1) {
-    const got = await api(page, "GET", `/api/v1/chats/?page=${n}`);
-    if (got.status !== 200 || !Array.isArray(got.body)) throw new Error(`the chat list could not be read (page ${n}: HTTP ${got.status})`);
-    const fresh = got.body.filter((c) => c && c.id && !found.some((f) => f.id === c.id));
-    if (!fresh.length) break;
-    found.push(...fresh.map((c) => ({ kind: "chat", id: String(c.id) })));
-  }
-  return found;
+  return owuiChats(page);
 }
 
 export async function run({ page, mark, log, state }) {
   await mark("home");
 
   state.sent = true;   // from here a chat may exist, even if its id is never read: cleanup() must not stay silent
-  await ask(page, prompts["0:45"], state);
+  await owuiAsk(page, prompts["0:45"], state);
   await mark("q1-sent");
-  await page.waitForURL(CHAT_ID, { timeout: 60000 });
-  state.chatId = page.url().match(CHAT_ID)[1];
+  await page.waitForURL(owui.CHAT_ID, { timeout: 60000 });
+  state.chatId = page.url().match(owui.CHAT_ID)[1];
   state.created.push({ kind: "chat", id: state.chatId });
   log(`chat ${state.chatId} created`);
-  await answered(page, state.chatId, 1);
+  await owuiAnswered(page, state.chatId, 1);
   await page.waitForTimeout(1500);
   await mark("q1-done");
 
@@ -176,13 +97,13 @@ export async function run({ page, mark, log, state }) {
   await page.waitForTimeout(800);
   if (!/Zuno Code/.test(await picker.innerText())) throw new Error("the model picker does not show Zuno Code after the choice");
   await mark("code-picked");
-  await ask(page, prompts["1:45"], state);
-  const code = await answered(page, state.chatId, 2);
+  await owuiAsk(page, prompts["1:45"], state);
+  const code = await owuiAnswered(page, state.chatId, 2);
   if (code && !/```[\s\S]*?```/.test(code)) throw new Error("the Zuno Code answer holds no complete code block");
   await page.locator("pre, .cm-editor, code.hljs").first().waitFor({ timeout: 15000 });
   await page.waitForTimeout(1500);
   await mark("q2-done");
-  if (page.url().match(CHAT_ID)?.[1] !== state.chatId) throw new Error("the second question opened another chat than the first");
+  if (page.url().match(owui.CHAT_ID)?.[1] !== state.chatId) throw new Error("the second question opened another chat than the first");
 
   // The page's row says "Three tools for sale-01: Drive search, Gmail read, diagram generation". Open WebUI 0.12.5
   // does not show tool names here: the panel lists the connection "Zuno tools" with its switch (seen live,
@@ -203,7 +124,7 @@ export async function run({ page, mark, log, state }) {
 // afterwards.
 export async function scout({ page, step, state }) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
-  await step("home", async () => ({ url: page.url().replace(/[?#].*/, ""), chat_link_on_screen: await onScreen(page, CHAT_LINK),
+  await step("home", async () => ({ url: page.url().replace(/[?#].*/, ""), chat_link_on_screen: await onScreen(page, owui.CHAT_LINK),
                                     buttons: await buttons(page, "#chat-input") }));
   await step("picker", async () => {
     const before = await page.locator("body").innerText();
@@ -233,7 +154,7 @@ export async function scout({ page, step, state }) {
   await closeMenus(page).catch(() => {});
   await step("closed", async () => {
     await page.waitForTimeout(600);
-    if (CHAT_ID.test(page.url())) throw new Error("a chat is open after the scout");
+    if (owui.CHAT_ID.test(page.url())) throw new Error("a chat is open after the scout");
     const typed = (await page.locator("#chat-input").innerText().catch(() => "")).trim();
     if (typed) throw new Error("the chat input is not empty after the scout");
     return { url: page.url().replace(/[?#].*/, ""), menu_still_open: await page.locator("[role='menu']").first().isVisible().catch(() => false),
@@ -241,26 +162,6 @@ export async function scout({ page, step, state }) {
   });
 }
 
-// Delete the chat this take created, by its id, and nothing else: true when it is gone, null when nothing was sent
-// (nothing to delete); a failure throws. Nothing sent: nothing to delete. Sent but the id
-// was never read (the address bar did not change in time): one more look at the address bar; without an id nothing is
-// deleted, and the take says a chat may remain.
 export async function cleanup({ page, log, state }) {
-  if (!state.sent) return null;
-  const id = state.chatId || (page.url().match(CHAT_ID) || [])[1];
-  if (!id) {
-    throw new Error(`the first question was sent but the chat's id was never read: a chat titled like "${prompts["0:45"]}" `
-      + `may remain in ${persona}'s history, check it by hand`);
-  }
-  if (!state.created.some((c) => c.id === id)) state.created.push({ kind: "chat", id });
-  const before = await api(page, "GET", `/api/v1/chats/${id}`).catch(() => null);
-  const title = (before && before.body && before.body.title) || "(title not read)";
-  const gone = await api(page, "DELETE", `/api/v1/chats/${id}`).catch((e) => ({ status: 0, body: String(e).slice(0, 80) }));
-  const after = await api(page, "GET", `/api/v1/chats/${id}`).catch(() => ({ status: 0 }));
-  if (gone.status !== 200 || gone.body === false || after.status === 200 || after.status === 0) {
-    throw new Error(`the chat "${title}" (${id}) was NOT deleted from ${persona}'s history: DELETE answered HTTP ${gone.status}, `
-      + `a read after it HTTP ${after.status}; delete it by hand`);
-  }
-  log(`chat ${id} deleted ("${title}")`);
-  return true;
+  return owuiDeleteChat(page, state, persona, prompts["0:45"], log);
 }
