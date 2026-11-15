@@ -4,6 +4,9 @@ Allowed, as written on the page:
 - `oc get|describe|logs|explain|whoami|api-resources|version`, `oc auth can-i`, `oc adm top`, `oc set env ... --list`;
 - pipes into `grep awk sort uniq head tail wc cut jq`;
 - `git log|show`;
+- `grep|tail|head|cat|wc` as the FIRST segment, on regular files of the repository only (a relative path with no `..`,
+  no symlink out of the repository, never under `ansible/confidential*`, `.git`, or a name holding `secret`, `.env`,
+  a key or a certificate);
 - GET-only `curl`, with `$(oc whoami -t)` resolved in this process and masked in everything printed;
 - `make help`, `make demo`, `make demo list`, `[ONLY=x] make demo golden-path`, `make dN check [component]` (run as
   its local playbook, never through AAP), `make d3 admit agents` without `UPDATE_LOCK`.
@@ -49,6 +52,22 @@ CURL_DENIED = {
     "--json", "-K", "--config", "-c", "--cookie-jar", "-D", "--dump-header", "--output-dir", "--create-dirs",
     "--trace", "--trace-ascii", "--libcurl", "--stderr", "-P", "--ftp-port", "-Q", "--quote", "--proxy", "-x",
 }
+FILE_READERS = {"grep", "tail", "head", "cat", "wc"}
+# Options that take a value, per file reader: the value is not a path (grep's pattern is handled apart).
+FILE_READER_VALUE_FLAGS = {
+    "grep": {"-A", "-B", "-C", "-m", "-e", "--after-context", "--before-context", "--context", "--max-count",
+             "--regexp", "--color", "--colour", "--label"},
+    "tail": {"-n", "-c", "--lines", "--bytes"},
+    "head": {"-n", "-c", "--lines", "--bytes"},
+    "cat": set(),
+    "wc": set(),
+}
+# Options that read other files or walk directories: refused outright.
+FILE_READER_DENIED_FLAGS = {"-f", "-r", "-R", "-d", "-D", "-F", "--file", "--recursive", "--dereference-recursive",
+                            "--directories", "--devices", "--include", "--exclude", "--exclude-from",
+                            "--exclude-dir", "--files0-from", "--follow", "--pid"}
+FILE_READER_DENIED_CLUSTER = set("fFrRdD")
+SENSITIVE_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".jks", ".crt", ".kubeconfig")
 DAY_CHECK_RE = re.compile(r"^(?:d|day)([0-3])$")
 
 
@@ -325,6 +344,82 @@ def check_filter(argv: List[str]) -> None:
             raise Denied("this jq program prints the environment")
 
 
+def _repo_file(arg: str, root: pathlib.Path) -> None:
+    """Raise Denied unless `arg` is a regular file inside the repository that a read may show."""
+    if not arg or arg == "-":
+        raise Denied("a file reader needs a repository file path")
+    if arg.startswith("/") or arg.startswith("~") or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", arg):
+        raise Denied(f"`{arg}` is not a relative path inside the repository")
+    parts = pathlib.PurePosixPath(arg).parts
+    if ".." in parts:
+        raise Denied(f"`{arg}` goes out of the repository (`..`)")
+    base = root.resolve()
+    target = base / arg
+    try:
+        resolved = target.resolve()
+        resolved.relative_to(base)
+    except (OSError, RuntimeError, ValueError):
+        raise Denied(f"`{arg}` resolves outside the repository")
+    for rel in (pathlib.PurePosixPath(arg), pathlib.PurePosixPath(resolved.relative_to(base).as_posix())):
+        low = [part.lower() for part in rel.parts]
+        if len(low) >= 2 and low[0] == "ansible" and low[1].startswith("confidential"):
+            raise Denied(f"`{arg}` is under ansible/confidential*: never read")
+        for part in low:
+            if (part == ".git" or "secret" in part or part == ".env" or part.startswith(".env.")
+                    or part.endswith(".env") or part.endswith(SENSITIVE_SUFFIXES)):
+                raise Denied(f"`{arg}` names a secret, key, .env or .git file: never read")
+    if not resolved.is_file():
+        raise Denied(f"`{arg}` is not a regular file of the repository")
+
+
+def check_file_reader(argv: List[str], root: pathlib.Path) -> None:
+    """grep, tail, head, cat or wc as the first segment: repository files only, never a secret."""
+    name = argv[0]
+    args = argv[1:]
+    value_flags = FILE_READER_VALUE_FLAGS[name]
+    positional: List[str] = []
+    has_regexp = False
+    after_dashdash = False
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        i += 1
+        if after_dashdash or not arg.startswith("-") or arg == "-":
+            positional.append(arg)
+            continue
+        if arg == "--":
+            after_dashdash = True
+            continue
+        flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
+        if flag in FILE_READER_DENIED_FLAGS:
+            raise Denied(f"`{name} {flag}` reads other files or walks directories")
+        if arg.startswith("--"):
+            if flag in value_flags and "=" not in arg:
+                i += 1
+            has_regexp = has_regexp or flag == "--regexp"
+            continue
+        # short options: `-A8`, `-n 5`, a cluster such as `-cn`; a digit option such as `-2` is a count
+        letters = arg[1:]
+        if re.match(r"^\d+$", letters):
+            continue
+        for pos, letter in enumerate(letters):
+            if letter in FILE_READER_DENIED_CLUSTER:
+                raise Denied(f"`{name} -{letter}` reads other files or walks directories")
+            if "-" + letter in value_flags:
+                has_regexp = has_regexp or letter == "e"
+                if pos == len(letters) - 1:
+                    i += 1      # the value is the next token
+                break           # otherwise the rest of the token is the value
+    if name == "grep" and not has_regexp:
+        if not positional:
+            raise Denied("grep needs a pattern and a repository file")
+        positional = positional[1:]
+    if not positional:
+        raise Denied(f"`{name}` needs a repository file (it only filters a pipe elsewhere)")
+    for path in positional:
+        _repo_file(path, root)
+
+
 def check_git(argv: List[str]) -> None:
     if len(argv) < 2 or argv[1] not in ("log", "show"):
         raise Denied("only `git log` and `git show` are allowed")
@@ -424,8 +519,10 @@ def plan(command: str, root: Optional[pathlib.Path] = None, variables: Optional[
         check_git(head)
     elif program == "curl":
         check_curl(head)
+    elif program in FILE_READERS:
+        check_file_reader(head, root)
     else:
-        raise Denied(f"`{program}` is not an allowed command (oc, curl, git, make)")
+        raise Denied(f"`{program}` is not an allowed command (oc, curl, git, make, grep, tail, head, cat, wc)")
     for segment in segments[1:]:
         check_filter(segment)
     needs_token = any(TOKEN_PLACEHOLDER in arg for seg in segments for arg in seg)

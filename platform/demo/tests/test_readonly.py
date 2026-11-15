@@ -173,6 +173,108 @@ class Allowlist(unittest.TestCase):
         self.assertGreater(judged, 100)
 
 
+class RepositoryFileReads(unittest.TestCase):
+    """grep/tail/head/cat/wc as the first segment read repository files only (reorg follow-up of WP-278)."""
+
+    ALLOWED = [
+        "grep -c 'release_tag' platform/supply-chain/pinned-releases.yaml",
+        "grep -A8 'release_tag: v0.15.0' platform/supply-chain/pinned-releases.yaml",
+        "grep -n -e release_tag -e signed platform/supply-chain/pinned-releases.yaml | head -5",
+        "tail -2 platform/okf/agents.lock",
+        "tail -n 2 platform/okf/agents.lock",
+        "head -3 platform/demo/readonly.py",
+        "cat platform/demo/readonly.py | wc -l",
+        "wc -l platform/demo/readonly.py",
+    ]
+    DENIED = {
+        "cat /etc/passwd": "relative path",
+        "cat ~/.ssh/id_rsa": "relative path",
+        "cat ../outside.txt": "..",
+        "cat platform/../../outside": "..",
+        "grep x -r platform": "walks directories",
+        "grep -rn x platform": "walks directories",
+        "grep -f patterns.txt platform/okf/agents.lock": "other files",
+        "grep -x": "needs a pattern",
+        "grep x": "needs a repository file",
+        "tail": "needs a repository file",
+        "tail -f platform/okf/agents.lock": "other files",
+        "tail -F platform/okf/agents.lock": "other files",
+        "cat platform": "not a regular file",
+        "cat platform/okf/missing-file.lock": "not a regular file",
+        "cat .git/config": "never read",
+        "cat ansible/confidential.yml": "never read",
+        "cat ansible/confidential/vault.yml": "never read",
+        "cat docs/.env": "never read",
+        "cat docs/x.env": "never read",
+        "wc --files0-from=list.txt": "other files",
+        "cat -": "repository file",
+        "cat https://x/y": "relative path",
+        "grep x platform/okf/agents.lock > out": "redirect",
+        "cat platform/okf/agents.lock; id": ";",
+        "A=1 cat platform/okf/agents.lock": "environment",
+    }
+
+    def test_allowed(self):
+        for command in self.ALLOWED:
+            ok, reason = r.check(command)
+            self.assertTrue(ok, f"{command!r} refused: {reason}")
+
+    def test_denied(self):
+        for command, why in self.DENIED.items():
+            ok, reason = r.check(command)
+            self.assertFalse(ok, f"{command!r} allowed")
+            self.assertIn(why.lower(), reason.lower(), f"{command!r}: {reason}")
+
+    def test_a_secret_named_file_is_refused_even_when_it_exists(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "ansible" / "confidential").mkdir(parents=True)
+            (root / "ansible" / "confidential" / "a.yml").write_text("x")
+            (root / "docs").mkdir()
+            (root / ".git").mkdir()
+            (root / ".git" / "config").write_text("x")
+            for name in ("my-secret.yaml", ".env", "tls.key", "ca.pem", "notes.txt"):
+                (root / "docs" / name).write_text("x")
+            with self.assertRaises(r.Denied):
+                r.plan("cat .git/config", root=root)
+            for name in ("my-secret.yaml", ".env", "tls.key", "ca.pem"):
+                with self.assertRaises(r.Denied, msg=name):
+                    r.plan(f"cat docs/{name}", root=root)
+            with self.assertRaises(r.Denied):
+                r.plan("cat ansible/confidential/a.yml", root=root)
+            r.plan("cat docs/notes.txt", root=root)
+
+    def test_a_symlink_cannot_leave_the_repository_or_reach_a_secret(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
+            root = pathlib.Path(tmp)
+            (root / "docs").mkdir()
+            (root / "ansible" / "confidential").mkdir(parents=True)
+            (root / "ansible" / "confidential" / "a.yml").write_text("x")
+            (pathlib.Path(outside) / "out.txt").write_text("x")
+            (root / "docs" / "out.txt").symlink_to(pathlib.Path(outside) / "out.txt")
+            (root / "docs" / "innocent.txt").symlink_to(root / "ansible" / "confidential" / "a.yml")
+            with self.assertRaises(r.Denied) as out:
+                r.plan("cat docs/out.txt", root=root)
+            self.assertIn("outside", str(out.exception))
+            with self.assertRaises(r.Denied) as inside:
+                r.plan("cat docs/innocent.txt", root=root)
+            self.assertIn("never read", str(inside.exception))
+
+    def test_runs_without_a_shell(self):
+        out = r.run("grep -c release_tag platform/supply-chain/pinned-releases.yaml")
+        self.assertEqual(out.rc, 0, out.output)
+        self.assertRegex(out.output.strip(), r"^\d+$")
+        tail = r.run("tail -2 platform/okf/agents.lock")
+        self.assertEqual(tail.rc, 0, tail.output)
+        self.assertEqual(len(tail.output.splitlines()), 2)
+
+    def test_filters_after_a_file_read_still_apply(self):
+        self.assertFalse(r.check("cat platform/okf/agents.lock | sh")[0])
+        self.assertFalse(r.check("cat platform/okf/agents.lock | xargs rm")[0])
+
+
 class MakeVerbsRunLocally(unittest.TestCase):
     def test_day_check_is_its_local_playbook(self):
         p = r.plan("make d2 check ai-gateway", ROOT)

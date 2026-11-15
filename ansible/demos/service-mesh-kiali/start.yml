@@ -4,24 +4,11 @@
 # gateways and the models. Read-only and allowed during a freeze (ADR-0605), so it is not a changing unit. Run it in
 # the hour before the session. The page section `## Presenter lifecycle` > `### Start` says what the presenter does
 # after it.
-- name: "service-mesh-kiali start | queue every golden-path probe (the probes of `make demo golden-path`)"
+- name: "service-mesh-kiali start | queue the whole golden path (`all`: every probe the script owns, none named here)"
   ansible.builtin.include_tasks: "{{ demo_lib }}/queue_probes.yml"
   vars:
     queue_probes:
-      - "unifai-tekos"
-      - "sovereignty"
-      - "open-webui"
-      - "zuno-code"
-      - "dify"
-      - "kagent"
-      - "openclaw"
-      - "lightspeed"
-      - "tools"
-      - "guardrails"
-      - "trace"
-      - "delegation-approval"
-      - "world-model"
-      - "blender"
+      - "all"
 - name: "service-mesh-kiali start | run them once"
   ansible.builtin.include_tasks: "{{ demo_lib }}/flush_checks.yml"
 - name: "service-mesh-kiali start | report"
