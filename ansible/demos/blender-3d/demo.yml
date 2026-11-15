@@ -11,4 +11,9 @@ addon: "Blender add-on (workstation)"
 mutations:
   install: "Workstation only: installs or updates the Zuno 3D add-on in the Blender user add-on folder (nothing on the cluster)"
   uninstall: "Workstation only: removes the Zuno 3D add-on from the Blender user add-on folders (the platform entry stays)"
+# Never run by `make demo rehearse` (ADR-0616 clause 11): a rehearsal on a shared workstation would remove an add-on a
+# presenter installed there. The presenter runs install and uninstall on the workstation that plays the demo.
+not_rehearsed:
+  install: "it writes the add-on into the Blender folders of the workstation that runs the rehearsal"
+  uninstall: "it would remove the add-on a presenter installed on the workstation that runs the rehearsal"
 steps: {}
