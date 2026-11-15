@@ -96,7 +96,7 @@ class Chain(unittest.TestCase):
         self.assertEqual([u.defer_flush for u in check], [True, False])
         self.assertFalse(any(u.defer_flush for u in workshop.action_units("w", self.manifest, "status", FIXTURES)))
         text = (ROOT / "ansible/demos/_lib/flush_checks.yml").read_text()
-        self.assertEqual(text.count("not (demo_unit.defer_flush | default(false) | bool)"), 4)
+        self.assertEqual(text.count("not (demo_unit.defer_flush | default(false) | bool)"), 6)
 
     def test_one_guard_names_every_changing_unit(self):
         units = workshop.action_units("fixture-workshop", self.manifest, "install", FIXTURES)

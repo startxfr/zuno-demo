@@ -14,6 +14,7 @@ import pathlib
 from typing import Dict, List, Optional, Tuple
 
 import guard
+import probe_order
 import session
 from catalogue import Page
 from runner import RunResult, Unit, UnitResult
@@ -94,16 +95,35 @@ def report(page: Page, version: str, results: List[UnitResult], run: Optional[Ru
     for r in results:
         detail = "; ".join(filter(None, [r.error] + r.messages + [
             f"{c.get('cmd')} -> exit {c.get('rc')}" for c in r.commands if c.get("rc") not in (0, None)] + [
-            f"{c.get('id')} FAIL" for c in r.checks if c.get("passed") not in (True, "True", "true")]))
+            f"{c.get('id')} FAIL" + (f": {c.get('detail')}" if c.get("detail") else "")
+            for c in r.checks if c.get("passed") not in (True, "True", "true")]))
         status = {"ok": "PASS", "nothing": "PASS (nothing to run)",
                   "skipped": "SKIPPED" if r.messages else "SKIPPED (mutating)",
                   "missing": "FAIL (missing)", "failed": "FAIL"}.get(r.status, r.status)
-        cell = detail.replace("|", "\\|")
+        cell = " ".join(detail.split()).replace("|", "\\|")
         lines.append(f"| {r.name} | {status} | {r.seconds:.1f} | {cell} |")
+    lines += failed_output(results)
     if run and run.error:
         lines += ["", f"Runner error: {run.error}"]
     lines += ["", f"RESULT: {'PASS' if passed else 'FAIL'}", ""]
     return "\n".join(lines), passed
+
+
+def failed_output(results: List[UnitResult]) -> List[str]:
+    """What the failed commands of the units printed (already masked and cut by what recorded them), one block each:
+    the table cell names the failure, this keeps its output next to it instead of only in the log."""
+    lines: List[str] = []
+    for r in results:
+        for c in r.commands:
+            output = str(c.get("output") or "").strip("\n")
+            if c.get("rc") in (0, None) or not output:
+                continue
+            if not lines:
+                lines += ["", "## Output of the failed commands"]
+            lines += ["", f"`{r.name}`: `{c.get('cmd')}` -> exit {c.get('rc')}", "", "```text"]
+            lines += [line.replace("```", "'" * 3) for line in output.split("\n")]
+            lines += ["```"]
+    return lines
 
 
 def write_report(page: Page, version: str, text: str) -> pathlib.Path:
@@ -177,6 +197,7 @@ def queued_checks(units: List[Unit], demo_dir: pathlib.Path) -> Tuple[List[str],
 def check_notices(probes: List[str], browser: List[str]) -> List[str]:
     notices = []
     if probes:
+        probes = probe_order.ordered(probes)   # the order flush_checks.yml runs them in
         what = "every golden-path probe" if "all" in probes else f"golden-path probes: {', '.join(probes)}"
         notices.append(f"{what} (real model calls, they spend the probe personas' budgets)")
     if browser:
