@@ -39,7 +39,8 @@ the owner's named "go <id>"; every catalogue page takes a presenter's shape, def
    each marker (a still is sharper than a frame of the low-bitrate `.webm`). A take leaves `recording.webm`,
    `markers.json` and the PNGs under `~/.cache/zuno/demo/recordings/<id>-<stamp>/`.
 3. **The recorder cleans up after itself.** It deletes the chat it created, by its id, after the last marker and outside
-   the cut. The `DEMO_CONFIRM` summary says so. If the deletion fails the run is FAILED and prints the chat title.
+   the cut. The `DEMO_CONFIRM` summary says so. If the deletion fails the run is FAILED and prints the chat title. A
+   take that sent its first question but could not read the chat id also fails, and says that a chat may remain.
 4. **A cut list per demo.** `ansible/demos/<id>/gif.yml` is versioned next to the demo's files. It lists the moments,
    each a still marker or a span from one marker to another, with a hold, a caption of a few words, and optionally a
    page step time (`step: "0:45"`), which `make demo gif` checks against the 5-minute table of the page. A motion
@@ -56,9 +57,15 @@ the owner's named "go <id>"; every catalogue page takes a presenter's shape, def
    its list of moments. It is copied to `docs/assets/img/demo/<id>.gif`, embedded and committed only after the owner's
    named "go <id>", given in the session that commits. One publication commit holds one GIF; a re-cut stays in the
    cache until the go.
-8. **A privacy review before the GIF leaves the workstation.** The recording session looks at every marker image: no
-   token, no real name, no earlier chat title, no data of another tenant. The persona name and the public route host
-   already appear in the pages. The result of the review is in the message that sends the GIF to the owner.
+8. **A privacy review before the GIF leaves the workstation.** The recording session reviews every marker image and
+   the assembled GIF, because a motion segment shows frames that no marker image covers. The review checks that
+   nothing shows: a token or an API key, a session cookie, a Keycloak form with a typed password, a real person's name
+   or email, chat content beyond the scripted prompts and their answers, an earlier chat title, or data of another
+   tenant. The persona name and the public route host already appear in the pages. The result of the review is in
+   the message that sends the GIF to the owner. The walkthrough also names, in `markers.json`, the first marker a
+   motion segment may start at (`motion_from`; for Open WebUI, `q1-sent`), and `make demo gif` refuses a motion
+   segment that starts before it, so the sign-in is never shown in motion. The login is still taken as a still, on the
+   empty form.
 9. **Guards.** `make demo record` is a live action: it asks for the demo id (`DEMO_CONFIRM=<id>`) and states its cost
    and effect (the answers spent, the chat created and deleted). It is refused during a freeze, as `rehearse` is, and
    refused unless the demo's last `check` passed that day, so a cold or broken demo is not recorded. `make demo gif` is
@@ -98,7 +105,7 @@ the owner's named "go <id>"; every catalogue page takes a presenter's shape, def
 
 ## Consequences
 
-- Two new verbs, `record` and `gif`, in `make demo`; two new files under `evaluations/browser/` and one cut list per
+- Two new verbs, `record` and `gif`, in `make demo`; new files under `evaluations/browser/` and one cut list per
   recorded demo.
 - A recording spends two model answers and one title on sale-01's budget, and a take needs a warm model: the runbook
   is `make demo start <id>`, then `record`.

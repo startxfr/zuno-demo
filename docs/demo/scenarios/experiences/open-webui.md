@@ -28,14 +28,15 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use open-webui 5|15` selects this page. Each section below is printed after its action's Ansible file (`ansible/demos/open-webui/<action>.yml`) has run, and
-says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
+`make demo use open-webui 5|15` selects this page. Each section below is printed after its action's Ansible file
+(`ansible/demos/open-webui/<action>.yml`) has run, and says what is left to the presenter. No action of this demo
+installs or removes anything on the cluster.
 
 ### Status
 
 Nothing to do. The file reads the Application `zuno-open-webui-d1`, the Deployment `open-webui`, the route
-`open-webui.apps.demo333.startx.fr` and its two ExternalSecrets `open-webui-app` and `open-webui-oidc`. If one is missing or not Healthy, stop and tell the
-platform owner: this demo installs nothing.
+`open-webui.apps.demo333.startx.fr` and its two ExternalSecrets `open-webui-app` and `open-webui-oidc`. If one is
+missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
 

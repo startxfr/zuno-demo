@@ -21,10 +21,11 @@ a 40 to 60 second GIF in `~/.cache/zuno/demo/recordings/`; the GIF is sent to th
 
 1. **Recorder** (`evaluations/browser/record.mjs`, `walkthroughs/open-webui.mjs`, `record.sh`; new files only,
    `run.mjs` and `run.sh` untouched). Markers `login`, `home`, `q1-sent`, `q1-done`, `code-picked`, `q2-done`, `tools`
-   and `end`, a PNG per marker, `recordVideo` at 1440x900, and the deletion of the chat the take created, by its id,
-   after the last marker. The persona password is read only, never printed.
+   and `end`, `motion_from` in `markers.json` (`q1-sent`), a PNG per marker, `recordVideo` at 1440x900, and the deletion of the chat the take created, by its id,
+   after the last marker; a take that sent its first question but could not read the chat id fails and says a chat may
+   remain. The persona password is read only, never printed.
 2. **Assembler** (`platform/demo/gif.py`, `ansible/demos/open-webui/gif.yml`): validates the cut list against
-   `markers.json` (unknown marker, `to` before `from`, a moment under 2 s, a total outside 40 to 60 s, an unknown page
+   `markers.json` (unknown marker, `to` before `from`, a moment under 2 s, a total outside 40 to 60 s, a motion segment that starts before `motion_from`, an unknown page
    step time), computes `fit`, builds the ffmpeg argument list, runs it in the Playwright image, and prints duration, size
    and moments. Hard limit 8 MB.
 3. **Verbs and guards.** `make demo record <id>` and `make demo gif <id>`, in `presenter.py`, the Makefile verb list, help
@@ -36,8 +37,9 @@ a 40 to 60 second GIF in `~/.cache/zuno/demo/recordings/`; the GIF is sent to th
 5. **Offline chain.** Run `gif.py` on a synthetic recording: the GIF lasts 40 to 60 s, every moment lasts at least 2 s,
    and a cut list naming an unknown marker or step time is refused.
 6. **Live take** (demo333, with the owner's go in that session): `make demo start open-webui`, then
-   `make demo record open-webui`. Review every marker PNG for tokens, real names, earlier chat titles and other
-   tenants' data. Send the GIF to the owner with its size, duration, moments and the review result. Re-cut with
+   `make demo record open-webui`. Review every marker PNG and the assembled GIF: no token or API key, no
+   session cookie, no Keycloak form with a typed password, no real person's name or email, no chat content beyond the
+   scripted prompts and their answers, no earlier chat title, no data of another tenant. Send the GIF to the owner with its size, duration, moments and the review result. Re-cut with
    `make demo gif open-webui`.
 7. **Publication,** only after the owner's named "go open-webui": copy to `docs/assets/img/demo/open-webui.gif`, add one
    embed line at the end of the Introduction, commit alone. Write `docs/roadmap/evidence/wp-284-open-webui-gif-<date>.md`.
