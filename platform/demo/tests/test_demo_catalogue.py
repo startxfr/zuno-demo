@@ -56,6 +56,18 @@ class Repository(unittest.TestCase):
         self.assertIn('"phase": "Succeeded"', item)
         self.assertNotIn('"name":', item)
 
+    def test_a_demo_file_never_reads_a_sibling_through_demo_dir(self):
+        """In a workshop `demo_dir` is the workshop's directory: a scenario's file reaches its own directory through
+        `demo_unit.dir | default(demo_dir, true)` (agentic-ai failed its unifai-live-rag start and stop on 2026-11-15)."""
+        bad = []
+        for path in sorted((ROOT / "ansible/demos").glob("*/**/*.yml")):
+            if path.parts[-2] == "_lib" or "_lib" in path.parts:
+                continue
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if "demo_dir" in line.replace("default(demo_dir", "") and not line.lstrip().startswith("#"):
+                    bad.append(f"{path.relative_to(ROOT)}:{number}")
+        self.assertEqual(bad, [])
+
     def test_demo_verbs_come_from_the_makefile(self):
         verbs = consistency.demo_verbs(ROOT)
         self.assertIn("rehearse", verbs)

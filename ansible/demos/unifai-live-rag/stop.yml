@@ -3,7 +3,7 @@
 # else. Declared changing in demo.yml. The page section `## Presenter lifecycle` > `### Stop` says what the presenter
 # does after it.
 - name: "unifai-live-rag stop | delete the three named files, and nothing else"
-  ansible.builtin.include_tasks: "{{ demo_dir }}/_library.yml"
+  ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/_library.yml"
   vars:
     rag_args: ["delete", "travel-and-expense-policy.md", "on-call-rota-handbook.md", "questions.md"]
 
