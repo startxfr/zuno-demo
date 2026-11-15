@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-275, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
+| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1170,12 +1170,12 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-272 | [wp-272](work-packages/wp-272-retire-the-webinar-demo-tools.md) | 0616 | WP-270 | Done | none |
 | WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
 | WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
-| WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
+| WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
 | WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
 | WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
 | WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
-| WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Not started | planned 2026-11-17 evening |
+| WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Operator pending | agendas, chained actions and merged probes merged on 2026-11-15; live rehearsal of the six workshops by the demo333 session, with a named go for the three that hold a changing unit |
 | WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Not started | dated 2026-11-18: full rehearsal, a named go per demo with a changing unit |
 
 ### OKF stream phases
@@ -1322,6 +1322,7 @@ moving.
 
 ## Change log
 
+- 2026-11-15 — WP-275 Done: the six experience demos rehearsed live in both versions, 12 of 12 `RESULT: PASS` (evidence wp-275-experiences-rehearsals-2026-11-15.md). WP-280 Operator pending: the six workshops play by composition of their scenarios' steps (21 to 57 steps), with chained actions, merged probes and one guard per workshop.
 - 2026-11-15 — WP-275 to WP-279 Operator pending: the files of the 28 remaining scenarios are merged and reviewed against their pages (page-versus-file warnings down from 62 to 3, all three on workshops awaiting WP-280). By the owner's decision of the day, the world-model install and uninstall never create or remove the GPU node (they verify and print the owner's actions); a rehearsal never runs the Blender add-on install or removal. Live rehearsals are running layer by layer; experiences: dify, open-webui and kagent PASS in both versions.
 - 2026-11-15 — The owner's gate is passed: WP-273 and WP-274 Done (both pilots rehearsed live in both versions, evidence in docs/roadmap/evidence/), go for the rollout. The 28 other scenario pages and the 6 workshops land on devel in their `## Presenter lifecycle` form; `consistency.py` lists 62 page-versus-file warnings, the review list of WP-275 to WP-279.
 - 2026-11-15 — WP-272 Done: the WP-136 webinar tools are deleted (seven playbooks, the persona probe and its task file), the operations pages name the `make demo` lifecycle, gitops-day0-3 moves to its lifecycle form, operator checks read a CSV by name prefix. WP-273 and WP-274 Operator pending: the guardrails and unifai-live-rag pilots are automated as their pages say and were rehearsed live on demo333 in both versions, all four `RESULT: PASS` (unifai-live-rag 9:30 SKIPPED as a mutating optional row); the owner's gate reviews the evidence.

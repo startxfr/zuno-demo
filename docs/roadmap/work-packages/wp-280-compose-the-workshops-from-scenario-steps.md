@@ -1,6 +1,6 @@
 # WP-280: Compose the workshops from scenario steps
 
-- **State:** Not started
+- **State:** Operator pending
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-275](wp-275-move-the-experience-demos-to-the-lifecycle.md), [WP-276](wp-276-move-the-governance-demos-to-the-lifecycle.md), [WP-277](wp-277-move-the-rhoai-demos-to-the-lifecycle.md), [WP-278](wp-278-move-the-foundation-demos-to-the-lifecycle.md), [WP-279](wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md)
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
