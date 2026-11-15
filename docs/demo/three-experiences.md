@@ -193,7 +193,8 @@ The decisions this page rests on:
 
 - [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
   presentation layers over the one governed backend.
-- [ADR-0588](../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): Open WebUI.
+- [ADR-0588](../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): a general-purpose chat with
+  Open WebUI, on the user's own token, without RAG, uploads or web search.
 - [ADR-0589](../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
   and [ADR-0590](../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md):
   OpenClaw.
