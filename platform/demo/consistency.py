@@ -34,8 +34,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import catalogue  # noqa: E402
 import guard  # noqa: E402
+import probe_order  # noqa: E402
 import readonly  # noqa: E402
+import rehearse  # noqa: E402
 import workshop  # noqa: E402
+from runner import Unit  # noqa: E402
 
 import yaml  # noqa: E402
 
@@ -249,6 +252,23 @@ def demo_problems(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
         for command in catalogue.do_commands(step.do):
             if _norm(command) not in covered:
                 problems.append(f"{rel}: the Do command `{command}` is not covered (cmd, page_text or not_run)")
+    return problems + probe_problems(rel_dir, base)
+
+
+def probe_problems(rel_dir: str, base: pathlib.Path) -> List[str]:
+    """The golden-path probes a check or start file queues: each one known to the script, and none without the
+    probe it reads from (`trace` needs `unifai-tekos` in the same run, platform/demo/probe_order.py)."""
+    problems = []
+    known = probe_order.known()
+    for action in ("check", "start"):
+        queued, _ = rehearse.queued_checks([Unit(action, f"{action}.yml")], base)
+        for name in queued:
+            if name != probe_order.ALL and name not in known:
+                problems.append(f"{rel_dir}/{action}.yml: queues the golden-path probe `{name}`, which "
+                                "evaluations/golden_path_probe.py does not have")
+        for name, need in probe_order.missing_needs(queued):
+            problems.append(f"{rel_dir}/{action}.yml: queues the golden-path probe `{name}` without `{need}`, "
+                            f"whose run it reads: queue `{need}` in the same file")
     return problems
 
 

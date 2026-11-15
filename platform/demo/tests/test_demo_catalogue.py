@@ -85,6 +85,25 @@ class Negative(FixtureCopy):
     def test_fixture_is_clean(self):
         self.assertEqual(self.found(), [])
 
+    def queue(self, action, names):
+        (self.demo / f"{action}.yml").write_text(
+            "---\n- name: \"fixture | queue\"\n  ansible.builtin.include_tasks: \"{{ demo_lib }}/queue_probes.yml\"\n"
+            f"  vars:\n    queue_probes: {names!r}\n"
+            "- name: \"fixture | flush\"\n  ansible.builtin.include_tasks: \"{{ demo_lib }}/flush_checks.yml\"\n")
+
+    def test_trace_queued_without_the_run_it_reads(self):
+        self.queue("check", ["sovereignty", "trace"])
+        self.assertTrue(any("check.yml: queues the golden-path probe `trace` without `unifai-tekos`" in p
+                            for p in self.found()), self.found())
+        for fine in (["trace", "unifai-tekos"], ["all"]):
+            self.queue("check", fine)
+            self.assertFalse(any("golden-path probe" in p for p in self.found()), self.found())
+
+    def test_unknown_probe_queued(self):
+        self.queue("start", ["no-such-probe"])
+        self.assertTrue(any("start.yml: queues the golden-path probe `no-such-probe`, which" in p
+                            for p in self.found()), self.found())
+
     def test_removed_step_file(self):
         (self.demo / "steps/05-00.yml").unlink()
         self.assertTrue(any("steps/05-00.yml: missing" in p for p in self.found()))

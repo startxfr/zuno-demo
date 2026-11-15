@@ -5,16 +5,29 @@
 # `browser/run.sh` with ONLY=, both read-only and allowed during a freeze; then empty the queues.
 # The queue holds probe names; the name `all` runs the whole golden path (`golden_path_probe.py` with no `--only`, every
 # probe of its PROBES once, the list the script owns) and absorbs every other queued probe.
-- name: "demo | run the queued golden-path probes ({{ demo_queued_probes | join(',') }})"
+# The script runs `--only` in the order it is given and `trace` reads the run of `unifai-tekos`: the queue is put in
+# the script's own PROBES order first (platform/demo/probe_order.py reads it from the script), each name once.
+- name: "demo | put the queued golden-path probes in the script's order"
+  ansible.builtin.command:
+    argv: "{{ ['python3', zuno_repo_root ~ '/platform/demo/probe_order.py'] + demo_queued_probes }}"
+  register: _demo_probe_order
+  changed_when: false
+  when:
+    - demo_queued_probes | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
+
+- name: "demo | run the queued golden-path probes ({{ _demo_only }})"
   ansible.builtin.command:
     argv: >-
       {{ ['python3', zuno_repo_root ~ '/evaluations/golden_path_probe.py']
-         + ([] if 'all' in demo_queued_probes else ['--only', demo_queued_probes | join(',')]) }}
+         + ([] if _demo_only == 'all' else ['--only', _demo_only]) }}
     chdir: "{{ zuno_repo_root }}"
   register: _demo_golden
   changed_when: false
   failed_when: false
   timeout: 1800
+  vars:
+    _demo_only: "{{ _demo_probe_order.stdout | default('') | trim }}"
   when:
     - demo_queued_probes | length > 0
     - not (demo_unit.defer_flush | default(false) | bool)
@@ -42,10 +55,11 @@
     demo_queued_browser: []
   vars:
     _demo_nl: "\n"
+    _demo_only: "{{ _demo_probe_order.stdout | default('') | trim }}"
     _demo_golden_ran: "{{ _demo_golden is defined and _demo_golden.rc is defined }}"
     _demo_browser_ran: "{{ _demo_browser is defined and _demo_browser.rc is defined }}"
     _demo_golden_rows: >-
-      {{ [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'golden-path/' ~ ('all' if 'all' in demo_queued_probes else demo_queued_probes | join(',')),
+      {{ [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'golden-path/' ~ _demo_only,
            'category': 'golden-path', 'passed': _demo_golden.rc == 0,
            'detail': 'exit ' ~ _demo_golden.rc, 'duration_ms': 0}] if _demo_golden_ran else [] }}
     _demo_browser_rows: >-
@@ -54,7 +68,7 @@
            'detail': 'exit ' ~ _demo_browser.rc, 'duration_ms': 0}] if _demo_browser_ran else [] }}
     _demo_rows: "{{ _demo_golden_rows + _demo_browser_rows }}"
     _demo_cmds: >-
-      {{ ([{'cmd': 'python3 evaluations/golden_path_probe.py' ~ ('' if 'all' in demo_queued_probes else ' --only ' ~ (demo_queued_probes | join(','))),
+      {{ ([{'cmd': 'python3 evaluations/golden_path_probe.py' ~ ('' if _demo_only == 'all' else ' --only ' ~ _demo_only),
             'rc': _demo_golden.rc, 'output': (_demo_golden.stdout_lines | default([]))[-40:] | join(_demo_nl), 'truncated': false}]
           if _demo_golden_ran else [])
          + ([{'cmd': 'ONLY=' ~ (demo_queued_browser | join(',')) ~ ' evaluations/browser/run.sh',
