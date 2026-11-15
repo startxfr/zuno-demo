@@ -11,6 +11,13 @@
       - {"name": "maas-ui", "namespace": "redhat-ods-applications"}
       - {"name": "maas-consumer-portal", "namespace": "redhat-ods-applications"}
       - {"name": "kube-auth-proxy", "namespace": "openshift-ingress"}
+- name: "maas-portal-api-keys status | the MaaS conditions of the DSC and the Gateway the page names"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "datasciencecluster.opendatahub.io/v2", "kind": "DataScienceCluster", "name": "zuno-dsc", "condition": "ModelsAsAServiceReady"}
+      - {"api_version": "datasciencecluster.opendatahub.io/v2", "kind": "DataScienceCluster", "name": "zuno-dsc", "condition": "MaaSConsumerPortalAvailable"}
+      - {"api_version": "gateway.networking.k8s.io/v1", "kind": "Gateway", "name": "maas-default-gateway", "namespace": "openshift-ingress", "condition": "Programmed"}
 - name: "maas-portal-api-keys status | Routes"
   ansible.builtin.include_tasks: "{{ demo_lib }}/routes.yml"
   vars:

@@ -25,5 +25,16 @@
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "qwen35-9b", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "qwen35-9b-wesh", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "qwen36-27b-instruct", "namespace": "zuno-ai-run", "condition": "Ready"}
+- name: "genai-playground check | genai-pgvector (1/1) and the maas-controller pod, unhealthy on 2026-11-13"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "genai-pgvector", "namespace": "zuno-playground"}
+      - {"name": "maas-controller", "namespace": "redhat-ods-applications"}
+- name: "genai-playground check | the zuno-mcp-gateway entry of the ConfigMap gen-ai-aa-mcp-servers"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get configmap gen-ai-aa-mcp-servers -n redhat-ods-applications -o jsonpath='{.data}' | grep zuno-mcp-gateway"
 - name: "genai-playground check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

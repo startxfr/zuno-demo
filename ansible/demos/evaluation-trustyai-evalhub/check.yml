@@ -15,10 +15,20 @@
   vars:
     cr_ready:
       - {"api_version": "trustyai.opendatahub.io/v1", "kind": "EvalHub", "name": "zuno-evalhub", "namespace": "zuno-ai-run", "condition": "Ready"}
-      - {"api_version": "grafana.integreatly.org/v1beta1", "kind": "GrafanaDashboard", "name": "trustyai", "namespace": "zuno-monitoring", "exists": true}
+      - {"api_version": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "name": "zuno-evalhub-user", "namespace": "zuno-ai-run", "exists": true}
       - {"api_version": "batch/v1", "kind": "Job", "name": "garak-smoke", "namespace": "zuno-ai-run", "condition": "Complete"}
       - {"api_version": "batch/v1", "kind": "Job", "name": "garak-security", "namespace": "zuno-ai-run", "condition": "Complete"}
       - {"api_version": "batch/v1", "kind": "Job", "name": "ragas-eval", "namespace": "zuno-ai-run", "condition": "Complete"}
       - {"api_version": "batch/v1", "kind": "Job", "name": "zuno-acceptance-gate-tekos", "namespace": "zuno-ai-run", "condition": "Complete"}
+- name: "evaluation-trustyai-evalhub check | the EvalHub Route (zuno-evalhub-zuno-ai-run.<cluster domain>) is admitted"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/routes.yml"
+  vars:
+    routes:
+      - {"namespace": "zuno-ai-run", "name": "zuno-evalhub"}
+- name: "evaluation-trustyai-evalhub check | no LMEvalJob: they are off on RHOAI 3.6 EA (the read fails if the CRD is gone)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get lmevaljobs -A"
 - name: "evaluation-trustyai-evalhub check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

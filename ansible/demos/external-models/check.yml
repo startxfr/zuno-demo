@@ -18,6 +18,10 @@
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-120b-ovhcloud-ai-gateway", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSAuthPolicy", "name": "gpt-oss-120b-ovhcloud-entitlement", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "kuadrant.io/v1alpha1", "kind": "TokenRateLimitPolicy", "name": "maas-trlp-gpt-oss-120b-ovhcloud", "namespace": "zuno-ai-run", "condition": "Enforced"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "gpt-oss-20b", "namespace": "zuno-ai-run", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "qwen35-9b", "namespace": "zuno-ai-run", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "qwen35-9b-wesh", "namespace": "zuno-ai-run", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "qwen36-27b-instruct", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "external-secrets.io/v1beta1", "kind": "ExternalSecret", "name": "llm-provider-mistral-maas", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "external-secrets.io/v1beta1", "kind": "ExternalSecret", "name": "llm-provider-ovhcloud-maas", "namespace": "zuno-ai-run", "condition": "Ready"}
 - name: "external-models check | report"

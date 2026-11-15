@@ -10,5 +10,17 @@
     cr_ready:
       - {"api_version": "aihub.opendatahub.io/v1alpha1", "kind": "Catalog", "name": "catalog", "namespace": "rhoai-model-registries", "condition": "Available"}
       - {"api_version": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "name": "zuno-portal-dashboard", "namespace": "redhat-ods-applications", "parents": "Accepted"}
+- name: "model-catalog-registry check | the catalog ConfigMaps and RoleBinding exist"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "v1", "kind": "ConfigMap", "name": "default-catalog-sources", "namespace": "rhoai-model-registries", "exists": true}
+      - {"api_version": "v1", "kind": "ConfigMap", "name": "model-catalog-sources", "namespace": "rhoai-model-registries", "exists": true}
+      - {"api_version": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "name": "model-catalog-authenticated", "namespace": "rhoai-model-registries", "exists": true}
+- name: "model-catalog-registry check | the catalog Route model-catalog-https is admitted"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/routes.yml"
+  vars:
+    routes:
+      - {"namespace": "rhoai-model-registries", "name": "model-catalog-https"}
 - name: "model-catalog-registry check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

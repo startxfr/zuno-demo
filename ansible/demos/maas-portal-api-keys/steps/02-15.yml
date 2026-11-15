@@ -7,3 +7,6 @@
   vars:
     run_reads:
       - "curl -s -o /dev/null -w '%{http_code}\\n' $MAAS/v1/models"
+    not_run:
+      - page_text: "-H \"Authorization: Bearer $MAAS_API_KEY\""
+        reason: "it needs the presenter's own API key, created live in the MaaS portal at row 1:00"

@@ -8,3 +8,5 @@
   vars:
     run_reads:
       - "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer $(oc whoami -t)\" $MAAS/gpt-oss-20b/v1/models"
+      - cmd: "curl -s -o /dev/null -w '%{http_code}\\n' -H \"Authorization: Bearer $(oc whoami -t)\" $MAAS/mistral-large/v1/models"
+        page_text: "$MAAS/mistral-large/v1/models"

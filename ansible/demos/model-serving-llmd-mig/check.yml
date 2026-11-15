@@ -18,5 +18,10 @@
       - {"api_version": "infrastructure.opendatahub.io/v1", "kind": "HardwareProfile", "name": "mig-1g-24gb", "namespace": "redhat-ods-applications", "exists": true}
       - {"api_version": "infrastructure.opendatahub.io/v1", "kind": "HardwareProfile", "name": "mig-2g-48gb", "namespace": "redhat-ods-applications", "exists": true}
       - {"api_version": "keda.sh/v1alpha1", "kind": "ScaledObject", "name": "gpt-oss-20b-kserve-keda", "namespace": "zuno-ai-run", "condition": "Ready"}
+- name: "model-serving-llmd-mig check | look for a wedged rollout (DESIRED 1, CURRENT 0: a rollout the quota refused; shown, not failed)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get rs -n zuno-ai-run | grep -e kserve -e predictor"
 - name: "model-serving-llmd-mig check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"
