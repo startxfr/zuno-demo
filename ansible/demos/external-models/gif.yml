@@ -1,0 +1,22 @@
+---
+# external-models: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record external-models` captures the 5-minute version as a real terminal session and checks it as text;
+# `make demo record external-models render` replays it in xterm.js and films it, then cuts it with this list. The GIF
+# stays in ~/.cache/zuno/demo/recordings/ until the owner's "go external-models".
+# Markers written by the replay: start, then per row with a command <MM-SS>-typed and <MM-SS>-done, then end. Row
+# 3:00 is an editor on provider-routing.yaml: no command, no marker, not in the GIF. Row 2:00 is cut in two (the
+# question typed, then the answer) so that three rows reach 40 s without a long frozen screen. Planned before the
+# first take from the typing pace of the vault-pki take (about 0.05 s a character): check the total and the longest
+# still after it.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: three read-only `oc get` commands, names, owners and
+  states only, no Secret value; row 3:00 (an editor on provider-routing.yaml) is not filmed
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 00-00-done, fit: 6, hold: 5, step: "0:00", caption: "0:00  Two SaaS models, declared like any platform object"}
+  - {from: 00-00-done, to: 01-00-done, fit: 6, hold: 5, step: "1:00", caption: "1:00  Published on the same gateway as our own models"}
+  - {from: 01-00-done, to: 02-00-typed, fit: 10, hold: 3, step: "2:00", caption: "2:00  Who may call a SaaS model?"}
+  - {from: 02-00-typed, to: 02-00-done, fit: 2, hold: 3, step: "2:00", caption: "2:00  One caller only: the platform's router"}
+  - {still: end, hold: 5, step: "4:15", caption: "No data to a SaaS model without the classification check"}
