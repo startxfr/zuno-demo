@@ -1,6 +1,6 @@
 # WP-280: Compose the workshops from scenario steps
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-275](wp-275-move-the-experience-demos-to-the-lifecycle.md), [WP-276](wp-276-move-the-governance-demos-to-the-lifecycle.md), [WP-277](wp-277-move-the-rhoai-demos-to-the-lifecycle.md), [WP-278](wp-278-move-the-foundation-demos-to-the-lifecycle.md), [WP-279](wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md)
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
@@ -40,3 +40,12 @@ scenarios and their steps flattened in agenda order.
 
 - The catalogue test passes for the six agendas.
 - Each workshop has a rehearsal report ending with `RESULT: PASS`, or failures its page explains.
+
+## Result of the rehearsals (2026-11-15)
+
+Rehearsals by zuno-demo-reorg-demo333, with the owner's named go for the three workshops that hold a changing unit.
+The six workshops passed, 6 of 6 `RESULT: PASS` ([evidence](../evidence/wp-280-workshops-rehearsals-2026-11-15.md)).
+`agentic-ai` failed its first run: the start and stop files of `unifai-live-rag` reached their helper file through
+`demo_dir`, which is the workshop's directory inside a workshop. Both units failed before touching the cluster. Fixed
+by b2dd53c1, with a catalogue test that refuses the old form; the replay passed and left consultant-01's library empty.
+`five-experiences` skips the Blender add-on install and removal, as the scenario does.
