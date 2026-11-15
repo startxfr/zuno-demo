@@ -68,7 +68,8 @@ async function load(id) {
 // motion_from (one of them: no motion segment of the cut starts before it, so a sign-in is never shown as motion),
 // changes (the settings the take may change, normally []), url(domain) (the page it starts from), enter(ctx),
 // owned(ctx) -> [{kind, id}], run(ctx), cleanup(ctx) -> true | null (throws when something may remain), scout(ctx);
-// optionally prompts {time: text} and page (the demo page, from the repository root).
+// optionally prompts {time: text}, page (the demo page, from the repository root) and sends (a RegExp: the requests
+// that send a message or create something, refused in a scout unless they are a GET).
 export function shapeProblems(walk) {
   const problems = [];
   if (typeof walk.persona !== "string" || !walk.persona) problems.push("`persona` must be a persona name");
@@ -83,6 +84,7 @@ export function shapeProblems(walk) {
   if (typeof walk.url !== "function") problems.push("`url(domain)` is missing");
   for (const phase of ["enter", "owned", "run", "cleanup"]) if (typeof walk[phase] !== "function") problems.push(`\`${phase}(ctx)\` is missing`);
   if (typeof walk.scout !== "function") problems.push("`scout(ctx)` is missing: a walkthrough is scouted before its first take");
+  if (walk.sends !== undefined && !(walk.sends instanceof RegExp)) problems.push("`sends` must be a regular expression");
   if (!Array.isArray(walk.changes) || walk.changes.some((c) => typeof c !== "string")) problems.push("`changes` must list the settings the take may change ([] for none)");
   return problems;
 }
@@ -252,7 +254,8 @@ if (process.env.RECORD_SCOUT === "1") {
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
   // A scout never sends a chat message: the calls that would are refused before they leave the browser.
   const refused = [];
-  await page.route(/\/api\/(chat\/completions|chat\/completed|v1\/chats\/new|v1\/chats\/[^/]+$|v1\/tasks\/)/, (route) => {
+  // Which calls those are is the application's own: a walkthrough names them in `sends` (Open WebUI's by default).
+  await page.route(walk.sends || /\/api\/(chat\/completions|chat\/completed|v1\/chats\/new|v1\/chats\/[^/]+$|v1\/tasks\/)/, (route) => {
     if (route.request().method() === "GET") return route.continue();
     refused.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
     return route.abort();

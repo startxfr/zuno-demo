@@ -157,3 +157,26 @@ export async function waitUntil(page, { what, done, failed = async () => "", tim
   }
   throw new Error(`${what} did not finish within ${Math.round(timeoutMs / 1000)} s`);
 }
+
+// The lines on screen now that were not in `before`, once the screen has changed and then stayed the same for
+// `quietMs` with none of the `busy` selectors visible: an answer that has finished, for an application whose API does
+// not say so. Lines equal to one of `ignore` (the prompt just typed) do not count as an answer.
+export async function settled(page, { what, before, ignore = [], busy = [], quietMs = 6000, timeoutMs = 180000 }) {
+  const old = new Set(before.split("\n").map((l) => l.trim()));
+  const skip = new Set(ignore.map((l) => l.trim()));
+  let last = null;
+  let stableSince = Date.now();
+  return waitUntil(page, {
+    what, timeoutMs,
+    done: async () => {
+      const text = await page.locator("body").innerText();
+      if (text !== last) { last = text; stableSince = Date.now(); return undefined; }
+      const fresh = [...new Set(text.split("\n").map((l) => l.trim()).filter((l) => l && !old.has(l) && !skip.has(l)))];
+      if (!fresh.length) return undefined;
+      for (const selector of busy) {
+        if (await page.locator(selector).first().isVisible().catch(() => false)) { stableSince = Date.now(); return undefined; }
+      }
+      return Date.now() - stableSince >= quietMs ? fresh : undefined;
+    },
+  });
+}

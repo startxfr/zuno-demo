@@ -1,0 +1,23 @@
+---
+# kagent: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE the first
+# take: tune it with `make demo gif kagent` once a take exists.
+# `make demo record kagent` takes the 5-minute version as ai-ops-01 (evaluations/browser/walkthroughs/kagent.mjs).
+# Markers written by the walkthrough, in order: login, agents, agent, q1-sent, q1-done, q2-sent, q2-done, end.
+# The two answers are live model answers: their wording and the pod count change, so no caption quotes them, and the
+# motion moments use `fit`. Review q2-done.png before any cut: it must show a refusal and no Secret data.
+# Rows 3:30 and 4:15 are words: the close is a caption on the last screen.
+record_notice: >-
+  a recorded browser session as ai-ops-01 on kagent: 2 real turns of the agent zuno-sre (model and cluster-read tool
+  calls) on ai-ops-01's budget, the second one asking for a Secret, as the page's 2:30 row does; the chat session it
+  creates is deleted at the end, and the take fails if kagent's sessions differ before and after; traces, audit
+  entries and metrics of the two turns remain, as for any use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account"}
+  - {still: agents, hold: 3, caption: "kagent: agents are Kubernetes resources"}
+  - {still: agent, hold: 5, step: "0:00", caption: "0:00  One agent, zuno-sre, with five read-only tools"}
+  - {from: q1-sent, to: q1-done, fit: 10, hold: 4, step: "0:45", caption: "0:45  It reads the cluster through the tool gateway"}
+  - {from: q2-sent, to: q2-done, fit: 8, hold: 5, step: "2:30", caption: "2:30  Asked for a Secret"}
+  - {still: end, hold: 5, step: "4:15", caption: "It never sees a secret and cannot change anything"}
