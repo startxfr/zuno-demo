@@ -95,3 +95,65 @@ export async function wordsOnScreen(page, words) {
   for (const word of words) found[word.source] = await page.getByText(word).first().isVisible().catch(() => false);
   return found;
 }
+
+// The elements on screen that carry a role or are a control (button, link, input), inside `scope` (a selector, the
+// whole page by default): tag, id, role, aria-* and data-state attributes, the first classes, 60 characters of text.
+// What scout() dumps so a selector is written from the real element, not from a screenshot.
+export async function describe(page, scope = "body", limit = 80) {
+  return page.evaluate(([scope, limit]) => {
+    const root = document.querySelector(scope);
+    if (!root) return [];
+    return [...root.querySelectorAll("[role], button, a[href], input, textarea, select")].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 1 && r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+    }).slice(0, limit).map((el) => {
+      const attrs = {};
+      for (const a of el.attributes) if (a.name.startsWith("aria-") || a.name === "data-state" || a.name === "type") attrs[a.name] = a.value.slice(0, 80);
+      return { tag: el.tagName.toLowerCase(), id: el.id || "", role: el.getAttribute("role") || "", attrs,
+               classes: [...el.classList].slice(0, 4), text: (el.innerText || el.value || "").trim().split("\n")[0].slice(0, 60) };
+    });
+  }, [scope, limit]);
+}
+
+// Click, unless the target is a control that changes a setting: a switch, a checkbox, a radio button, or anything
+// inside one. A walkthrough that must change one lists it in its exported `changes` and passes that name here; the
+// take's guard shows the list. Everything a walkthrough clicks goes through this.
+export async function click(locator, { change = "", changes = [], timeout = 15000 } = {}) {
+  const setting = await locator.evaluate((el) => {
+    const hit = el.closest("[role='switch'], [role='checkbox'], [role='radio'], input[type='checkbox'], input[type='radio']")
+      || el.querySelector("[role='switch'], [role='checkbox'], [role='radio'], input[type='checkbox'], input[type='radio']");
+    return hit ? (hit.getAttribute("role") || hit.getAttribute("type") || "control") : "";
+  }, undefined, { timeout });
+  if (setting && !(change && changes.includes(change))) {
+    throw new Error(`refused to click a ${setting}: a take never changes the persona's settings (not declared in \`changes\`)`);
+  }
+  await locator.click({ timeout });
+}
+
+// The error messages on screen now: error toasts and alerts, as text. A model refusal (HTTP 429, a quota, an error
+// bubble) shows here long before any timeout.
+export async function errorsOnScreen(page) {
+  return page.evaluate(() => {
+    const seen = [];
+    for (const el of document.querySelectorAll("[data-sonner-toast][data-type='error'], [role='alert'], .toast-error")) {
+      const r = el.getBoundingClientRect();
+      const text = (el.innerText || "").trim().replace(/\s+/g, " ");
+      if (r.width > 1 && r.height > 1 && text && /\b(429|rate.?limit|quota|too many requests|exceeded|denied|refused|unauthori[sz]ed|forbidden|failed|error)\b/i.test(text)) seen.push(text.slice(0, 200));
+    }
+    return seen;
+  });
+}
+
+// Poll until done() returns something other than undefined, and fail AT ONCE when failed() returns a message or an
+// error is on screen, instead of waiting out the timeout: a refused model call must not cost three minutes.
+export async function waitUntil(page, { what, done, failed = async () => "", timeoutMs = 180000, everyMs = 500 }) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = await done();
+    if (value !== undefined) return value;
+    const why = (await failed()) || (await errorsOnScreen(page))[0] || "";
+    if (why) throw new Error(`${what} was refused or failed: ${why}`);
+    await page.waitForTimeout(everyMs);
+  }
+  throw new Error(`${what} did not finish within ${Math.round(timeoutMs / 1000)} s`);
+}

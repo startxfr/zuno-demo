@@ -6,8 +6,16 @@
 // (the chat the take created is deleted, by its id), closes the context and leaves in OUT:
 //
 //   recording.webm   the whole take, never published
-//   markers.json     {demo, persona, viewport, started, motion_from, markers: [{name, t, png}], chat_deleted, status,
-//                    detail}; motion_from: the first marker a motion segment of the cut may start at
+//   markers.json     {demo, persona, viewport, started, motion_from, markers: [{name, t, png}], created, cleaned,
+//                    owned, status, detail}
+//                    motion_from: the first marker a motion segment of the cut may start at
+//                    created: [{kind, id}] what the take created; cleaned: true (all deleted), false (something may
+//                    remain), null (nothing was created)
+//                    owned: {before, after, same} what the persona owns (ids read in its own session after the
+//                    sign-in and after the cleanup); a difference fails the take
+//
+// A walkthrough plays in phases: enter(ctx) signs in and reaches the first screen; owned(ctx) lists what the persona
+// owns; run(ctx) plays the rows; cleanup(ctx) deletes what run created; then owned(ctx) again.
 //   <marker>.png     one per marker reached (and failed.png when the walkthrough stopped)
 //
 // This is not the browser check (run.mjs, WP-243, untouched): it carries its own copy of the Keycloak helper.
@@ -20,11 +28,12 @@
 // RECORD_SCOUT=1 (record.sh <id> [OUT] --scout) plays the walkthrough's scout(ctx) instead: it signs in, reaches the
 // first screen and opens the menus the walkthrough will use, WITHOUT sending a prompt, so a selector is checked for
 // the price of a sign-in. No video, no chat, no model call: every request that would send a chat message is refused
-// and fails the scout. It leaves scout.json ({demo, persona, started, steps: [{step, ok, selector, png, text, ...}],
-// status, detail}) and one scout-<step>.png per step; last line `SCOUT: done` (exit 0) or `SCOUT: failed <steps>`
+// and fails the scout. It leaves scout.json ({demo, persona, started, when, walkthrough_sha256, changes, steps:
+// [{step, ok, selector, png, text, ...}], status "done"|"fail", detail}) and one scout-<step>.png per step; last line `SCOUT: done` (exit 0) or `SCOUT: failed <steps>`
 // (exit 1).
 // Exit code: 0 every marker reached and the cleanup done, 1 the walkthrough or the cleanup failed, 2 usage/environment.
 // The last line printed is `RESULT: PASS` or `RESULT: FAIL <detail>`.
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,8 +58,9 @@ async function load(id) {
 
 // What every walkthrough exports: persona, viewport {width, height}, markers (the names it marks, in order),
 // motion_from (one of them: no motion segment of the cut starts before it, so a sign-in is never shown as motion),
-// url(domain) (the page it starts from), run(ctx); optionally prompts {time: text}, page (the demo page, from the
-// repository root) and cleanup(ctx) -> {chat_deleted}.
+// changes (the settings the take may change, normally []), url(domain) (the page it starts from), enter(ctx),
+// owned(ctx) -> [{kind, id}], run(ctx), cleanup(ctx) -> true | null (throws when something may remain), scout(ctx);
+// optionally prompts {time: text} and page (the demo page, from the repository root).
 export function shapeProblems(walk) {
   const problems = [];
   if (typeof walk.persona !== "string" || !walk.persona) problems.push("`persona` must be a persona name");
@@ -63,9 +73,9 @@ export function shapeProblems(walk) {
   }
   if (!Array.isArray(walk.markers) || !walk.markers.includes(walk.motion_from)) problems.push("`motion_from` must be one of the markers");
   if (typeof walk.url !== "function") problems.push("`url(domain)` is missing");
-  if (typeof walk.run !== "function") problems.push("`run(ctx)` is missing");
-  if (walk.cleanup !== undefined && typeof walk.cleanup !== "function") problems.push("`cleanup` must be a function");
-  if (walk.scout !== undefined && typeof walk.scout !== "function") problems.push("`scout` must be a function");
+  for (const phase of ["enter", "owned", "run", "cleanup"]) if (typeof walk[phase] !== "function") problems.push(`\`${phase}(ctx)\` is missing`);
+  if (typeof walk.scout !== "function") problems.push("`scout(ctx)` is missing: a walkthrough is scouted before its first take");
+  if (!Array.isArray(walk.changes) || walk.changes.some((c) => typeof c !== "string")) problems.push("`changes` must list the settings the take may change ([] for none)");
   return problems;
 }
 
@@ -80,6 +90,21 @@ export function promptProblems(walk, pageText) {
   return problems;
 }
 
+// The identity of a walkthrough's code, computable without node (platform/demo/presenter.py computes the same): the
+// sha256 over, for the shared helpers then the walkthrough, in that order: the repository-relative path as UTF-8, a 0
+// byte, the file's bytes, a 0 byte. scout.json carries it, so a take can be refused when the code changed since its
+// last good scout.
+function walkthroughHash(id) {
+  const hash = crypto.createHash("sha256");
+  for (const name of ["_helpers.mjs", `${id}.mjs`]) {
+    hash.update(Buffer.from(`evaluations/browser/walkthroughs/${name}`, "utf8"));
+    hash.update(Buffer.from([0]));
+    hash.update(fs.readFileSync(path.join(here, "walkthroughs", name)));
+    hash.update(Buffer.from([0]));
+  }
+  return hash.digest("hex");
+}
+
 if (process.argv[2] === "--check") {
   const walk = await load(process.argv[3]);
   const problems = [];
@@ -89,7 +114,14 @@ if (process.argv[2] === "--check") {
     else problems.push(...promptProblems(walk, fs.readFileSync(file, "utf8")));
   }
   for (const problem of problems) console.error(problem);
-  console.log(`${process.argv[3]}: persona ${walk.persona}, ${walk.viewport.width}x${walk.viewport.height}, markers ${walk.markers.join(", ")}; motion from ${walk.motion_from}`);
+  const summary = { demo: process.argv[3], persona: walk.persona, viewport: walk.viewport, markers: walk.markers,
+                    motion_from: walk.motion_from, changes: walk.changes, walkthrough_sha256: walkthroughHash(process.argv[3]) };
+  if (process.argv.includes("--json")) console.log(JSON.stringify(summary));
+  else {
+    console.log(`${summary.demo}: persona ${walk.persona}, ${walk.viewport.width}x${walk.viewport.height}, markers ${walk.markers.join(", ")}; motion from ${walk.motion_from}`);
+    console.log(`changes: ${walk.changes.length ? walk.changes.join(", ") : "none"}`);
+    console.log(`walkthrough_sha256: ${summary.walkthrough_sha256}`);
+  }
   process.exit(problems.length ? 1 : 0);
 }
 
@@ -111,9 +143,8 @@ async function keycloak(page, username) {
 const { chromium } = await import("playwright");
 
 if (process.env.RECORD_SCOUT === "1") {
-  if (!walk.scout) usage(`walkthrough ${id} has no scout()`);
   const report = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
-                   steps: [], status: "fail", detail: "" };
+                   walkthrough_sha256: walkthroughHash(id), changes: walk.changes, when: "", steps: [], status: "fail", detail: "" };
   const browser = await chromium.launch();
   const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport });
   const page = await context.newPage();
@@ -144,7 +175,12 @@ if (process.env.RECORD_SCOUT === "1") {
   const ctx = { page, domain, log, step, state: { scout: true }, mark: async () => {},
                 keycloak: (username) => keycloak(page, username), base: process.env.RECORD_BASE_URL || walk.url(domain) };
   try {
-    await walk.scout(ctx);
+    // The same first two phases as a take: the sign-in, then what the persona owns (its count is all a scout keeps).
+    const entered = await step("enter", async () => { await walk.enter(ctx); return {}; });
+    if (entered.ok) {
+      await step("owned", async () => ({ count: (await walk.owned(ctx)).length }));
+      await walk.scout(ctx);
+    }
   } catch (e) {
     report.steps.push({ step: "scout", ok: false, png: null, error: String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300) });
   }
@@ -153,6 +189,7 @@ if (process.env.RECORD_SCOUT === "1") {
   const bad = report.steps.filter((s) => !s.ok).map((s) => s.step);
   if (refused.length) bad.push(`a chat message was about to be sent (${refused.join(", ")})`);
   report.refused_requests = refused;
+  report.when = new Date().toISOString();
   report.status = bad.length ? "fail" : "done";
   report.detail = bad.length ? `failed: ${bad.join(", ")}` : `${report.steps.length} steps`;
   fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify(report, null, 2) + "\n");
@@ -161,7 +198,8 @@ if (process.env.RECORD_SCOUT === "1") {
 }
 
 const record = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
-                 motion_from: walk.motion_from, markers: [], chat_deleted: false, status: "fail", detail: "" };
+                 motion_from: walk.motion_from, markers: [], created: [], cleaned: null,
+                 owned: { before: null, after: null, same: null }, status: "fail", detail: "" };
 const browser = await chromium.launch();
 const context = await browser.newContext({
   ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport,
@@ -180,11 +218,16 @@ async function mark(name) {
   log(`marker ${name}`);
 }
 
-const state = {};
+const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
+const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
+let ownedBefore = null;
 const ctx = { page, domain, mark, log, state, keycloak: (username) => keycloak(page, username),
               base: process.env.RECORD_BASE_URL || walk.url(domain) };
 const failures = [];
 try {
+  await walk.enter(ctx);
+  ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
+  record.owned.before = ownedBefore.length;
   await walk.run(ctx);
   const missing = walk.markers.slice(record.markers.length);
   if (missing.length) throw new Error(`markers not reached: ${missing.join(", ")}`);
@@ -194,10 +237,29 @@ try {
 }
 // Pass or fail, what the take created is removed: a failed take must not leave its chat behind either.
 try {
-  const cleaned = walk.cleanup ? await walk.cleanup(ctx) : {};
-  record.chat_deleted = Boolean(cleaned && cleaned.chat_deleted);
+  const cleaned = await walk.cleanup(ctx);
+  record.cleaned = record.created.length || cleaned === true ? cleaned === true : null;
 } catch (e) {
+  record.cleaned = false;
   failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
+}
+// The persona must own after the take exactly what it owned before it: ids only, never a title, and only in the log.
+if (ownedBefore) {
+  try {
+    const ownedAfter = await ownedIds();
+    record.owned.after = ownedAfter.length;
+    const added = ownedAfter.filter((o) => !ownedBefore.includes(o));
+    const removed = ownedBefore.filter((o) => !ownedAfter.includes(o));
+    record.owned.same = !added.length && !removed.length;
+    if (!record.owned.same) {
+      failures.push(`${walk.persona} does not own the same items after the take: ${added.length} more, ${removed.length} fewer (ids in the log)`);
+      for (const o of added) log(`owned after, not before: ${o}`);
+      for (const o of removed) log(`owned before, not after: ${o}`);
+    }
+  } catch (e) {
+    record.owned.same = false;
+    failures.push(`what ${walk.persona} owns could not be read after the take: ${String(e.message || e).split("\n")[0].slice(0, 200)}`);
+  }
 }
 const video = page.video();
 await context.close();

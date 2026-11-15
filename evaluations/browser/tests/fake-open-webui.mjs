@@ -3,13 +3,16 @@
 // API calls of a chat (read, delete). Like 0.12.5 with its sidebar collapsed, the page keeps a new-chat button on screen
 // and an earlier chat's link off screen; its toggle would bring that link on screen. A sign-in toast shows for 2.5 s.
 // The tools are as seen live on 2026-11-15: the Integrations button opens a role=menu with one row "Tools 1", which
-// opens a panel with the connection "Zuno tools" and its switch (on); the wrench "Available Tools" opens nothing. FAKE_REFUSE_DELETE=1 makes the delete answer 403; FAKE_NO_URL=1
+// opens a panel with the connection "Zuno tools" and its switch (on); the wrench "Available Tools" opens nothing. FAKE_REFUSE_DELETE=1 makes the delete answer 403;
+// FAKE_REFUSE_MODEL=1 makes every answer an error (429); FAKE_STRAY_CHAT=1 creates a second chat the take does not
+// know about, on the first send; the chat list always holds one earlier chat. FAKE_NO_URL=1
 // keeps the address bar on the home page after a send (the chat exists, its id is never shown). No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
 
 const port = Number(process.env.FAKE_PORT || 8099);
 let toggled = 0;            // clicks on the tool connection's switch: a take or a scout must leave it at 0
+const EARLIER = "00000000-0000-0000-0000-000000000000";   // sale-01's earlier chat: listed, never touched by a take
 const chats = new Map();   // id -> {title, messages: {id: {role, content, done, timestamp}}}
 
 const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/"><input id="username" name="u">
@@ -18,7 +21,7 @@ const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/
 const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
 <style>body{font:16px sans-serif;margin:24px} #chat-input{border:1px solid #888;min-height:40px;padding:8px} .menu{border:1px solid #888;padding:8px;margin:4px 0}</style>
 <button id="model-selector-model-button" aria-label="Selected model: Zuno">Zuno</button>
-<div id="models" class="menu" hidden><div id="pick-code">Zuno Code</div></div>
+<div id="models" class="menu" hidden><div id="pick-code" role="option">Zuno Code</div></div>
 <div id="sidebar" style="position:fixed;top:0;left:-400px;width:300px"><a href="/c/00000000-0000-0000-0000-000000000000">An earlier chat of sale-01</a></div>
 <button id="sidebar-new-chat-button">new chat</button>
 <button id="sidebar-toggle-button" onclick="document.getElementById('sidebar').style.left='0px'">toggle</button>
@@ -87,7 +90,13 @@ http.createServer((req, res) => {
       messages[crypto.randomUUID()] = { role: "user", content: text, done: true, timestamp: now };
       const answer = { role: "assistant", content: "", done: false, timestamp: now + 1 };
       messages[crypto.randomUUID()] = answer;
+      if (process.env.FAKE_STRAY_CHAT === "1" && !id) chats.set(crypto.randomUUID(), { title: "A chat the take did not create", messages: {} });
       setTimeout(() => {
+        if (process.env.FAKE_REFUSE_MODEL === "1") {
+          answer.error = { content: "429: token quota exceeded for group sales" };
+          answer.done = true;
+          return;
+        }
         answer.content = model === "Zuno Code" ? "Here:\n```python\ndef is_email(s):\n    return '@' in s\n```" : "I can help you with questions.";
         answer.done = true;
       }, 1500);
@@ -101,6 +110,10 @@ http.createServer((req, res) => {
   if (chat && req.method === "DELETE") {
     if (process.env.FAKE_REFUSE_DELETE === "1") return json(res, 403, { detail: "refused" });
     return json(res, 200, chats.delete(chat[1]));
+  }
+  if (url.pathname === "/api/v1/chats/" && req.method === "GET") {
+    const all = [{ id: EARLIER, title: "An earlier chat of sale-01" }, ...[...chats].map(([id, c]) => ({ id, title: c.title }))];
+    return json(res, 200, url.searchParams.get("page") === "1" ? all : []);
   }
   if (url.pathname === "/fake/toggled") { toggled += 1; return json(res, 200, {}); }
   if (url.pathname === "/fake/count") return json(res, 200, { chats: chats.size, toggled });
