@@ -9,6 +9,23 @@
 // - A take reads the persona's settings and never changes them: no switch, no checkbox, no settings form is clicked.
 // - Whatever a take creates, it deletes by id, and says so.
 
+// Evaluate in the page, for a READ only: when the page navigates under the call ("Execution context was destroyed",
+// seen on 2026-11-16 with a slow sign-in redirect under load), wait for the new page and read again. Never used for
+// a call that sends, creates or deletes: those run once.
+const NAVIGATED = /Execution context was destroyed|because of a navigation|Cannot find context with specified id/i;
+export async function read(target, fn, arg, tries = 4) {
+  const page = typeof target.page === "function" ? target.page() : target;   // a page, or a locator of one
+  for (let i = 1; ; i += 1) {
+    try {
+      return await target.evaluate(fn, arg);
+    } catch (e) {
+      if (i >= tries || !NAVIGATED.test(String(e && e.message ? e.message : e))) throw e;
+      await page.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(500);
+    }
+  }
+}
+
 // The first of these selectors that is on screen, or null; the locator carries the selector that matched.
 export async function firstVisible(page, selectors) {
   for (const selector of selectors) {
@@ -20,7 +37,7 @@ export async function firstVisible(page, selectors) {
 
 // True when an element matching the selector can really be seen: inside the viewport and not covered or slid away.
 export async function onScreen(page, selector) {
-  return page.evaluate((selector) => [...document.querySelectorAll(selector)].some((el) => {
+  return read(page, (selector) => [...document.querySelectorAll(selector)].some((el) => {
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return false;
     const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
@@ -30,10 +47,12 @@ export async function onScreen(page, selector) {
   }), selector);
 }
 
-// One call to the application's own API from the page, with the signed-in session: {status, body}. The session token
+// One call to the application's own API from the page, with the signed-in session: {status, body}. A GET is read again
+// when the page navigates under it; a call that changes something runs once. The session token
 // (read from localStorage under `tokenKey` when the application keeps one there) never leaves the browser.
 export async function pageApi(page, method, path, tokenKey = "token") {
-  return page.evaluate(async ([method, path, tokenKey]) => {
+  const run = method === "GET" ? (fn, arg) => read(page, fn, arg) : (fn, arg) => page.evaluate(fn, arg);   // only a GET is read again
+  return run(async ([method, path, tokenKey]) => {
     const token = (tokenKey && localStorage.getItem(tokenKey)) || "";
     const r = await fetch(path, { method, credentials: "include", headers: token ? { Authorization: `Bearer ${token}` } : {} });
     let body = null;
@@ -52,7 +71,7 @@ export async function newText(page, before) {
 // The buttons around an anchor (its nearest ancestor that holds at least three), then every other labelled button on
 // screen: what a selector can be built from.
 export async function buttons(page, anchor) {
-  return page.evaluate((anchor) => {
+  return read(page, (anchor) => {
     const describe = (b) => {
       const r = b.getBoundingClientRect();
       return { id: b.id || "", aria: b.getAttribute("aria-label") || "", title: b.getAttribute("title") || "",
@@ -69,7 +88,7 @@ export async function buttons(page, anchor) {
 
 // The switches on screen ([role=switch]) with their state and the text beside them: [{label, on}]. Read, never clicked.
 export async function switches(page) {
-  return page.evaluate(() => [...document.querySelectorAll("[role='switch']")].filter((sw) => {
+  return read(page, () => [...document.querySelectorAll("[role='switch']")].filter((sw) => {
     const r = sw.getBoundingClientRect();
     return r.width > 1 && r.height > 1;
   }).map((sw) => {
@@ -100,7 +119,7 @@ export async function wordsOnScreen(page, words) {
 // whole page by default): tag, id, role, aria-* and data-state attributes, the first classes, 60 characters of text.
 // What scout() dumps so a selector is written from the real element, not from a screenshot.
 export async function describe(page, scope = "body", limit = 80) {
-  return page.evaluate(([scope, limit]) => {
+  return read(page, ([scope, limit]) => {
     const root = document.querySelector(scope);
     if (!root) return [];
     return [...root.querySelectorAll("[role], button, a[href], input, textarea, select")].filter((el) => {
@@ -119,11 +138,11 @@ export async function describe(page, scope = "body", limit = 80) {
 // inside one. A walkthrough that must change one lists it in its exported `changes` and passes that name here; the
 // take's guard shows the list. Everything a walkthrough clicks goes through this.
 export async function click(locator, { change = "", changes = [], timeout = 15000 } = {}) {
-  const setting = await locator.evaluate((el) => {
+  const setting = await read(locator, (el) => {
     const hit = el.closest("[role='switch'], [role='checkbox'], [role='radio'], input[type='checkbox'], input[type='radio']")
       || el.querySelector("[role='switch'], [role='checkbox'], [role='radio'], input[type='checkbox'], input[type='radio']");
     return hit ? (hit.getAttribute("role") || hit.getAttribute("type") || "control") : "";
-  }, undefined, { timeout });
+  });
   if (setting && !(change && changes.includes(change))) {
     throw new Error(`refused to click a ${setting}: a take never changes the persona's settings (not declared in \`changes\`)`);
   }
@@ -133,7 +152,7 @@ export async function click(locator, { change = "", changes = [], timeout = 1500
 // The error messages on screen now: error toasts and alerts, as text. A model refusal (HTTP 429, a quota, an error
 // bubble) shows here long before any timeout.
 export async function errorsOnScreen(page) {
-  return page.evaluate(() => {
+  return read(page, () => {
     const seen = [];
     for (const el of document.querySelectorAll("[data-sonner-toast][data-type='error'], [role='alert'], .toast-error")) {
       const r = el.getBoundingClientRect();
@@ -356,7 +375,7 @@ export async function unifaiDisclosure(page, state = {}) {
   state.disclosure.shown = true;
   const ticked = await notice.locator("[role='checkbox'][aria-checked='true'], input[type='checkbox']:checked").count();
   if (ticked) throw new Error(`the "${unifai.DISCLOSURE}" notice has its checkbox ticked: a take never saves that preference`);
-  const keys = () => page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
+  const keys = () => read(page, () => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
   const writes = (r) => { if (!["GET", "HEAD", "OPTIONS"].includes(r.method())) state.disclosure.writes.push(`${r.method()} ${new URL(r.url()).pathname}`); };
   const before = await keys();
   page.on("request", writes);

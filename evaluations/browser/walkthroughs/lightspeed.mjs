@@ -19,7 +19,7 @@
 // NOT yet scouted, and the console plugin's source is not in this repository: EVERY selector and EVERY API path
 // below is a guess from the upstream plugin (openshift/lightspeed-console), marked `guess`. scout() reports each one,
 // and the plugin's own requests as the browser sees them; no take before a scout that passes.
-import { buttons, click, describe, firstVisible, newText, switches, waitUntil, wordsOnScreen } from "./_helpers.mjs";
+import { buttons, click, describe, firstVisible, newText, read, switches, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "consultant-02";
 export const page = "docs/demo/scenarios/experiences/lightspeed.md";
@@ -53,7 +53,8 @@ const ANSWER_TIMEOUT_MS = 180000;
 // One call to Lightspeed's API through the console's proxy, in the page, with the console's own CSRF token (cookie
 // `csrf-token`, header X-CSRFToken: the console refuses a write without it).
 async function ols(page, method, path) {
-  return page.evaluate(async ([method, url]) => {
+  const run = method === "GET" ? (fn, arg) => read(page, fn, arg) : (fn, arg) => page.evaluate(fn, arg);   // only a GET is read again
+  return run(async ([method, url]) => {
     const csrf = (document.cookie.split("; ").find((c) => c.startsWith("csrf-token=")) || "").slice("csrf-token=".length);
     const r = await fetch(url, { method, credentials: "include", headers: csrf ? { "X-CSRFToken": csrf } : {} });
     let body = null;
@@ -185,7 +186,7 @@ export async function scout({ page, step, state }) {
     // The shape only: field names, never a conversation's topic or content.
     return { path: `${OLS}/v1/conversations`, status: got.status, top_keys: got.body && !Array.isArray(got.body) ? Object.keys(got.body).slice(0, 12) : [],
              count: before, conversation_keys: list && list[0] ? Object.keys(list[0]).slice(0, 20) : [],
-             csrf_cookie: await page.evaluate(() => document.cookie.split("; ").some((c) => c.startsWith("csrf-token="))) };
+             csrf_cookie: await read(page, () => document.cookie.split("; ").some((c) => c.startsWith("csrf-token="))) };
   });
   await step("console", async () => ({ url: page.url().replace(/[?#].*/, ""), dialog_on_screen: await page.locator(DIALOG).first().isVisible().catch(() => false),
                                        dialog_text: (await page.locator(DIALOG).first().innerText().catch(() => "")).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 12),

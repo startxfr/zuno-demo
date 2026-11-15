@@ -17,7 +17,7 @@
 //
 // NOT yet scouted, and kagent's UI source is not in this repository: EVERY selector and EVERY API path below is a
 // guess from the upstream project, marked `guess`. scout() reports each one; no take before a scout that passes.
-import { buttons, click, describe, firstVisible, pageApi as api, settled, switches, wordsOnScreen } from "./_helpers.mjs";
+import { buttons, click, describe, firstVisible, pageApi as api, read, settled, switches, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "ai-ops-01";
 export const page = "docs/demo/scenarios/experiences/kagent.md";
@@ -138,7 +138,7 @@ export async function enter({ page, base, mark, keycloak, state }) {
     list.push({ method: r.method(), path: new URL(r.url()).pathname, type: (headers["content-type"] || "").split(";")[0], action: headers["next-action"] || "" });
   };
   const writes = keep(state.wizard.sent);
-  const keys = () => page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
+  const keys = () => read(page, () => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
   const wizard = () => page.getByText(WIZARD).first();
   const agent = () => page.getByText(AGENT_NAME).first();
   let quietSince = 0;
