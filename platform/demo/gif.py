@@ -7,17 +7,17 @@ A recording is a directory `~/.cache/zuno/demo/recordings/<id>-<YYYYmmdd-HHMMSS>
 list `ansible/demos/<id>/gif.yml` names the moments to keep:
 
     target_seconds: [40, 60]      # the GIF's total length, inclusive
-    width: 960                    # pixels; the height follows the recording's viewport
+    width: 960                    # pixels; the picture keeps the viewport ratio, a 56 px caption band goes under it
     fps: 10
     moments:
       - {still: login, hold: 2.5, caption: "Sign in with the company account"}
       - {from: q1-sent, to: q1-done, fit: 5, hold: 2.5, step: "0:45", caption: "0:45 An answer"}
 
 A `still` moment shows the marker's PNG for `hold` seconds. A motion moment plays the recording from one marker to
-the next: `fit: <seconds>` sets its playing time whatever the real span (speed = span / fit, kept within 1-16; a span
-shorter than `fit` plays at speed 1 and its last frame fills the rest), or a fixed `speed:`; `hold` then freezes the
-last frame. Every moment lasts at least 2 s. `step` must be a time of the page's
-5-minute table. Each moment carries a caption bar. When markers.json names `motion_from`, no motion moment may
+the next: `fit: <seconds>` sets its playing time whatever the real span (speed = span / fit, kept within 0.5-16, so a
+fast answer is slowed down at most to half speed and the moment is then simply shorter; `fit` never freezes a frame),
+or a fixed `speed:`; `hold` freezes the last frame. Every moment lasts at least 2 s. `step` must be a time of the
+page's 5-minute table. Each moment's caption is written in a black band under the picture, so it hides nothing. When markers.json names `motion_from`, no motion moment may
 start before that marker: the take holds the sign-in before it, which a public GIF never shows in motion.
 
 ffmpeg runs in the Playwright image by podman (the workstation has no ffmpeg). The GIF is written next to the
@@ -52,7 +52,8 @@ CAPTIONS = ".gif-captions"
 MIN_MOMENT = 2.0
 MAX_BYTES = 8 * 1024 * 1024
 AIM_BYTES = 5 * 1024 * 1024
-SPEED_RANGE = (1.0, 16.0)
+SPEED_RANGE = (0.5, 16.0)
+BAND = 56                   # pixels of the caption band under the picture
 FPS_RANGE = (5, 15)
 WIDTH_RANGE = (480, 1280)
 CAPTION_MAX = 70
@@ -77,7 +78,6 @@ class Moment:
     start: float = 0.0     # motion: recording time of `from`
     end: float = 0.0       # motion: recording time of `to`
     speed: float = 1.0
-    fit: float = 0.0       # motion: the playing time asked for (0 with a fixed `speed`)
     step: str = ""
 
     @property
@@ -85,16 +85,9 @@ class Moment:
         return self.end - self.start
 
     @property
-    def freeze(self) -> float:
-        """Seconds the last frame stays: the hold, plus what a span too short for its `fit` leaves (no slow motion)."""
-        if self.kind == "still":
-            return self.hold
-        return self.hold + max(0.0, self.fit - self.span / self.speed)
-
-    @property
     def seconds(self) -> float:
-        """Length in the GIF."""
-        return self.hold if self.kind == "still" else self.span / self.speed + self.freeze
+        """Length in the GIF: a still's hold, or a motion's span at its speed plus its hold (never padded by `fit`)."""
+        return self.hold if self.kind == "still" else self.span / self.speed + self.hold
 
     def label(self) -> str:
         if self.kind == "still":
@@ -115,6 +108,11 @@ class Plan:
     @property
     def seconds(self) -> float:
         return sum(m.seconds for m in self.moments)
+
+    @property
+    def out_height(self) -> int:
+        """The GIF's height: the picture plus the caption band under it."""
+        return self.height + BAND
 
 
 # --- inputs ------------------------------------------------------------------------------------------------------
@@ -290,7 +288,6 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
                 if fit is not None and fit <= 0:
                     reasons.append(f"{where}: `fit` must be positive")
                 elif fit is not None and moment.span > 0:
-                    moment.fit = fit
                     moment.speed = min(max(moment.span / fit, SPEED_RANGE[0]), SPEED_RANGE[1])
             else:
                 speed = _number(item["speed"], "speed", reasons, where)
@@ -329,8 +326,9 @@ def caption_files(p: Plan) -> Dict[int, str]:
 
 
 def _drawtext(path: str) -> str:
+    """The caption, centred in the band under the picture (never over it: the band is added by `pad`)."""
     return (f"drawtext=fontfile={FONT}:textfile={MOUNT}/{path}:fontsize=26:fontcolor=white:"
-            "box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y=h-text_h-28")
+            f"x=(w-text_w)/2:y=h-{BAND}+({BAND}-text_h)/2")
 
 
 def ffmpeg_argv(p: Plan, markers: dict, output: str) -> List[str]:
@@ -340,7 +338,7 @@ def ffmpeg_argv(p: Plan, markers: dict, output: str) -> List[str]:
            if isinstance(m, dict)}
     argv = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
     graph: List[str] = []
-    size = f"scale={p.width}:{p.height}:flags=lanczos,setsar=1"
+    size = f"scale={p.width}:{p.height}:flags=lanczos,setsar=1,pad={p.width}:{p.out_height}:0:0:color=black"
     # One input per moment, in order: a motion moment seeks into the recording (-ss/-t before -i), so no frame of
     # the whole take is ever buffered; a still loops its PNG for the hold.
     for number, m in enumerate(p.moments):
@@ -352,8 +350,8 @@ def ffmpeg_argv(p: Plan, markers: dict, output: str) -> List[str]:
         else:
             argv += ["-ss", f"{m.start:.3f}", "-t", f"{m.span:.3f}", "-i", f"{MOUNT}/recording.webm"]
             chain = f"[{number}:v]setpts=(PTS-STARTPTS)/{m.speed:.4f},fps={p.fps},{size}"
-            if m.freeze > 0:
-                chain += f",tpad=stop_mode=clone:stop_duration={m.freeze:.3f}"
+            if m.hold > 0:
+                chain += f",tpad=stop_mode=clone:stop_duration={m.hold:.3f}"
             graph.append(f"{chain},{text},format=rgb24[v{m.index}]")
     graph.append("".join(f"[v{m.index}]" for m in p.moments) + f"concat=n={len(p.moments)}:v=1:a=0,split[g1][g2]")
     graph.append("[g1]palettegen=stats_mode=diff[pal]")
@@ -395,7 +393,8 @@ class Built:
         lines = [f"GIF: {self.path}",
                  f"  {self.size / 1048576:.1f} MB (limit {MAX_BYTES // 1048576} MB, aim {AIM_BYTES // 1048576} MB), "
                  f"{self.seconds if self.seconds is None else round(self.seconds, 1)} s by ffprobe "
-                 f"({self.plan.seconds:.1f} s planned), {self.plan.width}x{self.plan.height}, {self.plan.fps} fps"]
+                 f"({self.plan.seconds:.1f} s planned), {self.plan.width}x{self.plan.out_height} "
+                 f"(picture {self.plan.width}x{self.plan.height} + caption band {BAND}), {self.plan.fps} fps"]
         for m in self.plan.moments:
             step = f" [{m.step}]" if m.step else ""
             lines.append(f"  {m.index}. {m.seconds:4.1f} s  {m.label()}{step}  \"{m.caption}\"")
@@ -433,7 +432,7 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
     built = Built(path, _duration(directory, output), path.stat().st_size, p)
     (directory / f"{demo_id}.gif.json").write_text(json.dumps({
         "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
-        "width": p.width, "height": p.height, "fps": p.fps,
+        "width": p.width, "height": p.out_height, "picture_height": p.height, "fps": p.fps,
         "moments": [{"caption": m.caption, "seconds": round(m.seconds, 2), "cut": m.label(), "step": m.step}
                     for m in p.moments]}, indent=2) + "\n", encoding="utf-8")
     problems = [x for x in (size_problem(path),) if x]

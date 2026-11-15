@@ -60,14 +60,19 @@ class CutList(unittest.TestCase):
         cut_list = gif.load_cut_list(gif.cut_list_path("open-webui"))
         times = gif.page_times("open-webui")
         self.assertEqual(times, TIMES)
+        # The first real take (2026-11-15, demo333): q1 answered in 2.96 s, q2 in 6.08 s.
+        real = markers(at={"login": 1.0, "home": 8.28, "q1-sent": 10.36, "q1-done": 13.32, "code-picked": 14.65,
+                           "q2-done": 20.73, "tools": 22.05, "end": 23.43})
+        self.assertAlmostEqual(gif.plan("open-webui", cut_list, real, times).seconds, 42.92, places=2)
         for q1, q2 in ((6, 12), (3, 4), (40, 120), (120, 200)):   # fast, very fast and very slow answers
             take = markers(at={"q1-done": 9.0 + q1, "code-picked": 12.0 + q1, "q2-done": 12.0 + q1 + q2,
                                "tools": 15.0 + q1 + q2, "end": 17.0 + q1 + q2})
             p = gif.plan("open-webui", cut_list, take, times)
             self.assertTrue(40 <= p.seconds <= 60, f"{q1}/{q2}: {p.seconds}")
             self.assertTrue(all(m.seconds >= 2 for m in p.moments))
-        self.assertEqual([m.marker or m.kind for m in p.moments], ["login", "home", "motion", "motion", "tools", "end"])
-        self.assertEqual((p.width, p.height, p.fps), (960, 600, 10))
+        self.assertEqual([m.marker or m.kind for m in p.moments],
+                         ["login", "home", "motion", "code-picked", "motion", "tools", "end"])
+        self.assertEqual((p.width, p.height, p.out_height, p.fps), (960, 600, 656, 10))
 
     def test_fit_sets_the_speed_within_1_and_16(self):
         p = gif.plan("open-webui", cut({"from": "q1-sent", "to": "q1-done", "fit": 3, "caption": "x"}), markers(), TIMES)
@@ -75,9 +80,12 @@ class CutList(unittest.TestCase):
         self.assertAlmostEqual(p.moments[0].seconds, 3.0)
         slow = gif.plan("open-webui", cut({"from": "q1-sent", "to": "q1-done", "fit": 10, "hold": 1, "caption": "x"}),
                         markers(), TIMES).moments[0]
-        self.assertEqual(slow.speed, 1.0)                    # never slow motion: the last frame fills the rest
-        self.assertAlmostEqual(slow.freeze, 5.0)
+        self.assertAlmostEqual(slow.speed, 0.6)              # a fast answer is slowed down to its fit...
         self.assertAlmostEqual(slow.seconds, 11.0)
+        floor = gif.plan("open-webui", cut({"from": "q1-sent", "to": "q1-done", "fit": 20, "hold": 1, "caption": "x"}),
+                         markers(), TIMES).moments[0]
+        self.assertEqual(floor.speed, 0.5)                   # ...never under half speed: the moment is then shorter,
+        self.assertAlmostEqual(floor.seconds, 6 / 0.5 + 1)   # and `fit` never freezes a frame
         fast = gif.plan("open-webui", cut({"from": "q1-sent", "to": "end", "fit": 1, "hold": 1, "caption": "x"}),
                         markers(), TIMES)
         self.assertEqual(fast.moments[0].speed, 16.0)
@@ -95,7 +103,8 @@ class CutList(unittest.TestCase):
         refused(self, cut({"from": "q1-done", "to": "q1-sent", "fit": 3, "caption": "x"}), markers(), "is not after")
         refused(self, cut({"still": "home", "hold": 1.5, "caption": "x"}), markers(), "at least 2 s")
         refused(self, cut({"from": "q1-sent", "to": "q1-done", "speed": 4, "caption": "x"}), markers(), "at least 2 s")
-        refused(self, cut({"from": "q1-sent", "to": "q1-done", "speed": 20, "caption": "x"}), markers(), "1 to 16")
+        refused(self, cut({"from": "q1-sent", "to": "q1-done", "speed": 20, "caption": "x"}), markers(), "0.5 to 16")
+        refused(self, cut({"from": "q1-sent", "to": "q1-done", "speed": 0.3, "caption": "x"}), markers(), "0.5 to 16")
         refused(self, cut({"from": "q1-sent", "to": "q1-done", "caption": "x"}), markers(), "`fit` or `speed`")
         refused(self, cut({"from": "q1-sent", "to": "q1-done", "fit": 3, "speed": 2, "caption": "x"}), markers(),
                 "`fit` or `speed`")
@@ -145,8 +154,8 @@ class Ffmpeg(unittest.TestCase):
 
     def test_one_input_per_moment_in_order(self):
         inputs = [self.argv[i + 1] for i, a in enumerate(self.argv) if a == "-i"]
-        self.assertEqual(inputs, ["/rec/login.png", "/rec/home.png", "/rec/recording.webm", "/rec/recording.webm",
-                                  "/rec/tools.png", "/rec/end.png"])
+        self.assertEqual(inputs, ["/rec/login.png", "/rec/home.png", "/rec/recording.webm", "/rec/code-picked.png",
+                                  "/rec/recording.webm", "/rec/tools.png", "/rec/end.png"])
         joined = " ".join(self.argv)
         self.assertIn("-ss 9.000 -t 6.000 -i /rec/recording.webm", joined)       # q1: seek, never buffer the take
         self.assertIn("-loop 1 -framerate 10 -t 3.000 -i /rec/login.png", joined)
@@ -155,10 +164,14 @@ class Ffmpeg(unittest.TestCase):
     def test_filter_graph(self):
         graph = self.argv[self.argv.index("-filter_complex") + 1]
         self.assertIn("scale=960:600:flags=lanczos", graph)
-        self.assertIn("tpad=stop_mode=clone:stop_duration=7.000", graph)          # hold 3 + 4 s left by fit 10
+        self.assertIn("pad=960:656:0:0:color=black", graph)                       # the caption band under the picture
+        self.assertIn("y=h-56+(56-text_h)/2", graph)                              # the caption sits in that band
+        self.assertNotIn("box=1", graph)                                          # never an overlay on the picture
+        self.assertIn("setpts=(PTS-STARTPTS)/1.0000,", graph)                     # q1: 6 s fit to 6 s
+        self.assertIn("tpad=stop_mode=clone:stop_duration=3.000", graph)          # the hold only
         self.assertIn("textfile=/rec/.gif-captions/01.txt", graph)
         self.assertIn(gif.FONT, graph)
-        self.assertIn("concat=n=6:v=1:a=0", graph)
+        self.assertIn("concat=n=7:v=1:a=0", graph)
         self.assertIn("palettegen=stats_mode=diff", graph)
         self.assertIn("paletteuse=dither=bayer", graph)
         self.assertNotIn("Zuno picks", graph)                                     # captions go through files
@@ -202,6 +215,7 @@ class Build(unittest.TestCase):
         summary = "\n".join(built.summary())
         self.assertIn("3.0 MB", summary)
         self.assertIn("48.0 s by ffprobe", summary)
+        self.assertIn("960x656 (picture 960x600 + caption band 56)", summary)
         self.assertTrue(json.loads((self.dir / "open-webui.gif.json").read_text())["moments"])
 
     def test_over_8_mb_is_an_error(self):
