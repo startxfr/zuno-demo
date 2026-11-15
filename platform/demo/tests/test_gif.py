@@ -342,7 +342,7 @@ class Verbs(unittest.TestCase):
             rc, _, err = self.run_main("record", "open-webui")
             self.assertEqual(rc, 2)
             self.assertIn("no scout of open-webui", err)
-            self.assertIn("record.sh open-webui --scout", err)
+            self.assertIn("run `make demo scout open-webui` first", err)
             self.scout(status="fail", stamp="20261116-080000")
             rc, _, err = self.run_main("record", "open-webui")
             self.assertIn("did not finish (status 'fail': the picker was not found)", err)
@@ -365,6 +365,64 @@ class Verbs(unittest.TestCase):
             self.assertIn("SCOUT GATE SKIPPED by RECORD_NO_SCOUT=open-webui", out)
             self.assertIn("controls the take may switch: unknown (no scout)", out)
             self.assertIn("DEMO_CONFIRM=open-webui", err)                    # the confirmation still comes
+
+    def fake_scout_recorder(self, status="done", rc=0):
+        """A record.sh that writes the scout.json of a contract scout run into its 2nd argument."""
+        script = self.tools / "record.sh"
+        script.write_text("#!/bin/sh\n"
+                          f"[ \"$3\" = --scout ] || exit 9\n"
+                          "echo \"recording: $2\"\n"
+                          "cat > \"$2/scout.json\" <<'JSON'\n"
+                          + json.dumps({"demo": "open-webui", "status": status, "changes": [],
+                                        "detail": "2 steps" if status == "done" else "failed: picker",
+                                        "steps": [{"step": "home", "ok": True, "png": "scout-home.png"},
+                                                  {"step": "picker", "ok": status == "done",
+                                                   "error": None if status == "done" else "no picker"}]})
+                          + "\nJSON\n"
+                          f"echo \"SCOUT: {status}\"\nexit {rc}\n")
+        script.chmod(0o755)
+        kubeconfig = pathlib.Path(self.home) / "kubeconfig"
+        kubeconfig.write_text("apiVersion: v1\n")
+        return kubeconfig
+
+    def test_scout_is_refused_during_a_freeze(self):
+        session.freeze_on()
+        rc, _, err = self.run_main("scout", "open-webui")
+        self.assertEqual(rc, 2)
+        self.assertIn("`scout` is refused during a freeze", err)
+
+    def test_scout_asks_for_the_id_with_a_sign_in_only_notice(self):
+        with self.recorder:
+            rc, out, err = self.run_main("scout", "open-webui")
+        self.assertEqual(rc, 2)
+        self.assertIn("a sign-in as sale-01, then the menus the walkthrough uses: no prompt sent, no model call, "
+                      "nothing created", out)
+        self.assertIn("DEMO_CONFIRM=open-webui", err)
+        self.assertFalse(gif.recordings_dir().exists())                     # refused before any directory
+
+    def test_scout_needs_no_check_of_the_day_and_reports_its_steps(self):
+        kubeconfig = self.fake_scout_recorder()
+        with self.recorder, mock.patch.dict(os.environ, {"DEMO_CONFIRM": "open-webui", "KUBECONFIG": str(kubeconfig)}):
+            rc, out, _ = self.run_main("scout", "open-webui")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ok     home  scout-home.png", out)
+        self.assertIn("scout done: 2 steps (exit 0)", out)
+        self.assertIn("Next: make demo record open-webui", out)
+        scouts = [p.name for p in gif.recordings_dir().iterdir()]
+        self.assertEqual(len(scouts), 1)
+        self.assertRegex(scouts[0], r"^open-webui-\d{8}-\d{6}-scout$")
+        self.assertEqual(presenter.latest_scout("open-webui")["status"], "done")
+        logs = list(session.logs_dir().glob("open-webui-scout-*.log"))
+        self.assertEqual(len(logs), 1)
+        self.assertIn("SCOUT: done", logs[0].read_text())
+
+    def test_a_failed_scout_says_which_step(self):
+        kubeconfig = self.fake_scout_recorder(status="fail", rc=1)
+        with self.recorder, mock.patch.dict(os.environ, {"DEMO_CONFIRM": "open-webui", "KUBECONFIG": str(kubeconfig)}):
+            rc, out, _ = self.run_main("scout", "open-webui")
+        self.assertEqual(rc, 1)
+        self.assertIn("FAILED picker  no picker", out)
+        self.assertIn("scout fail: failed: picker (exit 1)", out)
 
     def test_the_walkthrough_hash_is_the_recorders(self):
         with self.recorder:
@@ -407,8 +465,9 @@ class Verbs(unittest.TestCase):
         self.assertEqual(session.checks_dir(), pathlib.Path(self.home, ".cache/zuno/demo/checks"))
 
     def test_completion_offers_only_demos_with_a_cut_list(self):
-        rc, out, _ = self.run_main("--complete", "gif")
-        self.assertEqual(out.split(), ["open-webui"])
+        for verb in ("scout", "record", "gif"):
+            rc, out, _ = self.run_main("--complete", verb)
+            self.assertEqual(out.split(), ["open-webui"], verb)
 
 
 if __name__ == "__main__":

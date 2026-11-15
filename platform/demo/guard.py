@@ -1,6 +1,6 @@
 """The guards in front of an action that changes the cluster (ADR-0616 clauses 7 and 8, WP-270).
 
-Order: the freeze marker (refuses install, uninstall, rehearse and record), the summary of the changes, the infrastructure
+Order: the freeze marker (refuses install, uninstall, rehearse, scout and record), the summary of the changes, the infrastructure
 notice, then the confirmation: the presenter types the demo id, or, without a terminal, `DEMO_CONFIRM` holds that exact
 id. There is no global yes. `ansible/playbooks/demo_run.yml` checks the confirmation again.
 """
@@ -12,7 +12,7 @@ from typing import Callable, Dict, Iterable, Optional, TextIO
 
 import session
 
-FREEZE_REFUSED = ("install", "uninstall", "rehearse", "record")
+FREEZE_REFUSED = ("install", "uninstall", "rehearse", "scout", "record")
 
 DOUBLE_APPROVAL = (
     "INFRASTRUCTURE CHANGE: {unit} of {demo} changes the infrastructure layer (a GPU node, a MachineSet).\n"

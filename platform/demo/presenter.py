@@ -7,14 +7,16 @@
     make demo step next|<N>                     run step N's reads, then print its Do, Say and You should see
     make demo freeze on|off                     a freeze marker on this workstation
     make demo rehearse <id> 5|15                the whole sequence without pauses, with a report
+    make demo scout <id>                        sign in and open the walkthrough's menus, no prompt (ADR-0618)
     make demo record <id>                       record the 5-minute version in a browser, then cut its GIF (ADR-0617)
     make demo gif <id>                          cut the newest recording again, offline
     make demo golden-path|browser               the catalogue-wide checks (run by the Makefile, unchanged)
 
 Each action and step runs its Ansible file (`ansible/demos/<id>/<action>.yml`, `steps/MM-SS.yml`) locally through
 `ansible/playbooks/demo_run.yml`, prints its result, then the page section. Exit codes: 0 ok, 1 failed, 2 usage or
-refused. `record` and `gif` write under ~/.cache/zuno/demo/recordings/ only, never in the repository. Run from the repository root through make (ZUNO_REPO_ROOT); ZUNO_DEMO_ROOT points the catalogue elsewhere
-(the test fixtures).
+refused. `scout`, `record` and `gif` write under ~/.cache/zuno/demo/recordings/ only, never in the repository. Run
+from the repository root through make (ZUNO_REPO_ROOT); ZUNO_DEMO_ROOT points the catalogue elsewhere (the test
+fixtures).
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 from typing import List, Optional
@@ -44,7 +47,7 @@ except ImportError:  # pragma: no cover - PyYAML ships with Ansible
     yaml = None
 
 VERBS = ("list", "use", "status", "check", "install", "start", "stop", "uninstall", "step", "freeze", "rehearse",
-         "record", "gif", "golden-path", "browser")
+         "scout", "record", "gif", "golden-path", "browser")
 ACTIONS = catalogue.LIFECYCLE_ACTIONS
 VERSIONS = ("5", "15")
 QUIET_ACTIONS = ("status",)
@@ -63,10 +66,11 @@ Usage: make demo <verb> [arguments]
   step next|<N>              Run the step's reads, then print its Do, Say and You should see
   stop [<id>]                Clean up what the session created
   uninstall [<id>]           Remove the demo's own add-on; never a shared component
-  freeze on|off              Mark a freeze on this workstation: install, uninstall, rehearse and record refuse
+  freeze on|off              Mark a freeze on this workstation: install, uninstall, rehearse, scout and record refuse
   rehearse <id> 5|15         The whole sequence without pauses, with a report (asks for the id when it runs probes)
-  record <id>                Record the 5-minute version in a browser, then cut its GIF (needs a scout of the walkthrough
-                             and a check that passed today)
+  scout <id>                 Sign in as the walkthrough's persona and open its menus: no prompt, nothing created
+  record <id>                Record the 5-minute version in a browser, then cut its GIF (needs a scout of the
+                             walkthrough and a check that passed today)
   gif <id>                   Cut the newest recording again, offline (the GIF is published only on the owner's go)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
@@ -491,8 +495,8 @@ def cmd_freeze(args: List[str]) -> int:
         raise UsageError("Usage: make demo freeze on|off")
     if args[0] == "on":
         marker = session.freeze_on()
-        out(f"Freeze ON ({marker['who']}, {marker['when']}): install, uninstall, rehearse and record refuse on this "
-            "workstation. It is local: other workstations and sessions are told by the freeze protocol.")
+        out(f"Freeze ON ({marker['who']}, {marker['when']}): install, uninstall, rehearse, scout and record refuse on "
+            "this workstation. It is local: other workstations and sessions are told by the freeze protocol.")
     else:
         out("Freeze off." if session.freeze_off() else "Freeze was already off.")
     return 0
@@ -582,8 +586,8 @@ def scout_gate(demo_id: str, root: pathlib.Path) -> str:
         return "controls the take may switch: unknown (no scout)"
     current = walkthrough_sha256(demo_id, root)
     scout = latest_scout(demo_id)
-    how = (f"run the scout first, with the owner's go: `evaluations/browser/record.sh {demo_id} --scout` (it signs "
-           "in and opens the menus: no prompt, no model call, no video)")
+    how = (f"run `make demo scout {demo_id}` first, with the owner's go (it signs in and opens the menus: no prompt, "
+           "no model call, nothing created)")
     if scout is None:
         raise guard.Refused(f"no scout of {demo_id} under {gif.recordings_dir()}: {how}.")
     if scout.get("status") != "done":
@@ -634,17 +638,75 @@ def cmd_gif(args: List[str]) -> int:
     return 0
 
 
-def cmd_record(args: List[str]) -> int:
-    """Record the 5-minute version through the demo's walkthrough, then cut the GIF. Local, never AAP."""
-    entry = scenario_for_gif(args, "record")
-    root = catalogue.repo_root()
-    guard.check_freeze("record")
+def require_recorder(entry: catalogue.Entry, root: pathlib.Path) -> pathlib.Path:
+    """The recorder script, once it and the demo's walkthrough exist; else Refused."""
     recorder = root / RECORDER
     walkthrough = root / WALKTHROUGHS / f"{entry.id}.mjs"
     for path in (recorder, walkthrough):
         if not path.is_file():
             shown = path.relative_to(root) if root in path.parents else path
             raise guard.Refused(f"{shown} is missing: {entry.id} cannot be recorded yet (WP-284).")
+    return recorder
+
+
+def walkthrough_persona(demo_id: str, root: pathlib.Path) -> str:
+    """The persona the walkthrough signs in as (`export const persona = "..."`), for the guard notice."""
+    try:
+        text = (root / WALKTHROUGHS / f"{demo_id}.mjs").read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    found = re.search(r"""export\s+const\s+persona\s*=\s*["']([^"']+)["']""", text)
+    return found.group(1) if found else "the walkthrough's persona"
+
+
+def cmd_scout(args: List[str]) -> int:
+    """Sign in as the walkthrough's persona and open the menus it uses, with no prompt (ADR-0618 clause 9): what
+    `record` needs first, for the current version of the walkthrough. Local, never AAP."""
+    entry = scenario_for_gif(args, "scout")
+    root = catalogue.repo_root()
+    guard.check_freeze("scout")
+    recorder = require_recorder(entry, root)
+    persona = walkthrough_persona(entry.id, root)
+    manifest = load_manifest(catalogue.demo_dir(entry.id))
+    confirmed = guard.confirm(entry.id, {}, notices=[
+        f"a sign-in as {persona}, then the menus the walkthrough uses: no prompt sent, no model call, nothing created"])
+    refusal = cluster_ready(manifest)
+    if refusal:
+        raise guard.Refused(refusal)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    directory = gif.recordings_dir() / f"{entry.id}-{stamp}-scout"
+    directory.mkdir(parents=True, mode=0o700)
+    log_path = session.logs_dir() / f"{entry.id}-scout-{stamp}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    out(f"{entry.id} · scout ({confirmed}) · {directory}")
+    rc = run_recorder([str(recorder), entry.id, str(directory), "--scout"], root, log_path)
+    try:
+        report = json.loads((directory / "scout.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        report = {}
+    report = report if isinstance(report, dict) else {}
+    out("RESULT")
+    for step in report.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        what = step.get("error") or step.get("selector") or step.get("png") or ""
+        out(f"  {'ok    ' if step.get('ok') else 'FAILED'} {step.get('step')}  {str(what)[:100]}")
+    status = report.get("status") or "no scout.json"
+    out(f"  scout {status}: {report.get('detail') or '-'} (exit {rc}). Log: {log_path}")
+    if rc == 0 and status == "done":
+        changes = [str(c) for c in report.get("changes") or []]
+        out(f"Controls the take may switch: {', '.join(changes) if changes else 'none'}. "
+            f"Next: make demo record {entry.id}")
+        return 0
+    return 2 if rc == 2 else 1
+
+
+def cmd_record(args: List[str]) -> int:
+    """Record the 5-minute version through the demo's walkthrough, then cut the GIF. Local, never AAP."""
+    entry = scenario_for_gif(args, "record")
+    root = catalogue.repo_root()
+    guard.check_freeze("record")
+    recorder = require_recorder(entry, root)
     if not session.check_passed_today(entry.id):
         last = session.last_check(entry.id)
         seen = (f"the last one {'passed' if last.get('passed') else 'FAILED'} on {last.get('date')} "
@@ -714,7 +776,7 @@ def complete(args: List[str]) -> int:
     if len(args) <= 1:
         if verb in ("use", "rehearse") + ACTIONS:
             out(" ".join(ids))
-        elif verb in ("record", "gif"):
+        elif verb in ("scout", "record", "gif"):
             out(" ".join(e.id for e in catalogue.discover() if gif.cut_list_path(e.id).is_file()))
         elif verb == "step":
             current = session.load_session()
@@ -752,6 +814,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return cmd_freeze(args)
         if verb == "rehearse":
             return cmd_rehearse(args)
+        if verb == "scout":
+            return cmd_scout(args)
         if verb == "record":
             return cmd_record(args)
         if verb == "gif":
