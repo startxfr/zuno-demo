@@ -1,0 +1,479 @@
+"""Cut a demo recording into its GIF (ADR-0617, WP-284).
+
+    python3 platform/demo/gif.py <id> [<recording dir>] [--dry-run]
+
+A recording is a directory `~/.cache/zuno/demo/recordings/<id>-<YYYYmmdd-HHMMSS>/` written by
+`evaluations/browser/record.sh <id> <dir>`: `recording.webm`, `markers.json` and one `<marker>.png` per marker. The cut
+list `ansible/demos/<id>/gif.yml` names the moments to keep:
+
+    target_seconds: [40, 60]      # the GIF's total length, inclusive
+    width: 960                    # pixels; the height follows the recording's viewport
+    fps: 10
+    moments:
+      - {still: login, hold: 2.5, caption: "Sign in with the company account"}
+      - {from: q1-sent, to: q1-done, fit: 5, hold: 2.5, step: "0:45", caption: "0:45 An answer"}
+
+A `still` moment shows the marker's PNG for `hold` seconds. A motion moment plays the recording from one marker to
+the next: `fit: <seconds>` sets its playing time whatever the real span (speed = span / fit, kept within 1-16; a span
+shorter than `fit` plays at speed 1 and its last frame fills the rest), or a fixed `speed:`; `hold` then freezes the
+last frame. Every moment lasts at least 2 s. `step` must be a time of the page's
+5-minute table. Each moment carries a caption bar. When markers.json names `motion_from`, no motion moment may
+start before that marker: the take holds the sign-in before it, which a public GIF never shows in motion.
+
+ffmpeg runs in the Playwright image by podman (the workstation has no ffmpeg). The GIF is written next to the
+recording, `<id>.gif`, never in the repository: it is published only after the owner's "go <id>" (ADR-0617).
+Exit codes: 0 built, 1 the cut list, the recording or the result is wrong, 2 usage.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import catalogue  # noqa: E402
+import session  # noqa: E402
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - PyYAML ships with Ansible
+    yaml = None
+
+IMAGE = "mcr.microsoft.com/playwright:v1.48.0-jammy"
+FONT = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+MOUNT = "/rec"
+CAPTIONS = ".gif-captions"
+MIN_MOMENT = 2.0
+MAX_BYTES = 8 * 1024 * 1024
+AIM_BYTES = 5 * 1024 * 1024
+SPEED_RANGE = (1.0, 16.0)
+FPS_RANGE = (5, 15)
+WIDTH_RANGE = (480, 1280)
+CAPTION_MAX = 70
+FFMPEG_TIMEOUT = 900
+
+
+class CutError(ValueError):
+    """The cut list, the recording or the result is wrong; every reason is listed."""
+
+    def __init__(self, reasons: Sequence[str]):
+        super().__init__("; ".join(reasons))
+        self.reasons = list(reasons)
+
+
+@dataclass
+class Moment:
+    index: int
+    kind: str              # still | motion
+    caption: str
+    hold: float
+    marker: str = ""       # still: its PNG
+    start: float = 0.0     # motion: recording time of `from`
+    end: float = 0.0       # motion: recording time of `to`
+    speed: float = 1.0
+    fit: float = 0.0       # motion: the playing time asked for (0 with a fixed `speed`)
+    step: str = ""
+
+    @property
+    def span(self) -> float:
+        return self.end - self.start
+
+    @property
+    def freeze(self) -> float:
+        """Seconds the last frame stays: the hold, plus what a span too short for its `fit` leaves (no slow motion)."""
+        if self.kind == "still":
+            return self.hold
+        return self.hold + max(0.0, self.fit - self.span / self.speed)
+
+    @property
+    def seconds(self) -> float:
+        """Length in the GIF."""
+        return self.hold if self.kind == "still" else self.span / self.speed + self.freeze
+
+    def label(self) -> str:
+        if self.kind == "still":
+            return f"still {self.marker}"
+        return f"{self.start:.1f}-{self.end:.1f} s x{self.speed:.1f}"
+
+
+@dataclass
+class Plan:
+    demo: str
+    moments: List[Moment]
+    width: int
+    height: int
+    fps: int
+    target: Sequence[float]
+    viewport: Dict[str, int]
+
+    @property
+    def seconds(self) -> float:
+        return sum(m.seconds for m in self.moments)
+
+
+# --- inputs ------------------------------------------------------------------------------------------------------
+
+def recordings_dir() -> pathlib.Path:
+    return session.recordings_dir()
+
+
+def cut_list_path(demo_id: str, root: Optional[pathlib.Path] = None) -> pathlib.Path:
+    return catalogue.demo_dir(demo_id, root) / "gif.yml"
+
+
+def load_cut_list(path: pathlib.Path) -> dict:
+    if yaml is None:
+        raise RuntimeError("PyYAML is missing: install Ansible (it ships PyYAML) or `pip install pyyaml`")
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        raise CutError([f"{path}: not a mapping"])
+    return data
+
+
+def load_markers(directory: pathlib.Path) -> dict:
+    path = directory / "markers.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise CutError([f"{path} is missing: not a recording directory"])
+    except ValueError as exc:
+        raise CutError([f"{path} is not JSON: {exc}"])
+    if not isinstance(data, dict):
+        raise CutError([f"{path}: not an object"])
+    return data
+
+
+def latest_recording(demo_id: str, base: Optional[pathlib.Path] = None) -> Optional[pathlib.Path]:
+    """The newest `<id>-<stamp>/` holding a markers.json, or None."""
+    base = base or recordings_dir()
+    if not base.is_dir():
+        return None
+    found = [p for p in base.glob(f"{demo_id}-*") if p.is_dir() and (p / "markers.json").is_file()
+             and p.name[len(demo_id) + 1:][:8].isdigit()]
+    return sorted(found)[-1] if found else None
+
+
+def page_times(demo_id: str, root: Optional[pathlib.Path] = None) -> List[str]:
+    """The times of the page's 5-minute table."""
+    entry = catalogue.find(demo_id, root)
+    return [s.time for s in catalogue.load(entry).steps("5")]
+
+
+# --- the plan ----------------------------------------------------------------------------------------------------
+
+def _number(value, name: str, reasons: List[str], where: str) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        reasons.append(f"{where}: `{name}` must be a number")
+        return None
+    return float(value)
+
+
+def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] = None) -> Plan:
+    """Check the cut list against the recording and the page; return what to cut, or raise CutError."""
+    reasons: List[str] = []
+    if markers.get("status") != "pass":
+        reasons.append(f"the recording did not pass (status {markers.get('status')!r}: "
+                       f"{markers.get('detail') or 'no detail'}): record it again")
+    if markers.get("chat_deleted") is not True:
+        reasons.append("the recording did not delete the chat it created: delete it by hand, then record again")
+    if markers.get("demo") not in (None, demo_id):
+        reasons.append(f"the recording is of {markers.get('demo')!r}, not {demo_id!r}")
+    at: Dict[str, float] = {}
+    png: Dict[str, str] = {}
+    previous = None
+    for item in markers.get("markers") or []:
+        name = item.get("name") if isinstance(item, dict) else None
+        t = item.get("t") if isinstance(item, dict) else None
+        if not isinstance(name, str) or isinstance(t, bool) or not isinstance(t, (int, float)):
+            reasons.append(f"markers.json: malformed marker {item!r}")
+            continue
+        if name in at:
+            reasons.append(f"markers.json: marker {name!r} appears twice")
+        if previous is not None and t < previous:
+            reasons.append(f"markers.json: marker {name!r} goes back in time")
+        at[name] = float(t)
+        png[name] = str(item.get("png") or f"{name}.png")
+        previous = t
+    # The walkthrough names the first marker a motion segment may start at: before it, the video holds the sign-in
+    # (the owner's rule: a public GIF never shows it in motion). Stills are allowed anywhere. Absent: no limit.
+    motion_from = markers.get("motion_from")
+    floor = None
+    if motion_from is not None:
+        if motion_from not in at:
+            reasons.append(f"markers.json: `motion_from` {motion_from!r} is not a marker")
+        else:
+            floor = at[motion_from]
+    viewport = markers.get("viewport") or {}
+    vw, vh = viewport.get("width"), viewport.get("height")
+    if not (isinstance(vw, int) and isinstance(vh, int) and vw > 0 and vh > 0):
+        reasons.append("markers.json: `viewport` needs integer width and height")
+        vw, vh = 16, 10
+
+    unknown = sorted(set(cut) - {"target_seconds", "width", "fps", "moments", "record_notice"})
+    if unknown:
+        reasons.append(f"the cut list has unknown key(s) {', '.join(unknown)}")
+    width = cut.get("width", 960)
+    fps = cut.get("fps", 10)
+    target = cut.get("target_seconds", [40, 60])
+    if not isinstance(width, int) or not WIDTH_RANGE[0] <= width <= WIDTH_RANGE[1]:
+        reasons.append(f"`width` must be an integer from {WIDTH_RANGE[0]} to {WIDTH_RANGE[1]}")
+        width = 960
+    if not isinstance(fps, int) or not FPS_RANGE[0] <= fps <= FPS_RANGE[1]:
+        reasons.append(f"`fps` must be an integer from {FPS_RANGE[0]} to {FPS_RANGE[1]}")
+        fps = 10
+    if (not isinstance(target, list) or len(target) != 2
+            or not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in target)
+            or not 0 < target[0] <= target[1]):
+        reasons.append("`target_seconds` must be [min, max] in seconds")
+        target = [40, 60]
+    height = int(round(width * vh / vw / 2.0)) * 2
+
+    raw = cut.get("moments")
+    if not isinstance(raw, list) or not raw:
+        reasons.append("`moments` must be a non-empty list")
+        raw = []
+    moments: List[Moment] = []
+    for index, item in enumerate(raw, 1):
+        where = f"moment {index}"
+        if not isinstance(item, dict):
+            reasons.append(f"{where}: not a mapping")
+            continue
+        unknown = sorted(set(item) - {"still", "from", "to", "fit", "speed", "hold", "step", "caption"})
+        if unknown:
+            reasons.append(f"{where}: unknown key(s) {', '.join(unknown)}")
+        caption = item.get("caption")
+        if not isinstance(caption, str) or not caption.strip():
+            reasons.append(f"{where}: `caption` is required")
+            caption = ""
+        elif len(caption) > CAPTION_MAX or "\n" in caption:
+            reasons.append(f"{where}: the caption must be one line of at most {CAPTION_MAX} characters")
+        step = item.get("step")
+        if step is not None:
+            step = guard_time(step)
+            if times is not None and step not in times:
+                reasons.append(f"{where}: step {step} is not a time of the page's 5-minute table "
+                               f"({', '.join(times)})")
+        hold = item.get("hold", 0)
+        hold = _number(hold, "hold", reasons, where)
+        if hold is not None and hold < 0:
+            reasons.append(f"{where}: `hold` cannot be negative")
+        hold = hold if hold is not None and hold >= 0 else 0.0
+        if "still" in item:
+            if any(k in item for k in ("from", "to", "fit", "speed")):
+                reasons.append(f"{where}: a `still` takes only `hold`, `step` and `caption`")
+            name = item["still"]
+            if name not in at:
+                reasons.append(f"{where}: marker {name!r} is not in markers.json")
+            moment = Moment(index, "still", caption.strip(), hold, marker=str(name), step=step or "")
+        elif "from" in item and "to" in item:
+            start, end = at.get(item["from"]), at.get(item["to"])
+            for key in ("from", "to"):
+                if item[key] not in at:
+                    reasons.append(f"{where}: marker {item[key]!r} is not in markers.json")
+            if start is not None and end is not None and end <= start:
+                reasons.append(f"{where}: `to` ({item['to']}) is not after `from` ({item['from']})")
+            if start is not None and floor is not None and start < floor:
+                reasons.append(f"{where}: a motion segment cannot start before `{motion_from}` (the recording shows "
+                               f"the sign-in before it); use a still")
+            moment = Moment(index, "motion", caption.strip(), hold, start=start or 0.0, end=end or 0.0,
+                            step=step or "")
+            if ("fit" in item) == ("speed" in item):
+                reasons.append(f"{where}: a motion moment takes `fit` or `speed`, one of them")
+            elif "fit" in item:
+                fit = _number(item["fit"], "fit", reasons, where)
+                if fit is not None and fit <= 0:
+                    reasons.append(f"{where}: `fit` must be positive")
+                elif fit is not None and moment.span > 0:
+                    moment.fit = fit
+                    moment.speed = min(max(moment.span / fit, SPEED_RANGE[0]), SPEED_RANGE[1])
+            else:
+                speed = _number(item["speed"], "speed", reasons, where)
+                if speed is not None and not SPEED_RANGE[0] <= speed <= SPEED_RANGE[1]:
+                    reasons.append(f"{where}: `speed` must be from {SPEED_RANGE[0]:g} to {SPEED_RANGE[1]:g}")
+                elif speed is not None:
+                    moment.speed = speed
+        else:
+            reasons.append(f"{where}: needs `still: <marker>` or `from:` and `to:` markers")
+            continue
+        if moment.seconds < MIN_MOMENT - 1e-9:
+            reasons.append(f"{where}: lasts {moment.seconds:.1f} s in the GIF; every moment needs at least "
+                           f"{MIN_MOMENT:g} s (raise `hold` or `fit`)")
+        moments.append(moment)
+    result = Plan(demo_id, moments, width, height, fps, target, {"width": vw, "height": vh})
+    if moments and not reasons and not target[0] <= result.seconds <= target[1]:
+        reasons.append(f"the GIF would last {result.seconds:.1f} s, outside {target[0]:g}-{target[1]:g} s: "
+                       f"change `hold` or `fit`")
+    if reasons:
+        raise CutError(reasons)
+    return result
+
+
+def guard_time(value) -> str:
+    """A step time as M:SS. YAML 1.1 reads an unquoted 0:45 as the base-60 integer 45; quote it."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return f"{value // 60}:{value % 60:02d}"
+    return str(value)
+
+
+# --- ffmpeg ------------------------------------------------------------------------------------------------------
+
+def caption_files(p: Plan) -> Dict[int, str]:
+    """moment index -> caption file name under CAPTIONS (drawtext reads a file: no escaping of the text)."""
+    return {m.index: f"{CAPTIONS}/{m.index:02d}.txt" for m in p.moments}
+
+
+def _drawtext(path: str) -> str:
+    return (f"drawtext=fontfile={FONT}:textfile={MOUNT}/{path}:fontsize=26:fontcolor=white:"
+            "box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y=h-text_h-28")
+
+
+def ffmpeg_argv(p: Plan, markers: dict, output: str) -> List[str]:
+    """One ffmpeg command for the whole GIF, paths as seen inside the container (the recording at /rec)."""
+    files = caption_files(p)
+    png = {m.get("name"): m.get("png") or f"{m.get('name')}.png" for m in markers.get("markers") or []
+           if isinstance(m, dict)}
+    argv = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
+    graph: List[str] = []
+    size = f"scale={p.width}:{p.height}:flags=lanczos,setsar=1"
+    # One input per moment, in order: a motion moment seeks into the recording (-ss/-t before -i), so no frame of
+    # the whole take is ever buffered; a still loops its PNG for the hold.
+    for number, m in enumerate(p.moments):
+        text = _drawtext(files[m.index])
+        if m.kind == "still":
+            argv += ["-loop", "1", "-framerate", str(p.fps), "-t", f"{m.hold:.3f}",
+                     "-i", f"{MOUNT}/{png.get(m.marker, m.marker + '.png')}"]
+            graph.append(f"[{number}:v]fps={p.fps},{size},{text},format=rgb24[v{m.index}]")
+        else:
+            argv += ["-ss", f"{m.start:.3f}", "-t", f"{m.span:.3f}", "-i", f"{MOUNT}/recording.webm"]
+            chain = f"[{number}:v]setpts=(PTS-STARTPTS)/{m.speed:.4f},fps={p.fps},{size}"
+            if m.freeze > 0:
+                chain += f",tpad=stop_mode=clone:stop_duration={m.freeze:.3f}"
+            graph.append(f"{chain},{text},format=rgb24[v{m.index}]")
+    graph.append("".join(f"[v{m.index}]" for m in p.moments) + f"concat=n={len(p.moments)}:v=1:a=0,split[g1][g2]")
+    graph.append("[g1]palettegen=stats_mode=diff[pal]")
+    graph.append("[g2][pal]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
+    argv += ["-filter_complex", ";".join(graph), "-loop", "0", f"{MOUNT}/{output}"]
+    return argv
+
+
+def podman(directory: pathlib.Path, argv: List[str]) -> List[str]:
+    return ["podman", "run", "--rm", "--network", "none", "-v", f"{directory}:{MOUNT}:Z", IMAGE] + argv
+
+
+def _duration(directory: pathlib.Path, name: str) -> Optional[float]:
+    probe = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f"{MOUNT}/{name}"]
+    done = subprocess.run(podman(directory, probe), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True, timeout=120)
+    try:
+        return float(done.stdout.strip())
+    except ValueError:
+        return None
+
+
+def size_problem(path: pathlib.Path) -> Optional[str]:
+    size = path.stat().st_size
+    if size > MAX_BYTES:
+        return (f"{path.name} is {size / 1048576:.1f} MB, over the {MAX_BYTES // 1048576} MB limit: lower `fps` or "
+                "`width`, or shorten the holds")
+    return None
+
+
+@dataclass
+class Built:
+    path: pathlib.Path
+    seconds: Optional[float]
+    size: int
+    plan: Plan
+
+    def summary(self) -> List[str]:
+        lines = [f"GIF: {self.path}",
+                 f"  {self.size / 1048576:.1f} MB (limit {MAX_BYTES // 1048576} MB, aim {AIM_BYTES // 1048576} MB), "
+                 f"{self.seconds if self.seconds is None else round(self.seconds, 1)} s by ffprobe "
+                 f"({self.plan.seconds:.1f} s planned), {self.plan.width}x{self.plan.height}, {self.plan.fps} fps"]
+        for m in self.plan.moments:
+            step = f" [{m.step}]" if m.step else ""
+            lines.append(f"  {m.index}. {m.seconds:4.1f} s  {m.label()}{step}  \"{m.caption}\"")
+        if self.size > AIM_BYTES:
+            lines.append(f"  Over the {AIM_BYTES // 1048576} MB aim: consider fewer fps or shorter holds.")
+        return lines
+
+
+def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[Sequence[str]] = None,
+          runner=subprocess.run) -> Built:
+    """Cut `directory`'s recording into `<id>.gif` in the same directory, or raise CutError."""
+    markers = load_markers(directory)
+    p = plan(demo_id, cut, markers, times)
+    missing = []
+    if any(m.kind == "motion" for m in p.moments) and not (directory / "recording.webm").is_file():
+        missing.append("recording.webm")
+    names = {m.get("name"): m.get("png") or f"{m.get('name')}.png" for m in markers.get("markers") or []
+             if isinstance(m, dict)}
+    missing += [names[m.marker] for m in p.moments if m.kind == "still" and not (directory / names[m.marker]).is_file()]
+    if missing:
+        raise CutError([f"{directory}: missing {', '.join(missing)}"])
+    if shutil.which("podman") is None:
+        raise CutError(["podman is not on PATH: ffmpeg runs in the Playwright image (see evaluations/browser/)"])
+    captions = directory / CAPTIONS
+    captions.mkdir(exist_ok=True)
+    for m in p.moments:
+        (directory / caption_files(p)[m.index]).write_text(m.caption, encoding="utf-8")
+    output = f"{demo_id}.gif"
+    done = runner(podman(directory, ffmpeg_argv(p, markers, output)), stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT, universal_newlines=True, timeout=FFMPEG_TIMEOUT)
+    path = directory / output
+    if done.returncode != 0 or not path.is_file():
+        tail = "\n".join((done.stdout or "").strip().split("\n")[-15:])
+        raise CutError([f"ffmpeg failed (exit {done.returncode}): {tail}"])
+    built = Built(path, _duration(directory, output), path.stat().st_size, p)
+    (directory / f"{demo_id}.gif.json").write_text(json.dumps({
+        "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
+        "width": p.width, "height": p.height, "fps": p.fps,
+        "moments": [{"caption": m.caption, "seconds": round(m.seconds, 2), "cut": m.label(), "step": m.step}
+                    for m in p.moments]}, indent=2) + "\n", encoding="utf-8")
+    problems = [x for x in (size_problem(path),) if x]
+    if built.seconds is not None and not p.target[0] - 0.5 <= built.seconds <= p.target[1] + 0.5:
+        problems.append(f"ffprobe says {built.seconds:.1f} s, outside {p.target[0]:g}-{p.target[1]:g} s")
+    if problems:
+        raise CutError(problems + [f"(the GIF is left in {directory} for a look)"])
+    return built
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Cut a demo recording into its GIF (ADR-0617). Offline.")
+    parser.add_argument("demo")
+    parser.add_argument("directory", nargs="?", help="a recording directory (default: the newest for the demo)")
+    parser.add_argument("--dry-run", action="store_true", help="check the cut list and print the ffmpeg command")
+    args = parser.parse_args(argv)
+    path = cut_list_path(args.demo)
+    if not path.is_file():
+        sys.stderr.write(f"{path} is missing: this demo has no cut list (ADR-0617)\n")
+        return 2
+    directory = pathlib.Path(args.directory) if args.directory else latest_recording(args.demo)
+    if directory is None:
+        sys.stderr.write(f"No recording of {args.demo} under {recordings_dir()}: run `make demo record {args.demo}`\n")
+        return 1
+    try:
+        cut = load_cut_list(path)
+        times = page_times(args.demo)
+        if args.dry_run:
+            p = plan(args.demo, cut, load_markers(directory), times)
+            print(" ".join(podman(directory, ffmpeg_argv(p, load_markers(directory), f"{args.demo}.gif"))))
+            print(f"{len(p.moments)} moments, {p.seconds:.1f} s planned")
+            return 0
+        built = build(args.demo, directory, cut, times=times)
+    except CutError as exc:
+        for reason in exc.reasons:
+            sys.stderr.write(f"REFUSED: {reason}\n")
+        return 1
+    print("\n".join(built.summary()))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

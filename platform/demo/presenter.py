@@ -7,23 +7,28 @@
     make demo step next|<N>                     run step N's reads, then print its Do, Say and You should see
     make demo freeze on|off                     a freeze marker on this workstation
     make demo rehearse <id> 5|15                the whole sequence without pauses, with a report
+    make demo record <id>                       record the 5-minute version in a browser, then cut its GIF (ADR-0617)
+    make demo gif <id>                          cut the newest recording again, offline
     make demo golden-path|browser               the catalogue-wide checks (run by the Makefile, unchanged)
 
 Each action and step runs its Ansible file (`ansible/demos/<id>/<action>.yml`, `steps/MM-SS.yml`) locally through
 `ansible/playbooks/demo_run.yml`, prints its result, then the page section. Exit codes: 0 ok, 1 failed, 2 usage or
-refused. Run from the repository root through make (ZUNO_REPO_ROOT); ZUNO_DEMO_ROOT points the catalogue elsewhere
+refused. `record` and `gif` write under ~/.cache/zuno/demo/recordings/ only, never in the repository. Run from the repository root through make (ZUNO_REPO_ROOT); ZUNO_DEMO_ROOT points the catalogue elsewhere
 (the test fixtures).
 """
 from __future__ import annotations
 
+import datetime
 import os
 import pathlib
+import subprocess
 import sys
 from typing import List, Optional
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import catalogue  # noqa: E402
+import gif  # noqa: E402
 import guard  # noqa: E402
 import rehearse  # noqa: E402
 import render  # noqa: E402
@@ -37,7 +42,7 @@ except ImportError:  # pragma: no cover - PyYAML ships with Ansible
     yaml = None
 
 VERBS = ("list", "use", "status", "check", "install", "start", "stop", "uninstall", "step", "freeze", "rehearse",
-         "golden-path", "browser")
+         "record", "gif", "golden-path", "browser")
 ACTIONS = catalogue.LIFECYCLE_ACTIONS
 VERSIONS = ("5", "15")
 QUIET_ACTIONS = ("status",)
@@ -56,8 +61,10 @@ Usage: make demo <verb> [arguments]
   step next|<N>              Run the step's reads, then print its Do, Say and You should see
   stop [<id>]                Clean up what the session created
   uninstall [<id>]           Remove the demo's own add-on; never a shared component
-  freeze on|off              Mark a freeze on this workstation: install, uninstall and rehearse refuse
+  freeze on|off              Mark a freeze on this workstation: install, uninstall, rehearse and record refuse
   rehearse <id> 5|15         The whole sequence without pauses, with a report (asks for the id when it runs probes)
+  record <id>                Record the 5-minute version in a browser, then cut its GIF (after a check passed today)
+  gif <id>                   Cut the newest recording again, offline (the GIF is published only on the owner's go)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
 
@@ -401,6 +408,8 @@ def cmd_action(action: str, args: List[str]) -> int:
         return 1
     result = run_one(entry, demo_dir, manifest, Unit(action, rel), confirmed=confirmed,
                      stream=action not in QUIET_ACTIONS)
+    if action == "check":
+        session.record_check(entry.id, not result.failed)
     lines(render.result_block(result))
     out()
     lines(render.action_section(page, action))
@@ -479,7 +488,7 @@ def cmd_freeze(args: List[str]) -> int:
         raise UsageError("Usage: make demo freeze on|off")
     if args[0] == "on":
         marker = session.freeze_on()
-        out(f"Freeze ON ({marker['who']}, {marker['when']}): install, uninstall and rehearse refuse on this "
+        out(f"Freeze ON ({marker['who']}, {marker['when']}): install, uninstall, rehearse and record refuse on this "
             "workstation. It is local: other workstations and sessions are told by the freeze protocol.")
     else:
         out("Freeze off." if session.freeze_off() else "Freeze was already off.")
@@ -515,11 +524,128 @@ def cmd_rehearse(args: List[str]) -> int:
         f"{sum(1 for d in decided if d.status == 'skipped')} skipped, {sum(1 for d in decided if d.failed)} missing.")
     run = run_units(entry.id, demo_dir, to_run, confirmed=confirmed, label=f"rehearse-{version}") if to_run else None
     results = rehearse.merge(page, version, run, decided)
+    checked = next((r for r in results if r.name == "check" and r.status in ("ok", "failed")), None)
+    if checked is not None:
+        session.record_check(entry.id, not checked.failed, source=f"rehearse {version}")
     text, passed = rehearse.report(page, version, results, run, changing=changing, confirmed=confirmed)
     path = rehearse.write_report(page, version, text)
     out(text.rstrip("\n"))
     out(f"Report: {path}")
     return 0 if passed else 1
+
+
+RECORDER = pathlib.Path("evaluations") / "browser" / "record.sh"
+WALKTHROUGHS = pathlib.Path("evaluations") / "browser" / "walkthroughs"
+RECORD_TIMEOUT = 1200
+
+
+def scenario_for_gif(args: List[str], verb: str) -> catalogue.Entry:
+    if len(args) > 1:
+        raise UsageError(f"Usage: make demo {verb} [<id>]")
+    entry = resolve(args[0] if args else None)
+    if entry.kind != "scenario":
+        raise UsageError(f"{entry.id} is a workshop: `{verb}` takes a scenario (its 5-minute version).")
+    if not gif.cut_list_path(entry.id).is_file():
+        raise UsageError(f"{entry.id} has no cut list (ansible/demos/{entry.id}/gif.yml): no GIF is planned for it yet "
+                         "(ADR-0617).")
+    return entry
+
+
+def print_built(built: "gif.Built", demo_id: str) -> None:
+    lines(built.summary())
+    out()
+    out(f"Nothing was copied into the repository. Send the GIF to the owner; it is published in "
+        f"docs/assets/img/demo/{demo_id}.gif only after their \"go {demo_id}\" (ADR-0617). "
+        f"`make demo gif {demo_id}` cuts this take again after a change of the cut list.")
+
+
+def cmd_gif(args: List[str]) -> int:
+    """Cut the newest recording again: offline, no guard, no cluster call."""
+    entry = scenario_for_gif(args, "gif")
+    directory = gif.latest_recording(entry.id)
+    if directory is None:
+        out(f"No recording of {entry.id} under {gif.recordings_dir()}: make demo record {entry.id}")
+        return 1
+    out(f"{entry.id} · gif · {directory}")
+    try:
+        built = gif.build(entry.id, directory, gif.load_cut_list(gif.cut_list_path(entry.id)),
+                          times=gif.page_times(entry.id))
+    except gif.CutError as exc:
+        lines([f"REFUSED: {r}" for r in exc.reasons])
+        return 1
+    print_built(built, entry.id)
+    return 0
+
+
+def cmd_record(args: List[str]) -> int:
+    """Record the 5-minute version through the demo's walkthrough, then cut the GIF. Local, never AAP."""
+    entry = scenario_for_gif(args, "record")
+    root = catalogue.repo_root()
+    guard.check_freeze("record")
+    recorder = root / RECORDER
+    walkthrough = root / WALKTHROUGHS / f"{entry.id}.mjs"
+    for path in (recorder, walkthrough):
+        if not path.is_file():
+            shown = path.relative_to(root) if root in path.parents else path
+            raise guard.Refused(f"{shown} is missing: {entry.id} cannot be recorded yet (WP-284).")
+    if not session.check_passed_today(entry.id):
+        last = session.last_check(entry.id)
+        seen = (f"the last one {'passed' if last.get('passed') else 'FAILED'} on {last.get('date')} "
+                f"({last.get('source')})") if last else "none is recorded on this workstation"
+        raise guard.Refused(f"`record` needs a `make demo check {entry.id}` that passed today: {seen}. Then "
+                            f"`make demo start {entry.id}` warms the model before the take.")
+    demo_dir = catalogue.demo_dir(entry.id)
+    manifest = load_manifest(demo_dir)
+    cut = gif.load_cut_list(gif.cut_list_path(entry.id))
+    notice = str(cut.get("record_notice") or "a recorded browser session that calls the models")
+    confirmed = guard.confirm(entry.id, {}, notices=[notice])
+    refusal = cluster_ready(manifest)
+    if refusal:
+        raise guard.Refused(refusal)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    directory = gif.recordings_dir() / f"{entry.id}-{stamp}"
+    directory.mkdir(parents=True, mode=0o700)
+    log_path = session.logs_dir() / f"{entry.id}-record-{stamp}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    out(f"{entry.id} · record ({confirmed}) · {directory}")
+    rc = run_recorder([str(recorder), entry.id, str(directory)], root, log_path)
+    if rc != 0:
+        out(f"RESULT: the recording failed (exit {rc}). Log: {log_path}")
+        out(f"Files so far: {directory}")
+        return 1 if rc != 2 else 2
+    try:
+        built = gif.build(entry.id, directory, cut, times=gif.page_times(entry.id))
+    except gif.CutError as exc:
+        lines([f"REFUSED: {r}" for r in exc.reasons])
+        out(f"The take is kept in {directory}: fix the cut list, then make demo gif {entry.id}")
+        return 1
+    print_built(built, entry.id)
+    return 0
+
+
+def run_recorder(argv: List[str], root: pathlib.Path, log_path: pathlib.Path) -> int:
+    """Run record.sh, its output on the terminal and in the log."""
+    with open(log_path, "w", encoding="utf-8") as log:
+        log.write("$ " + " ".join(argv) + "\n")
+        try:
+            proc = subprocess.Popen(argv, cwd=str(root), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    universal_newlines=True, bufsize=1)
+        except OSError as exc:
+            log.write(f"{exc}\n")
+            out(f"Cannot run the recorder: {exc}")
+            return 2
+        assert proc.stdout is not None
+        with proc.stdout:
+            for line in proc.stdout:
+                log.write(line)
+                sys.stdout.write(line)
+                sys.stdout.flush()
+        try:
+            return proc.wait(timeout=RECORD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out(f"The recorder ran over {RECORD_TIMEOUT} s and was stopped.")
+            return 1
 
 
 def complete(args: List[str]) -> int:
@@ -529,6 +655,8 @@ def complete(args: List[str]) -> int:
     if len(args) <= 1:
         if verb in ("use", "rehearse") + ACTIONS:
             out(" ".join(ids))
+        elif verb in ("record", "gif"):
+            out(" ".join(e.id for e in catalogue.discover() if gif.cut_list_path(e.id).is_file()))
         elif verb == "step":
             current = session.load_session()
             total = int(current.get("total") or 0) if current else 0
@@ -565,6 +693,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             return cmd_freeze(args)
         if verb == "rehearse":
             return cmd_rehearse(args)
+        if verb == "record":
+            return cmd_record(args)
+        if verb == "gif":
+            return cmd_gif(args)
         if verb in ("golden-path", "browser"):
             raise UsageError(f"`{verb}` is run by the Makefile: make demo {verb}")
         raise UsageError(f"Unsupported demo verb: '{verb}' (expected one of: {' '.join(VERBS)})")

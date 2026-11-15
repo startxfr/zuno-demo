@@ -145,7 +145,9 @@ DAY3_VERBS := test stresstest backup restore check admit run release scenario-fa
 # of ADR-0605/ADR-0606, dispatched here exactly as before. The WP-136
 # webinar verbs and their playbooks were retired by WP-272 (ADR-0616
 # clause 13); the GPU failover drill stays `make d3 scenario-failover-node`.
-DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse golden-path browser
+# ADR-0617/WP-284: record and gif take a demo's 5-minute version in a browser
+# and cut its GIF under ~/.cache/zuno/demo/recordings/, locally, never AAP.
+DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse record gif golden-path browser
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -268,8 +270,10 @@ help:
 	  '  make demo use <id> 5|15              Select a demo and its version (a workshop takes no version)' \
 	  '  make demo status|check|install|start|stop|uninstall [<id>]   Run the demo'"'"'s action file, then print its page section' \
 	  '  make demo step next|<N>              Run the step'"'"'s reads, then print its Do, Say and You should see' \
-	  '  make demo freeze on|off              Freeze marker on this workstation: install, uninstall and rehearse refuse' \
+	  '  make demo freeze on|off              Freeze marker on this workstation: install, uninstall, rehearse and record refuse' \
 	  '  make demo rehearse <id> 5|15         The whole sequence without pauses, with a report' \
+	  '  make demo record <id>                Record the 5-minute version in a browser, then cut its GIF in ~/.cache (ADR-0617)' \
+	  '  make demo gif <id>                   Cut the newest recording again, offline; never copies into the repository' \
 	  '  make demo golden-path|browser        The catalogue-wide checks (ADR-0605, ADR-0606); ONLY=a,b limits them' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \

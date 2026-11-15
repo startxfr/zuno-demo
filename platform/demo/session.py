@@ -2,7 +2,9 @@
 
 - `~/.config/zuno/demo-session.json`: the demo in use, its version, the last step played and the step count.
 - `~/.config/zuno/demo-freeze.json`: present while a freeze is on (who set it, when). Local by the owner's decision.
-- `~/.cache/zuno/demo/`: the Ansible logs and the rehearsal reports.
+- `~/.cache/zuno/demo/`: the Ansible logs, the rehearsal reports, the recordings of `make demo record` (ADR-0617,
+  never published as such) and `checks/<id>.json`, the result of the demo's last `check` (`record` needs one that passed
+  today).
 
 No credential is ever written here.
 """
@@ -40,6 +42,14 @@ def logs_dir() -> pathlib.Path:
 
 def rehearsals_dir() -> pathlib.Path:
     return cache_dir() / "rehearsals"
+
+
+def recordings_dir() -> pathlib.Path:
+    return cache_dir() / "recordings"
+
+
+def checks_dir() -> pathlib.Path:
+    return cache_dir() / "checks"
 
 
 def now_iso() -> str:
@@ -102,3 +112,21 @@ def freeze_off() -> bool:
         return True
     except FileNotFoundError:
         return False
+
+
+def record_check(demo: str, passed: bool, source: str = "check") -> dict:
+    """Keep the result of a demo's `check` (alone or inside a rehearsal): `record` reads it (ADR-0617)."""
+    data = {"demo": demo, "passed": bool(passed), "when": now_iso(),
+            "date": datetime.date.today().isoformat(), "source": source}
+    _write_json(checks_dir() / f"{demo}.json", data)
+    return data
+
+
+def last_check(demo: str) -> Optional[dict]:
+    """{demo, passed, when, date (local), source} of the demo's last `check`, or None."""
+    return _read_json(checks_dir() / f"{demo}.json")
+
+
+def check_passed_today(demo: str) -> bool:
+    last = last_check(demo)
+    return bool(last and last.get("passed") is True and last.get("date") == datetime.date.today().isoformat())

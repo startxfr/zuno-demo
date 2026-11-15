@@ -1,0 +1,21 @@
+---
+# open-webui: the cut list of its GIF (ADR-0617, WP-284), read by platform/demo/gif.py.
+# `make demo record open-webui` takes the 5-minute version as sale-01 (evaluations/browser/walkthroughs/open-webui.mjs)
+# and cuts it with this list; `make demo gif open-webui` cuts the newest take again, offline. The GIF stays in
+# ~/.cache/zuno/demo/recordings/ until the owner's "go open-webui".
+# Markers written by the walkthrough, in order: login, home, q1-sent, q1-done, code-picked, q2-done, tools, end.
+# Motion moments use `fit`: the answer time varies from take to take, the length in the GIF does not.
+# Step times are quoted: YAML reads an unquoted 0:45 as the number 45.
+record_notice: >-
+  a recorded browser session as sale-01 on Open WebUI: 2 real model answers and a chat title on sale-01's budget;
+  the chat it creates is deleted at the end
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account"}
+  - {still: home, hold: 4, step: "0:00", caption: "0:00  Zuno picks the model"}
+  - {from: q1-sent, to: q1-done, fit: 10, hold: 3, step: "0:45", caption: "0:45  An answer from a model on our own GPUs"}
+  - {from: code-picked, to: q2-done, fit: 14, hold: 4, step: "1:45", caption: "1:45  Zuno Code: code questions go to Codestral"}
+  - {still: tools, hold: 5, step: "3:00", caption: "3:00  My tools come from my job"}
+  - {still: end, hold: 5, step: "4:15", caption: "Identity, models, tools and budget stay governed"}
