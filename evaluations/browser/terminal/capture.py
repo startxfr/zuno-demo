@@ -23,6 +23,8 @@ fails naming the command and nothing is typed at all:
 - a command `platform/demo/readonly.py` accepts (the read-only allowlist of `make demo step`); a watch flag is removed
   as the engine removes it, so the read runs once;
 - or a command the demo lists in `ansible/demos/<id>/demo.yml` under `record: {allow: [...]}`;
+- a command that runs `make` (`ONLY=x make demo golden-path` included) only when the demo lists that exact command,
+  whatever readonly.py says;
 - never `oc whoami -t`, `oc config view`, `env`/`printenv`/`set`, or a read of a kubeconfig, whatever the list says.
   `$(oc whoami -t)` inside a command stays runnable: bash substitutes it and never echoes its value.
 A row listed in demo.yml `record: {skip: {"<M:SS>": "<why>"}}` is not typed at all, so it is not in the take and
@@ -86,6 +88,8 @@ NEVER = [
     (re.compile(r"\$\{?(?:HOME|PATH|PYTHONUSERBASE)\b"), "a local path variable would be printed"),
 ]
 CREDENTIAL_NAME = re.compile(r"KEY|TOKEN|PASSWORD|SECRET", re.I)
+SEGMENT_RE = re.compile(r"\|\|?|&&?|;|\(|\)|`")      # the commands of a line: pipes, lists, subshells, substitutions
+ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
 class NoDomain(RuntimeError):
@@ -119,11 +123,28 @@ def never(command: str) -> str:
     return ""
 
 
+def runs_make(command: str) -> bool:
+    """True when a segment of the command line runs `make` (after its variable assignments, `ONLY=x make ...`)."""
+    for segment in SEGMENT_RE.split(command):
+        words = segment.split()
+        while words and ASSIGNMENT_RE.match(words[0]):
+            words.pop(0)
+        if words and os.path.basename(words[0]) == "make":
+            return True
+    return False
+
+
 def acceptable(command: str, allow: List[str], check: Callable[[str], Tuple[bool, str]]) -> Tuple[str, str]:
     """(the command to type, "") or ("", why it may not be typed)."""
     why = never(command)
     if why:
         return "", f"never typed: {why}"
+    if runs_make(command):
+        # ADR-0618 clause 7: a `make` row is filmed only when the demo lists it, whatever the read-only allowlist
+        # says (it accepts `make demo golden-path`, a known row of the ADR-0616 step files, which spends budget).
+        if command in allow:
+            return command, ""
+        return "", "a `make` command, typed only when demo.yml lists this exact command under `record: {allow: [...]}`"
     ok, reason = check(command)
     if ok:
         return command, ""

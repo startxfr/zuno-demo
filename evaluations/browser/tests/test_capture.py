@@ -154,6 +154,21 @@ class WhatMayBeTyped(unittest.TestCase):
             self.assertEqual(typed, "", command)
             self.assertIn("never typed", why, command)
 
+    def test_a_make_command_needs_its_exact_string_in_the_demo_list(self):
+        for command in ("make help", "ONLY=sovereignty make demo golden-path", "make d0 check argocd",
+                        "oc get pods | make -s x", "cd /tmp && make all", "A=1 B=2 /usr/bin/make help"):
+            self.assertTrue(capture.runs_make(command), command)
+            typed, why = self.accept(command)
+            self.assertEqual(typed, "", command)
+            self.assertIn("a `make` command, typed only when demo.yml lists this exact command", why)
+            self.assertEqual(self.accept(command, [command]), (command, ""))
+        golden = "ONLY=sovereignty make demo golden-path"
+        self.assertTrue(readonly.check(golden, {})[0])      # readonly.py accepts it: the capture is stricter
+        self.assertEqual(self.accept(golden, ["make demo golden-path"])[0], "")   # nothing wider, nothing else
+        self.assertEqual(self.accept(golden, ["ONLY=trace make demo golden-path"])[0], "")
+        for command in ("oc get pods | grep make", "cmake --version", "echo make", "oc get cm makefile -n x"):
+            self.assertFalse(capture.runs_make(command), command)
+
     def test_the_token_substitution_stays_runnable(self):
         command = 'curl -s -H "Authorization: Bearer $(oc whoami -t)" https://tempo.example/api/search'
         self.assertEqual(capture.never(command), "")

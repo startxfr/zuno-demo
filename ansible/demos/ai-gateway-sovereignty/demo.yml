@@ -10,3 +10,14 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
+# The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. Row 1:00 is the
+# only Do command of the 5-minute version: a `make` command, typed only because it is listed here, exactly. It runs
+# the sovereignty probe of the golden path locally (no AAP routing in the demo recipe): real model calls on the
+# gateway persona's budget. The window is 140x30, planned from the probe's result line (about 135 columns inside the
+# Ansible report) and about 22 lines of Ansible output; check both after the first take.
+record:
+  kind: terminal
+  allow:
+    - "ONLY=sovereignty make demo golden-path"
+  cols: 140
+  rows: 30
