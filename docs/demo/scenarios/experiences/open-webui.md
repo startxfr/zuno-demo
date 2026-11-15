@@ -11,6 +11,8 @@ six other experiences.
 
 **The message:** "Bring any chat UI you like: identity, models, tools and budget stay governed by the platform."
 
+![The 5-minute version of the Open WebUI demo, recorded live as sale-01: sign-in, an answer from a local model, the switch to Zuno Code, and the governed Zuno tools connection.](../../../assets/img/demo/open-webui.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password, kept in Vault at
