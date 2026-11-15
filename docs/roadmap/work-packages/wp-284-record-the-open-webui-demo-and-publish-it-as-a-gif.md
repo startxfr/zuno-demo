@@ -1,6 +1,6 @@
 # WP-284: Record the Open WebUI demo and publish it as a GIF
 
-- **State:** Not started
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)
 - **Depends on:** none (Phase 56 is closed)
 - **Related:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md), [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md), [WP-285](wp-285-give-the-demo-pages-a-presenters-shape.md)
@@ -62,3 +62,12 @@ a 40 to 60 second GIF in `~/.cache/zuno/demo/recordings/`; the GIF is sent to th
   model call, creates no chat and refuses any chat request that is not a GET. Run it before a first take to check the
   selectors without spending budget.
 - The walkthrough never clicks a tool switch.
+
+## Result (2026-11-15)
+
+One take on demo333 as sale-01 (`open-webui-20261115-202921`, 23.4 s), cut offline into `open-webui.gif`: 42.9 s, 960x656,
+1.3 MB, 7 moments. It was sent to the owner and published with the owner's "go open-webui" (commit `dd9178fc`); the
+chat the take created was deleted, and sale-01's chat list was identical before and after. The first take failed on a
+selector and the first cut had two defects (a caption over the input, a frozen stretch); the owner received a re-cut. Limits, stated in the evidence: one take of one demo, selectors tied to Open WebUI 0.12.5, a sampled privacy
+review (29 of 429 frames, the 8 marker images not opened one by one), guards exercised offline only
+([evidence](../evidence/wp-284-open-webui-gif-2026-11-15.md)).

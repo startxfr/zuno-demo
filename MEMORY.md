@@ -1067,6 +1067,14 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — ADR-0617 stays Accepted; WP-284 Done (the Open WebUI pilot).** The first demo GIF is published
+  (`docs/assets/img/demo/open-webui.gif`, 42.9 s, 1.3 MB, owner's "go open-webui", evidence
+  `docs/roadmap/evidence/wp-284-open-webui-gif-2026-11-15.md`). WP-285 (the page shape rollout) waits for the owner's
+  gate. Traps kept for the next demo: on Open WebUI 0.12.5 the tools menu shows one connection, Zuno tools, not tool
+  names, so the presenter says the names; the walkthrough's selectors are tied to that version, and a collapsed sidebar
+  rail looks like an open sidebar; use `record.sh <id> --scout` before a first take; `fit` slows a fast answer and
+  never freezes a frame, the caption goes in a band under the picture; the privacy review of the first GIF sampled 29 of
+  429 frames, so a later review should say how many it looked at.
 - **2026-11-15 — ADR-0617 Accepted (Phase 57, WP-284 and WP-285, Not started).** Each demo page will show a 40 to 60
   second silent GIF of its 5-minute version, recorded by a dedicated walkthrough (`make demo record <id>`, then
   `make demo gif <id>`) and published only with the owner's named "go <id>"; the `.webm` is never published. Every
