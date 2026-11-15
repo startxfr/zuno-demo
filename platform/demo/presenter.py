@@ -569,7 +569,7 @@ def cmd_gif(args: List[str]) -> int:
     out(f"{entry.id} · gif · {directory}")
     try:
         built = gif.build(entry.id, directory, gif.load_cut_list(gif.cut_list_path(entry.id)),
-                          times=gif.page_times(entry.id))
+                          times=gif.page_times(entry.id), cut_path=gif.cut_list_path(entry.id))
     except gif.CutError as exc:
         lines([f"REFUSED: {r}" for r in exc.reasons])
         return 1
@@ -614,7 +614,8 @@ def cmd_record(args: List[str]) -> int:
         out(f"Files so far: {directory}")
         return 1 if rc != 2 else 2
     try:
-        built = gif.build(entry.id, directory, cut, times=gif.page_times(entry.id))
+        built = gif.build(entry.id, directory, cut, times=gif.page_times(entry.id),
+                          cut_path=gif.cut_list_path(entry.id))
     except gif.CutError as exc:
         lines([f"REFUSED: {r}" for r in exc.reasons])
         out(f"The take is kept in {directory}: fix the cut list, then make demo gif {entry.id}")

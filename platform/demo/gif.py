@@ -27,6 +27,7 @@ Exit codes: 0 built, 1 the cut list, the recording or the result is wrong, 2 usa
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import shutil
@@ -56,7 +57,7 @@ SPEED_RANGE = (0.5, 16.0)
 BAND = 56                   # pixels of the caption band under the picture
 FPS_RANGE = (5, 15)
 WIDTH_RANGE = (480, 1280)
-CAPTION_MAX = 70
+CAPTION_MAX = 60           # about 780 px at 26 px Liberation Sans: inside 960 with a margin
 FFMPEG_TIMEOUT = 900
 
 
@@ -403,9 +404,19 @@ class Built:
         return lines
 
 
+def git_blob(path: pathlib.Path) -> Optional[str]:
+    """The git blob id of a file (`git hash-object`), computed here: the cut list a GIF was cut with."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
 def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[Sequence[str]] = None,
-          runner=subprocess.run) -> Built:
-    """Cut `directory`'s recording into `<id>.gif` in the same directory, or raise CutError."""
+          runner=subprocess.run, cut_path: Optional[pathlib.Path] = None) -> Built:
+    """Cut `directory`'s recording into `<id>.gif` in the same directory, or raise CutError. `<id>.gif.json` records
+    the provenance: the take, its start, and the git blob of the cut list (`cut_path`), for the publication record."""
     markers = load_markers(directory)
     p = plan(demo_id, cut, markers, times)
     missing = []
@@ -432,6 +443,8 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
     built = Built(path, _duration(directory, output), path.stat().st_size, p)
     (directory / f"{demo_id}.gif.json").write_text(json.dumps({
         "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
+        "take": directory.name, "started": markers.get("started"),
+        "cut_list": f"ansible/demos/{demo_id}/gif.yml", "cut_list_blob": git_blob(cut_path) if cut_path else None,
         "width": p.width, "height": p.out_height, "picture_height": p.height, "fps": p.fps,
         "moments": [{"caption": m.caption, "seconds": round(m.seconds, 2), "cut": m.label(), "step": m.step}
                     for m in p.moments]}, indent=2) + "\n", encoding="utf-8")
@@ -465,7 +478,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(" ".join(podman(directory, ffmpeg_argv(p, load_markers(directory), f"{args.demo}.gif"))))
             print(f"{len(p.moments)} moments, {p.seconds:.1f} s planned")
             return 0
-        built = build(args.demo, directory, cut, times=times)
+        built = build(args.demo, directory, cut, times=times, cut_path=path)
     except CutError as exc:
         for reason in exc.reasons:
             sys.stderr.write(f"REFUSED: {reason}\n")

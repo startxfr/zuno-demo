@@ -109,7 +109,8 @@ class CutList(unittest.TestCase):
         refused(self, cut({"from": "q1-sent", "to": "q1-done", "fit": 3, "speed": 2, "caption": "x"}), markers(),
                 "`fit` or `speed`")
         refused(self, cut({"still": "home", "hold": 3}), markers(), "`caption` is required")
-        refused(self, cut({"still": "home", "hold": 3, "caption": "x" * 80}), markers(), "at most 70")
+        refused(self, cut({"still": "home", "hold": 3, "caption": "x" * 61}), markers(), "at most 60")
+        gif.plan("open-webui", cut({"still": "home", "hold": 3, "caption": "x" * 60}), markers(), TIMES)
         refused(self, cut({"still": "home", "hold": 3, "step": "0:50", "caption": "x"}), markers(), "step 0:50")
         refused(self, cut({"still": "home", "hold": 3, "fit": 3, "caption": "x"}), markers(), "takes only")
         refused(self, cut({"still": "home", "hold": 3, "colour": "red", "caption": "x"}), markers(), "unknown key")
@@ -206,7 +207,8 @@ class Build(unittest.TestCase):
     def build(self, size, seconds=48.0):
         with mock.patch.object(gif.shutil, "which", return_value="/usr/bin/podman"), \
                 mock.patch.object(gif, "_duration", return_value=seconds):
-            return gif.build("open-webui", self.dir, self.cut, times=TIMES, runner=self.fake_ffmpeg(size))
+            return gif.build("open-webui", self.dir, self.cut, times=TIMES, runner=self.fake_ffmpeg(size),
+                             cut_path=gif.cut_list_path("open-webui"))
 
     def test_built_with_captions_and_a_summary(self):
         built = self.build(3 * 1048576)
@@ -216,7 +218,17 @@ class Build(unittest.TestCase):
         self.assertIn("3.0 MB", summary)
         self.assertIn("48.0 s by ffprobe", summary)
         self.assertIn("960x656 (picture 960x600 + caption band 56)", summary)
-        self.assertTrue(json.loads((self.dir / "open-webui.gif.json").read_text())["moments"])
+        record = json.loads((self.dir / "open-webui.gif.json").read_text())
+        self.assertTrue(record["moments"])
+        # Provenance for the publication record: the take, its start, and the cut list's git blob.
+        self.assertEqual(record["take"], self.dir.name)
+        self.assertEqual(record["started"], "2026-11-16T09:00:00+00:00")
+        self.assertEqual(record["cut_list"], "ansible/demos/open-webui/gif.yml")
+        blob = subprocess.run(["git", "hash-object", str(gif.cut_list_path("open-webui"))], stdout=subprocess.PIPE,
+                              universal_newlines=True, cwd=str(ROOT))
+        if blob.returncode == 0:
+            self.assertEqual(record["cut_list_blob"], blob.stdout.strip())
+        self.assertRegex(record["cut_list_blob"], r"^[0-9a-f]{40}$")
 
     def test_over_8_mb_is_an_error(self):
         with self.assertRaises(gif.CutError) as ctx:
