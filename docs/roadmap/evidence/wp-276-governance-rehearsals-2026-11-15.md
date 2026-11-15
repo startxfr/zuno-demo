@@ -35,6 +35,10 @@ Session `zuno-demo-reorg-demo333` ran these rehearsals on demo333 with the owner
   answer through sale-01's OpenClaw assistant and one through consultant-02's, in each version, so sale-01's budget was
   spent twice. The Open WebUI question as sale-01 stays by hand. The `quotas` runs are short (37 s and 47 s) because `start` is one probe.
 - The host was loaded when several sessions worked on it: read the seconds as an upper bound.
+- **Replay of 2026-11-15, 10:30 to 10:43.** `ai-gateway-sovereignty` 5 (103829) and 15 (104136) were run again at checkout
+  fbdd31c7, with the probe queue in the script's order: both PASS. The 02:27 and 02:30 reports stay the result of this
+  file. The night log shows the queue was already `unifai-tekos,sovereignty,trace`, so the night PASS did not depend on
+  the queue-order bug found in WP-278.
 - `guardrails` belongs to this layer and has its own file: [WP-273](wp-273-guardrails-rehearsal-2026-11-15.md).
 
 ## A2A delegation with approval
