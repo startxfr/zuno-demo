@@ -14,6 +14,8 @@ admission and mirror paths: see [Appendix B](#appendix-b---lld).
 **The message:** "What runs here is signed, and the signer is named. In the namespaces that opted in, the cluster
 refuses an image whose signature does not match, and it reads images and signatures from our own registry."
 
+![The 5-minute version of the image signing and admission demo, recorded live in a terminal: the signer in the cluster, the policies in enforce, the namespaces that opted in, and the mirror to the platform's own registry.](../../../assets/img/demo/image-signing-admission.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
