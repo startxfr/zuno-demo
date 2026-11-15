@@ -35,6 +35,13 @@ class Unit:
     name: str          # an action ("status") or a step time ("7:30")
     file: str          # relative to the demo directory: "status.yml", "steps/07-30.yml"
     kind: str = "action"
+    # A workshop plays other demos' files (ADR-0616 clause 10): the directory and id of the demo that owns the file,
+    # the action or step time the owner's manifest knows it by, and whether its probes wait for one merged run.
+    dir: str = ""
+    demo: str = ""
+    action: str = ""
+    time: str = ""
+    defer_flush: bool = False
 
 
 @dataclass
@@ -125,7 +132,10 @@ def run_units(demo_id: str, demo_dir: pathlib.Path, units: List[Unit], *, confir
         "demo_dir": str(demo_dir),
         "demo_lib": str(engine_root / "ansible" / "demos" / "_lib"),
         "demo_readonly": str(engine_root / "platform" / "demo" / "readonly.py"),
-        "demo_units": [{"name": u.name, "file": u.file, "kind": u.kind} for u in units],
+        "demo_units": [{"name": u.name, "file": u.file, "kind": u.kind, "dir": u.dir, "demo": u.demo,
+                        "action": u.action or (u.name if u.kind == "action" else ""),
+                        "time": u.time or (u.name if u.kind == "step" else ""),
+                        "defer_flush": u.defer_flush} for u in units],
         "demo_confirmed": confirmed,
         "demo_results_path": str(results_path),
     }

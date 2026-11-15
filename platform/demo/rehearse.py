@@ -17,7 +17,7 @@ import session
 from catalogue import Page
 from runner import RunResult, Unit, UnitResult
 
-VERSION_LABEL = {"5": "5-minute", "15": "15-minute"}
+VERSION_LABEL = {"5": "5-minute", "15": "15-minute", "w": "workshop"}
 
 
 def plan_units(page: Page, version: str, demo_dir: pathlib.Path, manifest: dict) -> Tuple[List[Unit], List[UnitResult]]:
@@ -56,11 +56,14 @@ def sequence(page: Page, version: str) -> List[str]:
     return ["status", "check", "install", "start"] + [s.time for s in page.steps(version)] + ["stop", "uninstall"]
 
 
-def merge(page: Page, version: str, run: Optional[RunResult], decided: List[UnitResult]) -> List[UnitResult]:
+def merge(page: Page, version: str, run: Optional[RunResult], decided: List[UnitResult],
+          names: Optional[List[str]] = None) -> List[UnitResult]:
+    """One result per unit, in sequence order (`names`: a workshop's own order)."""
     by_name = {u.name: u for u in decided}
     for u in (run.units if run else []):
         by_name[u.name] = u
-    return [by_name.get(name, UnitResult(name, "failed", error="no result")) for name in sequence(page, version)]
+    order = names if names is not None else sequence(page, version)
+    return [by_name.get(name, UnitResult(name, "failed", error="no result")) for name in order]
 
 
 def report(page: Page, version: str, results: List[UnitResult], run: Optional[RunResult],
@@ -76,7 +79,7 @@ def report(page: Page, version: str, results: List[UnitResult], run: Optional[Ru
     else:
         changes = "- Changing units: none (every action is a read or has nothing to run)"
     lines = [
-        f"# Rehearsal: {page.id}, {VERSION_LABEL[version]} version",
+        f"# Rehearsal: {page.id}, " + ("workshop" if version == "w" else f"{VERSION_LABEL[version]} version"),
         "",
         f"- Date: {stamp}",
         f"- Page: `{page.path.name}`",

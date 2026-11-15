@@ -12,6 +12,9 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   `not_run` entry of its step file;
 - only the world-model directory names a MachineSet outside a read command, and nothing names `zuno-gpu-a` there;
 - a ClusterServiceVersion is read by `name_prefix`, never by its versioned name;
+- a workshop's `agenda:` matches the page's Agenda table row by row (scenario, version anchor, `only` times that
+  exist, inline section with a timed table), its own and inline rows have their step files, and its check and start
+  files run the queued probes;
 - a page that has moved has `## Presenter lifecycle` with exactly `### Status` ... `### Uninstall`, none empty;
 - every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile).
 Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
@@ -32,6 +35,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import catalogue  # noqa: E402
 import guard  # noqa: E402
 import readonly  # noqa: E402
+import workshop  # noqa: E402
 
 import yaml  # noqa: E402
 
@@ -223,7 +227,7 @@ def demo_problems(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
             continue
         problems += unit_problems(f"{rel_dir}/{action}.yml", tasks, action in changing_actions, variables, entry.id)
     if entry.kind == "workshop":
-        return problems
+        return problems + workshop_problems(entry, page, manifest, base, rel_dir, root)
     expected_files = {s.file_name: s for s in times.values()}
     steps_dir = base / "steps"
     present = {p.name for p in steps_dir.glob("*.yml")} if steps_dir.is_dir() else set()
@@ -245,6 +249,78 @@ def demo_problems(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
         for command in catalogue.do_commands(step.do):
             if _norm(command) not in covered:
                 problems.append(f"{rel}: the Do command `{command}` is not covered (cmd, page_text or not_run)")
+    return problems
+
+
+def _normal_entry(entry) -> dict:
+    if not isinstance(entry, dict):
+        return {"invalid": repr(entry)}
+    data = dict(entry)
+    if "at" in data:
+        data["at"] = guard.time_key(data["at"])
+    if "version" in data:
+        data["version"] = str(data["version"])
+    if "only" in data:
+        data["only"] = [guard.time_key(t) for t in data["only"] or []]
+    return data
+
+
+def workshop_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict, base: pathlib.Path,
+                      rel_dir: str, root: pathlib.Path) -> List[str]:
+    """The agenda of the manifest against the page's Agenda table (ADR-0616 clause 10), and the workshop's own
+    step files against its own and inline rows."""
+    problems: List[str] = []
+    rows = workshop.agenda_rows(page)
+    entries = [_normal_entry(e) for e in manifest.get("agenda") or []]
+    for raw in manifest.get("agenda") or []:
+        if isinstance(raw, dict) and not isinstance(raw.get("at"), str):
+            problems.append(f"{rel_dir}/demo.yml: agenda `at` {raw.get('at')!r} is not a string: quote the time stamp")
+    expected = [row.entry() for row in rows]
+    by_time = {e.get("at"): e for e in entries}
+    for row in rows:
+        have = by_time.get(row.at)
+        if have is None:
+            problems.append(f"{rel_dir}/demo.yml: the Agenda row {row.at} ({row.block}) has no agenda entry")
+        elif have != row.entry():
+            problems.append(f"{rel_dir}/demo.yml: agenda entry {row.at} is {have}, the page's row says {row.entry()}")
+    for extra in [e for e in entries if e.get("at") not in {r.at for r in rows}]:
+        problems.append(f"{rel_dir}/demo.yml: agenda entry {extra.get('at')} is not a row of the page's Agenda table")
+    if [e.get("at") for e in entries] != [e["at"] for e in expected] and not problems:
+        problems.append(f"{rel_dir}/demo.yml: the agenda entries are not in the page's order")
+    for name in workshop.scenarios(manifest):
+        if not catalogue.demo_dir(name, root).is_dir():
+            problems.append(f"{rel_dir}/demo.yml: scenario {name} has no directory under ansible/demos/")
+    try:
+        workshop.expand(page, manifest, root)
+    except (workshop.AgendaError, catalogue.ParseError) as exc:
+        problems.append(f"{rel_dir}/demo.yml: {exc}")
+    if workshop.scenarios(manifest):
+        for action in workshop.DEFERRED_FLUSH:
+            path = base / f"{action}.yml"
+            if path.is_file() and "flush_checks.yml" not in path.read_text(encoding="utf-8"):
+                problems.append(f"{rel_dir}/{action}.yml: a workshop's {action} must include _lib/flush_checks.yml "
+                                "(its scenarios only queue their probes)")
+    wanted = workshop.own_step_files(page)
+    steps_dir = base / "steps"
+    present = {f"steps/{p.name}" for p in steps_dir.glob("*.yml")} if steps_dir.is_dir() else set()
+    for rel in sorted(set(wanted) - present):
+        problems.append(f"{rel_dir}/{rel}: missing (agenda row {wanted[rel][0]} of the page)")
+    for rel in sorted(present - set(wanted)):
+        problems.append(f"{rel_dir}/{rel}: no own or inline agenda row of the page has this time")
+    for rel in sorted(present & set(wanted)):
+        step = wanted[rel][1]
+        try:
+            tasks = load_yaml(base / rel)
+        except yaml.YAMLError as exc:
+            problems.append(f"{rel_dir}/{rel}: {exc}")
+            continue
+        problems += unit_problems(f"{rel_dir}/{rel}", tasks, False, {}, entry.id)
+        found = commands_of(tasks) if isinstance(tasks, list) else {"cmd": [], "page_text": [], "not_run": []}
+        covered = {_norm(c) for c in found["cmd"] + found["page_text"] + found["not_run"]}
+        for command in catalogue.do_commands(step.do):
+            if _norm(command) not in covered:
+                problems.append(f"{rel_dir}/{rel}: the Do command `{command}` is not covered (cmd, page_text or "
+                                "not_run)")
     return problems
 
 

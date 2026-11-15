@@ -213,3 +213,22 @@ def failure_rows(page: Page, time: str = "") -> List[str]:
                [r for r in rows if not any(pattern.search(v) for v in r.values())]
     header = list(rows[0].keys())
     return ["FAILED", "If something goes wrong:"] + table_block(header, [[r.get(h, "") for h in header] for r in rows])
+
+
+def workshop_step_header(page: Page, item, total: int) -> str:
+    """`<workshop> · workshop · step 7/38 · 0:03 An agent at work · unifai-agents 0:45 (2/5)`."""
+    text = f"{page.id} · workshop · step {item.number}/{total} · {item.at} {plain(item.block)}"
+    if item.kind == "scenario":
+        text += f" · {item.demo_id} {item.step.time} ({item.position}/{item.of})"
+    elif item.kind == "inline":
+        text += f" · {item.step.time} ({item.position}/{item.of})"
+    return text
+
+
+def workshop_next_line(flat: list, item) -> str:
+    if item.number >= len(flat):
+        return "Last step done: make demo stop"
+    nxt = flat[item.number]
+    do = textwrap.shorten(plain(nxt.step.do), width=NEXT_PREVIEW, placeholder="...")
+    where = f"{nxt.at} {plain(nxt.block)}" if nxt.at != item.at else nxt.step.time
+    return f"Next: {nxt.number}/{len(flat)} · {where} · {do}"

@@ -169,7 +169,7 @@ class Presenter(PresenterRun):
         rc, text = self.presenter("list")
         self.assertEqual(rc, 0, text)
         self.assertRegex(text, r"fixture-demo\s+scenario\s+fixture\s+3\s+6")
-        self.assertRegex(text, r"fixture-workshop\s+workshop\s+workshop\s+-\s+-")
+        self.assertRegex(text, r"fixture-workshop\s+workshop\s+workshop\s+-\s+-\s+8\s")
 
     def test_unknown_verb_and_id(self):
         self.assertEqual(self.presenter("reset")[0], 2)
@@ -227,11 +227,17 @@ class Presenter(PresenterRun):
         self.assertEqual(self.presenter("freeze", "off")[0], 0)
         self.assertIn("Freeze: off", self.presenter("freeze")[1])
 
-    def test_workshop_waits_for_wp280(self):
+    def test_workshop_session_and_guard(self):
         rc, text = self.presenter("use", "fixture-workshop")
         self.assertEqual(rc, 0)
-        self.assertIn("WP-280", text)
-        self.assertEqual(self.presenter("step", "next")[0], 1)
+        self.assertIn("Using fixture-workshop · workshop · 8 steps.", text)
+        self.assertEqual(self.presenter("use", "fixture-workshop", "5")[0], 2)
+        self.assertEqual(self.presenter("rehearse", "fixture-workshop", "5")[0], 2)
+        rc, text = self.presenter("install", env={"DEMO_CONFIRM": "fixture-demo"})
+        self.assertEqual(rc, 2)
+        self.assertIn("install:fixture-demo: Writes the fixture add-on marker", text)
+        self.assertIn("does not confirm 'fixture-workshop'", text)
+        self.assertEqual(self.presenter("step", "9")[0], 2)
 
     def test_completion_words(self):
         self.assertIn("fixture-demo", self.presenter("--ids")[1].split())
@@ -282,6 +288,50 @@ class EndToEnd(PresenterRun):
                                       [runner.Unit("install", "install.yml")], confirmed="other")
         self.assertNotEqual(result.rc, 0)
         self.assertIn("stopped before any unit ran", result.error)
+        self.assertFalse(pathlib.Path(self.home, ".cache/zuno/demo/fixture-demo.installed").exists())
+
+    def test_workshop_chain_steps_and_rehearsal(self):
+        self.presenter("use", "fixture-workshop")
+        rc, text = self.presenter("status")
+        self.assertEqual(rc, 0, text)
+        self.assertIn("[status:fixture-demo]\n  $ git log -1 --format=%h   [ok]", text)
+        self.assertIn("[status]\n  Nothing to run.", text)
+        self.assertIn("STATUS\nNothing to do. The scenario's status file runs", text)
+        rc, text = self.presenter("step", "2")
+        self.assertEqual(rc, 0, text)
+        self.assertIn("step 2/8 · 0:02 The scenario · fixture-demo 0:00 (1/3)", text)
+        self.assertIn("$ git log -1 --format=%h   [ok]", text)
+        rc, text = self.presenter("step", "next")
+        self.assertIn("NOT RUN: this step changes the cluster", text)
+        rc, text = self.presenter("step", "5")
+        self.assertIn('Transition to the next block:\n  "And the workshop\'s own rows."', text)
+        rc, text = self.presenter("step", "6")
+        self.assertEqual(rc, 0, text)
+        self.assertIn("$ git log -1 --format=%s   [ok]", text)
+        marker = pathlib.Path(self.home, ".cache/zuno/demo/fixture-demo.installed")
+        rc, text = self.presenter("install", env={"DEMO_CONFIRM": "fixture-workshop"})
+        self.assertEqual(rc, 0, text)
+        self.assertTrue(marker.exists())
+        rc, text = self.presenter("rehearse", "fixture-workshop", env={"DEMO_CONFIRM": "fixture-workshop"})
+        self.assertEqual(rc, 0, text)
+        self.assertIn("| 0:02/1:30 | SKIPPED (mutating) |", text)
+        self.assertIn("| uninstall:fixture-demo | PASS |", text)
+        self.assertIn("confirmed by `fixture-workshop`: install:fixture-demo", text)
+        self.assertIn("RESULT: PASS", text)
+        self.assertFalse(marker.exists())
+        self.assertRegex(self.presenter("list")[1], r"fixture-workshop.*w: PASS \d{4}")
+
+    def test_a_scenario_unit_is_rechecked_by_the_playbook(self):
+        """A workshop unit that its scenario declares changing does not run without the workshop's confirmation."""
+        import runner
+        import workshop
+        units = [u for u in workshop.action_units("fixture-workshop", {"agenda": [
+            {"at": "0:02", "scenario": "fixture-demo", "version": "5"}]}, "install", FIXTURES)]
+        with mock.patch.dict(os.environ, {"PYTHONUSERBASE": USER_BASE}):
+            result = runner.run_units("fixture-workshop", FIXTURES / "ansible/demos/fixture-workshop", units,
+                                      confirmed="fixture-demo")
+        self.assertTrue(result.unit("install:fixture-demo").failed)
+        self.assertIn("changes the cluster", result.unit("install:fixture-demo").error)
         self.assertFalse(pathlib.Path(self.home, ".cache/zuno/demo/fixture-demo.installed").exists())
 
     def test_rehearse_reports(self):

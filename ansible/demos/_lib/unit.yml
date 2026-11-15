@@ -15,8 +15,38 @@
 
 - name: "demo | {{ demo_unit.name }}: run {{ demo_unit.file }}"
   block:
+    # A workshop's unit may belong to another demo (demo_unit.dir): its own manifest is read for its step variables
+    # (`env:`), and what that manifest declares changing is re-checked here, against the workshop's confirmation.
+    - name: "demo | {{ demo_unit.name }}: read the manifest of the demo that owns the file"
+      ansible.builtin.include_vars:
+        file: "{{ demo_unit.dir | default(demo_dir, true) }}/demo.yml"
+        name: demo_manifest
+
+    - name: "demo | {{ demo_unit.name }}: a changing unit runs only with the confirmation (ADR-0616 clause 7)"
+      ansible.builtin.assert:
+        that:
+          - demo_confirmed == demo_id
+        quiet: true
+        fail_msg: >-
+          {{ demo_unit.name }} changes the cluster: confirm with the id {{ demo_id }} (type it, or
+          DEMO_CONFIRM={{ demo_id }}).
+      when:
+        - demo_unit.kind == 'action'
+        - (demo_unit.action | default(demo_unit.name, true)) in ((demo_manifest.mutations | default({}, true)) | list)
+
+    - name: "demo | {{ demo_unit.name }}: a step declared changing is never run"
+      ansible.builtin.assert:
+        that:
+          - not (_demo_step_meta.mutating | default(false) | bool)
+        quiet: true
+        fail_msg: "{{ demo_unit.name }} is declared mutating in its demo.yml: the presenter runs it by hand."
+      vars:
+        _demo_step_time: "{{ demo_unit.time | default(demo_unit.name, true) }}"
+        _demo_step_meta: "{{ (demo_manifest.steps | default({}, true))[_demo_step_time] | default({}, true) }}"
+      when: demo_unit.kind == 'step'
+
     - name: "demo | {{ demo_unit.name }}: include {{ demo_unit.file }}"
-      ansible.builtin.include_tasks: "{{ demo_dir }}/{{ demo_unit.file }}"
+      ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/{{ demo_unit.file }}"
   rescue:
     - name: "demo | {{ demo_unit.name }}: record the failure"
       ansible.builtin.set_fact:

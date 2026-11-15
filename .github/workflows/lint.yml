@@ -95,6 +95,7 @@ jobs:
           python3 platform/demo/tests/test_readonly.py
           python3 platform/demo/tests/test_guard_session.py
           python3 platform/demo/tests/test_demo_catalogue.py
+          python3 platform/demo/tests/test_workshop.py
           home="$(mktemp -d)"
           HOME="$home" make demo list
           HOME="$home" make demo use guardrails 15

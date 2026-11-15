@@ -1,4 +1,6 @@
 ---
+# In a workshop (ADR-0616 clause 10) a scenario's check or start only queues (demo_unit.defer_flush): the queues
+# keep growing, and the workshop's own check.yml or start.yml runs everything once.
 # Run the queued checks once each (ADR-0616 clause 9): one `golden_path_probe.py --only` run and one
 # `browser/run.sh` with ONLY=, both read-only and allowed during a freeze; then empty the queues.
 # The queue holds probe names; the name `all` runs the whole golden path (`golden_path_probe.py` with no `--only`, every
@@ -13,7 +15,9 @@
   changed_when: false
   failed_when: false
   timeout: 1800
-  when: demo_queued_probes | length > 0
+  when:
+    - demo_queued_probes | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
 
 - name: "demo | run the queued browser checks ({{ demo_queued_browser | join(',') }})"
   ansible.builtin.command:
@@ -25,9 +29,12 @@
   changed_when: false
   failed_when: false
   timeout: 900
-  when: demo_queued_browser | length > 0
+  when:
+    - demo_queued_browser | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
 
 - name: "demo | record the checks"
+  when: not (demo_unit.defer_flush | default(false) | bool)
   ansible.builtin.set_fact:
     demo_unit_checks: "{{ demo_unit_checks + _demo_rows }}"
     demo_unit_commands: "{{ demo_unit_commands + _demo_cmds }}"

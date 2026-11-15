@@ -12,7 +12,8 @@ For each scenario of the catalogue, under `ansible/demos/<id>/`:
 - one `steps/MM-SS.yml` per timed row: the Do cell's commands that platform/demo/readonly.py accepts go into
   `run_reads` verbatim, a watch removed when that is the only refusal (`cmd` + `page_text`), the others into `not_run`
   with the reason.
-For each workshop: `demo.yml` and the six action files (the agenda is WP-280's).
+For each workshop: `demo.yml` with its `agenda:` read from the page's Agenda table, the six action files (check and
+start run the scenarios' queued probes once) and one step file per own or inline agenda row (WP-280).
 
 Without --write it prints what it would create. It never overwrites a file: the rollout work packages edit the files,
 and running it again only adds what is missing.
@@ -31,6 +32,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import catalogue  # noqa: E402
 import guard  # noqa: E402
 import readonly  # noqa: E402
+import workshop  # noqa: E402
 
 try:
     import yaml
@@ -388,8 +390,11 @@ def manifest(page: catalogue.Page, rel_page: str, probes: List[str], browser: Li
     lines += comment(GENERATED)
     lines += [f"kind: {page.kind}", f"page: {rel_page}"]
     if page.kind == "workshop":
-        lines += comment("The agenda (scenario rows, inline rows, own rows) is composed by WP-280.")
-        lines += ["agenda: []", "mutations: {}"]
+        lines += comment("The agenda, one entry per row of the page's Agenda table (ADR-0616 clause 10): `own` (the "
+                         "workshop's own row), `scenario` + `version` (+ `only`: named steps), or `inline` (a section "
+                         "of the page with its own timed table). The time keys are quoted.")
+        lines += agenda_lines(page)
+        lines.append("mutations: {}")
         return "\n".join(lines) + "\n"
     lines += [f"probes: [{', '.join(q(p) for p in probes)}]", f"browser: [{', '.join(q(b) for b in browser)}]"]
     lines += comment("Units that change the cluster, `<action>: \"what it changes\"`: the guard prints it and asks for "
@@ -406,6 +411,58 @@ def manifest(page: catalogue.Page, rel_page: str, probes: List[str], browser: Li
         lines += [f"  {json.dumps(time)}: {flow(meta)}" for time, meta in steps_meta.items()]
     else:
         lines.append("steps: {}")
+    return "\n".join(lines) + "\n"
+
+
+# --- workshops ---------------------------------------------------------------------------------------------------
+
+def agenda_lines(page: catalogue.Page) -> List[str]:
+    rows = workshop.agenda_rows(page)
+    if not rows:
+        return ["agenda: []"]
+    lines = ["agenda:"]
+    for row in rows:
+        entry = row.entry()
+        parts = [f'"at": {json.dumps(entry["at"])}']
+        for key in ("own", "scenario", "version", "only", "inline"):
+            if key in entry:
+                parts.append(f'"{key}": {json.dumps(entry[key])}')
+        lines.append("  - {" + ", ".join(parts) + "}  # " + re.sub(r"\s+", " ", row.block))
+    return lines
+
+
+def workshop_flush_action(page: catalogue.Page, action: str) -> str:
+    """check.yml and start.yml of a workshop: the scenarios' files only queued their probes; run them once here."""
+    return "\n".join(action_header(page, action) + comment(
+        "In a workshop each scenario's file only queues its golden-path probes and browser checks: this file runs "
+        "them once, merged.") + [
+        f'- name: "{page.id} {action} | run the probes and browser checks the scenarios queued, once"',
+        f'  ansible.builtin.include_tasks: "{LIB}/flush_checks.yml"',
+        f'- name: "{page.id} {action} | report"',
+        f'  ansible.builtin.include_tasks: "{LIB}/render.yml"']) + "\n"
+
+
+def workshop_step_file(page: catalogue.Page, at: str, step: catalogue.Step, own: bool) -> str:
+    lines = ["---"]
+    where = f"agenda row {at}" if own else f"agenda row {at}, inline step {step.time}"
+    lines += comment(f"{page.id}, {where}. Do: {step.do}")
+    lines += comment(GENERATED)
+    title = f"{page.id} {at}" if own else f"{page.id} {at}/{step.time}"
+    info = classify(page.id, step, {})
+    if not info["reads"]:
+        lines += [f'- name: "{title} | nothing to run"', f'  ansible.builtin.include_tasks: "{LIB}/nothing_to_run.yml"']
+    if info["reads"] or info["not_run"]:
+        lines += [f'- name: "{title} | the row\'s commands"', f'  ansible.builtin.include_tasks: "{LIB}/run_reads.yml"',
+                  "  vars:", "    run_reads:" + ("" if info["reads"] else " []")]
+        for read in info["reads"]:
+            if isinstance(read, dict):
+                lines += [f"      - cmd: {q(read['cmd'])}", f"        page_text: {q(read['page_text'])}"]
+            else:
+                lines.append(f"      - {q(read)}")
+        if info["not_run"]:
+            lines.append("    not_run:")
+            for item in info["not_run"]:
+                lines += [f"      - page_text: {q(item['page_text'])}", f"        reason: {q(item['reason'])}"]
     return "\n".join(lines) + "\n"
 
 
@@ -426,7 +483,11 @@ def plan_demo(entry: catalogue.Entry, root: pathlib.Path, inventory: dict, dryru
     if entry.kind == "workshop":
         files["demo.yml"] = manifest(page, rel_page, [], [], {}, {})
         for action in catalogue.LIFECYCLE_ACTIONS:
-            files[f"{action}.yml"] = nothing_action(page, action)
+            files[f"{action}.yml"] = (workshop_flush_action(page, action) if action in workshop.DEFERRED_FLUSH
+                                      else nothing_action(page, action))
+        rows = {row.at: row for row in workshop.agenda_rows(page)}
+        for rel, (at, step) in workshop.own_step_files(page).items():
+            files[rel] = workshop_step_file(page, at, step, rows[at].kind == "own")
         return files
     inv = inventory.get(entry.id)
     probes = page_probes(page, readme.get(entry.id, ""), known_probes)
