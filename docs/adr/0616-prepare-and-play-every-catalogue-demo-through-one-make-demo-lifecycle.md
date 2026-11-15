@@ -154,3 +154,23 @@ one Ansible file of that demo, then prints the matching section of its page, and
   layer).
 - [WP-280](../roadmap/work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) (the workshops).
 - [WP-281](../roadmap/work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) (the full rehearsal).
+
+## Update 2026-11-15 (WP-273 to WP-280): what the pilots, the rollout and an incident added
+
+- **Clause 7, by the owner's decision of 2026-11-15:** `make demo rehearse` also lists the golden-path probes and
+  browser checks its sequence will run and asks for the demo id (or `DEMO_CONFIRM=<id>`) when there is at least one.
+  They change nothing on the cluster, but they call the models and spend persona budgets; a rehearsal started by
+  mistake on 2026-11-15 showed the gap. One prompt covers the changing units and the probes.
+- **Clause 6, by the owner's decision of 2026-11-15:** the world-model `install` and `uninstall` never create or remove
+  the GPU node. They check the switch on `origin/devel`, read what exists and print the owner's actions. The Blender
+  add-on is installed and removed by its files, on the workstation, and a rehearsal never runs them
+  (`not_rehearsed` in the manifest).
+- **Clause 9:** a demo's `status` passes an Argo CD Application only when the application controller is running and
+  the Application was reconciled in the last 30 minutes. On 2026-11-15 at 01:38 the teardown of the world-model GPU
+  MachineSets (another work stream) deleted the Argo CD instance; five rehearsals then passed on the Applications'
+  stored `Synced/Healthy`. Those runs are not counted as evidence.
+- **Clause 5:** a step may also read a repository file (`grep`, `tail`, `head`, `cat`, `wc` as the first command, on
+  a relative path inside the repository, never a secret or key file), and a `$NAME` in a command is resolved from the
+  variables the manifest or the step declares.
+- **Clause 14:** `platform/demo/consistency.py` also warns when a page's `### Status` or `### Check` names an object
+  its file does not read; the rollout brought the count from 62 to 0.
