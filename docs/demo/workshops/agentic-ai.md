@@ -1,16 +1,5 @@
 # Workshop: Agentic AI
 
-> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
-> rehearse agentic-ai`: PASS at 11:49 (96 units, 348 s). Evidence:
-> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each
-> block keeps the status of its scenario page.
-> **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty,trace make demo golden-path`. The live RAG
-> block has no probe: rehearse it the same day.
-> **Duration:** 60 minutes, presenter-led. **Audience:** technical and business; the delegation block plays its
-> 15-minute version, the others their 5-minute version.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 Agents are useful only if they can act. On Zuno they act inside the same rules as everyone else. The workshop
@@ -27,24 +16,9 @@ bricks sit in the platform: see [Appendix A](#appendix-a---hld).
 **The message:** "Agents act with the user's identity, under the user's rights, through governed tools. They delegate
 only when a human approves, and they run only from a signed release."
 
-**Decisions:**
-- [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md): UnifAI is the agent platform.
-- [ADR-0011](../../adr/0011-define-tool-authorization-as-policy-intersection.md) and
-  [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): tool
-  authorization is an intersection, enforced in the mcp-gateway.
-- [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md),
-  [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md) and
-  [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
-  delegation carries the user's identity, is bounded, and waits for a human.
-- [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md),
-  [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) and
-  [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md): agents
-  are released from their own repository, signed, and pinned by digest.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -71,7 +45,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas
 
 ## Presenter lifecycle
 
-`make demo use agentic-ai` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use agentic-ai` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=agentic-ai`, covers the workshop. Each section below says
@@ -221,3 +195,35 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class UNIFAI,A2A,MCPGW,MCPS,OKF,KAGENT focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md): UnifAI is the agent platform.
+- [ADR-0011](../../adr/0011-define-tool-authorization-as-policy-intersection.md) and
+  [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): tool
+  authorization is an intersection, enforced in the mcp-gateway.
+- [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md),
+  [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md) and
+  [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
+  delegation carries the user's identity, is bounded, and waits for a human.
+- [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md),
+  [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) and
+  [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md): agents
+  are released from their own repository, signed, and pinned by digest.
+- [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse agentic-ai`: PASS at 11:49 (96 units, 348 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each
+> block keeps the status of its scenario page.
+> **Show-ready:** only if every probe of its blocks passed within the last hour:
+> `ONLY=unifai-tekos,open-webui,tools,delegation-approval,kagent,sovereignty,trace make demo golden-path`. The live RAG
+> block has no probe: rehearse it the same day.
+> **Duration:** 60 minutes, presenter-led. **Audience:** technical and business; the delegation block plays its
+> 15-minute version, the others their 5-minute version.
+> **Personas:** see [Personas](#personas).

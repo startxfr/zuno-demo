@@ -1,18 +1,5 @@
 # Workshop: One governed backend, many experiences
 
-> **Status:** Built from seven experience scenarios, linked in the agenda, and one inline block. Rehearsed as a whole on
-> 2026-11-15 through `make demo rehearse five-experiences`: PASS at 11:05 (94 units, 269 s), 2 skipped
-> (`install:blender-3d`, `uninstall:blender-3d`). Evidence:
-> [WP-280](../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of its scenario
-> page. A first version was shown live on 2026-11-07
-> ([WP-208](../roadmap/work-packages/wp-208-five-experiences-demonstration.md)) and in moment 1 of the
-> [2026-11-09 demonstration](demo-day-2026-11-09.md).
-> **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw,dify,tools,kagent,lightspeed,blender,guardrails make demo golden-path`.
-> **Duration:** 55 minutes, presenter-led (45 minutes with the short cut). **Audience:** mixed; every block plays its
-> 5-minute version.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 Seven very different experiences sit on one platform:
@@ -31,22 +18,9 @@ in the platform: see [Appendix A](#appendix-a---hld).
 **The message:** "Pick the experience your users like. Identity, models, tools, guardrails and budget stay the same,
 because one governed backend serves all of them."
 
-**Decisions:**
-- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend.
-- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and telemetry
-  are keyed by persona across experiences.
-- [ADR-0594](../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md): every
-  experience gets the same tools, filtered by group.
-- [ADR-0601](../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md): a token
-  proxy serves the experiences that cannot pass the user's token (Dify, kagent).
-- [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md): an experience is shown
-  only with its probe, its rollback and its scenario.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -77,7 +51,7 @@ experience, or show its recording labelled as recorded, as its page describes.
 
 ## Presenter lifecycle
 
-`make demo use five-experiences` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use five-experiences` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=five-experiences`, covers the workshop. Each section below says
@@ -248,3 +222,35 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class UNIFAI,OWUI,CLAW,DIFY,KAGENT,LS,BLENDER,AIGW,MCPGW focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend.
+- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and telemetry
+  are keyed by persona across experiences.
+- [ADR-0594](../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md): every
+  experience gets the same tools, filtered by group.
+- [ADR-0601](../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md): a token
+  proxy serves the experiences that cannot pass the user's token (Dify, kagent).
+- [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md): an experience is shown
+  only with its probe, its rollback and its scenario.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from seven experience scenarios, linked in the agenda, and one inline block. Rehearsed as a whole on
+> 2026-11-15 through `make demo rehearse five-experiences`: PASS at 11:05 (94 units, 269 s), 2 skipped
+> (`install:blender-3d`, `uninstall:blender-3d`). Evidence:
+> [WP-280](../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of its scenario
+> page. A first version was shown live on 2026-11-07
+> ([WP-208](../roadmap/work-packages/wp-208-five-experiences-demonstration.md)) and in moment 1 of the
+> [2026-11-09 demonstration](demo-day-2026-11-09.md).
+> **Show-ready:** only if every probe of its blocks passed within the last hour:
+> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw,dify,tools,kagent,lightspeed,blender,guardrails make demo golden-path`.
+> **Duration:** 55 minutes, presenter-led (45 minutes with the short cut). **Audience:** mixed; every block plays its
+> 5-minute version.
+> **Personas:** see [Personas](#personas).

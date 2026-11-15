@@ -1,12 +1,5 @@
 # Workshop: &lt;title&gt;
 
-> **Status:** Built from &lt;n&gt; scenarios, linked in the agenda. Not rehearsed as a whole. Each block keeps the status of
-> its scenario page.
-> **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=<probe>,<probe> make demo golden-path`. A block without a probe is rehearsed the same day.
-> **Duration:** &lt;NN&gt; minutes, presenter-led. **Audience:** &lt;who&gt;.
-> **Personas:** see [Personas](#personas).
-
 How to use this template (delete this paragraph in a real page):
 
 - A workshop tells one story with several scenarios. It does not copy their steps: every block links the scenario page
@@ -16,6 +9,11 @@ How to use this template (delete this paragraph in a real page):
   agenda. It moves to a link when the scenario exists.
 - Appendix A is the same platform map as in the scenarios, with every brick of the workshop highlighted
   (`class A,B,C focus;`). The internals of each brick stay in Appendix B of its scenario page.
+- The sections come in this order: Introduction, Personas, Agenda, Presenter lifecycle, the workshop's own sections
+  (inline blocks, a short story block), If time runs short, If something goes wrong, Limits, Appendix A, References, and
+  Page status last ([ADR-0617](../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)). The
+  Introduction, Personas and Presenter lifecycle name no ADR and no work package and link nothing under `docs/adr/` or
+  `docs/roadmap/`: those go in References. A workshop has no GIF of its own: its page links the scenarios' pages.
 - Paths below are relative to `docs/demo/`. A page under `workshops/` adds `../` to every link.
 
 ## Introduction
@@ -25,13 +23,10 @@ sit in the platform: see [Appendix A](#appendix-a---hld).&gt;
 
 **The message:** &lt;one sentence&gt;.
 
-**Decisions:** &lt;the ADRs the story rests on&gt;.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
-kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password, kept in Vault at
+`keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
 |---|---|---|
@@ -47,7 +42,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 
 ## Presenter lifecycle
 
-`make demo use <workshop-id>` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use <workshop-id>` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. Each section says only what is the workshop's own, or
 "Nothing to do.".
@@ -104,3 +99,24 @@ The platform map with every brick of this workshop highlighted.
 flowchart TB
   A["copy the Mermaid block of _template-scenario.md, Appendix A, and list every brick in the class line"]
 ```
+
+## References
+
+The decisions this workshop rests on:
+
+- [ADR-NNNN](../adr/TEMPLATE.md): &lt;one line each&gt;.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the demo personas, their
+  groups and their shared password.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): the `make demo`
+  lifecycle that the Presenter lifecycle section follows.
+
+Evidence: &lt;work-package evidence links, one line each, with what each proves&gt;.
+
+## Page status
+
+> **Status:** Built from &lt;n&gt; scenarios, linked in the agenda. Not rehearsed as a whole. Each block keeps the status of
+> its scenario page.
+> **Show-ready:** only if every probe of its blocks passed within the last hour:
+> `ONLY=<probe>,<probe> make demo golden-path`. A block without a probe is rehearsed the same day.
+> **Duration:** &lt;NN&gt; minutes, presenter-led. **Audience:** &lt;who&gt;.
+> **Personas:** see [Personas](#personas).

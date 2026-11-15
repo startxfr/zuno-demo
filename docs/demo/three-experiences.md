@@ -1,16 +1,5 @@
 # Workshop: One backend, three experiences
 
-> **Status:** Built from three experience scenarios, linked in the agenda, and one inline block. Rehearsed as a whole on
-> 2026-11-15 through `make demo rehearse three-experiences`: PASS at 10:58 (45 units, 206 s). Evidence:
-> [WP-280](../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of its scenario
-> page. A first version was shown live on 2026-11-03
-> ([WP-184](../roadmap/work-packages/wp-184-three-experiences-demonstration.md)). The longer version is
-> [One governed backend, many experiences](five-experiences.md).
-> **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw make demo golden-path`.
-> **Duration:** 30 minutes, presenter-led. **Audience:** any; every block plays its 5-minute version.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 Three experiences that look nothing alike: an agent platform, a general-purpose chat and a personal assistant. The
@@ -20,20 +9,9 @@ three experiences sit in the platform: see [Appendix A](#appendix-a---hld).
 
 **The message:** "Three very different screens, one platform behind them: the UI is a choice, the rules are not."
 
-**Decisions:**
-- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend.
-- [ADR-0588](../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): Open WebUI.
-- [ADR-0589](../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
-  and [ADR-0590](../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md):
-  OpenClaw.
-- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): one budget per
-  persona across experiences.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -55,7 +33,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 
 ## Presenter lifecycle
 
-`make demo use three-experiences` selects this workshop ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use three-experiences` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=three-experiences`, covers the workshop. Each section below says
@@ -208,3 +186,31 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class UNIFAI,OWUI,CLAW,AIGW,MCPGW focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend.
+- [ADR-0588](../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): Open WebUI.
+- [ADR-0589](../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
+  and [ADR-0590](../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md):
+  OpenClaw.
+- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): one budget per
+  persona across experiences.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from three experience scenarios, linked in the agenda, and one inline block. Rehearsed as a whole on
+> 2026-11-15 through `make demo rehearse three-experiences`: PASS at 10:58 (45 units, 206 s). Evidence:
+> [WP-280](../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of its scenario
+> page. A first version was shown live on 2026-11-03
+> ([WP-184](../roadmap/work-packages/wp-184-three-experiences-demonstration.md)). The longer version is
+> [One governed backend, many experiences](five-experiences.md).
+> **Show-ready:** only if every probe of its blocks passed within the last hour:
+> `ONLY=unifai-tekos,open-webui,zuno-code,openclaw make demo golden-path`.
+> **Duration:** 30 minutes, presenter-led. **Audience:** any; every block plays its 5-minute version.
+> **Personas:** see [Personas](#personas).

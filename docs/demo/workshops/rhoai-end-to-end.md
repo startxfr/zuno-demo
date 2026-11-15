@@ -1,15 +1,5 @@
 # Workshop: RHOAI end to end
 
-> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
-> rehearse rhoai-end-to-end`: PASS at 11:12 (105 units, 262 s). Evidence:
-> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
-> its scenario page.
-> **Show-ready:** none of these blocks has a golden-path probe. Rehearse every block on the day, and run
-> `make demo golden-path` before the session anyway: its Open WebUI moment proves that a local model answers.
-> **Duration:** 70 minutes, presenter-led. With the 15-minute versions of the playground and evaluation blocks it
-> takes 90 minutes. **Audience:** data scientists, ML engineers, platform teams.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 Red Hat OpenShift AI is the model layer under everything else in Zuno. The workshop follows a model through its life
@@ -27,25 +17,9 @@ these models. Where these bricks sit in the platform: see [Appendix A](#appendix
 **The message:** "One platform takes a model from the catalog to a governed, fine-tuned and evaluated service, on GPUs
 you share and control."
 
-**Decisions:**
-- [ADR-0019](../../adr/0019-use-openshift-ai-model-serving-for-local-inference.md): OpenShift AI model serving for
-  local inference.
-- [ADR-0351](../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): GPUs
-  shared through MIG, with burst capacity from zero.
-- [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md),
-  [ADR-0541](../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) and
-  [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): MaaS as the
-  model access plane, for local and SaaS models.
-- [ADR-0301](../../adr/0301-introduce-lora-and-peft-model-customization.md) and
-  [ADR-0302](../../adr/0302-build-dataset-to-model-mlops-pipelines.md): LoRA customization and dataset-to-model
-  pipelines.
-- [ADR-0027](../../adr/0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) and
-  [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): evaluation before trust.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -72,7 +46,7 @@ The scenario pages name a few more accounts; their Personas sections say which.
 
 ## Presenter lifecycle
 
-`make demo use rhoai-end-to-end` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use rhoai-end-to-end` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=rhoai-end-to-end`, covers the workshop. Each section below says
@@ -212,3 +186,35 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class MAAS,KSERVE,EXT,PG,BUILD,EVAL focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0019](../../adr/0019-use-openshift-ai-model-serving-for-local-inference.md): OpenShift AI model serving for
+  local inference.
+- [ADR-0351](../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): GPUs
+  shared through MIG, with burst capacity from zero.
+- [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md),
+  [ADR-0541](../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) and
+  [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): MaaS as the
+  model access plane, for local and SaaS models.
+- [ADR-0301](../../adr/0301-introduce-lora-and-peft-model-customization.md) and
+  [ADR-0302](../../adr/0302-build-dataset-to-model-mlops-pipelines.md): LoRA customization and dataset-to-model
+  pipelines.
+- [ADR-0027](../../adr/0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) and
+  [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): evaluation before trust.
+- [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse rhoai-end-to-end`: PASS at 11:12 (105 units, 262 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
+> its scenario page.
+> **Show-ready:** none of these blocks has a golden-path probe. Rehearse every block on the day, and run
+> `make demo golden-path` before the session anyway: its Open WebUI moment proves that a local model answers.
+> **Duration:** 70 minutes, presenter-led. With the 15-minute versions of the playground and evaluation blocks it
+> takes 90 minutes. **Audience:** data scientists, ML engineers, platform teams.
+> **Personas:** see [Personas](#personas).

@@ -1,17 +1,5 @@
 # Workshop: Sovereign and governed AI
 
-> **Status:** Built from six scenarios, linked in the agenda, plus two steps of a seventh. Rehearsed as a whole on
-> 2026-11-15 through `make demo rehearse sovereign-governed-ai`: PASS at 11:17 (77 units, 225 s). Evidence:
-> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md).
-> Each block keeps the status of its scenario page.
-> **Show-ready:** only if every probe of its blocks passed within the last hour:
-> `ONLY=open-webui,tools,sovereignty,unifai-tekos,trace,zuno-code,guardrails make demo golden-path` (`trace` looks
-> up the run that `unifai-tekos` makes, so the two go together). The identity and budget blocks
-> have no probe: rehearse them the same day.
-> **Duration:** 45 minutes, presenter-led. **Audience:** decision makers, security and compliance teams, architects;
-> every block plays its 5-minute version.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 Before they adopt AI, organisations ask the same questions:
@@ -29,24 +17,9 @@ backend, so it holds whatever screen the user picks. Where these controls sit in
 **The message:** "Every AI request on Zuno is checked for who sends it, where its data may go, which model may answer,
 what it contains and what it costs, and leaves a trace you can show an auditor."
 
-**Decisions:**
-- [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): personas and groups
-  drive every entitlement.
-- [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): data classification
-  from the agent's signed sheet, raised and never lowered.
-- [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) and
-  [ADR-0596](../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md): routing
-  to ready models, code questions to Codestral first.
-- [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): guardrails inside the ai-gateway.
-- [ADR-0593](../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): one budget and
-  one telemetry key per persona.
-- [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): tools authorised
-  by the full intersection of rules.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -75,7 +48,7 @@ The scenario pages name a few more accounts; their Personas sections say which.
 
 ## Presenter lifecycle
 
-`make demo use sovereign-governed-ai` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use sovereign-governed-ai` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=sovereign-governed-ai`, covers the workshop. Each section below says
@@ -215,3 +188,35 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class KC,AIGW,MCPGW,KSERVE,EXT,OBS focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): personas and groups
+  drive every entitlement.
+- [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): data classification
+  from the agent's signed sheet, raised and never lowered.
+- [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) and
+  [ADR-0596](../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md): routing
+  to ready models, code questions to Codestral first.
+- [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): guardrails inside the ai-gateway.
+- [ADR-0593](../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): one budget and
+  one telemetry key per persona.
+- [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): tools authorised
+  by the full intersection of rules.
+- [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from six scenarios, linked in the agenda, plus two steps of a seventh. Rehearsed as a whole on
+> 2026-11-15 through `make demo rehearse sovereign-governed-ai`: PASS at 11:17 (77 units, 225 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md).
+> Each block keeps the status of its scenario page.
+> **Show-ready:** only if every probe of its blocks passed within the last hour:
+> `ONLY=open-webui,tools,sovereignty,unifai-tekos,trace,zuno-code,guardrails make demo golden-path` (`trace` looks
+> up the run that `unifai-tekos` makes, so the two go together). The identity and budget blocks
+> have no probe: rehearse them the same day.
+> **Duration:** 45 minutes, presenter-led. **Audience:** decision makers, security and compliance teams, architects;
+> every block plays its 5-minute version.
+> **Personas:** see [Personas](#personas).

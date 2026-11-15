@@ -1,15 +1,5 @@
 # Workshop: Trusted platform and operations
 
-> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
-> rehearse trusted-platform-ops`: PASS at 11:38 (94 units, 725 s). Evidence:
-> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
-> its scenario page.
-> **Show-ready:** only the observability block has a golden-path probe (`trace`). Run `make demo golden-path` before the
-> session, and rehearse every other block the same day.
-> **Duration:** 60 minutes, presenter-led. **Audience:** platform, security and operations teams; the observability
-> block plays its 15-minute version, the others their 5-minute version.
-> **Personas:** see [Personas](#personas).
-
 ## Introduction
 
 An AI platform is only as trustworthy as the platform under it. This workshop shows the foundations that the other
@@ -27,29 +17,9 @@ screens. Where these bricks sit in the platform: see [Appendix A](#appendix-a---
 **The message:** "What runs is declared, signed and verified. Secrets come from Vault, traffic is encrypted, and every
 request and operation leaves a trace. The platform can show this, not just claim it."
 
-**Decisions:**
-- [ADR-0060](../../adr/0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md) and
-  [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): a Day 0-3 contract,
-  and a golden-path check before any live demonstration.
-- [ADR-0115](../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) and
-  [ADR-0535](../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md): immutable, signed and
-  verifiable artifacts, with RHTAS.
-- [ADR-0024](../../adr/0024-use-vault-for-application-secrets.md) and
-  [ADR-0211](../../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md): Vault for secrets, publicly
-  trusted certificates.
-- [ADR-0037](../../adr/0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md): network and
-  workload identity boundaries.
-- [ADR-0029](../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md): usage, cost and distributed
-  traces.
-- [ADR-0354](../../adr/0354-add-ansible-automation-platform-as-a-day-1-component.md) and
-  [ADR-0355](../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): audited operations with AAP.
-- [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md): the hardening of the
-  trust boundaries.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](../README.md#personas) lists all of them.
 
 | Persona | Profile | Blocks |
@@ -80,7 +50,7 @@ the foundations first, then the AI controls built on them.
 
 ## Presenter lifecycle
 
-`make demo use trusted-platform-ops` selects this workshop ([ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use trusted-platform-ops` selects this workshop.
 Its actions chain the actions of the scenarios in the agenda (status, check, install and start in agenda order; stop
 and uninstall in reverse), then run the workshop's own file. A workshop takes no 5 or 15 version: each block plays the
 version its agenda row names. One typed guard, `DEMO_CONFIRM=trusted-platform-ops`, covers the workshop. Each section below says
@@ -219,3 +189,39 @@ flowchart TB
   classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
   class GITOPS,SC,OKF,VAULT,OCP,OBS focus;
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0060](../../adr/0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md) and
+  [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): a Day 0-3 contract,
+  and a golden-path check before any live demonstration.
+- [ADR-0115](../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) and
+  [ADR-0535](../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md): immutable, signed and
+  verifiable artifacts, with RHTAS.
+- [ADR-0024](../../adr/0024-use-vault-for-application-secrets.md) and
+  [ADR-0211](../../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md): Vault for secrets, publicly
+  trusted certificates.
+- [ADR-0037](../../adr/0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md): network and
+  workload identity boundaries.
+- [ADR-0029](../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md): usage, cost and distributed
+  traces.
+- [ADR-0354](../../adr/0354-add-ansible-automation-platform-as-a-day-1-component.md) and
+  [ADR-0355](../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): audited operations with AAP.
+- [ADR-0602](../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md): the hardening of the
+  trust boundaries.
+- [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Built from seven scenarios, linked in the agenda. Rehearsed as a whole on 2026-11-15 through `make demo
+> rehearse trusted-platform-ops`: PASS at 11:38 (94 units, 725 s). Evidence:
+> [WP-280](../../roadmap/evidence/wp-280-workshops-rehearsals-2026-11-15.md). Each block keeps the status of
+> its scenario page.
+> **Show-ready:** only the observability block has a golden-path probe (`trace`). Run `make demo golden-path` before the
+> session, and rehearse every other block the same day.
+> **Duration:** 60 minutes, presenter-led. **Audience:** platform, security and operations teams; the observability
+> block plays its 15-minute version, the others their 5-minute version.
+> **Personas:** see [Personas](#personas).
