@@ -1,6 +1,6 @@
 # WP-286: Improve the recording chain and re-prove it on Open WebUI
 
-- **State:** Not started
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md) (Done)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -28,3 +28,11 @@ The chain of WP-284 carries the rules of ADR-0618 clause 9, and Open WebUI is re
 - The re-proof take of Open WebUI passes, lists what it created and cleaned, and the persona's list is the same before and after.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
 - No GIF is published without the owner's named go.
+
+## Result (2026-11-15)
+
+The chain carries the rules of ADR-0618 clause 9 and Open WebUI was re-proved live on demo333, with the owner's go: a
+scout of 6 steps (status done, no control to switch, no refused request), then a take that passed in 24.6 s, created one
+chat and cleaned it, left what the persona owns unchanged (1 before, 1 after) and cut into a 42.8 s, 1.4 MB GIF in the
+cache ([evidence](../evidence/wp-286-recording-chain-improvements-2026-11-15.md)). Limits, stated in the evidence: nothing
+published and no privacy review of this take, the refusal paths exercised offline only, one demo.

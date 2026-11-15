@@ -1067,6 +1067,12 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — WP-286 Done (ADR-0618 stays Accepted).** The recording chain was re-proved live on Open WebUI: a scout
+  (`make demo scout open-webui`, mandatory, tied to the walkthrough file's SHA-256) then a take that lists what it
+  created and cleaned and compares what the persona owns before and after. Evidence
+  `docs/roadmap/evidence/wp-286-recording-chain-improvements-2026-11-15.md`. Traps kept: read a GIF's size from its
+  `gif.json`, not from the report of the take; the refusal paths (a refused model answer, a refused click, a stale scout
+  hash) were exercised offline only; no privacy review was done on this take.
 - **2026-11-15 — ADR-0617 Implemented (WP-284 and WP-285, both Done).** The Open WebUI GIF is published and every
   catalogue page has the presenter's shape: `## References` and `## Page status` last, no ADR or WP reference in the
   Introduction, Personas and Presenter lifecycle. The shape checks of `platform/demo/consistency.py` are problems, not
