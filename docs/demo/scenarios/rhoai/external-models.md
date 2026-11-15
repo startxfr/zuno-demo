@@ -90,8 +90,7 @@ ExternalModels `mistral-large` and `gpt-oss-120b-ovhcloud` (phase `Migrated`), t
 two SaaS models, the MaaSSubscriptions `mistral-large-ai-gateway` and `gpt-oss-120b-ovhcloud-ai-gateway` (`Ready`), the
 MaaSAuthPolicies `mistral-large-entitlement` and `gpt-oss-120b-ovhcloud-entitlement` (`Ready`), the
 TokenRateLimitPolicies `maas-trlp-mistral-large` and `maas-trlp-gpt-oss-120b-ovhcloud` (`Enforced`) and the
-ExternalSecrets `llm-provider-mistral-maas` and `llm-provider-ovhcloud-maas` (`Ready`). The ExternalProviders are not
-read. If a model ref, a subscription or an auth policy is not `Ready`, see [If something goes wrong](#if-something-goes-wrong).
+ExternalSecrets `llm-provider-mistral-maas` and `llm-provider-ovhcloud-maas` (`Ready`). The file also reads the two ExternalProviders `mistral-large` and `gpt-oss-120b-ovhcloud` (`Ready`). If a model ref, a subscription or an auth policy is not `Ready`, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
@@ -102,7 +101,9 @@ Nothing to do. The SaaS models are part of the shared platform: the file runs no
 The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) from the cluster base domain (demo.yml:
 `https://maas.<cluster domain>/zuno-ai-run`), not from a read of the MaaS Route. The presenter no longer exports it. What only a person does:
 
-- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
+- [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. Not `kube:admin`: the policy
+  `gpt-oss-20b-entitlement` admits the groups `sales`, `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops` and the agent groups, so
+  row 7:30 returns `403` for `kube:admin` and `200` for a member. If **paas-ops-01** has
   never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
   terminal in.
 - [ ] Open [`platform/ai-gateway/provider-routing.yaml`](../../../../platform/ai-gateway/provider-routing.yaml) in an
@@ -141,7 +142,7 @@ Run the 5-minute version, then:
 |---|---|---|---|
 | 5:00 | `oc get externalproviders -n zuno-ai-run`, then `oc get externalprovider mistral-large -n zuno-ai-run -o jsonpath='{.spec.auth}'` | "RHOAI 3.6 split our object into its new API: an ExternalProvider holds the endpoint and the key reference, an ExternalModel the route. Ours stays the owner, so Git still drives both." | Both providers `Ready`. `{"secretRef":{"name":"llm-provider-mistral-maas"},"type":"apikey"}`. |
 | 6:15 | `oc get externalsecret llm-provider-mistral-maas -n zuno-ai-run -o jsonpath='{.spec.target.template.metadata.labels}'` | "The key comes from Vault, `providers/mistral`, the same value the router uses. One trap: the RHOAI component that injects the key only loads Secrets that carry this label. Without it, every call answered 500 'credentials not found'." | `{"inference.llm-d.ai/ipp-managed":"true","zuno.io/managed-by":"argocd"}`. |
-| 7:30 | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(oc whoami -t)" $MAAS/gpt-oss-20b/v1/models`, then the same on `$MAAS/mistral-large/v1/models` (`$MAAS` is set by the step file from the MaaS route) *(untested commands)* | "My own token, a platform administrator. MaaS lets me reach a model on our GPUs on my group's subscription. The SaaS model refuses me: I am not the router." | `200`, then a refusal (`403` expected). |
+| 7:30 | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(oc whoami -t)" $MAAS/gpt-oss-20b/v1/models`, then the same on `$MAAS/mistral-large/v1/models` (`$MAAS` is set by the step file from the MaaS route) *(untested commands)* | "My own token, a platform administrator. MaaS lets me reach a model on our GPUs on my group's subscription. The SaaS model refuses me: I am not the router." | `200`, then `403`. The `200` needs the token of a member of a group the policy admits: **paas-ops-01** (group `ocp-paas-ops`) is one; `kube:admin` gets `403` on both models. The `403` on `mistral-large` is the expected answer for every person: its policy admits only the ai-gateway ServiceAccount. |
 | 9:00 | Show WP-125, "Live verification (2026-11-07)" | "On 2026-11-07 both SaaS models answered through MaaS, with the router's own token. Before the label: 500. Then our Mistral account refused `mistral-large-latest`, so both paths moved to `mistral-large-4`." | The table: `gpt-oss-120b-ovhcloud` 500 then 200; `mistral-large` 500, then 403 `tier_not_allowed`, then 200. |
 | 10:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="MAAS_EXTERNAL_EGRESS_ENABLED")].value}'` | "The switch that sends the router's SaaS calls through MaaS is off. When it is on, MaaS will hold the only copy of the keys and count the SaaS tokens too." | `false`. |
 | 11:30 | Grafana **AI models & serving**, panel **Model calls (rate, by provider/model/outcome)** | "What the router actually sent out, provider by provider, next to the local models." | The SaaS providers that served calls in the range, for example `mistral-codestral`, next to the local `-maas` providers. An empty SaaS series means no task used a SaaS model in the range. |

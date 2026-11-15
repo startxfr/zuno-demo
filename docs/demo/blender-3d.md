@@ -82,10 +82,10 @@ What the platform entry is made of (WP-244, all delivered by commits and Argo CD
 
 | Change | Where | Applied by |
 |---|---|---|
-| Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper (audience `zuno-admin-api`) | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
+| Public Keycloak client `blender`, device authorization grant only, maas-gateway-audience mapper (audience zuno-admin-api) | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
 | `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
 | `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for `zuno-agent-gateway` | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
-| Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group `ocp-ai-dev`), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, turned on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
+| Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group ocp-ai-dev), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, turned on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
 | Experience client `blender`, task `bpy`, `models.preferred: [reasoning, default]` (`gpt-oss-20b` first), no tools, C3 | [`experience-clients/blender/`](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/client.okf.md) in zuno-demo-agents | the agents release and its promotion |
 
 The ai-gateway's per-persona token budgets apply on top of the entry's request rate.
@@ -93,15 +93,19 @@ The ai-gateway's per-persona token budgets apply on top of the entry's request r
 ### Check
 
 Nothing to do when it passes. It runs the golden-path probe `blender`
-(`ONLY=blender make demo golden-path`, see [golden-path.md](golden-path.md)). The probe signs in as `eval-ai-dev-01` by
+(`ONLY=blender make demo golden-path`, see [golden-path.md](golden-path.md)). The probe signs in as eval-ai-dev-01 by
 the device flow with no human, so it never uses the stage account. It proves the entry, the token, the C3 floor and a
 local answer, not the add-on on the laptop. Run it within the hour before the session. If it fails, see
 [If something goes wrong](#if-something-goes-wrong) and tell the platform owner.
 
 ### Install
 
-The platform entry is only verified here (see Status), never installed. What the presenter installs is the add-on, on
-their own workstation, once (about 10 minutes). Nothing is installed on the cluster.
+The file verifies the platform entry (the HTTPRoute, AuthPolicy and RateLimitPolicy, see Status), never installs it. Then
+it installs or updates the add-on on this workstation by running `bash evaluations/blender/install_addon.sh`. That is a
+changing unit, on the workstation only: `make demo install` shows it and asks you to type the demo id `blender-3d`.
+Nothing is installed on the cluster. `make demo rehearse` never runs install or uninstall (they are declared
+`not_rehearsed`: a rehearsal would touch the add-on of the workstation that runs it), so run them on the workstation
+that plays the demo. About 10 minutes the first time.
 
 Prerequisites on the workstation:
 
@@ -114,11 +118,10 @@ Prerequisites on the workstation:
   ([ADR-0211](../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md)): the cluster's CA
   certificate as a PEM file, set in **CA file**. Never disable certificate verification instead. demo333 needs none.
 
-Install or update the add-on by hand, from the repository root:
+To see what the script would do before you install, run it by hand from the repository root:
 
 ```bash
 bash evaluations/blender/install_addon.sh --dry-run   # copies nothing, prints what it would do
-bash evaluations/blender/install_addon.sh
 ```
 
 The script fetches `origin/devel`, copies [zuno_3d_generator.py](../../evaluations/blender/zuno_3d_generator.py) into
@@ -173,13 +176,9 @@ terminal. To sign out of Keycloak, use the logout URL of Start.
 
 ### Uninstall
 
-Removes the add-on from the workstation only:
-
-```bash
-bash evaluations/blender/install_addon.sh --remove
-```
-
-The platform entry stays: it is shared and never removed by this demo.
+The file removes the add-on from the workstation only, by running `bash evaluations/blender/install_addon.sh --remove`.
+That is a changing unit: `make demo uninstall` shows it and asks you to type the demo id `blender-3d`. `make demo
+rehearse` never runs it. The platform entry stays: it is shared and never removed by this demo.
 
 **Owner action, never run by the lifecycle.** Closing the platform entry is a platform change. Set
 `workstationEntry.enabled: false` in `gitops/apps/connectivity-link/application-d1.yaml`, push it, then run

@@ -65,7 +65,8 @@ earlier and prepare the recording. Credentials are named by their Vault path, ne
 ### Status
 
 Nothing to do when it reports the demo is off: that is its normal state today. The file reads, without changing
-anything: the flag `zuno_world_model_enabled` in `ansible/clusters/demo333.yml`, the namespace `zuno-world-model`, the
+anything: the flag `zuno_world_model_enabled` in `ansible/clusters/demo333.yml` (as committed in this checkout, not read from the
+cluster), the namespace `zuno-world-model`, the
 node labelled `zuno.io/gpu-workload=world-model`, and the world-model Application. While the flag is false there is no
 node and no Application, and the page is not show-ready. When the flag is true and a piece is missing, run Install.
 By hand, the same reads:
@@ -78,19 +79,21 @@ oc get pods -n zuno-world-model
 ### Check
 
 Nothing to do when it passes. It runs the golden-path probe `world-model`
-(`ONLY=world-model make demo golden-path`, see [golden-path.md](golden-path.md)). It creates a world as
+(`ONLY=world-model make demo golden-path`, see [golden-path.md](golden-path.md)). It reads that the GrafanaDashboard `world-model` exists in `zuno-monitoring`. It creates a world as
 `GOLDEN_WORLD_PERSONA` (**ai-ops-01**) from inside the web pod and must print `PASS`. While the application is not
 installed it reports `roadmap`: do not present the demo as live, use the recording (see Start). Run it within the
 hour before the session. After Install, `make d2 check world-model` is the deeper preflight: GPU node, runtime engine
-`waypoint-1.5-1b`, image model `flux2-klein-4b`, encoder `nvenc` (or `x264`), Keycloak 200, ai-gateway reached, no
+waypoint-1.5-1b, image model flux2-klein-4b, encoder `nvenc` (or `x264`), Keycloak 200, ai-gateway reached, no
 other egress, Route up. It must be green.
 
 ### Install
 
-The file refuses to install while `zuno_world_model_enabled` is not `true` on `origin/devel`
-(`ansible/clusters/demo333.yml`). It creates a GPU node, which is cluster infrastructure: it needs the platform
-owner's **double approval** for the GPU node, given before anything runs. The owner does the following by hand, never
-the step:
+The file never creates the GPU node. While `zuno_world_model_enabled` is not `true` on `origin/devel`
+(`ansible/clusters/demo333.yml`, as of the last `git fetch`), it fails with `REFUSED` and nothing is installed: use the
+recording. When the flag is true, it only reads what exists (the node, the Application, the pods) and prints the owner's
+four actions below. A GPU node is cluster infrastructure: it needs the platform owner's **double approval**, given
+before anything runs, and the owner does the following by hand, never the step. `make demo rehearse` does not run
+Install either: it refuses while the demo is off.
 
 1. Set `zuno_world_model_enabled: true` in `ansible/clusters/demo333.yml`, commit and push. The Day-2 install runs
    through AAP, which reads the repository, not your workstation.
@@ -111,7 +114,7 @@ the step:
 
 ### Start
 
-The file prepares nothing a person can skip. What only a person does, at least **40 minutes** after the Install
+The file runs nothing. What only a person does, at least **40 minutes** after the Install
 began, and earlier when AWS may have no capacity:
 
 - [ ] **Chrome or Edge** (the video is H.264 decoded by WebCodecs). Open `https://world-model.apps.demo333.startx.fr`
@@ -142,7 +145,8 @@ the client-reconcile Job). Close the Grafana profile and the terminal. The GPU n
 
 ### Uninstall
 
-Nothing in this demo removes the node by itself. The owner does it by hand after the session, never the step:
+The file removes nothing: it shows what is still there (the node and the pods) and prints the owner's actions below. The
+owner does them by hand after the session, never the step. The rehearsal covers Uninstall as that no-op:
 
 1. `make d2 uninstall world-model` removes the application.
 2. Set `zuno_world_model_enabled: false` in `ansible/clusters/demo333.yml`, commit and push. Otherwise the next
