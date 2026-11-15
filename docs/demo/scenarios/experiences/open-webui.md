@@ -18,8 +18,8 @@ The personas are fictional role accounts of the Keycloak realm `zuno`. They shar
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | Open WebUI user. Three tools: Drive search, Gmail read, diagram generation. | The everyday employee of the 5-minute version: signs in, chats, switches to Zuno Code, opens a tool list made for a salesperson. |
-| **consultant-02** | Consultant and architect, front office. Group `consultant` with its Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces), `agent_tekos`, `agent_arkos`. | Open WebUI user. Six tools: the three of **sale-01** plus Confluence search, Confluence page read and technical-docs search. | The contrast of the 15-minute version: same screen, a wider tool set, and an answer built from Confluence with the consultant's own rights. |
+| **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | Open WebUI user. Three tools: Drive search, Gmail read, diagram generation. | The everyday employee of the 5-minute version: signs in, chats, switches to Zuno Code, opens the Integrations menu, where the connection Zuno tools is on. Its three tools are said, not shown. |
+| **consultant-02** | Consultant and architect, front office. Group `consultant` with its Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces), `agent_tekos`, `agent_arkos`. | Open WebUI user. Six tools: the three of **sale-01** plus Confluence search, Confluence page read and technical-docs search. | The contrast of the 15-minute version: the same screen and the same connection, a wider tool set that is said, not shown, and an answer built from Confluence with the consultant's own rights. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces), `openwebui_admin`. | Open WebUI administrator. Admin on `zuno-monitoring`, which opens Grafana. | Shows the dashboards in the 15-minute version: which model served each turn, the tool calls, the shared budget. |
 
 Other identities:
@@ -82,7 +82,7 @@ Profile 1, **sale-01**.
 | 0:00 | Show the home page | "A chat everyone knows. I signed in with my company account, there is no password stored here." | The model picker shows **Zuno**. The info banner **Zuno picks the model** and four suggestion cards are visible. |
 | 0:45 | Ask: `In one short sentence, say what you can help me with.` | "I did not choose a model: Zuno did, and it chose one that runs on our own GPUs." | An answer in a few seconds. |
 | 1:45 | Switch the model picker to **Zuno Code** and ask: `write Python code that checks the format of an email address` | "Code questions go to a code model, Mistral Codestral. The platform makes that choice, not the UI, and falls back to a local model if Codestral is down." | A Python function with a regular expression. |
-| 3:00 | Click the tools button under the prompt (**Zuno tools**) | "My tools come from my job. As a salesperson I get Drive, Gmail and diagrams. A consultant gets Confluence and the technical documentation." | Three tools for **sale-01**: Drive search, Gmail read, diagram generation. |
+| 3:00 | Click the **Integrations** button under the prompt, then **Tools** | "My tools come from my job. This one connection, Zuno tools, holds my three tools: Drive search, Gmail read and diagram generation. A consultant gets Confluence and the technical documentation too." | The **Integrations** menu shows one row, **Tools 1**; its panel shows a single governed connection, **Zuno tools**, switched on. The tool names are not on this screen: say them. |
 | 4:15 | Close | "Any chat UI can plug in. Who you are, which model answers, which tools you can use and what it costs stay decided by the platform." | |
 
 ## 15-minute version
@@ -91,7 +91,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Profile 2, **consultant-02**, new chat. Open the tools button | "Same UI, another person: the tool list is computed from Keycloak groups and the agent policy, not configured in the UI." | Six tools: the three of **sale-01** plus Confluence search, Confluence page read and technical-docs search. |
+| 5:00 | Profile 2, **consultant-02**, new chat. Click **Integrations**, then **Tools** | "Same screen, another person: the same connection, Zuno tools, now holds six tools, the three of sale-01 plus Confluence search, Confluence page read and technical-docs search. The set is computed from Keycloak groups and the agent policy, not configured in the UI." | The same screen as at 3:00: **Tools 1** and the connection **Zuno tools**, switched on. The six tools are said, not shown; the next row makes one visible in the chat. |
 | 6:00 | Click the suggestion card **Find our onboarding pages in Confluence** (prompt `Find our onboarding pages in Confluence.`) | "The model calls Confluence with my own identity. The mcp-gateway checks my groups before the call." | A list of onboarding pages from Confluence, with the tool call shown in the chat. |
 | 7:30 | Grafana, row **Same models, same routing**, panel **Which provider served each experience (over range)** | "Each answer leaves a trace: the code question went to Codestral, the others stayed on local models. A turn that used a company tool is always kept local." | For `open-webui`: `mistral-codestral` for the Zuno Code turn and a local provider (`local-...`) for the other turns. |
 | 9:30 | Row **Same tools, governed: cluster reads (ADR-0600)**, panel **All governed tool calls by tool and outcome (over range)** | "Every tool call of every experience goes through the one mcp-gateway: same tools, same entitlement, one audit. This table is the same for UnifAI, Dify or OpenClaw." | The Confluence search of **consultant-02** with the outcome `allowed`. |
@@ -107,7 +107,7 @@ Run the 5-minute version, then:
 | A "Zuno" answer is slow (the model is cold or a fallback model answers) | Ask again, or use **Zuno Code**. Do not wait on stage. | "The first call wakes the model up; the platform keeps a fallback ready." |
 | 503 "no eligible provider is available" | Show it. Every candidate the turn's classification allows is down; a tool turn may only use local models. | "The gateway refuses rather than sending restricted data to a SaaS model: that is the sovereignty rule at work." |
 | A red cross on a Gmail or Drive tool call (`delegated_credential_missing`) | Carry on. | "Gmail and Drive need a delegated Google token, and no Google Workspace tenant is connected to this demo. The gateway refuses the call: that is the delegation rule." |
-| No tools in a chat | Start a new chat. Old chats keep their tool switch off. | |
+| The **Zuno tools** connection is missing or switched off in a chat | Start a new chat. Old chats keep their tool switch off. | |
 | No series on the Grafana dashboard | Widen the time range to 3 hours. Export and scrape take about a minute. | |
 | The Keycloak sign-in page does not return | Check that `keycloak.apps.demo333.startx.fr` answers. Open WebUI reaches Keycloak through the external load balancer, not the in-cluster router ([WP-181](../../../roadmap/work-packages/wp-181-install-open-webui-on-demo333.md)). | |
 
