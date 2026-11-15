@@ -10,5 +10,40 @@
     workloads:
       - {"name": "mcp-gateway", "namespace": "zuno-ai-run"}
       - {"name": "a2a-gateway", "namespace": "zuno-ai-run"}
+- name: "okf-signed-agent-release status | the internal Quay and the three served bundles (a gateway restarted while Quay is down stays in Init)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "quay.redhat.com/v1", "kind": "QuayRegistry", "name": "quay", "namespace": "zuno-registry", "condition": "Available"}
+- name: "okf-signed-agent-release status | the gateway pods the page shows (both 2/2 Running)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get pods -n zuno-ai-run | grep -e mcp-gateway -e a2a-gateway"
+      - "oc get quayregistry -n zuno-registry"
+# The workstation tools are looked up on the PATH with `stat` (a read-only module): the unit may not run a binary. The
+# version (cosign v2) is proved by the 6:00 step itself, `make d3 admit agents`, which fails without a v2 cosign.
+- name: "okf-signed-agent-release status | find cosign and oras on the PATH of the presenter"
+  ansible.builtin.stat:
+    path: "{{ item.0 }}/{{ item.1 }}"
+  loop: "{{ (lookup('ansible.builtin.env', 'PATH') | split(':') | select | list) | product(['cosign', 'oras']) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"
+  register: _okf_tools
+- name: "okf-signed-agent-release status | record the workstation tools"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_okf_row] }}"
+  loop: ["cosign", "oras"]
+  vars:
+    _okf_found: >-
+      {{ _okf_tools.results | selectattr('item.1', 'equalto', item) | selectattr('stat.exists') | map(attribute='item.0')
+         | map('regex_replace', '$', '/' ~ item) | list }}
+    _okf_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "workstation/{{ item }}"
+      category: tool
+      passed: "{{ _okf_found | length > 0 }}"
+      detail: "{{ _okf_found | first | default(item ~ ' not on the PATH: install it by hand (cosign must be v2)') }}"
 - name: "okf-signed-agent-release status | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

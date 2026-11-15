@@ -20,5 +20,16 @@
   vars:
     workloads:
       - {"name": "grafana-deployment", "namespace": "zuno-monitoring"}
+- name: "observability-trace status | the collector and Tempo"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "opentelemetry.io/v1beta1", "kind": "OpenTelemetryCollector", "name": "zuno-otel-collector", "namespace": "zuno-monitoring", "exists": true}
+      - {"api_version": "tempo.grafana.com/v1alpha1", "kind": "TempoMonolithic", "name": "tempo", "namespace": "zuno-monitoring", "condition": "Ready"}
+- name: "observability-trace status | the local models (at least one Ready=True)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get llminferenceservice -n zuno-ai-run"
 - name: "observability-trace status | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

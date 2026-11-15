@@ -8,5 +8,6 @@ probes: []
 browser: []
 # Units that change the cluster, `<action>: "what it changes"`: the guard prints it and asks for the demo id
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
-mutations: {}
+mutations:
+  start: "launches one read-only AAP job, zuno-day0-check, as the AAP admin: it creates a job record and an automation-job-* pod in zuno-aap and waits for its end (about six minutes)"
 steps: {}

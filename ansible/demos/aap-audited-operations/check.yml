@@ -10,5 +10,21 @@
     cr_ready:
       - {"api_version": "aap.ansible.com/v1alpha1", "kind": "AnsibleAutomationPlatform", "name": "aap", "namespace": "zuno-aap", "condition": "Running"}
       - {"api_version": "aap.ansible.com/v1alpha1", "kind": "AnsibleAutomationPlatform", "name": "aap", "namespace": "zuno-aap", "condition": "Successful"}
+      - {"api_version": "tower.ansible.com/v1alpha1", "kind": "JobTemplate", "name": "zuno-day0-check", "namespace": "zuno-aap", "exists": true}
+      - {"api_version": "tower.ansible.com/v1alpha1", "kind": "JobTemplate", "name": "zuno-day3-test", "namespace": "zuno-aap", "exists": true}
+      - {"api_version": "tower.ansible.com/v1alpha1", "kind": "WorkflowTemplate", "name": "zuno-day1-check-workflow", "namespace": "zuno-aap", "exists": true}
+      - {"api_version": "tower.ansible.com/v1alpha1", "kind": "AnsibleProject", "name": "zuno-demo", "namespace": "zuno-aap", "exists": true}
+- name: "aap-audited-operations check | the aap Route and the aap-mcp Deployment"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/routes.yml"
+  vars:
+    routes:
+      - {"namespace": "zuno-aap", "name": "aap"}
+- name: "aap-audited-operations check | the template counts and the aap-mcp Deployment the page names"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get jobtemplates.tower.ansible.com -n zuno-aap --no-headers"
+      - "oc get workflowtemplates.tower.ansible.com -n zuno-aap --no-headers"
+      - "oc get deploy aap-mcp -n zuno-ai-run"
 - name: "aap-audited-operations check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

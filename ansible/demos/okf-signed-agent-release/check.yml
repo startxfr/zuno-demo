@@ -9,5 +9,19 @@
   vars:
     cr_ready:
       - {"api_version": "quay.redhat.com/v1", "kind": "QuayRegistry", "name": "quay", "namespace": "zuno-registry", "condition": "Available"}
+- name: "okf-signed-agent-release check | the three served agents are Verified and Ready (the five placeholders stay Pending)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiAgentBundle", "name": "arkos", "namespace": "zuno-unifai", "condition": "Verified"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiAgentBundle", "name": "arkos", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiAgentBundle", "name": "comage", "namespace": "zuno-unifai", "condition": "Ready"}
+      - {"api_version": "unifai.startx.fr/v1alpha1", "kind": "UnifaiAgentBundle", "name": "tekos", "namespace": "zuno-unifai", "condition": "Ready"}
+- name: "okf-signed-agent-release check | the bundle list and the revocation list"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get unifaiagentbundle -n zuno-unifai"
+      - "oc get configmap unifai-agent-revocations -n zuno-unifai -o jsonpath='{.data.revoked}{\"\\n\"}'"
 - name: "okf-signed-agent-release check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

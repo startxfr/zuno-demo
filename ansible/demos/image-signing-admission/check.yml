@@ -16,5 +16,21 @@
       - {"api_version": "config.openshift.io/v1", "kind": "ImageDigestMirrorSet", "name": "zuno-unifai-via-registry", "exists": true}
       - {"api_version": "config.openshift.io/v1", "kind": "ImageDigestMirrorSet", "name": "zuno-public-via-registry", "exists": true}
       - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name_prefix": "rhtas-operator.v", "namespace": "openshift-operators", "phase": "Succeeded"}
+- name: "image-signing-admission check | the policy controller Deployment, the ClusterImagePolicies and their modes"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "zuno-policy-controller-webhook", "namespace": "policy-controller-operator"}
+- name: "image-signing-admission check | the two policies shown on stage exist, and every policy lists its mode"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "policy.sigstore.dev/v1beta1", "kind": "ClusterImagePolicy", "name": "zuno-first-party-images", "exists": true}
+      - {"api_version": "policy.sigstore.dev/v1beta1", "kind": "ClusterImagePolicy", "name": "zuno-unifai-images-unifai-ui", "exists": true}
+- name: "image-signing-admission check | the modes (all `enforce` but `openshift`, OpenShift's own)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get clusterimagepolicies.policy.sigstore.dev -o custom-columns=NAME:.metadata.name,MODE:.spec.mode"
 - name: "image-signing-admission check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

@@ -16,5 +16,11 @@
       - {"api_version": "cert-manager.io/v1", "kind": "Certificate", "name": "api-server-tls", "namespace": "openshift-config", "condition": "Ready"}
       - {"api_version": "cert-manager.io/v1", "kind": "Certificate", "name": "keycloak-wildcard-tls", "namespace": "zuno-auth", "condition": "Ready"}
       - {"api_version": "cert-manager.io/v1", "kind": "Certificate", "name": "istiod", "namespace": "zuno-mesh", "condition": "Ready"}
+- name: "vault-pki check | the Vault pod labels and the ExternalSecrets (only `SecretSynced`); no Secret is read"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version"
+      - "oc get externalsecrets -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c"
 - name: "vault-pki check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

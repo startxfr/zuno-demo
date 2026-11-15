@@ -17,5 +17,19 @@
       - {"api_version": "cert-manager.io/v1", "kind": "Certificate", "name": "istiod", "namespace": "zuno-mesh", "condition": "Ready"}
       - {"api_version": "cert-manager.io/v1", "kind": "ClusterIssuer", "name": "vault-issuer-istio", "condition": "Ready"}
       - {"api_version": "security.istio.io/v1", "kind": "PeerAuthentication", "name": "default", "namespace": "zuno-ai-run", "exists": true}
+- name: "service-mesh-kiali check | the Deployments of zuno-mesh, cert-manager-istio-csr and Kiali"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "istiod", "namespace": "zuno-mesh"}
+      - {"name": "cert-manager-istio-csr", "namespace": "zuno-mesh"}
+      - {"name": "kiali", "namespace": "zuno-mesh"}
+- name: "service-mesh-kiali check | the page's reads: Istio and IstioCNI, the PeerAuthentications, and the RESTARTS of cert-manager-istio-csr (20 and 10 on 2026-11-13: read whether they grow)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get istio,istiocni,deploy -n zuno-mesh"
+      - "oc get peerauthentication -A"
+      - "oc get pods -n zuno-mesh"
 - name: "service-mesh-kiali check | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

@@ -19,5 +19,10 @@
   vars:
     workloads:
       - {"name": "zuno-vault-0", "namespace": "zuno-vault", "kind": "Pod"}
+- name: "vault-pki status | the Vault pod and its labels (VAULT-SEALED false, VAULT-ACTIVE true)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version"
 - name: "vault-pki status | report"
   ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"
