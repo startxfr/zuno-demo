@@ -21,6 +21,8 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   contract's order (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status
   last), no ADR or WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter
   lifecycle, and the `> **Status:**` banner under `## Page status` only;
+- demo.yml `record: {kind, allow}` (ADR-0618): kind browser (a walkthrough) or terminal; each `allow` entry is a Do
+  command of the 5-minute version, never a command the capture never types, and only on a terminal take;
 - a published GIF `docs/assets/img/demo/<id>.gif` belongs to a catalogue demo, is at most 8 MB, and is embedded as the
   last line of that demo's Introduction (and only there); a page embeds no other demo's GIF.
 Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
@@ -189,6 +191,60 @@ def lifecycle_problems(page: catalogue.Page, rel: str) -> List[str]:
     return problems
 
 
+TAKE_KINDS = ("browser", "terminal")
+
+
+def _capture_never():
+    """capture.py's `never(command)`: the commands no `record.allow` can open (ADR-0618 clause 7). None when the
+    capture driver is absent from this tree."""
+    path = catalogue.ENGINE_ROOT / "evaluations" / "browser" / "terminal" / "capture.py"
+    if not path.is_file():
+        return None
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("zuno_capture", str(path))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules.setdefault("zuno_capture", module)       # its dataclasses look their module up while it loads
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module.never
+
+
+def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict, root: pathlib.Path) -> List[str]:
+    """demo.yml `record: {kind, allow}` (ADR-0618 clause 7, WP-287): the kind of take, and the commands a terminal take
+    may type beyond the read-only allowlist, each one a Do command of the 5-minute version, never an always-refused
+    one."""
+    rel = f"ansible/demos/{entry.id}/demo.yml"
+    record = manifest.get("record")
+    if record is None:
+        return []
+    if not isinstance(record, dict):
+        return [f"{rel}: `record` must be a mapping {{kind, allow}}"]
+    found = []
+    unknown = sorted(set(record) - {"kind", "allow"})
+    if unknown:
+        found.append(f"{rel}: `record` has unknown key(s) {', '.join(unknown)}")
+    kind = record.get("kind", "browser")
+    allow = record.get("allow") or []
+    if kind not in TAKE_KINDS:
+        found.append(f"{rel}: `record.kind` is {kind!r}, one of {', '.join(TAKE_KINDS)}")
+    elif kind == "browser":
+        walkthrough = root / "evaluations" / "browser" / "walkthroughs" / f"{entry.id}.mjs"
+        if gif.cut_list_path(entry.id, root).is_file() and not walkthrough.is_file():
+            found.append(f"{rel}: a browser take needs evaluations/browser/walkthroughs/{entry.id}.mjs")
+        if allow:
+            found.append(f"{rel}: `record.allow` is for a terminal take; a browser take types nothing")
+    if not isinstance(allow, list) or not all(isinstance(a, str) for a in allow):
+        return found + [f"{rel}: `record.allow` must be a list of commands"]
+    commands = {readonly.strip_watch_flags(c)[0] for step in page.steps("5") for c in catalogue.do_commands(step.do)}
+    never = _capture_never() if kind == "terminal" and allow else None
+    for command in allow:
+        if command not in commands:
+            found.append(f"{rel}: `record.allow` names `{command}`, which is not a Do command of the 5-minute version")
+        why = never(command) if never else ""
+        if why:
+            found.append(f"{rel}: `record.allow` names `{command}`, which is never typed ({why})")
+    return found
+
+
 def demo_problems(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
     page = catalogue.load(entry)
     rel_page = entry.path.relative_to(root).as_posix()
@@ -215,6 +271,7 @@ def demo_problems(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
         for action in (manifest.get("mutations") or {}):
             if action not in catalogue.LIFECYCLE_ACTIONS:
                 problems.append(f"{rel_dir}/demo.yml: mutations names {action!r}, not an action")
+        problems += record_problems(entry, page, manifest, root)
     times = {s.time: s for s in page.steps("15")}
     for key in (manifest.get("steps") or {}):
         if not isinstance(key, str):
@@ -543,7 +600,8 @@ def shape_warnings(entries: List[catalogue.Entry], root: pathlib.Path, detailed:
                 found.append(f"{rel}: not in the ADR-0617 page shape yet ({len(findings)} finding(s); "
                              f"`python3 platform/demo/consistency.py --only {entry.id}` lists them)")
         if (gif_dir(root) / f"{entry.id}.gif").is_file() and not gif.cut_list_path(entry.id, root).is_file():
-            found.append(f"docs/assets/img/demo/{entry.id}.gif: no ansible/demos/{entry.id}/gif.yml says how it was cut")
+            found.append(f"docs/assets/img/demo/{entry.id}.gif: no ansible/demos/{entry.id}/gif.yml says how it was "
+                         "cut")
     return found
 
 

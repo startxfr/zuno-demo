@@ -8,7 +8,9 @@
     make demo freeze on|off                     a freeze marker on this workstation
     make demo rehearse <id> 5|15                the whole sequence without pauses, with a report
     make demo scout <id>                        sign in and open the walkthrough's menus, no prompt (ADR-0618)
-    make demo record <id>                       record the 5-minute version in a browser, then cut its GIF (ADR-0617)
+    make demo record <id>                       record the 5-minute version in a browser, then cut its GIF (ADR-0617);
+                                                a terminal demo: capture the session and check it as text (ADR-0618)
+    make demo record <id> render                a terminal demo: film the checked session, then cut its GIF
     make demo gif <id>                          cut the newest recording again, offline
     make demo golden-path|browser               the catalogue-wide checks (run by the Makefile, unchanged)
 
@@ -38,6 +40,7 @@ import guard  # noqa: E402
 import rehearse  # noqa: E402
 import render  # noqa: E402
 import session  # noqa: E402
+import textgate  # noqa: E402
 import workshop  # noqa: E402
 from runner import Unit, UnitResult, run_units  # noqa: E402
 
@@ -71,6 +74,8 @@ Usage: make demo <verb> [arguments]
   scout <id>                 Sign in as the walkthrough's persona and open its menus: no prompt, nothing created
   record <id>                Record the 5-minute version in a browser, then cut its GIF (needs a scout of the
                              walkthrough and a check that passed today)
+  record <id> [render]       A terminal demo: capture the session and check it as text; `render` films the checked
+                             session and cuts its GIF, after the transcript is read
   gif <id>                   Cut the newest recording again, offline (the GIF is published only on the owner's go)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
@@ -542,6 +547,8 @@ def cmd_rehearse(args: List[str]) -> int:
 
 
 RECORDER = pathlib.Path("evaluations") / "browser" / "record.sh"
+CAPTURE = pathlib.Path("evaluations") / "browser" / "terminal" / "capture.py"
+TAKE_RE = re.compile(r"^\d{8}-\d{6}$")
 WALKTHROUGHS = pathlib.Path("evaluations") / "browser" / "walkthroughs"
 WALKTHROUGH_HELPERS = ("_helpers.mjs",)        # hashed before the walkthrough, in this order (WP-286 contract)
 RECORD_TIMEOUT = 1200
@@ -664,6 +671,9 @@ def cmd_scout(args: List[str]) -> int:
     `record` needs first, for the current version of the walkthrough. Local, never AAP."""
     entry = scenario_for_gif(args, "scout")
     root = catalogue.repo_root()
+    if take_kind(load_manifest(catalogue.demo_dir(entry.id))) != "browser":
+        raise UsageError(f"{entry.id} is a terminal demo: its take guesses no selector and needs no scout "
+                         f"(make demo record {entry.id}).")
     guard.check_freeze("scout")
     recorder = require_recorder(entry, root)
     persona = walkthrough_persona(entry.id, root)
@@ -701,18 +711,153 @@ def cmd_scout(args: List[str]) -> int:
     return 2 if rc == 2 else 1
 
 
-def cmd_record(args: List[str]) -> int:
-    """Record the 5-minute version through the demo's walkthrough, then cut the GIF. Local, never AAP."""
-    entry = scenario_for_gif(args, "record")
-    root = catalogue.repo_root()
-    guard.check_freeze("record")
-    recorder = require_recorder(entry, root)
-    if not session.check_passed_today(entry.id):
-        last = session.last_check(entry.id)
+def take_kind(manifest: dict) -> str:
+    """demo.yml `record.kind`: browser (a walkthrough) or terminal (a captured session); browser when absent."""
+    record = manifest.get("record") if isinstance(manifest.get("record"), dict) else {}
+    return str(record.get("kind") or "browser")
+
+
+def require_check_today(demo_id: str) -> None:
+    if not session.check_passed_today(demo_id):
+        last = session.last_check(demo_id)
         seen = (f"the last one {'passed' if last.get('passed') else 'FAILED'} on {last.get('date')} "
                 f"({last.get('source')})") if last else "none is recorded on this workstation"
-        raise guard.Refused(f"`record` needs a `make demo check {entry.id}` that passed today: {seen}. Then "
-                            f"`make demo start {entry.id}` warms the model before the take.")
+        raise guard.Refused(f"`record` needs a `make demo check {demo_id}` that passed today: {seen}. Then "
+                            f"`make demo start {demo_id}` warms the model before the take.")
+
+
+def latest_terminal_take(demo_id: str) -> Optional[pathlib.Path]:
+    """The newest `recordings/<id>-<YYYYmmdd-HHMMSS>/` holding a terminal.cast, or None."""
+    base = gif.recordings_dir()
+    if not base.is_dir():
+        return None
+    found = [p for p in base.glob(f"{demo_id}-*") if p.is_dir() and TAKE_RE.match(p.name[len(demo_id) + 1:])
+             and (p / textgate.CAST).is_file()]
+    return sorted(found)[-1] if found else None
+
+
+def capture_plan(demo_id: str, root: pathlib.Path) -> List[str]:
+    """What the capture would type (`<time>  $ <cmd>` lines), or Refused with its reasons. Runs nothing."""
+    done = subprocess.run([sys.executable, str(root / CAPTURE), demo_id, "--plan"], cwd=str(root),
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=120)
+    lines_out = [line for line in done.stdout.split("\n") if line.strip()]
+    if done.returncode == 2:
+        raise guard.Refused(done.stderr.strip() or f"the capture cannot plan {demo_id}")
+    if done.returncode != 0:
+        failed = next((line for line in reversed(lines_out) if line.startswith("CAPTURE: failed")), "")
+        raise guard.Refused(f"the take may not type every Do command of {demo_id}: "
+                            f"{failed[len('CAPTURE: failed '):] or done.stderr.strip()}. A command outside the "
+                            "read-only allowlist is typed only when demo.yml lists it under `record: {allow: [...]}`.")
+    return [line for line in lines_out if not line.startswith("CAPTURE:")]
+
+
+def record_terminal(entry: catalogue.Entry, root: pathlib.Path, manifest: dict) -> int:
+    """A terminal take, first call: capture the real session, then the text gate. Nothing is rendered before the
+    recording session has read the transcript (ADR-0618 clause 5): `make demo record <id> render` films it."""
+    guard.check_freeze("record")
+    for path in (root / CAPTURE, root / RECORDER):
+        if not path.is_file():
+            raise guard.Refused(f"{path.relative_to(root) if root in path.parents else path} is missing: "
+                                f"{entry.id} cannot be recorded yet (WP-287).")
+    require_check_today(entry.id)
+    plan = capture_plan(entry.id, root)
+    allow = [str(c) for c in (manifest.get("record") or {}).get("allow") or []]
+    cut = gif.load_cut_list(gif.cut_list_path(entry.id))
+    notices = [str(cut.get("record_notice") or "a real terminal session on the cluster with your `oc` login: the "
+                   "5-minute rows typed as the page says"), "the session is checked as text before anything is filmed"]
+    notices += [f"typed: {line}" for line in plan]
+    notices.append(f"typed beyond the read-only allowlist (demo.yml record.allow): "
+                   f"{', '.join(allow) if allow else 'none'}")
+    confirmed = guard.confirm(entry.id, {}, notices=notices)
+    refusal = cluster_ready(manifest)
+    if refusal:
+        raise guard.Refused(refusal)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    directory = gif.recordings_dir() / f"{entry.id}-{stamp}"
+    directory.mkdir(parents=True, mode=0o700)
+    log_path = session.logs_dir() / f"{entry.id}-capture-{stamp}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    out(f"{entry.id} · record, terminal capture ({confirmed}) · {directory}")
+    rc = run_recorder([sys.executable, str(root / CAPTURE), entry.id, str(directory)], root, log_path)
+    if rc == 2:
+        out(f"RESULT: the capture could not start (exit 2). Log: {log_path}")
+        return 2
+    if not (directory / textgate.CAST).is_file():
+        out("RESULT: REFUSED by the capture: the session printed a real local value (the token, the kubeconfig path, "
+            f"the home directory, the login or host name), so no cast was written. Log: {log_path}")
+        return 1
+    try:
+        record = textgate.gate(directory)
+    except textgate.GateError as exc:
+        out(f"RESULT: {exc}")
+        return 1
+    out("RESULT")
+    for hit in record["hits"]:
+        out(f"  HIT {textgate.TRANSCRIPT}:{hit['line']}: {hit['detector']}")
+    if record["status"] != "pass":
+        out(f"  REFUSED by the text gate: {len(record['hits'])} hit(s). The cast is never edited: fix the cause, then "
+            f"record again. Transcript: {directory / textgate.TRANSCRIPT}")
+        return 1
+    if record.get("steps_status") != "done":
+        out(f"  The capture did not finish (status {record.get('steps_status')!r}, exit {rc}): read "
+            f"{directory / textgate.TRANSCRIPT} and {directory / textgate.STEPS}. Log: {log_path}")
+        return 1
+    out(f"  Text gate passed, {record['lines']} lines. Read the transcript before anything is filmed (ADR-0618 "
+        f"clause 5): {directory / textgate.TRANSCRIPT}")
+    out(f"  If it shows nothing private: make demo record {entry.id} render")
+    return 0
+
+
+def render_terminal(entry: catalogue.Entry, root: pathlib.Path) -> int:
+    """A terminal take, second call: film the checked session (offline: the replay has no network), then cut."""
+    directory = latest_terminal_take(entry.id)
+    if directory is None:
+        raise guard.Refused(f"no captured session of {entry.id}: run `make demo record {entry.id}` first.")
+    ok, why = textgate.passed(directory)
+    if not ok:
+        raise guard.Refused(f"{directory}: {why}. Record again with `make demo record {entry.id}`.")
+    if (directory / "recording.webm").exists():
+        raise guard.Refused(f"{directory} is already filmed: `make demo gif {entry.id}` cuts it again.")
+    recorder = root / RECORDER
+    if not recorder.is_file():
+        raise guard.Refused(f"{RECORDER} is missing (WP-287).")
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_path = session.logs_dir() / f"{entry.id}-render-{stamp}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    out(f"{entry.id} · record render · {directory}")
+    rc = run_recorder([str(recorder), entry.id, str(directory), "--terminal"], root, log_path)
+    if rc != 0:
+        out(f"RESULT: the replay failed (exit {rc}). Log: {log_path}")
+        return 2 if rc == 2 else 1
+    try:
+        built = gif.build(entry.id, directory, gif.load_cut_list(gif.cut_list_path(entry.id)),
+                          times=gif.page_times(entry.id), cut_path=gif.cut_list_path(entry.id))
+    except gif.CutError as exc:
+        lines([f"REFUSED: {r}" for r in exc.reasons])
+        out(f"The take is kept in {directory}: fix the cut list, then make demo gif {entry.id}")
+        return 1
+    print_built(built, entry.id)
+    return 0
+
+
+def cmd_record(args: List[str]) -> int:
+    """Record the 5-minute version through the demo's walkthrough, then cut the GIF; a terminal demo is captured and
+    checked as text first, then filmed by `record <id> render`. Local, never AAP."""
+    render_call = bool(args) and args[-1] == "render"
+    if render_call:
+        args = args[:-1]
+    entry = scenario_for_gif(args, "record")
+    root = catalogue.repo_root()
+    manifest = load_manifest(catalogue.demo_dir(entry.id))
+    kind = take_kind(manifest)
+    if kind == "terminal":
+        return render_terminal(entry, root) if render_call else record_terminal(entry, root, manifest)
+    if render_call:
+        raise UsageError(f"`render` is the second call of a terminal take; {entry.id} is recorded in a browser: "
+                         f"make demo record {entry.id}")
+    guard.check_freeze("record")
+    recorder = require_recorder(entry, root)
+    require_check_today(entry.id)
     changes = scout_gate(entry.id, root)
     demo_dir = catalogue.demo_dir(entry.id)
     manifest = load_manifest(demo_dir)
@@ -777,7 +922,10 @@ def complete(args: List[str]) -> int:
         if verb in ("use", "rehearse") + ACTIONS:
             out(" ".join(ids))
         elif verb in ("scout", "record", "gif"):
-            out(" ".join(e.id for e in catalogue.discover() if gif.cut_list_path(e.id).is_file()))
+            with_cut = [e.id for e in catalogue.discover() if gif.cut_list_path(e.id).is_file()]
+            if verb == "scout":         # a terminal take is not scouted: it guesses no selector
+                with_cut = [i for i in with_cut if take_kind(load_manifest(catalogue.demo_dir(i))) == "browser"]
+            out(" ".join(with_cut))
         elif verb == "step":
             current = session.load_session()
             total = int(current.get("total") or 0) if current else 0

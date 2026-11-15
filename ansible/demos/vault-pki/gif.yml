@@ -1,0 +1,20 @@
+---
+# vault-pki: the cut list of its GIF (ADR-0618, WP-287), read by platform/demo/gif.py.
+# `make demo record vault-pki` captures the 5-minute version as a real terminal session and checks it as text;
+# `make demo record vault-pki render` replays it in xterm.js and films it, then cuts it with this list. The GIF stays
+# in ~/.cache/zuno/demo/recordings/ until the owner's "go vault-pki".
+# Markers written by the replay: start, then per row <MM-SS>-typed and <MM-SS>-done, then end. A typed..done span
+# holds the row's commands and their output; `fit` sets its length in the GIF whatever the cluster's answer time.
+# A first draft for the first take: adjust the fits and holds on the real markers.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: six read-only `oc get` commands, names and states
+  only, no Secret value
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: 00-00-typed, to: 00-00-done, fit: 5, hold: 4, step: "0:00", caption: "0:00  Vault unseals itself: no key typed, none stored"}
+  - {from: 01-00-typed, to: 01-00-done, fit: 8, hold: 5, step: "1:00", caption: "1:00  Every workload secret comes from Vault, synced"}
+  - {from: 02-15-typed, to: 02-15-done, fit: 6, hold: 4, step: "2:15", caption: "2:15  One store per namespace, its own keys only"}
+  - {from: 03-15-typed, to: 03-15-done, fit: 6, hold: 5, step: "3:15", caption: "3:15  Public certificates and the Vault PKI issuer"}
+  - {still: end, hold: 4, step: "4:15", caption: "Vault holds every credential, each namespace its own"}

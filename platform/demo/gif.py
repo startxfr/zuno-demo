@@ -17,8 +17,9 @@ A `still` moment shows the marker's PNG for `hold` seconds. A motion moment play
 the next: `fit: <seconds>` sets its playing time whatever the real span (speed = span / fit, kept within 0.5-16, so a
 fast answer is slowed down at most to half speed and the moment is then simply shorter; `fit` never freezes a frame),
 or a fixed `speed:`; `hold` freezes the last frame. Every moment lasts at least 2 s. `step` must be a time of the
-page's 5-minute table. Each moment's caption is written in a black band under the picture, so it hides nothing. When markers.json names `motion_from`, no motion moment may
-start before that marker: the take holds the sign-in before it, which a public GIF never shows in motion.
+page's 5-minute table. Each moment's caption is written in a black band under the picture, so it hides nothing.
+When markers.json names `motion_from`, no motion moment may start before that marker: the take holds the sign-in
+before it, which a public GIF never shows in motion.
 
 ffmpeg runs in the Playwright image by podman (the workstation has no ffmpeg). The GIF is written next to the
 recording, `<id>.gif`, never in the repository: it is published only after the owner's "go <id>" (ADR-0617).
@@ -179,18 +180,27 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
     if markers.get("status") != "pass":
         reasons.append(f"the recording did not pass (status {markers.get('status')!r}: "
                        f"{markers.get('detail') or 'no detail'}): record it again")
-    # ADR-0618 clause 9: a take says what it created and whether it cleaned it, and what the persona owns before and
-    # after. cleaned null: nothing was created.
-    if markers.get("cleaned") is False:
-        created = ", ".join(f"{c.get('kind')} {c.get('id')}" for c in markers.get("created") or [] if isinstance(c, dict))
-        reasons.append(f"the take did not clean what it created ({created or 'see markers.json'}): delete it by hand, "
-                       "then record again")
-    owned = markers.get("owned")
-    if not isinstance(owned, dict):
-        reasons.append("markers.json does not say what the persona owns before and after the take (`owned`)")
-    elif owned.get("same") is not True:
-        reasons.append(f"what the persona owns changed during the take ({owned.get('before')} before, "
-                       f"{owned.get('after')} after): read the take's log, then record again")
+    # ADR-0618 clause 9: a browser take says what it created and whether it cleaned it, and what the persona owns
+    # before and after (cleaned null: nothing was created). A terminal take replays a captured session: it creates
+    # nothing and reads no persona's list (owned null). `kind` absent: a browser take of the first chain.
+    kind = markers.get("kind", "browser")
+    if kind not in ("browser", "terminal"):
+        reasons.append(f"markers.json: unknown take kind {kind!r}")
+    elif kind == "terminal":
+        if markers.get("created") or markers.get("cleaned") is not None:
+            reasons.append("a terminal take creates nothing: its `created` must be [] and its `cleaned` null")
+    else:
+        if markers.get("cleaned") is False:
+            created = ", ".join(f"{c.get('kind')} {c.get('id')}" for c in markers.get("created") or []
+                                if isinstance(c, dict))
+            reasons.append(f"the take did not clean what it created ({created or 'see markers.json'}): delete it by "
+                           "hand, then record again")
+        owned = markers.get("owned")
+        if not isinstance(owned, dict):
+            reasons.append("markers.json does not say what the persona owns before and after the take (`owned`)")
+        elif owned.get("same") is not True:
+            reasons.append(f"what the persona owns changed during the take ({owned.get('before')} before, "
+                           f"{owned.get('after')} after): read the take's log, then record again")
     if markers.get("demo") not in (None, demo_id):
         reasons.append(f"the recording is of {markers.get('demo')!r}, not {demo_id!r}")
     at: Dict[str, float] = {}

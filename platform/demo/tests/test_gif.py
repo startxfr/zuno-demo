@@ -467,7 +467,13 @@ class Verbs(unittest.TestCase):
     def test_completion_offers_only_demos_with_a_cut_list(self):
         for verb in ("scout", "record", "gif"):
             rc, out, _ = self.run_main("--complete", verb)
-            self.assertEqual(out.split(), ["open-webui"], verb)
+            self.assertIn("open-webui", out.split(), verb)
+            self.assertNotIn("guardrails", out.split(), verb)             # no cut list
+        rc, out, _ = self.run_main("--complete", "scout")
+        self.assertNotIn("vault-pki", out.split())                         # a terminal demo is not scouted
+        rc, _, err = self.run_main("scout", "vault-pki")
+        self.assertEqual(rc, 2)
+        self.assertIn("is a terminal demo", err)
 
 
 if __name__ == "__main__":

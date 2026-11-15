@@ -101,6 +101,7 @@ jobs:
           python3 platform/demo/tests/test_argo_health.py
           python3 platform/demo/tests/test_gif.py
           python3 platform/demo/tests/test_page_shape.py
+          python3 platform/demo/tests/test_terminal_take.py
           home="$(mktemp -d)"
           HOME="$home" make demo list
           HOME="$home" make demo use guardrails 15

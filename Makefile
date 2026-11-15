@@ -275,6 +275,7 @@ help:
 	  '  make demo rehearse <id> 5|15         The whole sequence without pauses, with a report' \
 	  '  make demo scout <id>                 Sign in as the walkthrough'"'"'s persona and open its menus: no prompt, nothing created (ADR-0618)' \
 	  '  make demo record <id>                Record the 5-minute version in a browser, then cut its GIF in ~/.cache (ADR-0617)' \
+	  '  make demo record <id> [render]       A terminal demo: capture and check as text; render films it after the transcript is read (ADR-0618)' \
 	  '  make demo gif <id>                   Cut the newest recording again, offline; never copies into the repository' \
 	  '  make demo golden-path|browser        The catalogue-wide checks (ADR-0605, ADR-0606); ONLY=a,b limits them' \
 	  '' \

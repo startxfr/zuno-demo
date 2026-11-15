@@ -9,3 +9,8 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
+# The GIF take (ADR-0618, WP-287): a real terminal session, captured, checked as text, then filmed. Every Do command
+# of the 5-minute version passes the read-only allowlist, so `allow` is empty.
+record:
+  kind: terminal
+  allow: []
