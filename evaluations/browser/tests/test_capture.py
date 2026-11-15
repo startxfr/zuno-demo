@@ -153,6 +153,23 @@ class WhatMayBeTyped(unittest.TestCase):
         self.assertEqual(lines[0], "0:00  $ oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version")
         self.assertEqual(len(lines), 6)
 
+    def test_a_demo_that_needs_the_cluster_domain_does_not_plan_without_it(self):
+        import shutil
+        import subprocess as sp
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for rel in ("docs/demo", "ansible/demos/vault-pki", "platform/demo"):
+                shutil.copytree(ROOT / rel, root / rel)
+            manifest = root / "ansible/demos/vault-pki/demo.yml"
+            manifest.write_text(manifest.read_text() + 'env: {VAULT_URL: "https://vault.{{ cluster_base_domain }}"}\n')
+            real = sp.run
+            capture.subprocess.run = lambda *a, **k: sp.CompletedProcess(a, 1, "", "")   # oc gives nothing
+            try:
+                with self.assertRaises(capture.NoDomain):
+                    capture.demo_steps("vault-pki", root)
+            finally:
+                capture.subprocess.run = real
+
     def test_the_first_terminal_demo_plans_offline(self):
         rows, variables, problems = capture.demo_steps("vault-pki", ROOT)
         self.assertEqual(problems, [])

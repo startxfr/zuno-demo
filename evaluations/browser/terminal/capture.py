@@ -83,6 +83,10 @@ NEVER = [
 CREDENTIAL_NAME = re.compile(r"KEY|TOKEN|PASSWORD|SECRET", re.I)
 
 
+class NoDomain(RuntimeError):
+    """The demo's variables need the cluster domain and it could not be read."""
+
+
 class Refused(Exception):
     """A command may not be typed, or the session printed a local value."""
 
@@ -320,6 +324,8 @@ def demo_steps(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[List[Step], Dic
     if any("cluster_base_domain" in v for v in variables.values()):
         domain = subprocess.run(["oc", "get", "ingresses.config.openshift.io", "cluster", "-o", "jsonpath={.spec.domain}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True).stdout.strip()
+        if not domain:
+            raise NoDomain("the demo's variables use the cluster domain and `oc` gave none: is oc logged in?")
         variables = {k: re.sub(r"\{\{\s*cluster_base_domain\s*\}\}", domain, v) for k, v in variables.items()}
     allow = [str(c) for c in ((manifest.get("record") or {}).get("allow") or [])]
     steps, problems = [], []
@@ -347,7 +353,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("out_dir is required unless --plan")
     try:
         steps, variables, problems = demo_steps(args.demo)
-    except (KeyError, OSError) as exc:
+    except (KeyError, OSError, NoDomain) as exc:   # also for --plan: a plan with an empty host would show wrong URLs
         print(f"{args.demo}: {exc}", file=sys.stderr)
         return 2
     if args.plan or problems:
