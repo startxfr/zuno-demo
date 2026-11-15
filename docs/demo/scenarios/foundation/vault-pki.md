@@ -19,6 +19,8 @@ the parts connect is in [Appendix B](#appendix-b---lld).
 **The message:** "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the
 cluster does not hold, and its signing keys never leave it."
 
+![The 5-minute version of the Vault and PKI demo, recorded live in a terminal: Vault unsealed, 97 ExternalSecrets synced, one SecretStore per namespace, and the certificates cert-manager issues.](../../../assets/img/demo/vault-pki.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
