@@ -105,7 +105,9 @@ Install either: it refuses while the demo is off.
    means AWS has no capacity in that zone for now.
 3. The node is ready when exactly one node is labelled `zuno.io/gpu-workload=world-model` with
    `mig.config.state=success` and 1 GPU allocatable.
-4. `make d2 install world-model`: applies the chart. The runtime copies about 20 GB of weights from S3 (about 2.5
+4. `make d2 build world-model` first, then `make d2 install world-model`. The world-model images were not rebuilt after
+   the incident of 2026-11-15 (the internal registry bucket was emptied), so the build comes before the install until
+   the images are back in the registry. The install applies the chart. The runtime copies about 20 GB of weights from S3 (about 2.5
    minutes, measured) and loads two models: about 10 more minutes. The Route is
    `https://world-model.apps.demo333.startx.fr`.
 5. `make d2 check world-model`: the preflight of Check. It must be green.
