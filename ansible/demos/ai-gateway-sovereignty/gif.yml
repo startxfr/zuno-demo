@@ -5,8 +5,8 @@
 # list. The GIF stays in ~/.cache/zuno/demo/recordings/ until the owner's "go ai-gateway-sovereignty".
 # One row has a command (1:00, the probe); rows 0:00, 2:30, 3:30 and 4:15 are words or reading. Markers: start,
 # 01-00-typed, 01-00-done, end. The probe's wait is played fast; the result screen then carries the 2:30, 3:30 and
-# closing captions. No caption names a provider or a model. Planned before the first take: check the total and how
-# the wait reads after it.
+# closing captions. No caption names a provider or a model. Re-cut on the first take (20261116-005557, the probe
+# answered in 2 s: the wait spans 5.4 s): 43.0 s, and 40.2 to 46.3 s for probe waits of 2 to 180 s.
 record_notice: >-
   a real terminal session with your oc login: `ONLY=sovereignty make demo golden-path`, the sovereignty probe, real
   model calls on the gateway persona's budget; the probe reads its credentials itself and prints none
@@ -14,8 +14,8 @@ target_seconds: [40, 60]
 width: 960
 fps: 10
 moments:
-  - {from: start, to: 01-00-typed, fit: 4, hold: 4, step: "1:00", caption: "1:00  One real call to Arkos, labelled C1 by the caller"}
-  - {from: 01-00-typed, to: 01-00-done, fit: 12, hold: 0, step: "1:00", caption: "1:00  The probe runs; a local model may take a few seconds"}
-  - {still: 01-00-done, hold: 7, step: "2:30", caption: "2:30  Raised to C3: answered by a model on our GPUs"}
-  - {still: end, hold: 7, step: "3:30", caption: "3:30  The level decides, not the application"}
-  - {still: end, hold: 7, step: "4:15", caption: "If no local model is ready, Zuno refuses"}
+  - {from: start, to: 01-00-typed, fit: 4, hold: 5, step: "1:00", caption: "1:00  One real call to Arkos, labelled C1 by the caller"}
+  - {from: 01-00-typed, to: 01-00-done, fit: 8, hold: 0, step: "1:00", caption: "1:00  The probe runs; a local model may take a few seconds"}
+  - {still: 01-00-done, hold: 9, step: "2:30", caption: "2:30  Raised to C3: answered by a model on our GPUs"}
+  - {still: end, hold: 8, step: "3:30", caption: "3:30  The level decides, not the application"}
+  - {still: end, hold: 9, step: "4:15", caption: "If no local model is ready, Zuno refuses"}
