@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# WP-288: the offline test of the walkthroughs written before their first scout (kagent). Runs record.mjs in the
-# Playwright image against tests/fake-kagent.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
+# WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag) and of the
+# shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs and
+# tests/fake-unifai.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
 # test of the recorder itself.
@@ -21,6 +22,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
     sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node "tests/$FAKE" >/dev/null & sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")"; exit $rc'
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
+unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
 }
@@ -84,6 +86,54 @@ out="$(kagent k-noid FAKE_NO_URL=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: a session whose id was never read is reported, not silent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL .*a session of zuno-sre starting with \"Which pods of zuno-ai-run are not Running, and how many are?\" may remain' <<<\"\$0\"" "$out"
 
+echo "== unifai-live-rag"
+out="$(unifai u-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "unifai: a scout creates no session, ticks no row and no switch" grep -q 'left: {"sessions":1,"touched":0}' <<<"$out"
+expect "unifai: scout.json reports every guess" scouted u-scout '
+assert list(steps) == ["enter", "owned", "home", "documents", "chats", "workflows", "closed"], list(steps)
+assert steps["owned"]["count"] == 1 and steps["home"]["nav"] == {"documents": "a[href=\x27/documents\x27]", "chats": "a[href=\x27/agentic-chats\x27]"}, steps["home"]
+assert steps["documents"]["ready"] is True and steps["documents"]["done"] == 2, steps["documents"]
+assert steps["chats"]["available_chats"] == "1" and steps["chats"]["add_selector"] and steps["chats"]["session_open"] is False, steps["chats"]
+w = steps["workflows"]
+assert w["workflow_listed"] is True and w["workflow_exact_matches"] == 1 and w["confirm_button"] == 1 and w["cancel_button"] == 1, w
+assert w["switches"] and not any(sw["on"] for sw in w["switches"]), w["switches"]
+assert steps["closed"]["sessions"] == 1 and steps["closed"]["dialog_still_open"] is False
+'
+out="$(unifai u-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "unifai: its session is gone, the earlier one is kept, nothing ticked" grep -q 'left: {"sessions":1,"touched":0}' <<<"$out"
+expect "unifai: the log says the retriever is named on screen" grep -q 'the retriever consultant-01-documents is named on screen' <<<"$out"
+expect "unifai: markers.json follows the contract" markers u-pass '
+assert names == ["login", "home", "documents", "chat-new", "q1-sent", "q1-done", "q2-done", "end"], names
+assert m["persona"] == "consultant-01" and m["motion_from"] == "home" and m["status"] == "pass", m
+assert len(m["created"]) == 1 and m["created"][0]["kind"] == "session" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(unifai u-nofiles FAKE_NO_FILES=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: a library without the demo files fails before anything is created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the Document Library does not show both demo files Done .*make demo start unifai-live-rag' <<<\"\$0\"" "$out"
+expect "unifai: nothing created, nothing to clean" markers u-nofiles '
+assert names == ["login", "home"] and m["created"] == [] and m["cleaned"] is None and m["owned"]["same"] is True, m
+'
+out="$(unifai u-wrong FAKE_WRONG_ANSWER=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: an answer without the page's code fails the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the answer to the 2:00 question does not hold ZN-CAR-7' <<<\"\$0\"" "$out"
+expect "unifai: its session is deleted all the same" grep -q 'left: {"sessions":1,"touched":0}' <<<"$out"
+out="$(unifai u-quota FAKE_REFUSE_MODEL=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: a refused model call fails at once with its message" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL answer 1 was refused or failed: 429: token quota exceeded for persona consultant-01' <<<\"\$0\"" "$out"
+expect "unifai: stopped at q1-sent within 30 s, session deleted" markers u-quota '
+assert names[-1] == "q1-sent" and m["markers"][-1]["t"] < 30 and m["cleaned"] is True and m["owned"]["same"] is True, m
+'
+out="$(unifai u-refused FAKE_REFUSE_DELETE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: a refused delete fails the take and names the session" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the session of consultant-01-my-documents (.*) was NOT deleted from consultant-01.s Agentic Chats' <<<\"\$0\"" "$out"
+expect "unifai: markers.json says not cleaned, one more session owned" markers u-refused '
+assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same": False} and len(names) == 8, m
+'
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 exit $failed

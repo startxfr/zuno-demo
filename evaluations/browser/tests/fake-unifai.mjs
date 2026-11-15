@@ -1,0 +1,137 @@
+// WP-288: a stand-in for UnifAI and Keycloak, for the offline test of walkthroughs/unifai-live-rag.mjs and of the
+// shared unifai* helpers (tests/walkthroughs-offline.sh). It serves what the fork's UI source says UnifAI shows (no
+// scout has run yet): "Login using SSO", the sidebar links, the Document Library with the two demo files Done, the
+// chats page with "Add new chat from flow", its dialog (search box, workflows with a Human-in-the-Loop switch, Cancel,
+// Add) and the session API (/api2/sessions/*). A session exists as soon as Add is clicked, as in UnifAI.
+// The session list always holds one earlier session. Knobs: FAKE_REFUSE_DELETE=1 the delete answers success false;
+// FAKE_WRONG_ANSWER=1 the first answer lacks ZN-CAR-7; FAKE_NO_FILES=1 the library is empty; FAKE_REFUSE_MODEL=1 the
+// answer carries a rate-limit error. No cluster, no model.
+import http from "node:http";
+import crypto from "node:crypto";
+
+const port = Number(process.env.FAKE_PORT || 8097);
+const EARLIER = "22222222-2222-2222-2222-222222222222";
+const sessions = new Map([[EARLIER, { blueprint: "consultant-01-my-assistant", status: "COMPLETED", messages: [] }]]);
+let touched = 0;   // clicks on a row's checkbox or a Human-in-the-Loop switch: a take or a scout must leave it at 0
+
+const WELCOME = `<!doctype html><title>UnifAI (fake)</title><h1>Welcome to UnifAI</h1><button onclick="location.href='/api1/auth/login'">Login using SSO</button>`;
+const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/cb"><input id="username" name="u">
+<input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`;
+const FILES = process.env.FAKE_NO_FILES === "1" ? "" : ["travel-and-expense-policy.md", "on-call-rota-handbook.md"].map((f) =>
+  `<tr><td><input type="checkbox" onclick="fetch('/fake/touched',{method:'POST'})"></td><td>${f}</td><td>consultant-01</td><td>Done</td></tr>`).join("");
+
+const APP = `<!doctype html><title>UnifAI (fake)</title>
+<style>body{font:16px sans-serif;margin:0;display:flex} nav{width:200px;padding:16px} main{padding:16px;flex:1} textarea{width:600px;height:40px}
+[role=dialog]{position:fixed;top:40px;left:240px;width:700px;border:1px solid #888;background:#fff;padding:16px} .flow{padding:6px;display:flex;gap:12px}</style>
+<nav><div>Personal</div><div>Team</div><a href="/documents">Documents</a><br><a href="/agentic-chats">Agentic Chats</a></nav>
+<main>
+<div id="home" hidden><h2>Get to know UnifAI</h2></div>
+<div id="docs" hidden><h2>Document Library</h2><table>${FILES}</table></div>
+<div id="chats" hidden><span id="count"></span> <button title="Add new chat from flow" id="add">+</button>
+<div id="messages"></div><textarea id="in" hidden placeholder="Type your message..."></textarea><div id="live"></div></div>
+<div role="dialog" id="dialog" hidden><h3>Add New Chat from Flow</h3><input placeholder="Search workflows..." id="search">
+<div id="flows"></div><button id="cancel">Cancel</button><button id="confirm">Add</button></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const FLOWS = ["consultant-01-my-assistant", "consultant-01-my-documents"];
+let picked = "";
+let sid = (location.pathname.match(/^\\/agentic-chats\\/(.+)$/) || [])[1] || "";
+$("home").hidden = location.pathname !== "/";
+$("docs").hidden = location.pathname !== "/documents";
+$("chats").hidden = !location.pathname.startsWith("/agentic-chats");
+function flows() {
+  $("flows").innerHTML = "";
+  for (const name of FLOWS.filter((f) => f.includes($("search").value))) {
+    const row = document.createElement("div"); row.className = "flow";
+    const label = document.createElement("span"); label.textContent = name; label.onclick = () => { picked = name; };
+    const hitl = document.createElement("button"); hitl.setAttribute("role", "switch"); hitl.setAttribute("aria-checked", "false");
+    hitl.style.cssText = "width:30px;height:16px"; hitl.onclick = () => fetch("/fake/touched", { method: "POST" });
+    row.append(label, hitl); $("flows").appendChild(row);
+  }
+}
+$("search").oninput = flows;
+$("add").onclick = () => { picked = ""; $("search").value = ""; flows(); $("dialog").hidden = false; };
+$("cancel").onclick = () => { $("dialog").hidden = true; };
+$("confirm").onclick = async () => {
+  if (!picked) return;
+  const r = await fetch("/api2/sessions/user.session.create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blueprintId: picked }) });
+  sid = await r.json();
+  history.replaceState(null, "", "/agentic-chats/" + sid);
+  $("dialog").hidden = true; $("in").hidden = false;
+};
+async function show() {
+  const list = await (await fetch("/api2/sessions/session.user.list?limit=100&offset=0")).json();
+  $("count").textContent = "Available Chats (" + list.sessions.length + ")";
+  if (!sid) return;
+  $("in").hidden = false;
+  const r = await fetch("/api2/sessions/session.chat.get?sessionId=" + sid);
+  if (r.status !== 200) return;
+  const chat = await r.json();
+  if ($("messages").children.length === chat.messages.length) return;
+  $("messages").innerHTML = "";
+  for (const m of chat.messages) { const p = document.createElement("p"); p.textContent = m.role + ": " + m.content; $("messages").appendChild(p); }
+  if (chat.messages.some((m) => m.role === "assistant")) $("live").textContent = "Live workflow: retriever consultant-01-documents";
+}
+if (!$("chats").hidden) setInterval(show, 300);
+$("in").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const text = $("in").value; $("in").value = "";
+  await fetch("/api2/sessions/user.session.submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sid, inputs: { user_prompt: text } }) });
+});
+</script>`;
+
+function answer(text) {
+  if (/rental car/.test(text)) return process.env.FAKE_WRONG_ANSWER === "1" ? "The documents do not say." : "The code is ZN-CAR-7 (travel-and-expense-policy.md).";
+  return "The documents do not give a hotel ceiling for Madrid.";
+}
+
+http.createServer((req, res) => {
+  const u = new URL(req.url, "http://x");
+  const signed = /(^|; )s=1/.test(req.headers.cookie || "");
+  const json = (code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
+  const body = (then) => { let raw = ""; req.on("data", (c) => { raw += c; }); req.on("end", () => then(raw ? JSON.parse(raw) : {})); };
+  const id = u.searchParams.get("sessionId") || "";
+  if (u.pathname === "/fake/count") return json(200, { sessions: sessions.size, touched });
+  if (u.pathname === "/fake/touched") { touched += 1; return json(200, {}); }
+  if (u.pathname === "/api1/auth/login") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
+  if (u.pathname === "/cb") { res.writeHead(302, { "Set-Cookie": "s=1; Path=/", Location: "/" }); return res.end(); }
+  if (!signed) {
+    if (u.pathname.startsWith("/api")) return json(401, { error: "not signed in" });
+    res.writeHead(200, { "Content-Type": "text/html" }); return res.end(WELCOME);
+  }
+  if (u.pathname === "/api2/sessions/session.user.list") {
+    const all = [...sessions.keys()].map((session_id) => ({ session_id, blueprint_id: sessions.get(session_id).blueprint }));
+    return json(200, { sessions: all, pagination: { total: all.length, limit: 100, offset: 0, has_more: false } });
+  }
+  if (u.pathname === "/api2/sessions/user.session.create" && req.method === "POST") {
+    return body((b) => { const made = crypto.randomUUID(); sessions.set(made, { blueprint: b.blueprintId, status: "PENDING", messages: [] }); json(200, made); });
+  }
+  if (u.pathname === "/api2/sessions/user.session.submit" && req.method === "POST") {
+    return body((b) => {
+      const s = sessions.get(b.sessionId);
+      if (!s) return json(404, {});
+      s.status = "RUNNING";
+      s.messages.push({ role: "user", content: b.inputs.user_prompt });
+      setTimeout(() => {
+        const refused = process.env.FAKE_REFUSE_MODEL === "1";
+        s.messages.push({ role: "assistant", content: refused ? "" : answer(b.inputs.user_prompt),
+                          metadata: refused ? { error: { type: "rate_limited", message: "429: token quota exceeded for persona consultant-01", retry_after: 60 } } : {} });
+        s.status = "COMPLETED";
+      }, 1200);
+      return json(202, { sessionId: b.sessionId });
+    });
+  }
+  if (u.pathname === "/api2/sessions/session.status.get") return sessions.has(id) ? json(200, sessions.get(id).status) : json(500, { error: "not found" });
+  if (u.pathname === "/api2/sessions/session.chat.get") {
+    return sessions.has(id) ? json(200, { messages: sessions.get(id).messages, output: "", status: sessions.get(id).status, status_message: null }) : json(500, { error: "not found" });
+  }
+  if (u.pathname === "/api2/sessions/session.cancel") return json(409, {});
+  if (u.pathname === "/api2/sessions/session.delete" && req.method === "DELETE") {
+    if (process.env.FAKE_REFUSE_DELETE === "1") return json(200, { success: false });
+    return json(200, { success: sessions.delete(id) });
+  }
+  res.writeHead(200, { "Content-Type": "text/html" });
+  return res.end(APP);
+}).listen(port, "127.0.0.1");

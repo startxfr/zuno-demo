@@ -180,3 +180,157 @@ export async function settled(page, { what, before, ignore = [], busy = [], quie
     },
   });
 }
+
+// ---- UnifAI: what unifai-live-rag, unifai-agents, observability-trace and a2a-delegation-approval share ----------
+//
+// Read from the fork's UI source (ui/client/src, v0.1.72) on 2026-11-15, NOT yet seen live by a scout: every selector
+// below is a guess until one. The API paths are the UI's own (/api2/sessions/*, the session cookie, no token).
+// A UnifAI session exists from the moment its workflow is chosen in "Add New Chat from Flow" (user.session.create),
+// before any question: unifaiNewChat() records its id at once, and unifaiDeleteSession() deletes that id only.
+export const unifai = {
+  url: (domain) => `https://unifai-ui-zuno-unifai.${domain}`,
+  SESSION_ID: /\/agentic-chats\/([A-Za-z0-9_-]{8,})/,
+  // The requests a scout refuses: a session created, a prompt submitted, a session deleted or cancelled.
+  sends: /\/api2\/sessions\/(user\.session\.(create|submit|execute)|session\.(delete|cancel|approval))/,
+  SSO: ["button:has-text('Login using SSO')"],                                            // guess (Login.tsx)
+  NAV: { documents: ["a[href='/documents']", "nav >> text=Documents"],                    // guess (Sidebar.tsx)
+         chats: ["a[href='/agentic-chats']", "nav >> text=Agentic Chats"] },              // guess (Sidebar.tsx)
+  ADD_CHAT: ["button[title='Add new chat from flow']"],                                   // guess (ExecutionTab.tsx)
+  DIALOG: "[role='dialog']",                                                              // guess (Radix dialog)
+  SEARCH: ["[role='dialog'] input[placeholder='Search workflows...']"],                   // guess (WorkflowsPanel.tsx)
+  INPUT: ["main textarea", "textarea"],                                                   // guess (ChatInterface.tsx)
+  ANSWER_TIMEOUT_MS: 240000,
+};
+
+// Sign in through "Login using SSO" and Keycloak, and wait for the first screen. The `login` marker is the EMPTY
+// Keycloak form; nothing is marked once the password is typed.
+export async function unifaiSignIn({ page, base, mark, keycloak }, persona) {
+  await page.goto(`${base}/`);
+  const sso = page.locator(unifai.SSO[0]).first();
+  await sso.waitFor({ timeout: 30000 });
+  await click(sso);
+  await page.waitForSelector("#username", { timeout: 30000 });
+  await mark("login");
+  await keycloak(persona);
+  await page.waitForURL((u) => u.href.startsWith(base), { timeout: 60000 });
+  const nav = await waitUntil(page, { what: "UnifAI's first screen", timeoutMs: 60000,
+                                      done: async () => (await firstVisible(page, unifai.NAV.chats)) || undefined });
+  await page.waitForTimeout(1000);
+  return nav.matched;
+}
+
+// The persona's own sessions in its Personal workspace, by id, every page of the list: [{kind: "session", id}].
+export async function unifaiSessions(page) {
+  const found = [];
+  for (let offset = 0; offset < 5000; offset += 100) {
+    const got = await pageApi(page, "GET", `/api2/sessions/session.user.list?limit=100&offset=${offset}`, "");
+    const list = got.body && (Array.isArray(got.body) ? got.body : got.body.sessions);
+    if (got.status !== 200 || !Array.isArray(list)) throw new Error(`the session list could not be read (offset ${offset}: HTTP ${got.status})`);
+    for (const s of list) if (s && s.session_id && !found.some((f) => f.id === String(s.session_id))) found.push({ kind: "session", id: String(s.session_id) });
+    if (Array.isArray(got.body) || !got.body.pagination || !got.body.pagination.has_more || !list.length) break;
+  }
+  return found;
+}
+
+// Go to a page of the sidebar by its link (a click, as the presenter does).
+export async function unifaiGo(page, where, { changes = [] } = {}) {
+  const link = await firstVisible(page, unifai.NAV[where]);
+  if (!link) throw new Error(`the sidebar entry for ${where} was not found (${unifai.NAV[where].join(" | ")})`);
+  await click(link, { changes });
+  await page.waitForTimeout(800);
+  return link.matched;
+}
+
+// Open "Add New Chat from Flow" and show the workflow in its list. Returns the dialog and the workflow's row; nothing
+// is created yet. The list's entries carry a Human-in-the-Loop switch: it is never clicked (the click guard refuses).
+export async function unifaiOpenWorkflows(page, workflow, { changes = [] } = {}) {
+  const add = await firstVisible(page, unifai.ADD_CHAT);
+  if (!add) throw new Error(`the new-chat button was not found (${unifai.ADD_CHAT.join(" | ")})`);
+  await click(add, { changes });
+  const dialog = page.locator(unifai.DIALOG).first();
+  await dialog.waitFor({ timeout: 15000 });
+  const search = await firstVisible(page, unifai.SEARCH);
+  if (search) { await search.click(); await page.keyboard.type(workflow, { delay: 20 }); }   // a search box, not a setting
+  const row = dialog.getByText(workflow, { exact: true }).first();
+  await row.waitFor({ timeout: 15000 });
+  return { dialog, row, add: add.matched, search: search ? search.matched : "" };
+}
+
+// Create the take's session: choose the workflow and confirm. The id is the answer of UnifAI's own create call, so it
+// is this take's session and no other; it is recorded in state.created before anything else happens.
+export async function unifaiNewChat(page, workflow, state, { changes = [] } = {}) {
+  if (state.scout) throw new Error("a scout never creates a session");
+  const { dialog, row } = await unifaiOpenWorkflows(page, workflow, { changes });
+  await click(row, { changes });
+  state.creating = workflow;   // from here a session may exist even if its id is never read
+  const [created] = await Promise.all([
+    page.waitForResponse((r) => /\/api2\/sessions\/user\.session\.create/.test(r.url()) && r.request().method() === "POST", { timeout: 60000 }),
+    click(dialog.getByRole("button", { name: "Add", exact: true }), { changes }),
+  ]);
+  const body = await created.json().catch(() => null);
+  const id = typeof body === "string" ? body : (body && (body.sessionId || body.session_id)) || "";
+  if (created.status() >= 300 || !id) throw new Error(`the session of ${workflow} was not created (HTTP ${created.status()})`);
+  state.sessionId = String(id);
+  state.created.push({ kind: "session", id: state.sessionId });
+  await dialog.waitFor({ state: "hidden", timeout: 15000 });
+  await waitUntil(page, { what: "the chat input", timeoutMs: 30000, done: async () => (await firstVisible(page, unifai.INPUT)) || undefined });
+  return state.sessionId;
+}
+
+export async function unifaiAsk(page, prompt, state) {
+  if (state && state.scout) throw new Error("a scout never types in the chat input");
+  const input = await firstVisible(page, unifai.INPUT);
+  if (!input) throw new Error(`the chat input was not found (${unifai.INPUT.join(" | ")})`);
+  await input.click();
+  await page.keyboard.type(prompt, { delay: 25 });
+  await page.keyboard.press("Enter");
+}
+
+// Wait until the session holds `count` assistant messages and is COMPLETED: the text of the last one. A FAILED or
+// CANCELLED session, or an error attached to a message (a rate limit, a quota), fails at once with its message.
+export async function unifaiAnswered(page, sessionId, count) {
+  let refused = "";
+  return waitUntil(page, {
+    what: `answer ${count}`, timeoutMs: unifai.ANSWER_TIMEOUT_MS, everyMs: 1000,
+    failed: async () => refused,
+    done: async () => {
+      const got = await pageApi(page, "GET", `/api2/sessions/session.chat.get?sessionId=${encodeURIComponent(sessionId)}`, "").catch(() => null);
+      if (!got || got.status !== 200 || !got.body) return undefined;
+      const messages = (Array.isArray(got.body.messages) ? got.body.messages : []).filter((m) => m && m.role === "assistant");
+      const error = messages.map((m) => m.metadata && m.metadata.error).find(Boolean);
+      if (error) { refused = String(error.message || error.type || JSON.stringify(error)).slice(0, 200); return undefined; }
+      if (got.body.status === "FAILED" || got.body.status === "CANCELLED") {
+        refused = `the session is ${got.body.status}: ${String(got.body.status_message || "").slice(0, 160)}`;
+        return undefined;
+      }
+      if (messages.length >= count && got.body.status === "COMPLETED") return String(messages[count - 1].content || "");
+      return undefined;
+    },
+  });
+}
+
+// Delete the session this take created, by its id, and nothing else: true when it is gone, null when the take never
+// chose a workflow; a failure throws and names the session. A session still running is cancelled first.
+export async function unifaiDeleteSession(page, state, persona) {
+  if (!state.creating) return null;
+  const id = state.sessionId || "";
+  if (!id) {
+    throw new Error(`the workflow ${state.creating} was chosen but the session's id was never read: a session of `
+      + `${state.creating} may remain in ${persona}'s Agentic Chats, check it by hand`);
+  }
+  if (!state.created.some((c) => c.id === id)) state.created.push({ kind: "session", id });
+  const q = `sessionId=${encodeURIComponent(id)}`;
+  const status = await pageApi(page, "GET", `/api2/sessions/session.status.get?${q}`, "").catch(() => null);
+  if (status && ["PENDING", "QUEUED", "RUNNING"].includes(status.body)) {
+    await page.evaluate((id) => fetch("/api2/sessions/session.cancel", { method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: id }) }).then((r) => r.status).catch(() => 0), id);
+    await page.waitForTimeout(1500);
+  }
+  const gone = await pageApi(page, "DELETE", `/api2/sessions/session.delete?${q}`, "").catch((e) => ({ status: 0, body: String(e).slice(0, 80) }));
+  const left = await unifaiSessions(page).catch(() => null);
+  if (gone.status !== 200 || !gone.body || gone.body.success !== true || left === null || left.some((s) => s.id === id)) {
+    throw new Error(`the session of ${state.creating} (${id}) was NOT deleted from ${persona}'s Agentic Chats: DELETE answered `
+      + `HTTP ${gone.status}, ${left === null ? "the list could not be read after it" : "it is still listed"}; delete it by hand`);
+  }
+  return true;
+}
