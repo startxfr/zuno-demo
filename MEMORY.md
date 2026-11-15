@@ -1067,6 +1067,17 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — ADR-0618 Accepted (Phase 57, WP-286 to WP-290, Not started).** Every catalogue scenario gets a GIF
+  by the chain of ADR-0617, terminal demos included; the workshops get none for now. A terminal demo is a real bash
+  session on the workstation, captured as an asciicast (bytes and timing), checked as TEXT (masks plus a deny list of
+  the real local values; a hit refuses the take; the stream is never edited), reviewed as a transcript, then replayed
+  in a vendored xterm.js and filmed. A `make` row is typed only if the demo's `demo.yml` lists it under
+  `record: {allow: [...]}`; `oc whoami -t`, `oc config view`, `env` and kubeconfig reads are always refused.
+  Server-side traces that cannot be deleted are accepted and stated; `record` does not read a persona's budget (no
+  endpoint; a refused answer fails the take). Six demos wait for the owner's decision, one by one, last: blender-3d,
+  world-model, a2a-delegation-approval, maas-portal-api-keys, openclaw, genai-playground. Traps kept: every
+  delete-by-id call outside Open WebUI and every sign-in flow other than the Keycloak form are unverified until a
+  scout; a page row that names a screen the take cannot show is settled before the take.
 - **2026-11-15 — ADR-0617 stays Accepted; WP-284 Done (the Open WebUI pilot).** The first demo GIF is published
   (`docs/assets/img/demo/open-webui.gif`, 42.9 s, 1.3 MB, owner's "go open-webui", evidence
   `docs/roadmap/evidence/wp-284-open-webui-gif-2026-11-15.md`). WP-285 (the page shape rollout) waits for the owner's
