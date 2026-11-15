@@ -1,6 +1,6 @@
 # WP-279: Move the Blender and world-model demos to the lifecycle
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) and [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md), and the owner's go at the gate of 2026-11-16
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
@@ -41,3 +41,19 @@ For each demo below, in the order given:
 - The catalogue test passes with every demo of this brief counted as moved.
 - Each demo has a 5-minute and a 15-minute rehearsal report ending with `RESULT: PASS`, or failures the page explains.
 - Every "Nothing to do." and "Nothing to run." is deliberate.
+
+## Result (2026-11-15)
+
+Files by zuno-demo-reorg-coder, pages reviewed against them by zuno-demo-reorg-writer, rehearsals by
+zuno-demo-reorg-demo333. Both demos passed both rehearsals, 4 of 4 `RESULT: PASS`
+([evidence](../evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md)), with the units the owner decided not to
+rehearse reported as skipped:
+
+- `blender-3d`: install and uninstall run `install_addon.sh` on the presenter's workstation, so a rehearsal skips both.
+- `world-model`: install is skipped; it only verifies and prints the owner's actions, and never creates the GPU node.
+  Uninstall removes nothing and prints the owner's three actions.
+
+The `world-model` PASS does not make the demo show-ready: it is switched off (`zuno_world_model_enabled: false`), with
+no GPU node and no application, and its check passes because the probe reports the demo as roadmap. The rehearsal
+proves that the files and the page play; the page keeps "not show-ready" until a rehearsal with the GPU node, which
+needs the owner's double approval.
