@@ -25,6 +25,8 @@ fails naming the command and nothing is typed at all:
 - or a command the demo lists in `ansible/demos/<id>/demo.yml` under `record: {allow: [...]}`;
 - never `oc whoami -t`, `oc config view`, `env`/`printenv`/`set`, or a read of a kubeconfig, whatever the list says.
   `$(oc whoami -t)` inside a command stays runnable: bash substitutes it and never echoes its value.
+A row listed in demo.yml `record: {skip: {"<M:SS>": "<why>"}}` is not typed at all, so it is not in the take and
+not in the GIF (a `make` row that prints the checkout's path, say); `--plan` prints it as `<time>  not typed: <why>`.
 
 The shell (clause 8): `env -i` with only PATH, TERM, LC_ALL=C.UTF-8, KUBECONFIG (by path, never typed) and
 PYTHONUSERBASE, the step variables of the demo (`env:` of demo.yml), HOME an empty temporary directory,
@@ -74,6 +76,7 @@ COMMAND_TIMEOUT = 600.0
 RC_MARK = re.compile(r"\x1b\]1337;rc=(\d+)\x07\$ $")
 PS1 = r"\[\e]1337;rc=$?\a\]$ "
 TOKEN_EXPR = "$(oc whoami -t)"
+SKIPPED = "not typed:"     # a `--plan` line of a row demo.yml `record.skip` leaves out: `<time>  not typed: <why>`
 # Never typed, whatever a demo allows (clause 7). Checked on the command with `$(oc whoami -t)` taken out.
 NEVER = [
     (re.compile(r"\boc\b[^|;&]*\bwhoami\b[^|;&]*(?:\s-t\b|--show-token)"), "`oc whoami -t` prints the presenter's token"),
@@ -328,6 +331,51 @@ def window(record: dict) -> Tuple[int, int, List[str]]:
     return size[0], size[1], problems
 
 
+def skips(record: dict, rows: List[Tuple[str, bool]]) -> Tuple[Dict[str, str], List[str]]:
+    """({time: why}, problems) of demo.yml `record: {skip: {"<M:SS>": "<why>"}}`: 5-minute rows the take does not
+    type, each with the reason in one phrase (the guard summary prints it). `rows` are the 5-minute rows as
+    (time, has a Do command). A skipped time must be such a row with a command; an unquoted 3:00 is read by YAML as
+    the base-60 integer 180, so integers are read back as M:SS."""
+    value = (record or {}).get("skip")
+    if value is None:
+        return {}, []
+    if not isinstance(value, dict) or not value:
+        return {}, ['demo.yml `record.skip` must be a mapping of 5-minute row times to a reason, such as '
+                    '{"3:00": "prints the checkout path"}']
+    commands = dict(rows)
+    found, problems = {}, []
+    for key, why in value.items():
+        time_ = f"{key // 60}:{key % 60:02d}" if isinstance(key, int) and not isinstance(key, bool) else str(key)
+        if time_ not in commands:
+            problems.append(f"demo.yml `record.skip` names {time_}, which is not a time of the 5-minute version "
+                            f"({', '.join(t for t, _ in rows)})")
+        elif not commands[time_]:
+            problems.append(f"demo.yml `record.skip` names {time_}, a row with no Do command: nothing is typed there")
+        elif not isinstance(why, str) or not why.strip() or "\n" in why.strip():
+            problems.append(f"demo.yml `record.skip` {time_}: the reason must be one phrase")
+        else:
+            found[time_] = why.strip()
+    return found, problems
+
+
+def demo_manifest(demo_id: str, root: pathlib.Path = ROOT) -> dict:
+    sys.path.insert(0, str(root / "platform/demo"))
+    import catalogue
+    import yaml
+
+    return yaml.safe_load((catalogue.demo_dir(demo_id, root) / "demo.yml").read_text(encoding="utf-8")) or {}
+
+
+def demo_skips(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[Dict[str, str], List[str]]:
+    """The skipped 5-minute rows of a demo, {time: why}, and the problems of its `record.skip`."""
+    sys.path.insert(0, str(root / "platform/demo"))
+    import catalogue
+
+    page = catalogue.load(catalogue.find(demo_id, root))
+    rows = [(row.time, bool(catalogue.do_commands(row.do))) for row in page.steps("5")]
+    return skips(demo_manifest(demo_id, root).get("record") or {}, rows)
+
+
 def demo_window(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[int, int, List[str]]:
     sys.path.insert(0, str(root / "platform/demo"))
     import catalogue
@@ -354,8 +402,12 @@ def demo_steps(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[List[Step], Dic
             raise NoDomain("the demo's variables use the cluster domain and `oc` gave none: is oc logged in?")
         variables = {k: re.sub(r"\{\{\s*cluster_base_domain\s*\}\}", domain, v) for k, v in variables.items()}
     allow = [str(c) for c in ((manifest.get("record") or {}).get("allow") or [])]
-    steps, problems = [], []
+    skipped, problems = skips(manifest.get("record") or {},
+                              [(row.time, bool(catalogue.do_commands(row.do))) for row in page.steps("5")])
+    steps = []
     for row in page.steps("5"):
+        if row.time in skipped:
+            continue        # not typed, so not checked either: the take does not show this row
         step = Step(row.time)
         for command in catalogue.do_commands(row.do):
             once = readonly.strip_watch_flags(command)[0]
@@ -381,6 +433,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         steps, variables, problems = demo_steps(args.demo)
         cols, rows, size_problems = demo_window(args.demo)
         problems += size_problems
+        skipped = demo_skips(args.demo)[0]
     except (KeyError, OSError, NoDomain) as exc:   # also for --plan: a plan with an empty host would show wrong URLs
         print(f"{args.demo}: {exc}", file=sys.stderr)
         return 2
@@ -388,6 +441,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         for step in steps:
             for command in step.commands:
                 print(f"{step.time}  $ {command.cmd}")
+        for time_, why in skipped.items():
+            print(f"{time_}  {SKIPPED} {why}")
     if problems:
         print("CAPTURE: failed " + "; ".join(problems))
         return 1

@@ -213,9 +213,10 @@ def _capture():
 
 
 def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict, root: pathlib.Path) -> List[str]:
-    """demo.yml `record: {kind, allow, cols, rows}` (ADR-0618 clause 7, WP-287): the kind of take, the commands a
-    terminal take may type beyond the read-only allowlist (each a Do command of the 5-minute version, never an
-    always-refused one), and the terminal's size when a table needs more than 100x30."""
+    """demo.yml `record: {kind, allow, cols, rows, skip}` (ADR-0618 clause 7, WP-287, WP-289): the kind of take, the
+    commands a terminal take may type beyond the read-only allowlist (each a Do command of the 5-minute version, never
+    an always-refused one), the terminal's size when a table needs more than 100x30, and the 5-minute rows a terminal
+    take does not type (each a row with a Do command, with its reason)."""
     rel = f"ansible/demos/{entry.id}/demo.yml"
     record = manifest.get("record")
     if record is None:
@@ -223,7 +224,7 @@ def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict
     if not isinstance(record, dict):
         return [f"{rel}: `record` must be a mapping {{kind, allow, cols, rows}}"]
     found = []
-    unknown = sorted(set(record) - {"kind", "allow"} - set(TERMINAL_SIZE))
+    unknown = sorted(set(record) - {"kind", "allow", "skip"} - set(TERMINAL_SIZE))
     if unknown:
         found.append(f"{rel}: `record` has unknown key(s) {', '.join(unknown)}")
     kind = record.get("kind", "browser")
@@ -240,9 +241,13 @@ def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict
             if key in record:
                 found.append(f"{rel}: `record.{key}` is for a terminal take; a browser take has its walkthrough's "
                              "viewport")
+        if "skip" in record:
+            found.append(f"{rel}: `record.skip` is for a terminal take; a browser take plays its walkthrough")
     capture = _capture() if kind == "terminal" else None
     if capture is not None:
         found += [f"{rel}: {problem}" for problem in capture.window(record)[2]]
+        rows = [(step.time, bool(catalogue.do_commands(step.do))) for step in page.steps("5")]
+        found += [f"{rel}: {problem}" for problem in capture.skips(record, rows)[1]]
     if not isinstance(allow, list) or not all(isinstance(a, str) for a in allow):
         return found + [f"{rel}: `record.allow` must be a list of commands"]
     commands = {readonly.strip_watch_flags(c)[0] for step in page.steps("5") for c in catalogue.do_commands(step.do)}

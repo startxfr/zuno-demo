@@ -549,6 +549,7 @@ def cmd_rehearse(args: List[str]) -> int:
 RECORDER = pathlib.Path("evaluations") / "browser" / "record.sh"
 CAPTURE = pathlib.Path("evaluations") / "browser" / "terminal" / "capture.py"
 TAKE_RE = re.compile(r"^\d{8}-\d{6}$")
+SKIPPED_RE = re.compile(r"^(\S+)\s+not typed: (.+)$")   # capture.py --plan's line for a row of demo.yml record.skip
 WALKTHROUGHS = pathlib.Path("evaluations") / "browser" / "walkthroughs"
 WALKTHROUGH_HELPERS = ("_helpers.mjs",)        # hashed before the walkthrough, in this order (WP-286 contract)
 RECORD_TIMEOUT = 1200
@@ -773,7 +774,10 @@ def record_terminal(entry: catalogue.Entry, root: pathlib.Path, manifest: dict) 
     notices = [str(cut.get("record_notice") or "a real terminal session on the cluster with your `oc` login: the "
                    "5-minute rows typed as the page says"), "the session is checked as text before anything is filmed",
                f"a terminal of {record_size(manifest)}"]
-    notices += [f"typed: {line}" for line in plan]
+    for line in plan:
+        skipped = SKIPPED_RE.match(line)    # demo.yml record.skip: a row the take leaves out, and why
+        notices.append(f"not typed, not filmed: {skipped.group(1)} ({skipped.group(2)})" if skipped
+                       else f"typed: {line}")
     notices.append(f"typed beyond the read-only allowlist (demo.yml record.allow): "
                    f"{', '.join(allow) if allow else 'none'}")
     confirmed = guard.confirm(entry.id, {}, notices=notices)

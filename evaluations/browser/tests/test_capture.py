@@ -187,6 +187,46 @@ class WhatMayBeTyped(unittest.TestCase):
             finally:
                 capture.subprocess.run = real
 
+    def test_skipped_rows_are_read_and_checked(self):
+        rows = [("0:00", True), ("1:00", True), ("3:00", True), ("4:15", False)]
+        self.assertEqual(capture.skips({}, rows), ({}, []))
+        self.assertEqual(capture.skips({"skip": {"3:00": " prints the checkout path "}}, rows),
+                         ({"3:00": "prints the checkout path"}, []))
+        self.assertEqual(capture.skips({"skip": {180: "unquoted 3:00"}}, rows)[0], {"3:00": "unquoted 3:00"})
+        for skip, says in (({"2:00": "x"}, "not a time of the 5-minute version"),
+                           ({"4:15": "x"}, "a row with no Do command"),
+                           ({"3:00": "  "}, "one phrase"), ({"3:00": "two\nlines"}, "one phrase"),
+                           ({"3:00": 7}, "one phrase"), (["3:00"], "must be a mapping"), ({}, "must be a mapping")):
+            found, problems = capture.skips({"skip": skip}, rows)
+            self.assertEqual(found, {}, skip)
+            self.assertEqual(len(problems), 1, skip)
+            self.assertIn(says, problems[0], skip)
+
+    def test_a_skipped_row_is_not_typed_and_not_checked(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for rel in ("docs/demo", "ansible/demos/vault-pki", "platform/demo"):
+                shutil.copytree(ROOT / rel, root / rel)
+            manifest = root / "ansible/demos/vault-pki/demo.yml"
+            manifest.write_text(manifest.read_text() + '  skip: {"2:15": "a reason in one phrase"}\n')
+            rows, _, problems = capture.demo_steps("vault-pki", root)
+            self.assertEqual(problems, [])
+            self.assertEqual([row.time for row in rows], ["0:00", "1:00", "3:15"])
+            self.assertEqual(capture.demo_skips("vault-pki", root), ({"2:15": "a reason in one phrase"}, []))
+            # A skipped row is not checked: a refused command there does not stop the take.
+            page = next((root / "docs/demo").rglob("vault-pki.md"))
+            text = page.read_text()
+            start = text.index("| 2:15 | ")
+            page.write_text(text[:start] + "| 2:15 | `oc delete pod x -n zuno-vault` | \"x\" | x |\n"
+                            + text[text.index("\n", start) + 1:])
+            rows, _, problems = capture.demo_steps("vault-pki", root)
+            self.assertEqual((problems, [row.time for row in rows]), ([], ["0:00", "1:00", "3:15"]))
+            manifest.write_text(manifest.read_text().replace('"2:15"', '"2:16"'))
+            problems = capture.demo_steps("vault-pki", root)[2]
+            self.assertTrue(any("names 2:16, which is not a time" in p for p in problems), problems)
+            self.assertTrue(any("`oc delete pod x -n zuno-vault` is refused" in p for p in problems), problems)
+
     def test_the_first_terminal_demo_plans_offline(self):
         rows, variables, problems = capture.demo_steps("vault-pki", ROOT)
         self.assertEqual(problems, [])

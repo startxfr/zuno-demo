@@ -251,6 +251,22 @@ class RecordKey(FixtureRoot):
         self.edit('record:\n  kind: browser\n  cols: 140\n')
         self.assertTrue(any("`record.cols` is for a terminal take" in p for p in self.record_problems()))
 
+    def test_skipped_rows(self):
+        self.edit('record:\n  kind: terminal\n  skip: {"1:30": "it deletes a pod"}\n')
+        self.assertEqual(self.record_problems(), [])
+        self.edit('record:\n  kind: terminal\n  skip: {1:30: "unquoted, read by YAML as 90"}\n')
+        self.assertEqual(self.record_problems(), [])
+        for bad, says in (('{"9:99": "no such row"}', "not a time of the 5-minute version (0:00, 1:30, 4:00)"),
+                          ('{"4:00": "the close"}', "a row with no Do command"),
+                          ('{"1:30": ""}', "the reason must be one phrase"),
+                          ('["1:30"]', "must be a mapping of 5-minute row times to a reason")):
+            self.edit(f'record:\n  kind: terminal\n  skip: {bad}\n')
+            found = self.record_problems()
+            self.assertEqual(len(found), 1, (bad, found))
+            self.assertIn(says, found[0])
+        self.edit('record:\n  kind: browser\n  skip: {"1:30": "it deletes a pod"}\n')
+        self.assertTrue(any("`record.skip` is for a terminal take" in p for p in self.record_problems()))
+
     def test_the_repository_has_no_record_problem(self):
         self.assertEqual([p for p in consistency.problems(ROOT) if "`record" in p], [])
 
@@ -261,6 +277,8 @@ mode = os.environ.get("FAKE_CAPTURE", "clean")
 demo, rest = sys.argv[1], sys.argv[2:]
 if rest == ["--plan"]:
     print("0:00  $ git log -1 --format=%h")
+    if mode == "plan-skip":
+        print("1:30  not typed: it deletes a pod")
     if mode == "plan-refuse":
         print("CAPTURE: failed row 1:30: `oc delete pod fixture -n fixture` is refused by the read-only allowlist")
         sys.exit(1)
@@ -345,6 +363,14 @@ class Routing(FixtureRoot):
                       out)
         self.assertIn("DEMO_CONFIRM=fixture-demo", err)
         self.assertFalse(gif.recordings_dir().exists())
+
+    def test_the_notice_names_a_skipped_row_and_why(self):
+        session.record_check("fixture-demo", True)
+        rc, out, _ = self.run_main("record", "fixture-demo", FAKE_CAPTURE="plan-skip")
+        self.assertEqual(rc, 2)
+        self.assertIn("typed: 0:00  $ git log -1 --format=%h", out)
+        self.assertIn("not typed, not filmed: 1:30 (it deletes a pod)", out)
+        self.assertNotIn("typed: 1:30", out)
 
     def test_a_clean_capture_passes_the_gate_and_stops_for_the_transcript(self):
         rc, out, _ = self.capture()
