@@ -24,6 +24,13 @@ Session `zuno-demo-reorg` ran these rehearsals on demo333 with the owner's named
   seconds as an upper bound, not as a measure of the presenter's time.
 - An accidental rehearsal of the `five-experiences` workshop overlapped the `openclaw` and `unifai-agents` rehearsals
   between 01:30 and 01:35. It had no effect on their results.
+- **Incident of 2026-11-15, 01:38 (after this layer).** The world-model GPU teardown deleted the Argo CD instance of
+  demo333 and emptied the internal registry bucket. Argo CD was restored at 02:06, and the BuildConfig images are to be
+  rebuilt later in the day. The last report of this layer is from 01:37, before the incident, so these 12 rehearsals ran
+  while Argo CD was alive. The incident revealed a defect: `status` read the stored Application statuses and did not
+  fail on a dead Argo CD or a stale reconciliation. It now fails on both. The `status` units of this file passed under
+  the old behaviour: they show that the Applications were Healthy at the last reconciliation, not that they were
+  freshly reconciled.
 - No unit of these six demos is a changing unit: every action is a read or has nothing to run. No go was needed beyond
   the owner's go to run the rehearsals.
 
