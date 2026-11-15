@@ -179,8 +179,18 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
     if markers.get("status") != "pass":
         reasons.append(f"the recording did not pass (status {markers.get('status')!r}: "
                        f"{markers.get('detail') or 'no detail'}): record it again")
-    if markers.get("chat_deleted") is not True:
-        reasons.append("the recording did not delete the chat it created: delete it by hand, then record again")
+    # ADR-0618 clause 9: a take says what it created and whether it cleaned it, and what the persona owns before and
+    # after. cleaned null: nothing was created.
+    if markers.get("cleaned") is False:
+        created = ", ".join(f"{c.get('kind')} {c.get('id')}" for c in markers.get("created") or [] if isinstance(c, dict))
+        reasons.append(f"the take did not clean what it created ({created or 'see markers.json'}): delete it by hand, "
+                       "then record again")
+    owned = markers.get("owned")
+    if not isinstance(owned, dict):
+        reasons.append("markers.json does not say what the persona owns before and after the take (`owned`)")
+    elif owned.get("same") is not True:
+        reasons.append(f"what the persona owns changed during the take ({owned.get('before')} before, "
+                       f"{owned.get('after')} after): read the take's log, then record again")
     if markers.get("demo") not in (None, demo_id):
         reasons.append(f"the recording is of {markers.get('demo')!r}, not {demo_id!r}")
     at: Dict[str, float] = {}
@@ -443,7 +453,8 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
     built = Built(path, _duration(directory, output), path.stat().st_size, p)
     (directory / f"{demo_id}.gif.json").write_text(json.dumps({
         "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
-        "take": directory.name, "started": markers.get("started"),
+        "take": directory.name, "started": markers.get("started"), "created": markers.get("created"),
+        "cleaned": markers.get("cleaned"),
         "cut_list": f"ansible/demos/{demo_id}/gif.yml", "cut_list_blob": git_blob(cut_path) if cut_path else None,
         "width": p.width, "height": p.out_height, "picture_height": p.height, "fps": p.fps,
         "moments": [{"caption": m.caption, "seconds": round(m.seconds, 2), "cut": m.label(), "step": m.step}

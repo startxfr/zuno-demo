@@ -38,7 +38,8 @@ def markers(**changes) -> dict:
     data = {"demo": "open-webui", "persona": "sale-01", "viewport": {"width": 1280, "height": 800},
             "started": "2026-11-16T09:00:00+00:00",
             "markers": [{"name": n, "t": t, "png": f"{n}.png"} for n, t in at.items()],
-            "motion_from": "q1-sent", "chat_deleted": True, "status": "pass", "detail": ""}
+            "motion_from": "q1-sent", "created": [{"kind": "chat", "id": "c-1"}], "cleaned": True,
+            "owned": {"before": 3, "after": 3, "same": True}, "status": "pass", "detail": ""}
     data.update(changes)
     return data
 
@@ -139,7 +140,10 @@ class CutList(unittest.TestCase):
     def test_a_failed_or_dirty_take_is_refused(self):
         still = {"still": "home", "hold": 3, "caption": "x"}
         refused(self, cut(still), markers(status="fail", detail="no answer"), "did not pass")
-        refused(self, cut(still), markers(chat_deleted=False), "did not delete the chat")
+        refused(self, cut(still), markers(cleaned=False), "did not clean what it created (chat c-1)")
+        refused(self, cut(still), markers(owned={"before": 3, "after": 4, "same": False}), "3 before, 4 after")
+        refused(self, cut(still), markers(owned=None), "does not say what the persona owns")
+        gif.plan("open-webui", cut(still), markers(created=[], cleaned=None), TIMES)    # nothing created
         refused(self, cut(still), markers(demo="dify"), "not 'open-webui'")
         back = markers()
         back["markers"][3]["t"] = 2.0
@@ -263,7 +267,8 @@ class Verbs(unittest.TestCase):
         self.home = tempfile.mkdtemp(prefix="zuno-demo-test-")
         self.tools = pathlib.Path(tempfile.mkdtemp(prefix="zuno-demo-tools-"))
         (self.tools / "record.sh").write_text("#!/bin/sh\nexit 0\n")
-        (self.tools / "open-webui.mjs").write_text("")
+        (self.tools / "open-webui.mjs").write_text("export const persona = 'sale-01';\n")
+        (self.tools / "_helpers.mjs").write_text("export const helper = 1;\n")
         env = {"HOME": self.home, "KUBECONFIG": str(pathlib.Path(self.home) / "none")}
         self.patches = [mock.patch.dict(os.environ, env), mock.patch.dict(os.environ, {}, clear=False)]
         os.environ.pop("DEMO_CONFIRM", None)
@@ -313,18 +318,75 @@ class Verbs(unittest.TestCase):
             self.assertIn("the last one passed on", err)
             self.assertIn("make demo start open-webui", err)
 
+    def current_sha(self) -> str:
+        """The contract with record.mjs: helpers then walkthrough, each `path NUL bytes NUL`."""
+        import hashlib
+        digest = hashlib.sha256()
+        for name in ("_helpers.mjs", "open-webui.mjs"):
+            digest.update(f"evaluations/browser/walkthroughs/{name}".encode() + b"\0"
+                          + (self.tools / name).read_bytes() + b"\0")
+        return digest.hexdigest()
+
+    def scout(self, status="done", sha=None, changes=(), stamp="20261116-090000"):
+        directory = gif.recordings_dir() / f"open-webui-{stamp}-scout"
+        directory.mkdir(parents=True)
+        current = self.current_sha()
+        (directory / "scout.json").write_text(json.dumps({
+            "demo": "open-webui", "status": status, "walkthrough_sha256": sha or current, "changes": list(changes),
+            "when": "2026-11-16T09:00:00Z", "detail": "" if status == "done" else "the picker was not found"}))
+        return directory
+
+    def test_record_needs_a_finished_scout_of_the_current_walkthrough(self):
+        session.record_check("open-webui", True)
+        with self.recorder:
+            rc, _, err = self.run_main("record", "open-webui")
+            self.assertEqual(rc, 2)
+            self.assertIn("no scout of open-webui", err)
+            self.assertIn("record.sh open-webui --scout", err)
+            self.scout(status="fail", stamp="20261116-080000")
+            rc, _, err = self.run_main("record", "open-webui")
+            self.assertIn("did not finish (status 'fail': the picker was not found)", err)
+            self.scout(sha="0" * 64, stamp="20261116-090000")
+            rc, _, err = self.run_main("record", "open-webui")
+            self.assertIn("another version of the walkthrough", err)
+            self.scout(stamp="20261116-100000")
+            (self.tools / "_helpers.mjs").write_text("export const helper = 2;\n")      # a helper changed since
+            rc, _, err = self.run_main("record", "open-webui")
+            self.assertIn("another version of the walkthrough", err)
+
+    def test_record_no_scout_override_names_the_demo_and_says_so(self):
+        session.record_check("open-webui", True)
+        with self.recorder:
+            with mock.patch.dict(os.environ, {"RECORD_NO_SCOUT": "dify"}):
+                rc, _, err = self.run_main("record", "open-webui")
+            self.assertIn("RECORD_NO_SCOUT='dify' does not name 'open-webui'", err)
+            with mock.patch.dict(os.environ, {"RECORD_NO_SCOUT": "open-webui"}):
+                rc, out, err = self.run_main("record", "open-webui")
+            self.assertIn("SCOUT GATE SKIPPED by RECORD_NO_SCOUT=open-webui", out)
+            self.assertIn("controls the take may switch: unknown (no scout)", out)
+            self.assertIn("DEMO_CONFIRM=open-webui", err)                    # the confirmation still comes
+
+    def test_the_walkthrough_hash_is_the_recorders(self):
+        with self.recorder:
+            self.assertEqual(presenter.walkthrough_sha256("open-webui", ROOT), self.current_sha())
+        real = ROOT / "evaluations/browser/walkthroughs"
+        if (real / "_helpers.mjs").is_file():
+            self.assertRegex(presenter.walkthrough_sha256("open-webui", ROOT), r"^[0-9a-f]{64}$")
+
     def test_record_asks_for_the_id_and_says_the_chat_is_deleted(self):
         session.record_check("open-webui", True)
+        self.scout(changes=["tools switch"])
         with self.recorder:
             rc, out, err = self.run_main("record", "open-webui")
             self.assertEqual(rc, 2)
             self.assertIn("DEMO_CONFIRM=open-webui", err)
             self.assertIn("the chat it creates is deleted at the end", out)
+            self.assertIn("controls the take may switch: tools switch", out)
             with mock.patch.dict(os.environ, {"DEMO_CONFIRM": "open-webui"}):
                 rc, out, err = self.run_main("record", "open-webui")
             self.assertEqual(rc, 2)
             self.assertIn("No kubeconfig", err)                          # still refused before anything runs
-        self.assertFalse(gif.recordings_dir().exists())
+        self.assertEqual([p.name for p in gif.recordings_dir().iterdir() if not p.name.endswith("-scout")], [])
 
     def test_record_and_gif_take_a_scenario_with_a_cut_list(self):
         rc, _, err = self.run_main("record", "three-experiences")

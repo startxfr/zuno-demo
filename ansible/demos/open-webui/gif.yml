@@ -9,7 +9,8 @@
 # Step times are quoted: YAML reads an unquoted 0:45 as the number 45.
 record_notice: >-
   a recorded browser session as sale-01 on Open WebUI: 2 real model answers and a chat title on sale-01's budget;
-  the chat it creates is deleted at the end
+  the chat it creates is deleted at the end, and the take fails if sale-01's chats differ before and after; traces
+  and model-call metrics of the two answers remain, as for any use
 target_seconds: [40, 60]
 width: 960
 fps: 10

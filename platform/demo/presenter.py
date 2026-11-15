@@ -19,6 +19,8 @@ refused. `record` and `gif` write under ~/.cache/zuno/demo/recordings/ only, nev
 from __future__ import annotations
 
 import datetime
+import hashlib
+import json
 import os
 import pathlib
 import subprocess
@@ -63,7 +65,8 @@ Usage: make demo <verb> [arguments]
   uninstall [<id>]           Remove the demo's own add-on; never a shared component
   freeze on|off              Mark a freeze on this workstation: install, uninstall, rehearse and record refuse
   rehearse <id> 5|15         The whole sequence without pauses, with a report (asks for the id when it runs probes)
-  record <id>                Record the 5-minute version in a browser, then cut its GIF (after a check passed today)
+  record <id>                Record the 5-minute version in a browser, then cut its GIF (needs a scout of the walkthrough
+                             and a check that passed today)
   gif <id>                   Cut the newest recording again, offline (the GIF is published only on the owner's go)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
@@ -536,7 +539,61 @@ def cmd_rehearse(args: List[str]) -> int:
 
 RECORDER = pathlib.Path("evaluations") / "browser" / "record.sh"
 WALKTHROUGHS = pathlib.Path("evaluations") / "browser" / "walkthroughs"
+WALKTHROUGH_HELPERS = ("_helpers.mjs",)        # hashed before the walkthrough, in this order (WP-286 contract)
 RECORD_TIMEOUT = 1200
+
+
+def walkthrough_sha256(demo_id: str, root: pathlib.Path) -> str:
+    """The hash a scout records for the walkthrough it scouted (the recorder computes the same): SHA-256 over, for the
+    helper files then `walkthroughs/<id>.mjs`, the path `evaluations/browser/walkthroughs/<name>`, a 0 byte, the file's
+    bytes, a 0 byte."""
+    digest = hashlib.sha256()
+    for name in WALKTHROUGH_HELPERS + (f"{demo_id}.mjs",):
+        digest.update(f"evaluations/browser/walkthroughs/{name}".encode("utf-8") + b"\0")
+        digest.update((root / WALKTHROUGHS / name).read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def latest_scout(demo_id: str) -> Optional[dict]:
+    """The newest `recordings/<id>-<stamp>-scout/scout.json`, or None."""
+    base = gif.recordings_dir()
+    found = sorted(p for p in base.glob(f"{demo_id}-*-scout") if (p / "scout.json").is_file()
+                   and p.name[len(demo_id) + 1:][:8].isdigit()) if base.is_dir() else []
+    if not found:
+        return None
+    try:
+        data = json.loads((found[-1] / "scout.json").read_text(encoding="utf-8"))
+    except ValueError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    data["_dir"] = str(found[-1])
+    return data
+
+
+def scout_gate(demo_id: str, root: pathlib.Path) -> str:
+    """The `changes` line of the guard notice, or raise Refused: a take needs a finished scout of the current
+    walkthrough (ADR-0618 clause 9). RECORD_NO_SCOUT=<this exact id> skips the gate for the owner, loudly."""
+    override = os.environ.get("RECORD_NO_SCOUT", "")
+    if override:
+        if override != demo_id:
+            raise guard.Refused(f"RECORD_NO_SCOUT={override!r} does not name {demo_id!r}: it must hold this demo's "
+                                "exact id.")
+        out(f"SCOUT GATE SKIPPED by RECORD_NO_SCOUT={demo_id}: this take has no finished scout of its walkthrough.")
+        return "controls the take may switch: unknown (no scout)"
+    current = walkthrough_sha256(demo_id, root)
+    scout = latest_scout(demo_id)
+    how = (f"run the scout first, with the owner's go: `evaluations/browser/record.sh {demo_id} --scout` (it signs "
+           "in and opens the menus: no prompt, no model call, no video)")
+    if scout is None:
+        raise guard.Refused(f"no scout of {demo_id} under {gif.recordings_dir()}: {how}.")
+    if scout.get("status") != "done":
+        raise guard.Refused(f"the newest scout ({scout['_dir']}) did not finish (status {scout.get('status')!r}: "
+                            f"{scout.get('detail') or 'no detail'}): {how}.")
+    if scout.get("walkthrough_sha256") != current:
+        raise guard.Refused(f"the newest scout ({scout['_dir']}) is of another version of the walkthrough (the "
+                            f"walkthrough or its helpers changed since): {how}.")
+    changes = [str(c) for c in scout.get("changes") or []]
+    return f"controls the take may switch: {', '.join(changes) if changes else 'none'}"
 
 
 def scenario_for_gif(args: List[str], verb: str) -> catalogue.Entry:
@@ -594,11 +651,12 @@ def cmd_record(args: List[str]) -> int:
                 f"({last.get('source')})") if last else "none is recorded on this workstation"
         raise guard.Refused(f"`record` needs a `make demo check {entry.id}` that passed today: {seen}. Then "
                             f"`make demo start {entry.id}` warms the model before the take.")
+    changes = scout_gate(entry.id, root)
     demo_dir = catalogue.demo_dir(entry.id)
     manifest = load_manifest(demo_dir)
     cut = gif.load_cut_list(gif.cut_list_path(entry.id))
     notice = str(cut.get("record_notice") or "a recorded browser session that calls the models")
-    confirmed = guard.confirm(entry.id, {}, notices=[notice])
+    confirmed = guard.confirm(entry.id, {}, notices=[notice, changes])
     refusal = cluster_ready(manifest)
     if refusal:
         raise guard.Refused(refusal)
