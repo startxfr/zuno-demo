@@ -1,6 +1,6 @@
 # WP-287: Record terminal demos as real sessions checked as text
 
-- **State:** Not started
+- **State:** Done
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-286](wp-286-improve-the-recording-chain-and-reprove-it-on-open-webui.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -27,3 +27,13 @@
 - The replay needs no network and no cluster, and renders the same stream at another size.
 - `vault-pki` has a transcript reviewed before rendering, a GIF inside the limits of ADR-0617, and no GIF is published before the owner's named go.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
+
+## Result (2026-11-15)
+
+`vault-pki` was captured as a real terminal session, passed the text gate (no hit, 76 lines), was reviewed as text before
+rendering, replayed in xterm.js and cut into a 42.0 s, 1.3 MB GIF. The first take at 100 columns wrapped the tables, so the
+window became a setting of `demo.yml` and the second take at 136x30 is the one published, with the owner's named "go
+vault-pki" (commit `afb13dae`). See the
+[evidence](../evidence/wp-287-terminal-recording-vault-pki-2026-11-15.md). Limits, stated there: small text at 960 px,
+one terminal demo, the allowed-`make`-row path and the refusal of the gate proven offline only, a sampled review of the
+frames.

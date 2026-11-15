@@ -1067,6 +1067,12 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — WP-287 Done (ADR-0618 stays Accepted).** `vault-pki` is the first terminal demo recorded and published:
+  a real session captured, gated as text (no hit), the transcript read before rendering, replayed and filmed, GIF
+  published with the owner's "go vault-pki" (`afb13dae`). Evidence
+  `docs/roadmap/evidence/wp-287-terminal-recording-vault-pki-2026-11-15.md`. Traps kept: the window of a terminal take
+  is the demo's own (`record.cols`/`rows` in `demo.yml`; 100 columns wrapped the tables); the gate's refusal and the
+  allowed-`make`-row path were seen offline only; the privacy review of frames is a sample.
 - **2026-11-15 — WP-286 Done (ADR-0618 stays Accepted).** The recording chain was re-proved live on Open WebUI: a scout
   (`make demo scout open-webui`, mandatory, tied to the walkthrough file's SHA-256) then a take that lists what it
   created and cleaned and compares what the persona owns before and after. Evidence
