@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-276, WP-277, WP-278, WP-279, WP-280, WP-281 |
+| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-277, WP-278, WP-279, WP-280, WP-281 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1171,7 +1171,7 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-273 | [wp-273](work-packages/wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
 | WP-274 | [wp-274](work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md) | 0616 | WP-271 | Done | none |
 | WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
-| WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
+| WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
 | WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
 | WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | files and pages merged and reviewed against each other on 2026-11-15; live rehearsals of both versions by the demo333 session, with the owner's go |
@@ -1323,6 +1323,7 @@ moving.
 ## Change log
 
 - 2026-11-15 — Incident on demo333 (WP-260, ADR-0614 update). At the end of a world-model GPU search, the cascade delete of `zuno-machines-world-model-d0` removed two cluster singletons it also tracked, because the machines chart turns `infraPlacement` on by default. Deleting the GitopsService removed the openshift-gitops Argo CD instance. Deleting the image registry Config made the operator delete the registry's S3 bucket. Fix: the world-model Application lists every `infraPlacement` key as false, and the role refuses a cascade delete while the Application tracks anything but MachineSets. A CI test covers both. Argo CD was restored the same night, and the internal images were rebuilt from devel by 03:23 (supply chain 12 of 12 verified, golden path PASS).
+- 2026-11-15 — WP-276 Done: the six governance demos rehearsed live in both versions, 12 of 12 `RESULT: PASS`, every report from after the Argo CD restore and outside the image rebuild (evidence wp-276-governance-rehearsals-2026-11-15.md). `quotas` ran with the owner's named go: its start spends token budget and is not undone.
 - 2026-11-15 — WP-275 Done: the six experience demos rehearsed live in both versions, 12 of 12 `RESULT: PASS` (evidence wp-275-experiences-rehearsals-2026-11-15.md). WP-280 Operator pending: the six workshops play by composition of their scenarios' steps (21 to 57 steps), with chained actions, merged probes and one guard per workshop.
 - 2026-11-15 — WP-275 to WP-279 Operator pending: the files of the 28 remaining scenarios are merged and reviewed against their pages (page-versus-file warnings down from 62 to 3, all three on workshops awaiting WP-280). By the owner's decision of the day, the world-model install and uninstall never create or remove the GPU node (they verify and print the owner's actions); a rehearsal never runs the Blender add-on install or removal. Live rehearsals are running layer by layer; experiences: dify, open-webui and kagent PASS in both versions.
 - 2026-11-15 — The owner's gate is passed: WP-273 and WP-274 Done (both pilots rehearsed live in both versions, evidence in docs/roadmap/evidence/), go for the rollout. The 28 other scenario pages and the 6 workshops land on devel in their `## Presenter lifecycle` form; `consistency.py` lists 62 page-versus-file warnings, the review list of WP-275 to WP-279.

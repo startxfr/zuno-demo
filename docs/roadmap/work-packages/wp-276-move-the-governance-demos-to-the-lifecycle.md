@@ -1,6 +1,6 @@
 # WP-276: Move the governance demos to the lifecycle
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) and [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md), and the owner's go at the gate of 2026-11-16
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
@@ -45,3 +45,13 @@ For each demo below, in the order given:
 - The catalogue test passes with every demo of this brief counted as moved.
 - Each demo has a 5-minute and a 15-minute rehearsal report ending with `RESULT: PASS`, or failures the page explains.
 - Every "Nothing to do." and "Nothing to run." is deliberate.
+
+## Result (2026-11-15)
+
+Files by zuno-demo-reorg-coder, pages reviewed against them by zuno-demo-reorg-writer, rehearsals by
+zuno-demo-reorg-demo333 with the owner's go. The six demos passed both rehearsals, 12 of 12 `RESULT: PASS`, no failed
+or skipped unit ([evidence](../evidence/wp-276-governance-rehearsals-2026-11-15.md)). Every report used is from after
+the Argo CD restore of 02:06 and outside the image rebuild of 02:35 to 03:30, and ran with the status check that fails
+on a dead or stale Argo CD. `quotas` is the only demo with a changing unit: its `start` spends token budget through
+sale-01's and consultant-02's OpenClaw assistants and is not undone; it ran with the owner's named go. `guardrails`,
+the seventh governance demo, is [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md).

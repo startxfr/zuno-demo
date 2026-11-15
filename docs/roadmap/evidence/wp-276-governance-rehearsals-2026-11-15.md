@@ -2,7 +2,7 @@
 
 Rehearsal of the governance demos through `make demo`, in both versions, on 2026-11-15 between 02:17 and 08:47 (the times of the reports).
 
-Session `zuno-demo-reorg` ran these rehearsals on demo333 with the owner's named go for each, given in the demo333 session, from the checkout `phase56-integ-c, fixed at commit 68ed5a62`. "PASS (nothing to run)" means the step's Ansible file has nothing to run: the row is played by the presenter. The seconds are the engine's own timing of each unit; the total is the time between the start of the log and the report.
+Session `zuno-demo-reorg-demo333` ran these rehearsals on demo333 with the owner's named go for each, given in the demo333 session, from the checkout `phase56-integ-c, fixed at commit 68ed5a62`. "PASS (nothing to run)" means the step's Ansible file has nothing to run: the row is played by the presenter. The seconds are the engine's own timing of each unit; the total is the time between the start of the log and the report.
 
 ## Result
 
