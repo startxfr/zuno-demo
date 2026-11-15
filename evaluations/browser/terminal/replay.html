@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- WP-287 / ADR-0618 clause 6: replays a captured terminal session (asciicast v2, written by terminal/capture.py)
+     in xterm.js, at its own timing, for evaluations/browser/record.mjs to film. Loaded from disk: no network.
+     The recorder calls replay.load(header, events) then replay.play(stops); replay.clock() is the session's clock in
+     seconds, replay.reached the stop the replay is holding at. Nothing here reads or changes the bytes. -->
+<meta charset="utf-8">
+<title>Terminal</title>
+<link rel="stylesheet" href="vendor/xterm-6.0.0/xterm.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #16181d; overflow: hidden; }
+  #frame { box-sizing: border-box; height: 100%; padding: 14px 16px; }
+  .xterm { height: 100%; }
+  .xterm .xterm-viewport { overflow: hidden !important; }
+</style>
+<div id="frame"><div id="terminal"></div></div>
+<script src="vendor/xterm-6.0.0/xterm.js"></script>
+<script>
+  const replay = { clock: () => -1, written: 0, total: 0, finished: false, term: null, size: null };
+  replay.load = (header, events) => {
+    const term = new Terminal({
+      cols: header.width, rows: header.height, fontFamily: '"Liberation Mono", "DejaVu Sans Mono", monospace',
+      fontSize: 20, lineHeight: 1.15, cursorBlink: false, scrollback: 0, convertEol: false, allowProposedApi: false,
+      theme: { background: "#16181d", foreground: "#e6e6e6", cursor: "#e6e6e6" },
+    });
+    term.open(document.getElementById("terminal"));
+    term.focus();   // a solid cursor at the prompt, as in a terminal that has the keyboard
+    replay.term = term;
+    replay.events = events;
+    replay.total = events.length;
+    const screen = document.querySelector(".xterm-screen").getBoundingClientRect();
+    replay.size = { width: Math.ceil(screen.right), height: Math.ceil(screen.bottom), viewport: [innerWidth, innerHeight] };
+    return replay.size;
+  };
+  // Every event is drawn at its own instant on the session's clock; a late timer never reorders two events.
+  // `stops` are the instants the recorder marks: when the clock reaches one and everything before it is drawn, the
+  // replay holds (the clock stands still, nothing more is drawn) until resume(), so the marker's image and its
+  // instant in the video are the same state. The hold is the only time that is not the session's own.
+  replay.play = (stops) => {
+    let started = performance.now();
+    let held = 0;          // when the current hold began, 0 when playing
+    let next = 0;          // the next event to draw
+    let stop = 0;          // the next stop to reach
+    replay.reached = "";
+    replay.held_ms = 0;
+    replay.clock = () => ((held || performance.now()) - started) / 1000;
+    const tick = () => {
+      if (held) return;
+      const limit = stop < stops.length ? stops[stop].at : Infinity;
+      while (next < replay.events.length && replay.events[next][0] <= Math.min(replay.clock(), limit)) {
+        replay.term.write(replay.events[next][2], () => { replay.written += 1; });
+        next += 1;
+      }
+      if (stop < stops.length && replay.clock() >= limit) {
+        if (replay.written === next) {   // everything before the stop is on screen
+          held = performance.now();
+          replay.reached = stops[stop].name;
+          return;
+        }
+        return setTimeout(tick, 5);
+      }
+      if (next < replay.events.length || stop < stops.length) {
+        const until = Math.min(next < replay.events.length ? replay.events[next][0] : Infinity, limit) - replay.clock();
+        setTimeout(tick, Math.max(0, Math.min(50, until * 1000)));
+      } else replay.finished = true;
+    };
+    replay.resume = () => {
+      const paused = performance.now() - held;
+      started += paused;
+      replay.held_ms += paused;
+      held = 0;
+      stop += 1;
+      tick();
+      return paused;
+    };
+    tick();
+  };
+  // The text on screen, row by row: what the recorder's test reads, never written by a take.
+  replay.screen = () => {
+    const buffer = replay.term.buffer.active;
+    const rows = [];
+    for (let y = 0; y < replay.term.rows; y += 1) rows.push((buffer.getLine(buffer.viewportY + y) || { translateToString: () => "" }).translateToString(true));
+    return rows;
+  };
+  window.replay = replay;
+</script>

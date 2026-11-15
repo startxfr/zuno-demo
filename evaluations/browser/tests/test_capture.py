@@ -142,6 +142,17 @@ class WhatMayBeTyped(unittest.TestCase):
         self.assertEqual(capture.never(command), "")
         self.assertEqual(capture.never("oc whoami"), "")
 
+    def test_plan_needs_no_out_dir_and_runs_nothing(self):
+        import contextlib
+        import io
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            code = capture.main(["vault-pki", "--plan"])
+        self.assertEqual(code, 0)
+        lines = printed.getvalue().splitlines()
+        self.assertEqual(lines[0], "0:00  $ oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version")
+        self.assertEqual(len(lines), 6)
+
     def test_the_first_terminal_demo_plans_offline(self):
         rows, variables, problems = capture.demo_steps("vault-pki", ROOT)
         self.assertEqual(problems, [])

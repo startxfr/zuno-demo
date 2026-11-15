@@ -6,8 +6,8 @@
 // (the chat the take created is deleted, by its id), closes the context and leaves in OUT:
 //
 //   recording.webm   the whole take, never published
-//   markers.json     {demo, persona, viewport, started, motion_from, markers: [{name, t, png}], created, cleaned,
-//                    owned, status, detail}
+//   markers.json     {demo, kind "browser"|"terminal", persona, viewport, started, motion_from, markers: [{name, t,
+//                    png}], created, cleaned, owned, status, detail}
 //                    motion_from: the first marker a motion segment of the cut may start at
 //                    created: [{kind, id}] what the take created; cleaned: true (all deleted), false (something may
 //                    remain), null (nothing was created)
@@ -31,6 +31,14 @@
 // and fails the scout. It leaves scout.json ({demo, persona, started, when, walkthrough_sha256, changes, steps:
 // [{step, ok, selector, png, text, ...}], status "done"|"fail", detail}) and one scout-<step>.png per step; last line `SCOUT: done` (exit 0) or `SCOUT: failed <steps>`
 // (exit 1).
+//
+// RECORD_TERMINAL=1 (record.sh <id> <OUT> --terminal) films a terminal demo (ADR-0618 clause 6): OUT already holds
+// terminal.cast and terminal-steps.json, a real session captured by terminal/capture.py and passed by the text gate.
+// The recorder replays those bytes at their own timing in xterm.js (terminal/replay.html, vendored, loaded from disk)
+// and films the page, with the markers `start`, then `<MM-SS>-typed` and `<MM-SS>-done` for each row, then `end`. The
+// replay holds still while a marker's image is saved (markers.json: terminal.held_seconds, the only time in the video
+// that is not the session's own). No
+// walkthrough, no sign-in, no password, no cluster: the container receives the two text files and nothing else.
 // Exit code: 0 every marker reached and the cleanup done, 1 the walkthrough or the cleanup failed, 2 usage/environment.
 // The last line printed is `RESULT: PASS` or `RESULT: FAIL <detail>`.
 import crypto from "node:crypto";
@@ -105,6 +113,82 @@ function walkthroughHash(id) {
   return hash.digest("hex");
 }
 
+// Film the replay of a captured terminal session. Returns the exit code.
+async function terminalTake(id, out) {
+  const castFile = path.join(out, "terminal.cast");
+  const stepsFile = path.join(out, "terminal-steps.json");
+  if (!fs.existsSync(castFile) || !fs.existsSync(stepsFile)) usage(`${out} needs terminal.cast and terminal-steps.json (terminal/capture.py writes them)`);
+  const lines = fs.readFileSync(castFile, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  const header = lines[0];
+  const events = lines.slice(1).filter((e) => Array.isArray(e) && e[1] === "o");
+  const captured = JSON.parse(fs.readFileSync(stepsFile, "utf8"));
+  if (captured.demo !== id) usage(`terminal-steps.json is the capture of ${captured.demo}, not of ${id}`);
+  if (header.version !== 2 || !events.length) usage("terminal.cast is not a non-empty asciicast v2 file");
+  const name = (time) => time.split(":").map((part) => part.padStart(2, "0")).join("-");
+  // What is marked, on the session's clock: the first prompt, each row's line typed and prompt back, the end.
+  const wanted = [{ name: "start", at: Math.min(events[0][0] + 0.4, captured.steps.length ? captured.steps[0].typed : Infinity) }];
+  for (const step of captured.steps) {
+    wanted.push({ name: `${name(step.time)}-typed`, at: step.typed + 0.05 });   // the line is complete, Enter not pressed yet
+    wanted.push({ name: `${name(step.time)}-done`, at: step.done + 0.05 });     // the prompt is back
+  }
+  wanted.push({ name: "end", at: events[events.length - 1][0] + 0.6 });
+  const viewport = { width: 1232, height: 808 };   // 100x30 at 20 px Liberation Mono, with the page padding
+  const record = { demo: id, kind: "terminal", persona: "", viewport, started: new Date().toISOString(), motion_from: "start",
+                   markers: [], created: [], cleaned: null, owned: null,   // nothing is signed in to, created or read
+                   terminal: { cols: header.width, rows: header.height, captured: captured.started,
+                               cast_sha256: crypto.createHash("sha256").update(fs.readFileSync(castFile)).digest("hex") },
+                   status: "fail", detail: "" };
+  const failures = [];
+  if (captured.status !== "done") failures.push(`the capture did not pass (${captured.detail})`);
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ locale: "en-US", viewport, recordVideo: { dir: out, size: viewport }, offline: true });
+  const page = await context.newPage();
+  const t0 = Date.now();
+  const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
+  try {
+    await page.goto(`file://${path.join(here, "terminal", "replay.html")}`);
+    const size = await page.evaluate(([header, events]) => window.replay.load(header, events), [header, events]);
+    if (size.width > viewport.width || size.height > viewport.height) throw new Error(`the ${header.width}x${header.height} terminal is ${size.width}x${size.height} px: it does not fit ${viewport.width}x${viewport.height}`);
+    await page.waitForTimeout(300);
+    await page.evaluate((stops) => window.replay.play(stops), wanted);
+    let before = 0;
+    for (const mark of wanted) {
+      // The replay holds at each instant to mark, everything before it drawn: the image, the instant in the video
+      // and the screen are then the same state. It goes on as soon as the image is saved.
+      await page.waitForFunction((name) => window.replay.reached === name, mark.name, { timeout: (mark.at - before + 30) * 1000, polling: 20 });
+      before = mark.at;
+      const t = Math.round((Date.now() - t0) / 10) / 100;
+      await page.screenshot({ path: path.join(out, `${mark.name}.png`) });
+      record.markers.push({ name: mark.name, t, png: `${mark.name}.png` });
+      log(`marker ${mark.name}`);
+      if (process.env.RECORD_TERMINAL_DUMP === "1") {   // the offline test reads the screen as text; a take never does
+        fs.writeFileSync(path.join(out, `screen-${mark.name}.txt`), (await page.evaluate(() => window.replay.screen())).join("\n") + "\n");
+      }
+      await page.evaluate(() => window.replay.resume());
+    }
+    await page.waitForFunction(() => window.replay.finished && window.replay.written === window.replay.total, null, { timeout: 30000 });
+    record.terminal.held_seconds = Math.round((await page.evaluate(() => window.replay.held_ms)) / 10) / 100;
+  } catch (e) {
+    failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
+    await page.screenshot({ path: path.join(out, "failed.png") }).catch(() => {});
+  }
+  const video = page.video();
+  await context.close();
+  await browser.close();
+  try {
+    fs.renameSync(await video.path(), path.join(out, "recording.webm"));
+  } catch (e) {
+    failures.push(`no recording.webm: ${String(e.message || e).slice(0, 200)}`);
+  }
+  record.status = failures.length ? "fail" : "pass";
+  record.detail = failures.length ? failures.join("; ")
+    : `${record.markers.length} markers in ${record.markers[record.markers.length - 1].t.toFixed(1)} s`;
+  fs.writeFileSync(path.join(out, "markers.json"), JSON.stringify(record, null, 2) + "\n");
+  console.log(record.status === "pass" ? "RESULT: PASS" : `RESULT: FAIL ${record.detail}`);
+  return failures.length ? 1 : 0;
+}
+
 if (process.argv[2] === "--check") {
   const walk = await load(process.argv[3]);
   const problems = [];
@@ -126,9 +210,15 @@ if (process.argv[2] === "--check") {
 }
 
 const id = process.env.DEMO || "";
+const out = process.env.OUT || "/out";
+
+if (process.env.RECORD_TERMINAL === "1") {
+  if (!id || !MARKER_NAME.test(id)) usage("DEMO must be a demo id, e.g. vault-pki");
+  process.exit(await terminalTake(id, out));
+}
+
 const domain = process.env.APPS_DOMAIN || "";
 const password = process.env.PERSONA_PASSWORD || "";
-const out = process.env.OUT || "/out";
 if (!domain || !password) usage("APPS_DOMAIN and PERSONA_PASSWORD are required");
 const walk = await load(id);
 fs.mkdirSync(out, { recursive: true });
@@ -197,7 +287,7 @@ if (process.env.RECORD_SCOUT === "1") {
   process.exit(bad.length ? 1 : 0);
 }
 
-const record = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
+const record = { demo: id, kind: "browser", persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
                  motion_from: walk.motion_from, markers: [], created: [], cleaned: null,
                  owned: { before: null, after: null, same: null }, status: "fail", detail: "" };
 const browser = await chromium.launch();

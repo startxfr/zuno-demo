@@ -9,6 +9,8 @@ engine's results and the stream is never edited: `evaluations/browser/record.mjs
 terminal emulator and films that.
 
     python3 evaluations/browser/terminal/capture.py <id> <out_dir>
+    python3 evaluations/browser/terminal/capture.py <id> --plan     what would be typed, `<time>  $ <cmd>` per line, and
+                                                                    the refusals; nothing runs
 
 Writes in <out_dir>:
     terminal.cast         asciicast v2, 100x30 (only when the session printed none of the local values below)
@@ -338,9 +340,11 @@ def demo_steps(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[List[Step], Dic
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Capture a terminal demo as a real session (ADR-0618).")
     parser.add_argument("demo")
-    parser.add_argument("out_dir")
-    parser.add_argument("--plan", action="store_true", help="only print what would be typed; nothing runs")
+    parser.add_argument("out_dir", nargs="?", default="")
+    parser.add_argument("--plan", action="store_true", help="only print what would be typed; nothing runs, no out_dir needed")
     args = parser.parse_args(argv)
+    if not args.plan and not args.out_dir:
+        parser.error("out_dir is required unless --plan")
     try:
         steps, variables, problems = demo_steps(args.demo)
     except (KeyError, OSError) as exc:

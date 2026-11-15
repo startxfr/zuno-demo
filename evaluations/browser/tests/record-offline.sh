@@ -75,7 +75,7 @@ assert names == ["login", "home", "q1-sent", "q1-done", "code-picked", "q2-done"
 ts = [x["t"] for x in m["markers"]]
 assert ts == sorted(ts) and all(isinstance(t, (int, float)) for t in ts), ts
 assert all((d / x["png"]).stat().st_size > 0 and x["png"] == x["name"] + ".png" for x in m["markers"])
-assert m["demo"] == "open-webui" and m["persona"] == "sale-01" and m["viewport"] == {"width": 1280, "height": 800}
+assert m["kind"] == "browser" and m["demo"] == "open-webui" and m["persona"] == "sale-01" and m["viewport"] == {"width": 1280, "height": 800}
 assert m["status"] == "pass" and m["started"].endswith("Z") and "chat_deleted" not in m, m
 assert len(m["created"]) == 1 and m["created"][0]["kind"] == "chat" and set(m["created"][0]) == {"kind", "id"}, m["created"]
 assert m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m

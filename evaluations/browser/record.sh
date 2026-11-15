@@ -4,6 +4,10 @@
 # printed and never on a command line. A live action: it signs in as the walkthrough's persona and spends its budget.
 #   evaluations/browser/record.sh <id> [OUT_DIR]
 #   evaluations/browser/record.sh <id> [OUT_DIR] --scout     (or RECORD_SCOUT=1)
+#   evaluations/browser/record.sh <id> <OUT_DIR> --terminal  (or RECORD_TERMINAL=1)
+# --terminal films a terminal demo (ADR-0618): OUT_DIR holds terminal.cast and terminal-steps.json, captured on this
+# workstation by terminal/capture.py; the recorder replays them in xterm.js and films. No `oc`, no password and no
+# cluster call here: the container gets those two text files and nothing else.
 # --scout only signs in and opens the menus the walkthrough uses: no prompt sent, no chat, no model call, no video.
 # It leaves scout.json and scout-<step>.png; last line `SCOUT: done` (exit 0) or `SCOUT: failed <steps>` (exit 1).
 # OUT_DIR defaults to ~/.cache/zuno/demo/recordings/<id>-<YYYYmmdd-HHMMSS>/ (created, mode 700). It receives
@@ -13,15 +17,45 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 scout="${RECORD_SCOUT:-0}"
 args=()
+terminal="${RECORD_TERMINAL:-0}"
 for arg in "$@"; do
-  if [[ "$arg" == "--scout" ]]; then scout=1; else args+=("$arg"); fi
+  case "$arg" in
+    --scout) scout=1 ;;
+    --terminal) terminal=1 ;;
+    *) args+=("$arg") ;;
+  esac
 done
+[[ "$terminal" == "1" ]] || terminal=0
 set -- "${args[@]+"${args[@]}"}"
 [[ "$scout" == "1" ]] || scout=0
 id="${1:-}"
 if [[ ! "$id" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-  echo "usage: evaluations/browser/record.sh <id> [OUT_DIR] [--scout]" >&2
+  echo "usage: evaluations/browser/record.sh <id> [OUT_DIR] [--scout] | <id> <OUT_DIR> --terminal" >&2
   exit 2
+fi
+if [[ $terminal == 1 ]]; then
+  command -v podman >/dev/null 2>&1 || { echo "podman is not on PATH" >&2; exit 2; }
+  out="${2:-}"
+  if [[ -z "$out" || ! -f "$out/terminal.cast" || ! -f "$out/terminal-steps.json" ]]; then
+    echo "--terminal needs an OUT_DIR holding terminal.cast and terminal-steps.json (terminal/capture.py)" >&2
+    exit 2
+  fi
+  out="$(cd "$out" && pwd)"
+  echo "recording: $out"
+  # The Playwright module is installed first, in a container that sees neither the session nor any credential; the
+  # container that reads the session then runs without a network.
+  if [[ ! -d "$here/node_modules/playwright" ]]; then
+    podman run --rm -v "$here:/work:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
+      sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1' || true
+  fi
+  podman run --rm --network none -e DEMO="$id" -e RECORD_TERMINAL=1 -e RECORD_TERMINAL_DUMP="${RECORD_TERMINAL_DUMP:-0}" -e OUT=/out \
+    -v "$here:/work:Z" -v "$out:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy node record.mjs
+  rc=$?
+  if [[ $rc -ne 0 && $rc -ne 1 ]]; then
+    echo "RESULT: FAIL the recorder did not run to its end (exit $rc)"
+    rc=$([[ $rc -eq 2 ]] && echo 2 || echo 1)
+  fi
+  exit $rc
 fi
 if [[ ! -f "$here/walkthroughs/$id.mjs" ]]; then
   echo "no walkthrough for $id: evaluations/browser/walkthroughs/$id.mjs is missing" >&2
