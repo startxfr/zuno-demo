@@ -562,7 +562,9 @@ jobs:
       # cluster. The tests run with a temporary HOME and pass PYTHONUSERBASE on, so an Ansible installed in the user
       # site stays importable.
       - name: Demo lifecycle runner end to end on the fixture (ADR-0616)
-        run: python3 platform/demo/tests/test_guard_session.py
+        run: |
+          python3 platform/demo/tests/test_guard_session.py
+          python3 platform/demo/tests/test_flush_checks.py
 
   # ADR-0580/WP-160: the agents release this platform pins is re-verified on
   # every change, offline against the committed Sigstore trust root, and
