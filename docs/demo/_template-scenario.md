@@ -60,7 +60,8 @@ missing piece. Or: Nothing to do.&gt;
 ### Check
 
 &lt;What `make demo check` proves: the golden-path probe `<name>`, the browser check, the demo's own assertions; what
-to do when one fails. A page without a probe says so: rehearse it the same day.&gt;
+to do when one fails. A page without a probe says so: rehearse it the same day. `make demo rehearse` lists the probes and
+browser checks of the sequence and asks for the demo id before it runs them.&gt;
 
 ### Install
 

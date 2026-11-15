@@ -58,7 +58,8 @@ and uninstall in reverse), then run the workshop's own file. Each section says o
 
 ### Check
 
-&lt;The merged probes (`<probe>,<probe>`) and browser checks; what to do when one block is red.&gt;
+&lt;The merged probes (`<probe>,<probe>`) and browser checks; what to do when one block is red. `make demo rehearse
+<workshop-id>` lists them and asks for the workshop id, or `DEMO_CONFIRM=<workshop-id>`, before it runs them.&gt;
 
 ### Install
 

@@ -45,8 +45,12 @@ you start" checklist by hand.
 | `make demo stop` | Cleans up what the session created |
 | `make demo uninstall` | Removes the demo's own add-on; never a shared component |
 | `make demo freeze on\|off` | Marks a freeze on this workstation: `install`, `uninstall` and `rehearse` refuse |
-| `make demo rehearse <id> 5\|15` | The whole sequence without pauses, with a report |
+| `make demo rehearse <id> 5\|15` | The whole sequence without pauses, with a report. It never runs a changing unit that is declared `not_rehearsed`, and skips an optional or mutating step. When the sequence queues golden-path probes or browser checks, it lists them and asks you to type the demo id (or `DEMO_CONFIRM=<id>` without a terminal): they call the models and spend the probe personas' budgets |
 | `make demo golden-path`, `make demo browser` | The catalogue-wide checks ([golden-path.md](golden-path.md)) |
+
+A rehearsal that runs probes asks for the demo id even when no unit changes the cluster (the decision of 2026-11-15, after
+an unattended workshop rehearsal started by mistake): one prompt covers the changing units and the probes. A rehearsal
+that queues none asks nothing. `status`, `check`, `start` and `step`, run alone, are unchanged.
 
 Each command prints the result of its Ansible file first, then the page section. An action that changes the cluster
 shows what it will change and asks you to type the demo id.
