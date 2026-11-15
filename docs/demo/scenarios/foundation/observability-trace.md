@@ -76,13 +76,16 @@ what is left to the presenter.
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-observability-d0`/`-d1`, `zuno-tempo-d0`/`-d1`,
-`zuno-grafana-d0`/`-d1` and `zuno-perses-d1`, the collector, Tempo and Grafana, and the local models
+`zuno-grafana-d0`/`-d1` and `zuno-perses-d1`, the Deployment `grafana-deployment` in `zuno-monitoring`, the
+`OpenTelemetryCollector` `zuno-otel-collector` and the `TempoMonolithic` `tempo` (`Ready`), and the local models
 (`oc get llminferenceservice -n zuno-ai-run`: at least one `Ready=True`). If one is missing or not Healthy, stop and
 tell the platform owner: this demo installs nothing.
 
 ### Check
 
-Nothing to do when it passes. It runs the golden-path probes `unifai-tekos` and `trace` together: both lines must print
+Nothing to do when it passes. It reads the `OpenTelemetryCollector` `zuno-otel-collector`, the `TempoMonolithic`
+`tempo` and the `LLMInferenceServices` `gpt-oss-20b`, `qwen35-9b`, `qwen35-9b-wesh` and `qwen36-27b-instruct` in
+`zuno-ai-run` (all `Ready`). It then runs the golden-path probes `unifai-tekos` and `trace` together: both lines must print
 `PASS` (`ONLY=unifai-tekos,trace make demo golden-path`, within the hour before the session). The `trace` moment alone
 always fails: it reads the run id that `unifai-tekos` produces. See [golden-path.md](../../golden-path.md). The probes
 prove that the trace exists. The Tempo search, the dashboards and Perses have no probe: rehearse them the same day.

@@ -80,18 +80,22 @@ Other identities, none of which signs in on stage:
 
 `make demo use service-mesh-kiali 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/service-mesh-kiali/<action>.yml`) has run, and says
-what is left to the presenter. Start runs `make demo golden-path` to create traffic.
+what is left to the presenter. Start runs the probes of `make demo golden-path` to create traffic. It is read-only and allowed during a freeze, so it is not a changing unit: no demo id is typed.
 
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-service-mesh-d0`/`-d1`, `zuno-kiali-d0`/`-d1`,
-`zuno-mesh-monitoring-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1`. If one is missing or not
+`zuno-mesh-monitoring-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1`, the Deployments `istiod`,
+`cert-manager-istio-csr` and `kiali` in `zuno-mesh`, and the Route `kiali`. If one is missing or not
 Healthy, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
 
-Nothing to do when it passes. It reads Istio, IstioCNI and the Deployments of `zuno-mesh` (`oc get istio,istiocni,deploy
--n zuno-mesh`: `Healthy` twice, every Deployment ready), the PeerAuthentications and Kiali. No golden-path probe covers
+Nothing to do when it passes. It reads the `Istio` and `IstioCNI` `default` (`oc get istio,istiocni,deploy
+-n zuno-mesh`: `Healthy` twice, every Deployment ready), the `Kiali` `kiali`, the `MonitoringStack` `mesh-monitoring`,
+the Gateways `maas-default-gateway` and `zuno-agent-gateway` (`Programmed`), the Certificate `istiod`, the
+ClusterIssuer `vault-issuer-istio`, the `PeerAuthentication` `default` in `zuno-ai-run` (and every PeerAuthentication,
+`oc get peerauthentication -A`), and the Deployments `istiod`, `cert-manager-istio-csr` and `kiali`. No golden-path probe covers
 this page. Read the `RESTARTS` of `cert-manager-istio-csr` (`oc get pods -n zuno-mesh`): on 2026-11-13 they were 20 and
 10 and still growing. If they grow in the hour before the session, see
 [If something goes wrong](#if-something-goes-wrong).
@@ -102,8 +106,9 @@ Nothing to do. The mesh is part of the shared platform: the file only verifies i
 
 ### Start
 
-The file runs `make demo golden-path` to create traffic for the Kiali graph ([golden-path.md](../../golden-path.md)):
-it calls the gateways and the models. Run it in the hour before the session. What only a person does:
+The file runs the probes of `make demo golden-path`, each once, to create traffic for the Kiali graph
+([golden-path.md](../../golden-path.md)): it calls the gateways and the models, and some probes spend persona budgets.
+It is read-only and allowed during a freeze, so it is not a changing unit and needs no typed demo id. Run it in the hour before the session. What only a person does:
 
 - [ ] A terminal logged in with `oc` as **paas-ops-01**, large font, at the repository root. If **paas-ops-01** has
   never signed in to the OpenShift console (on 2026-11-13 it had no OpenShift user), sign in once in a browser first,

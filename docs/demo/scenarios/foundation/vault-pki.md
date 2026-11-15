@@ -105,8 +105,9 @@ platform owner: this demo installs nothing.
 ### Check
 
 Nothing to do when it passes. It reads the Vault pod labels, the ExternalSecrets (`oc get externalsecrets -A
---no-headers | awk '{print $(NF-1)}' | sort | uniq -c` prints only `SecretSynced`), and the ClusterIssuers and
-Certificates. It reads no Secret. No golden-path probe covers this page: rehearse it the same day. Optional, by hand:
+--no-headers | awk '{print $(NF-1)}' | sort | uniq -c` prints only `SecretSynced`), the ClusterIssuers
+`letsencrypt-route53`, `letsencrypt-route53-staging`, `vault-issuer` and `vault-issuer-istio` (`Ready`), and the
+Certificates `router-wildcard-tls`, `api-server-tls`, `keycloak-wildcard-tls` and `istiod` (`Ready`). It reads no Secret. No golden-path probe covers this page: rehearse it the same day. Optional, by hand:
 `make d0 check vault` *(untested)*. Its precheck reads `vault status` inside the pod and reports Vault installed only
 when it is initialized and unsealed. It is read-only. Do not run it on stage.
 

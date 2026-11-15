@@ -103,13 +103,14 @@ what is left to the presenter. Start changes the cluster: it launches one AAP jo
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-aap-d0`/`-d1`, `zuno-aap-config-d0`/`-d1` and
-`zuno-mcp-aap-d0`/`-d1`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
+`zuno-mcp-aap-d0`/`-d1`, the Deployment `aap-mcp` in `zuno-ai-run` and the Route `aap` in `zuno-aap`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs
 nothing.
 
 ### Check
 
-Nothing to do when it passes. It reads the `AnsibleAutomationPlatform` `aap` (`Running` and `Successful`), its Route, the
-job and workflow templates in `zuno-aap` and Deployment `aap-mcp` in `zuno-ai-run`. No golden-path probe covers this
+Nothing to do when it passes. It reads the `AnsibleAutomationPlatform` `aap` (`Running` and `Successful`), its Route `aap`, the
+JobTemplates `zuno-day0-check` and `zuno-day3-test`, the WorkflowTemplate `zuno-day1-check-workflow` and the
+AnsibleProject `zuno-demo` in `zuno-aap`, the template counts, and the Deployment `aap-mcp` in `zuno-ai-run`. No golden-path probe covers this
 page: the `delegation-approval` probe rejects its approval, so it never launches an AAP job. Rehearse the page the
 same day. If a read fails, see [If something goes wrong](#if-something-goes-wrong).
 
@@ -121,7 +122,9 @@ Nothing to do. AAP is part of the shared platform: the file only verifies it.
 
 The file launches one read-only check job the same day, `zuno-day0-check`, and so proves the execution path
 ([freeze protocol](../../freeze-protocol.md)). It is a changing unit: it creates an AAP job record and an
-`automation-job-*` pod in `zuno-aap`, and it counts against the launch limit of `aap-mcp` (2 per caller in 900 s). The
+`automation-job-*` pod in `zuno-aap`. It runs as the local AAP `admin` account through the Controller API, not through
+`aap-mcp`, so it does not count against the launch limit of `aap-mcp` (2 per caller in 900 s). `make demo start` asks
+you to type the demo id (`DEMO_CONFIRM`) before it runs. The file waits for the job to end. The
 job takes several minutes (about six in the delegation scenario). Green AAP resources hid a dead dispatcher for a week
 (2026-11-02) and a two-day stop after a cluster restart (2026-09-14). What only a person does:
 

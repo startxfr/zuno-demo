@@ -81,11 +81,11 @@ Other identities:
 
 `make demo use okf-signed-agent-release 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/okf-signed-agent-release/<action>.yml`) has run, and says
-what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset).
+what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset). The `tail` of row 1:15 reads a repository file: the step does not run it, you run it by hand in the terminal.
 
 ### Status
 
-Nothing to do. The file reads the gateways (`oc get pods -n zuno-ai-run | grep -e mcp-gateway -e a2a-gateway` shows both
+Nothing to do. The file reads the Deployments `mcp-gateway` and `a2a-gateway` in `zuno-ai-run` (`oc get pods -n zuno-ai-run | grep -e mcp-gateway -e a2a-gateway` shows both
 `2/2 Running`) and the internal Quay (`oc get quayregistry -n zuno-registry` shows `AVAILABLE True`: if a gateway pod
 restarts while Quay is down, it stays in `Init`). It also checks the workstation tools: `cosign` v2 and `oras` on the
 presenter's `PATH`, needed for `make d3 admit agents` in the 15-minute version. If one is missing, install it by
@@ -93,7 +93,9 @@ hand: this demo installs nothing.
 
 ### Check
 
-Nothing to do when it passes. No golden-path probe covers this page. `ONLY=unifai-tekos make demo golden-path` proves
+Nothing to do when it passes. It reads the `QuayRegistry` `quay`, the `UnifaiAgentBundles` `arkos` (`Verified` and `Ready`),
+`comage` and `tekos` (`Ready`) in `zuno-unifai`, the bundle list, and the ConfigMap `unifai-agent-revocations`. The five
+placeholder bundles stay `Pending`. No golden-path probe covers this page. `ONLY=unifai-tekos make demo golden-path` proves
 that Tekos, from this release, answers in UnifAI ([golden-path.md](../../golden-path.md)). Run it by hand if you want
 that proof. Re-read the lock, `tail -2 platform/okf/agents.lock`: the digest and the release number of this page were
 read on 2026-11-13; use what the file says on the day.

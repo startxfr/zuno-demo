@@ -92,17 +92,21 @@ Other identities:
 
 `make demo use gitops-day0-3 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
 Each section below is printed after its action's Ansible file (`ansible/demos/gitops-day0-3/<action>.yml`) has run, and says
-what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo list` (14:15) through their local playbooks.
+what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo list` (14:15) through their local playbooks. The 11:45 step does not run `make demo golden-path`: it is a 15-minute run, so the page shows the morning's output.
 
 ### Status
 
-Nothing to do. The file reads the Argo CD Applications in `openshift-gitops`. A few are not Synced and Healthy on
+Nothing to do. The file reads the Argo CD Applications `startx-cluster-auth` and `startx-cluster-infra-config` (any
+sync state allowed), counts every Application of `openshift-gitops`, lists those that are not Synced and Healthy, and
+lists the pods of `openshift-gitops`. A few are not Synced and Healthy on
 purpose (see the status banner): they are known on screen, not a failure. If many are missing or Degraded, stop and
 tell the platform owner: this demo installs nothing.
 
 ### Check
 
-Nothing to do when it passes. It reads the Argo CD Applications. No golden-path probe covers this scenario. Two checks
+Nothing to do when it passes. It reads the Argo CD Applications `zuno-ai-gateway-d1` (shown at 5:00),
+`startx-cluster-auth` and `startx-cluster-infra-config` (any sync state allowed), and lists the Applications of
+`openshift-gitops` that are not Synced and Healthy. It does not run the two checks below: they stay with you. No golden-path probe covers this scenario. Two checks
 are worth running by hand before the session:
 
 - [ ] `make d0 check argocd` passes the same day. It fails when the GitOps operator's pod restarted in the last 15
