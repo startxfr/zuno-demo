@@ -100,3 +100,15 @@ replicas field). Open: the `startx-cluster-infra-config` Application (startxfr/h
   outage, open tasks and pending approvals lost) instead of blocking; Limitador has no budget (the Kuadrant CR sets
   none), and its eviction resets the counters.
 - No zone-loss drill: clause 5's sizing stays a calculation, not a measurement.
+
+## Update 2026-11-15: only zuno-machines-d0 may own the singletons
+
+The `infraPlacement` switches were turned on in the machines chart's defaults, so the world-model Application, which
+renders the same chart, tracked the GitopsService and the image registry `Config` as well. Its cascade delete at the
+end of a GPU search deleted both:
+- deleting the GitopsService removed the `openshift-gitops` Argo CD instance;
+- deleting the registry `Config` made the operator delete the registry's S3 bucket.
+
+Rule from now on: an Application that renders `gitops/charts/machines` other than zuno-machines-d0 lists every
+`infraPlacement` key as false. A cascade delete of the world-model Application refuses to run while it tracks anything
+but MachineSets. The incident, the fix and the recovery are in WP-260, "Incident 2026-11-15".

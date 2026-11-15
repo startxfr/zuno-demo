@@ -138,3 +138,54 @@ check).
 - The inoperative `restore_command` block (616890dd) is removed from the PostgreSQL chart: PGO ignored it. The
   workaround for a replica stuck on pgBackRest's "duplicates found" is in
   [operations.md](../../platform/operations.md#a-postgresql-replica-stuck-in-archive-recovery).
+
+## Incident 2026-11-15: the world-model Application deleted two of the singletons
+
+**What happened.** P2 turned the `infraPlacement` switches on in the machines chart's defaults
+(`gitops/charts/machines/values.yaml`). The values were not set in zuno-machines-d0's own values, as the comment there
+says. `zuno-machines-world-model-d0` renders the same chart, so it tracked the three singletons too:
+- the image registry `Config cluster`;
+- the `user-workload-monitoring-config` ConfigMap;
+- the `GitopsService cluster`.
+
+Argo CD reported only a `SharedResourceWarning`.
+
+A world-model GPU search ran with the owner's go, 01:07-01:38 CET: 3 attempts, no g7e capacity. Its teardown then ran
+`make d0 uninstall world-model-gpu`, which deletes that Application with the resources finalizer. The cascade did the
+following:
+- **01:38:32, GitopsService deleted.** Garbage collection took the `openshift-gitops` Argo CD instance with it at about
+  01:41. Every Argo CD pod stopped. The 115 Applications stayed, and their stored status still read Synced/Healthy.
+- **01:38:32, registry `Config` deleted.** The operator's finalizer removed the registry and its storage: CloudTrail
+  shows `DeleteBucket` on `demo333-m4k9r-image-registry-eu-central-1` at 01:39:18. The operator then created a new,
+  empty bucket with the same name (01:39:22), so the 137 ImageStreams point at lost blobs. The pods that were running
+  kept their cached images.
+- The ConfigMap was not deleted: its tracking still named zuno-machines-d0.
+
+The uninstall timed out after 600 s because the Argo CD controller died in the middle of the cascade.
+
+**Fix (this commit).**
+- `gitops/apps/machines-world-model/application-d0.yaml` lists every `infraPlacement` key as false.
+- The chart defaults stay as they are. zuno-machines-d0 takes its values from them, and turning them off there would
+  make Argo CD prune the same singletons.
+- The `world_model_gpu` role refuses to apply the Application unless every chart switch is listed and false.
+- Before any cascade delete, the role refuses if the Application tracks anything but MachineSets
+  (`assert_cascade_only_machinesets.yml`), and nothing is deleted.
+- `platform/gitops/tests/test_world_model_gpu_singletons.py` covers the switches, the other Applications of the chart,
+  the guard's order and its filter. It fails on the previous state.
+
+**Recovery (that night, owner's go).**
+1. Removed the finalizer of the world-model Application. It went away without deleting anything else; the
+   user-workload monitoring ConfigMap was untouched.
+2. `make d0 install argocd` recreated the `openshift-gitops` Argo CD instance with the repository's spec.
+3. Its pods stayed Pending: the namespace's node selector sends them to the infra nodes, and only the GitopsService's
+   `runOnInfra` gives them the infra toleration. Recreating the GitopsService with the chart's spec fixed every pod except
+   `application-controller-0`. The StatefulSet had created that pod before the toleration existed and does not replace a
+   pod that never became Ready, so it had to be deleted by hand.
+4. Argo CD was complete at 02:06. By 02:09 it had reconciled 106 of the 114 Applications: 112 Synced/Healthy, and the
+   two `startx-cluster-*` OutOfSync, as before the incident. zuno-machines-d0 re-applied the singletons and pruned
+   nothing. The registry `Config` and the GitopsService are now tracked by zuno-machines-d0 only, and the registry pods
+   are back on the infra nodes.
+
+**Still open: rebuilding the internal images.** It is left for the next morning, with its own go. Until then, no pod
+that runs an internal-registry image may restart. On 2026-11-15 they ran in zuno-ai-build, zuno-ai-run, zuno-auth,
+zuno-data, zuno-dify, zuno-kagent, zuno-monitoring and zuno-vault: 27 containers, 137 ImageStreams, 20 BuildConfigs.

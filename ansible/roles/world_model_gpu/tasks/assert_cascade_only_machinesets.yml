@@ -1,0 +1,24 @@
+---
+# Incident 2026-11-15: deleting the node's Application cascades to every
+# resource Argo CD tracks under it (resources finalizer). The Application then
+# also rendered the ADR-0614 singletons, so the cascade deleted the
+# GitopsService (the openshift-gitops Argo CD instance went with it) and the
+# image registry Config (the operator deleted the registry's S3 bucket).
+# Before any cascade delete, the tracked resources must be MachineSets only.
+# Input: world_model_gpu_app_obj, the live Application object.
+- name: "world-model-gpu | list what the node's Application tracks besides MachineSets"
+  ansible.builtin.set_fact:
+    _world_model_gpu_tracked_other: >-
+      {% set out = [] %}{% for r in (world_model_gpu_app_obj.status.resources | default([]))
+         if r.kind != 'MachineSet' %}{% set _ = out.append(r.kind ~ '/' ~ r.name) %}{% endfor %}{{ out }}
+
+- name: "world-model-gpu | refuse a cascade that would delete anything but MachineSets"
+  ansible.builtin.assert:
+    that:
+      - _world_model_gpu_tracked_other | length == 0
+    fail_msg: >-
+      {{ world_model_gpu_app_name }} tracks {{ _world_model_gpu_tracked_other | join(', ') }} besides its
+      MachineSets. Deleting it would delete them too (incident 2026-11-15: the GitopsService and the image
+      registry Config). Nothing was deleted. Set every infraPlacement key to false in
+      gitops/apps/machines-world-model/application-d0.yaml, re-apply the Application, wait until those
+      resources leave its status, then run this again.
