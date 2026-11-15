@@ -135,3 +135,17 @@ the owner's named "go <id>"; every catalogue page takes a presenter's shape, def
   Open WebUI pilot, the owner's go and the publication).
 - [WP-285](../roadmap/work-packages/wp-285-give-the-demo-pages-a-presenters-shape.md) (the page shape: the pilot on three
   files, then the rollout after the owner's gate).
+
+## Update 2026-11-15 (WP-284): what the recording chain does as built
+
+The build of WP-284 fixes four details of clauses 3 to 5. The clauses stay as decided; this is a dated precision.
+
+- **Clause 4, `fit`:** the speed is the span of the markers divided by the `fit` seconds, clamped from 0.5 to 16 (not
+  from 1 to 16). A fast answer is slowed down rather than padded: `fit` never adds a frozen frame, and `hold` is the
+  only freeze of a moment.
+- **Clause 5, captions and size:** the caption is drawn in a band under the picture, not over it, so it hides nothing.
+  The GIF is 960x656: a 960x600 picture and a 56 px band.
+- **Clause 3, a scout mode:** `record.sh <id> --scout` signs in and opens the menus, sends no prompt, makes no model
+  call and creates no chat, and it refuses any chat request that is not a GET. It is run before a first take to check
+  the selectors without spending budget.
+- **The walkthrough never clicks a tool switch:** it only opens the menus and shows the state the persona has.

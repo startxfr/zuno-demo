@@ -52,3 +52,13 @@ a 40 to 60 second GIF in `~/.cache/zuno/demo/recordings/`; the GIF is sent to th
 - `git status` shows no `.webm`; `make demo browser` is untouched (`run.mjs` has no change).
 - The offline tests, `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
 - No GIF is in the repository before the owner's named go.
+
+## As built (2026-11-15)
+
+- `fit` computes the speed as the span divided by the `fit` seconds, clamped from 0.5 to 16, and never pads with a
+  frozen frame; `hold` is the only freeze.
+- The caption is drawn in a band under the picture (the GIF is 960x656: a 960x600 picture and a 56 px band).
+- The recorder has a scout mode, `record.sh <id> --scout`: it signs in and opens the menus, sends no prompt, makes no
+  model call, creates no chat and refuses any chat request that is not a GET. Run it before a first take to check the
+  selectors without spending budget.
+- The walkthrough never clicks a tool switch.
