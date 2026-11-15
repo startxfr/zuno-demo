@@ -13,9 +13,9 @@ env:
   MAAS: "https://maas.{{ cluster_base_domain }}/zuno-ai-run"
 steps: {}
 # The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. The Do commands
-# of rows 0:00, 1:00 and 2:00 pass the read-only allowlist, so `allow` is empty; row 3:00 (an editor on
-# provider-routing.yaml) has no command and is not filmed. The window is 136x20: the widest output is the model refs
-# (132 columns on 2026-11-16), the tallest screen 9 lines.
+# of rows 0:00 to 3:00 pass the read-only allowlist, so `allow` is empty; row 3:00 reads provider-routing.yaml from
+# git (no path printed). The window is 136x20: the widest output is the model refs (132 columns on 2026-11-16), the
+# tallest screen 9 lines; the typed 2:00 and 3:00 commands wrap on two lines.
 record:
   kind: terminal
   allow: []
