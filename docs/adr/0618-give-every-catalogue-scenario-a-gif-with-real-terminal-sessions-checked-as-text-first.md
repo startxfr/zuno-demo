@@ -138,3 +138,22 @@ publication, and nothing else.**
 - [WP-289](../roadmap/work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) (the repeats, including the demos
   told with stills).
 - [WP-290](../roadmap/work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) (the six delicate demos).
+
+## Update 2026-11-15 (WP-287): what the capture driver does as built
+
+The build of the capture driver fixes six details of clauses 3 to 8. The clauses stay as decided; this is a dated
+precision.
+
+- **Clause 4, where the checks live:** the pattern masks used as detectors are in `platform/demo/probe_rows.py`, not in
+  `readonly.py`. The deny list of real local values (the token, the kubeconfig path, `HOME`, the login name as a whole
+  word, the host name, the variables of a step whose name looks like a credential) runs inside the capture process, in
+  memory, and on a hit no cast is written. The pattern detectors and `transcript.txt` run on the written cast.
+- **Clause 8, the prompt:** the prompt shows `$ ` and carries one invisible OSC sequence holding the last exit code,
+  which the driver needs to know that the prompt is back. It is part of the real bytes of the session; the transcript
+  strips it like the other escape codes.
+- **Clause 7, refusals:** every command of the demo is checked before the shell starts. Besides the four commands the
+  clause names, the driver never types `printenv`, `set`, `export`, `declare`, nor a command that expands `$HOME`,
+  `$PATH` or `$PYTHONUSERBASE`.
+- **A failing command:** a command that ends with a non-zero exit code fails the take. An entry for a command that may
+  fail is not built yet.
+- **Clause 6, markers:** one `typed` and one `done` marker per row, and the driver sends Ctrl-L between rows.
