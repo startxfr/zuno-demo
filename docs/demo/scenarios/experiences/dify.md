@@ -1,23 +1,5 @@
 # Scenario: Dify - a no-code canvas on the governed backend
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse dify`: the 5-minute version PASS at 14:39 (11 units,
-> 42 s); the 15-minute version PASS at 14:42 (20 units, 50 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12: Applications
-> `zuno-dify-d1`, `zuno-dify-knowledge-d1` and `zuno-token-proxy-dify-d1` Synced and Healthy; in `zuno-dify` the
-> Deployments `dify-api`, `-worker`, `-beat`, `-web`, `-plugin-daemon`, `-nginx`, `-front-door`, `zuno-token-proxy` and
-> `zuno-dify-knowledge` 1/1 (Dify 1.17.0 pinned by digest) and `dify-redis-master` 1/1; route
-> `dify.apps.demo333.startx.fr`; five ExternalSecrets synced; EgressFirewall applied; the token proxy runs as Keycloak
-> client `dify` with `X-Zuno-Agent: dify` and task `chat`; `dify` is in the ai-gateway's experience and persona-claim
-> clients. Around 22:00Z master ip-10-18-36-37 was cordoned, Grafana was down and the local models were restarting. At
-> 22:51Z the master was schedulable again, Grafana was 1/1, the four local models were Ready, and the Dify pods had been
-> recreated about 80 minutes earlier (`dify-api` with 3 restarts, `dify-web` with 1). The three applications were not
-> checked: that needs a sign-in.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `dify`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).
-
 ## Introduction
 
 Dify is an open-source canvas on which a business user draws an LLM application: an agent, a chat flow or a workflow,
@@ -31,23 +13,9 @@ applications are imported at every install.
 **The message:** "Business users can draw their own AI apps. The models, tools, documents and budget behind them stay
 the platform's."
 
-**Decisions:**
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend.
-- [ADR-0599](../../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md): Dify in one
-  workspace behind a Keycloak front door; no datasets, marketplace, code sandbox or internet egress; External
-  Knowledge through an adapter; the three example applications.
-- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
-  the token proxy adds a client-credentials token of the persona to every model and tool call.
-- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
-  telemetry are keyed by persona, so every Dify user counts as consultant-02.
-- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
-  the same tools as the agents, filtered by group; a turn that used a tool stays on local models.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -66,7 +34,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use dify 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use dify 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/dify/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
@@ -290,3 +258,41 @@ flowchart LR
   API & WRK & PD -->|"databases dify, dify_plugin<br/>pgvector, empty"| PG[("zuno-postgresql<br/>zuno-data")]
   API -->|"files"| S3[("dedicated S3 bucket")]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend.
+- [ADR-0599](../../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md): Dify in one
+  workspace behind a Keycloak front door; no datasets, marketplace, code sandbox or internet egress; External
+  Knowledge through an adapter; the three example applications.
+- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
+  the token proxy adds a client-credentials token of the persona to every model and tool call.
+- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
+  telemetry are keyed by persona, so every Dify user counts as consultant-02.
+- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
+  the same tools as the agents, filtered by group; a turn that used a tool stays on local models.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse dify`: the 5-minute version PASS at 14:39 (11 units,
+> 42 s); the 15-minute version PASS at 14:42 (20 units, 50 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12: Applications
+> `zuno-dify-d1`, `zuno-dify-knowledge-d1` and `zuno-token-proxy-dify-d1` Synced and Healthy; in `zuno-dify` the
+> Deployments `dify-api`, `-worker`, `-beat`, `-web`, `-plugin-daemon`, `-nginx`, `-front-door`, `zuno-token-proxy` and
+> `zuno-dify-knowledge` 1/1 (Dify 1.17.0 pinned by digest) and `dify-redis-master` 1/1; route
+> `dify.apps.demo333.startx.fr`; five ExternalSecrets synced; EgressFirewall applied; the token proxy runs as Keycloak
+> client `dify` with `X-Zuno-Agent: dify` and task `chat`; `dify` is in the ai-gateway's experience and persona-claim
+> clients. Around 22:00Z master ip-10-18-36-37 was cordoned, Grafana was down and the local models were restarting. At
+> 22:51Z the master was schedulable again, Grafana was 1/1, the four local models were Ready, and the Dify pods had been
+> recreated about 80 minutes earlier (`dify-api` with 3 restarts, `dify-web` with 1). The three applications were not
+> checked: that needs a sign-in.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `dify`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).

@@ -1,25 +1,5 @@
 # Scenario: kagent - a read-only cluster operations assistant
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse kagent`: the 5-minute version PASS at 14:44 (11 units,
-> 41 s); the 15-minute version PASS at 14:47 (21 units, 52 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12: Applications
-> `zuno-kagent-d0`, `zuno-kagent-d1`, `zuno-token-proxy-kagent-d1`, `zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1` Synced and
-> Healthy; in `zuno-kagent` the Deployments `kagent-controller`, `kagent-ui`, `kagent-front-door`, `zuno-sre` and
-> `zuno-token-proxy` 1/1 (kagent 0.10.4, running the pinned digests); Agent `zuno-sre` Declarative, Accepted and Ready;
-> RemoteMCPServer `zuno-mcp-gateway` Accepted, with five discovered tools (`k8s.resource.read`, `k8s.resource.list`,
-> `k8s.events.read`, `k8s.logs.read`, `metrics.query`); Deployment `k8s-mcp` 1/1 in `zuno-ai-run`, its configuration
-> `read_only = true` with Secret and ConfigMap denied; route `kagent.apps.demo333.startx.fr`; the token proxy runs as
-> Keycloak client `kagent` with `X-Zuno-Agent: kagent` and task `diagnose`. Around 22:00Z master ip-10-18-36-37 was
-> cordoned, Grafana was down and the local models were restarting. At 22:51Z the master was schedulable again, Grafana
-> was 1/1, the four local models were Ready, and the kagent pods had been recreated about 80 minutes earlier with no
-> restart.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `kagent`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md),
-> [Agentic AI](../../workshops/agentic-ai.md).
-
 ## Introduction
 
 kagent is a Kubernetes-native agent framework: agents, model settings and tool servers are custom resources. Installed
@@ -33,22 +13,9 @@ with namespaced Roles only. It calls the model and the tools through a token pro
 **The message:** "An operations assistant may read the cluster through the same gateway, identity and audit as every
 other tool. It never sees a secret and cannot change anything."
 
-**Decisions:**
-- [ADR-0600](../../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md):
-  Kubernetes reads become mcp-gateway capabilities; kagent is a thin operations client; no write tool until human
-  approval exists.
-- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
-  the token proxy adds a client-credentials token of the persona to every model and tool call.
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend; kagent's agents are not UnifAI agents (correction note of
-  2026-11-04).
-- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
-  telemetry are keyed by persona, so every kagent user counts as ai-ops-01.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -67,7 +34,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use kagent 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use kagent 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/kagent/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
@@ -96,7 +63,7 @@ The file sends one short question through kagent's token proxy (the golden-path 
 does not ask the 5-minute question: that one is the presenter's, in the UI. What only a person does:
 
 - [ ] A browser profile used by **ai-ops-01** only. A Keycloak session of another persona in the same browser gets a
-  403 from the front door ([WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md) D4).
+  403 from the front door.
 - [ ] Open `https://kagent.apps.demo333.startx.fr` and sign in to Keycloak as **ai-ops-01**. There is no second
   login: kagent's UI has none of its own.
 - [ ] **Click "Skip wizard"** on the first screen of a new browser. The onboarding wizard creates a stray agent
@@ -286,3 +253,46 @@ flowchart LR
   K8S -->|"cluster-monitoring-view"| THANOS["Thanos Querier :9091"]
   AIGW --> LOCAL["local models through MaaS"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0600](../../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md):
+  Kubernetes reads become mcp-gateway capabilities; kagent is a thin operations client; no write tool until human
+  approval exists.
+- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
+  the token proxy adds a client-credentials token of the persona to every model and tool call.
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend; kagent's agents are not UnifAI agents (correction note of
+  2026-11-04).
+- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
+  telemetry are keyed by persona, so every kagent user counts as ai-ops-01.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md): Five experiences demonstration.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse kagent`: the 5-minute version PASS at 14:44 (11 units,
+> 41 s); the 15-minute version PASS at 14:47 (21 units, 52 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12: Applications
+> `zuno-kagent-d0`, `zuno-kagent-d1`, `zuno-token-proxy-kagent-d1`, `zuno-mcp-k8s-d0` and `zuno-mcp-k8s-d1` Synced and
+> Healthy; in `zuno-kagent` the Deployments `kagent-controller`, `kagent-ui`, `kagent-front-door`, `zuno-sre` and
+> `zuno-token-proxy` 1/1 (kagent 0.10.4, running the pinned digests); Agent `zuno-sre` Declarative, Accepted and Ready;
+> RemoteMCPServer `zuno-mcp-gateway` Accepted, with five discovered tools (`k8s.resource.read`, `k8s.resource.list`,
+> `k8s.events.read`, `k8s.logs.read`, `metrics.query`); Deployment `k8s-mcp` 1/1 in `zuno-ai-run`, its configuration
+> `read_only = true` with Secret and ConfigMap denied; route `kagent.apps.demo333.startx.fr`; the token proxy runs as
+> Keycloak client `kagent` with `X-Zuno-Agent: kagent` and task `diagnose`. Around 22:00Z master ip-10-18-36-37 was
+> cordoned, Grafana was down and the local models were restarting. At 22:51Z the master was schedulable again, Grafana
+> was 1/1, the four local models were Ready, and the kagent pods had been recreated about 80 minutes earlier with no
+> restart.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `kagent`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md),
+> [Agentic AI](../../workshops/agentic-ai.md).

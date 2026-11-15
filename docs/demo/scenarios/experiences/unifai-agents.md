@@ -1,27 +1,8 @@
 # Scenario: UnifAI - governed agents in team and personal workspaces
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-agents`: the 5-minute version PASS at 15:08 (11
-> units, 46 s); the 15-minute version PASS at 15:12 (21 units, 58 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12 at 22:50 UTC:
-> Applications `zuno-unifai-d0`/`-d1` Synced and Healthy, UnifaiStack `unifai` Ready (images v0.1.69, operator CSV
-> `unifai-operator.v0.1.69` Succeeded), the 14 stack pods Running, the 11 UnifaiTeams Ready (`agent-tekos` included),
-> UnifaiAgentBundle `tekos` Ready and verified (4 tasks, 17 objects), the 45 UnifaiWorkflows Ready (`tekos` and the
-> personal starters included), the four local models Ready, `ai-gateway` and `mcp-gateway` 1/1. An earlier check, at
-> about 22:00 UTC, found the master `ip-10-18-36-37` cordoned, Grafana down and the local models restarting. At
-> 22:50 UTC the master was schedulable again and Grafana was 1/1. The UnifAI multiagent, worker and UI pods had
-> restarted at 22:47 UTC on the same image digests. The last recorded `unifai-tekos` pass was at 17:07 UTC that day
-> ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `unifai-tekos`. The probe proves a Tekos turn only. The cluster-tools contrast at 3:00 has no
-> probe: rehearse it the same day.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
-> many experiences](../../five-experiences.md), [Agentic AI](../../workshops/agentic-ai.md).
-
 ## Introduction
 
-UnifAI is the agent platform of Zuno ([ADR-0561](../../../adr/0561-adopt-unifai-as-the-agent-platform.md)). It
+UnifAI is the agent platform of Zuno. It
 gives each person a **Personal** workspace and **Team** workspaces with workflows, chats, a catalog and a document
 library (see [Appendix A](#appendix-a---hld)). UnifAI does not decide anything on its own:
 - the agents (prompts, tasks, tools, data level) come from a **signed release** of the `zuno-demo-agents` repository;
@@ -34,28 +15,9 @@ The operator, the custom resources and the call path are in [Appendix B](#append
 **The message:** "Agents are published from a signed release, and what an agent may do follows the person who asks.
 UnifAI holds no model key and no tool credential."
 
-**Decisions:**
-- [ADR-0561](../../../adr/0561-adopt-unifai-as-the-agent-platform.md): UnifAI is the agent platform. The agent
-  definition, the model path, the tool authorization and the identity stay Zuno's.
-- [ADR-0563](../../../adr/0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md): UnifAI forwards the
-  user's token and the agent, task and run headers.
-- [ADR-0578](../../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
-  and [ADR-0580](../../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md):
-  agents are signed keyless by the agents repository's release workflow, and the platform pins one release by digest.
-- [ADR-0574](../../../adr/0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) and
-  [ADR-0586](../../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md):
-  Argo CD deploys the stack from a pinned operator catalog; the images are checked by digest and signature.
-- [ADR-0597](../../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md): the shared gateway LLM and
-  MCP provider are public built-ins.
-- [ADR-0598](../../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md): one team
-  workspace per business group, a catalog without secrets, starters for three personas.
-- [ADR-0600](../../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md):
-  cluster read tools are governed by the mcp-gateway and granted to `ocp-ai-ops` only.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -72,7 +34,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use unifai-agents 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use unifai-agents 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/unifai-agents/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
@@ -100,7 +62,7 @@ Nothing to do. UnifAI and the Tekos agent are part of the shared platform: the f
 The file sends the probe prompt once to warm the model. What only a person does:
 
 - [ ] Two browser profiles, so two personas stay signed in side by side. A shared browser session signs in the wrong
-  account (the kagent 403 of [WP-208](../../../roadmap/work-packages/wp-208-five-experiences-demonstration.md), D4):
+  account (the kagent 403 of the five-experiences demonstration):
   - profile 1: **consultant-02**;
   - profile 2: **ai-ops-01**.
 - [ ] Open `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` in both profiles and sign in through Keycloak
@@ -293,3 +255,47 @@ flowchart LR
   AIGW --> MAAS["MaaS<br/>local models"]
   MAS -.->|"OTLP"| OTEL["OTel collector,<br/>Tempo"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0561](../../../adr/0561-adopt-unifai-as-the-agent-platform.md): UnifAI is the agent platform. The agent
+  definition, the model path, the tool authorization and the identity stay Zuno's.
+- [ADR-0563](../../../adr/0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md): UnifAI forwards the
+  user's token and the agent, task and run headers.
+- [ADR-0578](../../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
+  and [ADR-0580](../../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md):
+  agents are signed keyless by the agents repository's release workflow, and the platform pins one release by digest.
+- [ADR-0574](../../../adr/0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) and
+  [ADR-0586](../../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md):
+  Argo CD deploys the stack from a pinned operator catalog; the images are checked by digest and signature.
+- [ADR-0597](../../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md): the shared gateway LLM and
+  MCP provider are public built-ins.
+- [ADR-0598](../../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md): one team
+  workspace per business group, a catalog without secrets, starters for three personas.
+- [ADR-0600](../../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md):
+  cluster read tools are governed by the mcp-gateway and granted to `ocp-ai-ops` only.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-agents`: the 5-minute version PASS at 15:08 (11
+> units, 46 s); the 15-minute version PASS at 15:12 (21 units, 58 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 at 22:50 UTC:
+> Applications `zuno-unifai-d0`/`-d1` Synced and Healthy, UnifaiStack `unifai` Ready (images v0.1.69, operator CSV
+> `unifai-operator.v0.1.69` Succeeded), the 14 stack pods Running, the 11 UnifaiTeams Ready (`agent-tekos` included),
+> UnifaiAgentBundle `tekos` Ready and verified (4 tasks, 17 objects), the 45 UnifaiWorkflows Ready (`tekos` and the
+> personal starters included), the four local models Ready, `ai-gateway` and `mcp-gateway` 1/1. An earlier check, at
+> about 22:00 UTC, found the master `ip-10-18-36-37` cordoned, Grafana down and the local models restarting. At
+> 22:50 UTC the master was schedulable again and Grafana was 1/1. The UnifAI multiagent, worker and UI pods had
+> restarted at 22:47 UTC on the same image digests. The last recorded `unifai-tekos` pass was at 17:07 UTC that day
+> ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `unifai-tekos`. The probe proves a Tekos turn only. The cluster-tools contrast at 3:00 has no
+> probe: rehearse it the same day.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
+> many experiences](../../five-experiences.md), [Agentic AI](../../workshops/agentic-ai.md).

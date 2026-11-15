@@ -1,24 +1,5 @@
 # Scenario: OpenShift Lightspeed - the console assistant served by MaaS
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lightspeed`: the 5-minute version PASS at 14:50 (11
-> units, 33 s); the 15-minute version PASS at 14:53 (19 units, 47 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12 (22:50 to 22:55
-> UTC): Applications `zuno-lightspeed-d0`/`-d1` and `zuno-lightspeed-config-d0`/`-d1` Synced and Healthy, operator
-> `lightspeed-operator.v2.0.1` Succeeded (channel `stable`, Automatic), `OLSConfig` provider `rhoai_vllm` on
-> `https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1`, `gpt-oss-20b` Ready,
-> MaaSSubscription `gpt-oss-20b-lightspeed` Active (200,000 tokens per hour), MCP server `zuno-mcp` with the feature
-> gate `MCPServer`, ClusterRoleBinding `zuno-lightspeed-query-access` for `consultant` and `sales`, RoleBindings
-> `zuno-personas-view` on the Zuno namespaces, conditions `ConsolePluginReady`, `MCPServerReady` and `RHOKPReady` True.
-> Down at the time of the check: `ApiReady` was False since 21:27 UTC (the app server's readiness answered 503, 19
-> ReplicaSets in 80 minutes, the operator manager restarted 10 times). From about 23:00 UTC the Kubernetes API itself
-> timed out and answered 401 for about three minutes; at 23:03 UTC it answered again and `ApiReady` was still False.
-> The probe passed at 10:38 UTC the same day. Run it before any session.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `lightspeed`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).
-
 ## Introduction
 
 OpenShift Lightspeed is Red Hat's assistant inside the OpenShift web console. It answers from the official
@@ -31,18 +12,9 @@ subscription. Its company tools come from the mcp-gateway, called with the conso
 **The message:** "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what
 the person asking may see."
 
-**Decisions:**
-- [ADR-0524](../../../adr/0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md): Lightspeed is a consumer
-  of Zuno: inference through MaaS (provider `rhoai_vllm`), official documentation untouched, Zuno tools through the
-  mcp-gateway's `/mcp` front door, read-only in three places, per-user identity, cluster introspection on.
-- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): local-model traffic goes through MaaS.
-- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
-  access plane, with subscriptions and token limits per consumer.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -59,7 +31,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use lightspeed 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use lightspeed 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/lightspeed/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
@@ -243,7 +215,7 @@ Lightspeed's operand and the three paths it calls. Drawn from `gitops/charts/lig
 `templates/olsconfig.yaml`, `clusterrolebinding-query-access.yaml`, `credentials-maas.yaml`, `configmap-maas-ca.yaml`),
 `gitops/charts/models/values.yaml` (subscription `gpt-oss-20b-lightspeed`), `gitops/charts/mcp-gateway/values.yaml`
 (`lightspeed.frontdoorCapabilities`), `gitops/charts/openshift-rbac-groups/` (`personaView`), and the live objects
-listed in the status banner.
+listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -268,3 +240,37 @@ flowchart LR
   API -->|"/mcp, Authorization: the user's<br/>OpenShift token (valueFrom kubernetes)"| MCPGW["mcp-gateway, zuno-ai-run<br/>TokenReview, read-only ceiling<br/>of nine capabilities"]
   MCPGW -->|"tools allowed for<br/>the user's groups"| TOOLS["Confluence, technical docs,<br/>AAP audit, k8s reads"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0524](../../../adr/0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md): Lightspeed is a consumer
+  of Zuno: inference through MaaS (provider `rhoai_vllm`), official documentation untouched, Zuno tools through the
+  mcp-gateway's `/mcp` front door, read-only in three places, per-user identity, cluster introspection on.
+- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): local-model traffic goes through MaaS.
+- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
+  access plane, with subscriptions and token limits per consumer.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lightspeed`: the 5-minute version PASS at 14:50 (11
+> units, 33 s); the 15-minute version PASS at 14:53 (19 units, 47 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 (22:50 to 22:55
+> UTC): Applications `zuno-lightspeed-d0`/`-d1` and `zuno-lightspeed-config-d0`/`-d1` Synced and Healthy, operator
+> `lightspeed-operator.v2.0.1` Succeeded (channel `stable`, Automatic), `OLSConfig` provider `rhoai_vllm` on
+> `https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1`, `gpt-oss-20b` Ready,
+> MaaSSubscription `gpt-oss-20b-lightspeed` Active (200,000 tokens per hour), MCP server `zuno-mcp` with the feature
+> gate `MCPServer`, ClusterRoleBinding `zuno-lightspeed-query-access` for `consultant` and `sales`, RoleBindings
+> `zuno-personas-view` on the Zuno namespaces, conditions `ConsolePluginReady`, `MCPServerReady` and `RHOKPReady` True.
+> Down at the time of the check: `ApiReady` was False since 21:27 UTC (the app server's readiness answered 503, 19
+> ReplicaSets in 80 minutes, the operator manager restarted 10 times). From about 23:00 UTC the Kubernetes API itself
+> timed out and answered 401 for about three minutes; at 23:03 UTC it answered again and `ApiReady` was still False.
+> The probe passed at 10:38 UTC the same day. Run it before any session.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `lightspeed`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One governed backend, many experiences](../../five-experiences.md).

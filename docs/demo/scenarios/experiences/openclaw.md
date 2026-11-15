@@ -1,23 +1,5 @@
 # Scenario: OpenClaw - one personal assistant per persona
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse openclaw`: the 5-minute version PASS at 14:56 (11
-> units, 68 s); the 15-minute version PASS at 15:00 (20 units, 73 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12 (22:50 UTC):
-> Applications `zuno-openclaw-d0`/`-d1` Synced and Healthy. In both persona namespaces: CSV
-> `claw-operator.v0.0.227-commit-f5aa592` Succeeded, `Claw` `assistant` Ready on the pinned OpenClaw digest,
-> Deployments `assistant`, `assistant-proxy` and `front-door` 1/1, Route `front-door` admitted and the operator's Route
-> `HostAlreadyClaimed`, EgressFirewall rules applied, ExternalSecrets `openclaw-client` and `openclaw-ui` synced. The
-> ai-gateway lists `openclaw-*` in its experience, persona-claim and fail-closed clients. The four local models were
-> Ready, Grafana 1/1 and master ip-10-18-36-37 schedulable again. One thing was not healthy: both claw-operator managers
-> were restarting (13 restarts in 80 minutes in `zuno-claw-consultant-02`, 3 in 13 minutes in `zuno-claw-sale-01`, exit
-> code 1), while the assistants kept running. Run the probe before any session.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `openclaw`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
-> many experiences](../../five-experiences.md).
-
 ## Introduction
 
 OpenClaw is an open-source personal assistant: a long-lived agent with its own chat, sessions and memory. Its own
@@ -30,23 +12,9 @@ own password (see [Appendix B](#appendix-b---lld)).
 **The message:** "Everyone can have their own AI assistant. It holds no key, it cannot reach the internet, and the
 platform decides which models and tools it may use."
 
-**Decisions:**
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend.
-- [ADR-0589](../../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md):
-  one assistant per persona by claw-operator, a service account per assistant with the persona's groups, a token
-  injected by the egress proxy, ClawHub and community skills off.
-- [ADR-0590](../../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md):
-  one namespace and one operator per persona, an oauth2-proxy front door that claims the host first, an EgressFirewall.
-- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
-  the same tools as the other experiences, filtered by group; a turn that used a company tool stays on local models.
-- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): the budget and
-  the `user` label are the persona's, shared with its other experiences.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -65,7 +33,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use openclaw 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use openclaw 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/openclaw/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
@@ -263,7 +231,7 @@ One persona's namespace; the other persona has the same objects in its own. Draw
 (`values.yaml`, `templates/operator.yaml`, `claw.yaml`, `front-door.yaml`, `externalsecrets.yaml`,
 `secretstores.yaml`), `gitops/charts/keycloak/files/realm-zuno.json` (clients `openclaw-<persona>`), the operator's
 proxy as described in the [WP-182 evidence](../../../roadmap/evidence/wp-182-openclaw-spike.md), and the live objects
-listed in the status banner.
+listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -292,3 +260,41 @@ flowchart LR
   AIGW -->|"chat: gpt-oss-20b first<br/>zuno-code: Codestral first<br/>tool turns local only"| MODELS["Local models through MaaS,<br/>Mistral Codestral"]
   MCPGW -->|"task chat tools<br/>allowed for the groups"| TOOLS["MCP servers<br/>Drive, Gmail, diagram,<br/>Confluence, technical docs"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend.
+- [ADR-0589](../../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md):
+  one assistant per persona by claw-operator, a service account per assistant with the persona's groups, a token
+  injected by the egress proxy, ClawHub and community skills off.
+- [ADR-0590](../../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md):
+  one namespace and one operator per persona, an oauth2-proxy front door that claims the host first, an EgressFirewall.
+- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
+  the same tools as the other experiences, filtered by group; a turn that used a company tool stays on local models.
+- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): the budget and
+  the `user` label are the persona's, shared with its other experiences.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse openclaw`: the 5-minute version PASS at 14:56 (11
+> units, 68 s); the 15-minute version PASS at 15:00 (20 units, 73 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12 (22:50 UTC):
+> Applications `zuno-openclaw-d0`/`-d1` Synced and Healthy. In both persona namespaces: CSV
+> `claw-operator.v0.0.227-commit-f5aa592` Succeeded, `Claw` `assistant` Ready on the pinned OpenClaw digest,
+> Deployments `assistant`, `assistant-proxy` and `front-door` 1/1, Route `front-door` admitted and the operator's Route
+> `HostAlreadyClaimed`, EgressFirewall rules applied, ExternalSecrets `openclaw-client` and `openclaw-ui` synced. The
+> ai-gateway lists `openclaw-*` in its experience, persona-claim and fail-closed clients. The four local models were
+> Ready, Grafana 1/1 and master ip-10-18-36-37 schedulable again. One thing was not healthy: both claw-operator managers
+> were restarting (13 restarts in 80 minutes in `zuno-claw-consultant-02`, 3 in 13 minutes in `zuno-claw-sale-01`, exit
+> code 1), while the assistants kept running. Run the probe before any session.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `openclaw`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
+> many experiences](../../five-experiences.md).
