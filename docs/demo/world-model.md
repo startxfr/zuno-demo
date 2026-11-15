@@ -1,27 +1,5 @@
 # Scenario: World model - walk into a generated world on an on-demand GPU
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse world-model`: the 5-minute version PASS at 10:50 (12
-> units, 22 s), 1 skipped (`install`); the 15-minute version PASS at 10:52 (21 units, 32 s), 1 skipped (`install`).
-> Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md). This PASS is not
-> show-ready: the demo is switched off (`zuno_world_model_enabled` is `false`), there is no GPU node and the application
-> is not installed, so `check` passed on the dashboard and on a probe that reports the demo as `roadmap`, not on a
-> world. It proves the files and the page play, not the demo. Prerequisites checked read-only on demo333 on 2026-11-12:
-> namespace
-> `zuno-world-model` present with no pods and no world-model Application installed (quota `requests.nvidia.com/gpu`
-> 0/1, SecretStore `vault` Valid); no world-model GPU node. The six world-model MachineSets (g7e.2xlarge, g7e.4xlarge
-> and g7e.8xlarge in eu-central-1a and 1b) each had a Machine in `Provisioning` at 22:46 UTC, refused by AWS with
-> `InsufficientInstanceCapacity`; after that one-hour search the switch `zuno_world_model_enabled` was set back to
-> `false` in git (42172d2e, 2026-11-13 00:05 CET). Grafana
-> dashboard `world-model` synced. The golden-path probe `world-model` reports `roadmap` until the application is
-> installed. History: shown live on 2026-11-09 (moment 5 of the [demonstration](demo-day-2026-11-09.md)), where it was
-> the one part that did not go as planned. The presenter's feedback (the picture blurred and lost the scene while
-> walking) led to the re-anchor of [ADR-0604](../adr/0604-introduce-an-interactive-generative-world-model-experience.md)
-> D9, deployed the same day.
-> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> not show-ready: the GPU node is off.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** none while it is not show-ready.
-
 ## Introduction
 
 A world model does not draw a scene from a 3D model. It invents the next frame from the last ones, the visitor's key
@@ -34,19 +12,9 @@ while the demo does. The pods, the GPU node and the prompt path are in [Appendix
 **The message:** "Generative AI can build a world you walk into and change. The platform keeps it governed: who may
 use it, what may be asked, what it costs, and a GPU that exists only while it is used."
 
-**Decisions:**
-- [ADR-0604](../adr/0604-introduce-an-interactive-generative-world-model-experience.md): Waypoint-1.5 and FLUX.2 klein
-  on one unpartitioned GPU, an on-demand node behind one switch, prompts screened through the ai-gateway, and the
-  re-anchor against drift (D9).
-- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are clients
-  of the one governed backend.
-- [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): no live demo without a
-  passing golden path.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -61,7 +29,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use world-model 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use world-model 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/world-model/<action>.yml`) has run, and
 says what is left to the presenter. The GPU node is created on demand and bills by the hour. Lead time: about **40
 minutes** from the switch to a warm page (15 minutes for the node, 10 for the application, then the checks and a dry
@@ -132,7 +100,7 @@ began, and earlier when AWS may have no capacity:
   start.
 - [ ] Grafana `zuno-monitoring`, dashboard **Zuno Platform / World model**, last 1 hour. It is empty while the demo is
   off. The alert `ZunoWorldModelGpuNodeUpTooLong` fires when a world-model Machine has existed for more than 8 hours. A
-  Perses copy of the dashboard is deferred (ADR-0604, phase 2).
+  Perses copy of the dashboard is deferred.
 - [ ] The recorded fallback `world-model-recorded-2026-11-08.mp4` is on the presenting laptop, open in a video player.
   It is 24 s, 1280x720, a real run of this runtime on 2026-11-08 with the red-sky edit, with the label "RECORDED"
   burnt in. It is not in git (7 MB): it is kept at `/home/cl/demo-fallback/` on the operator's workstation. Show it
@@ -343,3 +311,41 @@ flowchart LR
   NODE["MachineSets zuno-gpu-world-model-*<br/>taint zuno.io/gpu-world-model,<br/>switch zuno_world_model_enabled"] -.-> GPU
   WEB & ENC -.->|"ServiceMonitors"| PROM["Prometheus, Grafana<br/>World model dashboard"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0604](../adr/0604-introduce-an-interactive-generative-world-model-experience.md): Waypoint-1.5 and FLUX.2 klein
+  on one unpartitioned GPU, an on-demand node behind one switch, prompts screened through the ai-gateway, and the
+  re-anchor against drift (D9).
+- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are clients
+  of the one governed backend.
+- [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): no live demo without a
+  passing golden path.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse world-model`: the 5-minute version PASS at 10:50 (12
+> units, 22 s), 1 skipped (`install`); the 15-minute version PASS at 10:52 (21 units, 32 s), 1 skipped (`install`).
+> Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md). This PASS is not
+> show-ready: the demo is switched off (`zuno_world_model_enabled` is `false`), there is no GPU node and the application
+> is not installed, so `check` passed on the dashboard and on a probe that reports the demo as `roadmap`, not on a
+> world. It proves the files and the page play, not the demo. Prerequisites checked read-only on demo333 on 2026-11-12:
+> namespace
+> `zuno-world-model` present with no pods and no world-model Application installed (quota `requests.nvidia.com/gpu`
+> 0/1, SecretStore `vault` Valid); no world-model GPU node. The six world-model MachineSets (g7e.2xlarge, g7e.4xlarge
+> and g7e.8xlarge in eu-central-1a and 1b) each had a Machine in `Provisioning` at 22:46 UTC, refused by AWS with
+> `InsufficientInstanceCapacity`; after that one-hour search the switch `zuno_world_model_enabled` was set back to
+> `false` in git (42172d2e, 2026-11-13 00:05 CET). Grafana
+> dashboard `world-model` synced. The golden-path probe `world-model` reports `roadmap` until the application is
+> installed. History: shown live on 2026-11-09 (moment 5 of the [demonstration](demo-day-2026-11-09.md)), where it was
+> the one part that did not go as planned. The presenter's feedback (the picture blurred and lost the scene while
+> walking) led to the re-anchor of [ADR-0604](../adr/0604-introduce-an-interactive-generative-world-model-experience.md)
+> D9, deployed the same day.
+> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> not show-ready: the GPU node is off.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** none while it is not show-ready.

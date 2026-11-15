@@ -1,23 +1,5 @@
 # Scenario: UnifAI - live RAG on your own documents
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-live-rag`: the 5-minute version PASS at 15:21
-> (11 units, 73 s); the 15-minute version PASS at 15:25 (21 units, 117 s), 1 skipped (`9:30`). Evidence:
-> [WP-274](../roadmap/evidence/wp-274-unifai-live-rag-rehearsal-2026-11-15.md). Its `start` replaces consultant-01's
-> Personal documents with the two demo files and its `stop` removes them. The upload and the Confluence resync last ran
-> live in the browser on
-> 2026-11-05 ([WP-200](../roadmap/work-packages/wp-200-show-the-unifai-rag-working-live.md)). Prerequisites checked
-> read-only on demo333 on 2026-11-12 at 22:50 UTC: UnifaiStack `unifai` Ready (images v0.1.69), pods `docling-serve`,
-> `unifai-rag-server`, `unifai-rag-celery`, `qdrant`, `mongodb` and `rabbitmq` Running, InferenceService `embeddings`
-> Ready, workflows `consultant-01-my-documents`, `sale-01-my-documents` and `consultant-rag` Ready, retrievers
-> `consultant-01-documents` and `sale-01-documents` Ready, UnifaiRAGSources `tekos-satellite` (90 pages) and
-> `tekos-openshift` (411 pages) Ready with their last pipeline `DONE`, ExternalSecret `unifai-confluence` synced, the
-> four local models Ready. An earlier check, at about 22:00 UTC, found the local models restarting and Grafana down;
-> at 22:50 UTC both were back.
-> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Agentic AI](workshops/agentic-ai.md).
-
 ## Introduction
 
 UnifAI's RAG answers questions from documents and cites them. In Zuno it runs inside the UnifAI stack (see
@@ -37,19 +19,9 @@ their groups. The pods, the objects and the two paths (upload, question) are in 
 **The message:** "A document you upload is answered from a minute later, with its source. It stays yours: neither a
 colleague's assistant nor your team's sees it."
 
-**Decisions:**
-- [ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md): UnifAI's RAG on
-  Qdrant, hybrid search, embeddings served by OpenShift AI, shared sources filtered by groups.
-- [ADR-0598](../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md) point 5, amended
-  2026-11-05: the personal workflow `<user>-my-documents` runs as the persona. A team workflow runs as the team and
-  never sees a member's personal uploads.
-- [ADR-0563](../adr/0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md): UnifAI forwards the user's
-  token to the RAG search and to the ai-gateway.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -67,7 +39,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use unifai-live-rag 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use unifai-live-rag 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/unifai-live-rag/<action>.yml`) has run,
 and says what is left to the presenter. Unlike most demos, `start` and `stop` change shared state: they act on
 **consultant-01**'s Personal documents.
@@ -98,7 +70,7 @@ Nothing to do. UnifAI and its RAG are part of the shared platform: the file only
 
 ### Start
 
-The file does the preparation that used to be a checklist ([WP-274](../roadmap/work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md)).
+The file does the preparation that used to be a checklist.
 It signs in as **consultant-01**, then:
 
 - deletes only three files from **Personal**, **Documents**: `travel-and-expense-policy.md`,
@@ -330,3 +302,41 @@ flowchart LR
   SRC -.-> OPR
   CEL -->|"incremental sync, technical identity<br/>Vault confluence/technical"| CONF[("Confluence<br/>startxfr.atlassian.net")]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md): UnifAI's RAG on
+  Qdrant, hybrid search, embeddings served by OpenShift AI, shared sources filtered by groups.
+- [ADR-0598](../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md) point 5, amended
+  2026-11-05: the personal workflow `<user>-my-documents` runs as the persona. A team workflow runs as the team and
+  never sees a member's personal uploads.
+- [ADR-0563](../adr/0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md): UnifAI forwards the user's
+  token to the RAG search and to the ai-gateway.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-274](../roadmap/work-packages/wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md): Pilot the UnifAI live RAG demo on the lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse unifai-live-rag`: the 5-minute version PASS at 15:21
+> (11 units, 73 s); the 15-minute version PASS at 15:25 (21 units, 117 s), 1 skipped (`9:30`). Evidence:
+> [WP-274](../roadmap/evidence/wp-274-unifai-live-rag-rehearsal-2026-11-15.md). Its `start` replaces consultant-01's
+> Personal documents with the two demo files and its `stop` removes them. The upload and the Confluence resync last ran
+> live in the browser on
+> 2026-11-05 ([WP-200](../roadmap/work-packages/wp-200-show-the-unifai-rag-working-live.md)). Prerequisites checked
+> read-only on demo333 on 2026-11-12 at 22:50 UTC: UnifaiStack `unifai` Ready (images v0.1.69), pods `docling-serve`,
+> `unifai-rag-server`, `unifai-rag-celery`, `qdrant`, `mongodb` and `rabbitmq` Running, InferenceService `embeddings`
+> Ready, workflows `consultant-01-my-documents`, `sale-01-my-documents` and `consultant-rag` Ready, retrievers
+> `consultant-01-documents` and `sale-01-documents` Ready, UnifaiRAGSources `tekos-satellite` (90 pages) and
+> `tekos-openshift` (411 pages) Ready with their last pipeline `DONE`, ExternalSecret `unifai-confluence` synced, the
+> four local models Ready. An earlier check, at about 22:00 UTC, found the local models restarting and Grafana down;
+> at 22:50 UTC both were back.
+> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Agentic AI](workshops/agentic-ai.md).

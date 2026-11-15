@@ -1,23 +1,5 @@
 # Scenario: Blender add-on - a sentence becomes editable 3D objects on a local model
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse blender-3d`: the 5-minute version PASS at 10:44 (13
-> units, 42 s), 2 skipped (`install`, `uninstall`); the 15-minute version PASS at 10:47 (23 units, 51 s), 2 skipped
-> (`install`, `uninstall`). Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md).
-> Prerequisites checked read-only on demo333 on 2026-11-12: Route
-> `zuno-agent-gateway-workstation-ai-gateway` (`ai-gateway.apps.demo333.startx.fr`, reencrypt), HTTPRoute
-> `ai-gateway-workstation` (`POST /v1/chat/completions`, `GET /v1/models`), AuthPolicy `ai-gateway-workstation-jwt`
-> (issuer `https://keycloak.apps.demo333.startx.fr/realms/zuno`, `azp` `blender`, group `/ocp-ai-dev`) and
-> RateLimitPolicy `ai-gateway-workstation` (60 requests per user per 5 minutes) all Accepted and Enforced; Deployment
-> `ai-gateway` 1/1 with `CLASSIFICATION_CLIENT_FLOORS=blender=C3` and `blender` in `EXPERIENCE_CLIENTS`; `gpt-oss-20b`
-> and `qwen35-9b` Ready; Keycloak route `keycloak.apps.demo333.startx.fr` in `zuno-auth`; Applications
-> `zuno-connectivity-link-d1` and `zuno-ai-gateway-d1` Synced and Healthy. The entry was removed and restored the same
-> morning in a rollback test, with the `blender` probe passing after it
-> ([WP-249 evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md)).
-> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `blender`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One governed backend, many experiences](five-experiences.md).
-
 ## Introduction
 
 The Blender add-on is the first experience client that runs on a **workstation**: a desktop application with no
@@ -33,20 +15,9 @@ models on the platform's own GPUs may answer: `gpt-oss-20b` first. The entry, th
 **The message:** "A 3D artist gets editable objects from a sentence. The prompt, the code and the scene never leave the
 company, and the call is governed like every other experience."
 
-**Decisions:**
-- [ADR-0610](../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md): text
-  to a `bpy` script, the C3 floor on the client `blender`, one entry limited to two paths, show, check, then run.
-- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are clients
-  of the one governed backend; ADR-0610 extends it to a workstation.
-- [ADR-0565](../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): the classification level
-  can only be raised.
-- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and telemetry
-  are keyed by the person, across experiences.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
 kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -61,7 +32,7 @@ golden-path probe `blender` signs it in by the device flow with no human
 
 ## Presenter lifecycle
 
-`make demo use blender-3d 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use blender-3d 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/blender-3d/<action>.yml`) has run, and
 says what is left to the presenter. The platform side is already live on demo333: the only thing this demo installs is
 the add-on on the presenter's workstation. Credentials are named by their Vault path, never written.
@@ -80,8 +51,7 @@ oc get llminferenceservice -n zuno-ai-run                                       
 oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   # Accepted and Enforced
 ```
 
-What the platform entry is made of (WP-244, all delivered by commits and Argo CD, nothing applied by hand,
-[ADR-0608](../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md)):
+What the platform entry is made of (all delivered by commits and Argo CD, nothing applied by hand):
 
 | Change | Where | Applied by |
 |---|---|---|
@@ -117,8 +87,7 @@ Prerequisites on the workstation:
 - HTTPS reach to `https://ai-gateway.apps.<cluster-domain>` and to Keycloak `https://keycloak.apps.<cluster-domain>`.
 - A `zuno` account in an admitted group (demo333: `ocp-ai-dev`); for the demo, the persona **ai-dev-01**, password in
   Vault at `keycloak/demo-personas`.
-- Only on a cluster whose routes do not serve the Let's Encrypt wildcard
-  ([ADR-0211](../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md)): the cluster's CA
+- Only on a cluster whose routes do not serve the Let's Encrypt wildcard: the cluster's CA
   certificate as a PEM file, set in **CA file**. Never disable certificate verification instead. demo333 needs none.
 
 To see what the script would do before you install, run it by hand from the repository root:
@@ -187,10 +156,10 @@ rehearse` never runs it. The platform entry stays: it is shared and never remove
 `workstationEntry.enabled: false` in `gitops/apps/connectivity-link/application-d1.yaml`, push it, then run
 `make d1 install connectivity-link` (the role applies that Application, so a push alone does nothing). Argo CD prunes
 the four entry objects and the edge answers 503. Back with `true` and the same command. Each way takes 2 to 3 minutes,
-tested on 2026-11-12 ([WP-249 evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md)). The
+tested on 2026-11-12. The
 Keycloak client `blender` stays: without the entry it reaches nothing from outside the cluster. Do not `oc delete`
 the objects: Argo CD would recreate them, or the repository and the cluster would drift. See
-[rollback.md](rollback.md) and [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md).
+[rollback.md](rollback.md).
 
 ## 5-minute version
 
@@ -370,3 +339,45 @@ flowchart LR
   OKF["Agents release<br/>experience client blender, task bpy<br/>no tools, external roles forbidden"] -.-> AIGW
   AIGW -->|"3. bpy script, streamed"| CHECK --> RUN
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0610](../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md): text
+  to a `bpy` script, the C3 floor on the client `blender`, one entry limited to two paths, show, check, then run.
+- [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are clients
+  of the one governed backend; ADR-0610 extends it to a workstation.
+- [ADR-0565](../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): the classification level
+  can only be raised.
+- [ADR-0593](../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and telemetry
+  are keyed by the person, across experiences.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+- [ADR-0211](../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md): Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01.
+- [ADR-0608](../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md): keep the repository the only source of cluster state.
+
+Evidence:
+
+- [WP-249](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md): the rollback test of the Blender edge entry, 2026-11-12.
+- [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md): the Blender workstation experience client, and how the platform entry is delivered.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse blender-3d`: the 5-minute version PASS at 10:44 (13
+> units, 42 s), 2 skipped (`install`, `uninstall`); the 15-minute version PASS at 10:47 (23 units, 51 s), 2 skipped
+> (`install`, `uninstall`). Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md).
+> Prerequisites checked read-only on demo333 on 2026-11-12: Route
+> `zuno-agent-gateway-workstation-ai-gateway` (`ai-gateway.apps.demo333.startx.fr`, reencrypt), HTTPRoute
+> `ai-gateway-workstation` (`POST /v1/chat/completions`, `GET /v1/models`), AuthPolicy `ai-gateway-workstation-jwt`
+> (issuer `https://keycloak.apps.demo333.startx.fr/realms/zuno`, `azp` `blender`, group `/ocp-ai-dev`) and
+> RateLimitPolicy `ai-gateway-workstation` (60 requests per user per 5 minutes) all Accepted and Enforced; Deployment
+> `ai-gateway` 1/1 with `CLASSIFICATION_CLIENT_FLOORS=blender=C3` and `blender` in `EXPERIENCE_CLIENTS`; `gpt-oss-20b`
+> and `qwen35-9b` Ready; Keycloak route `keycloak.apps.demo333.startx.fr` in `zuno-auth`; Applications
+> `zuno-connectivity-link-d1` and `zuno-ai-gateway-d1` Synced and Healthy. The entry was removed and restored the same
+> morning in a rollback test, with the `blender` probe passing after it
+> ([WP-249 evidence](../roadmap/evidence/wp-249-blender-edge-rollback-2026-11-12.md)).
+> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `blender`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One governed backend, many experiences](five-experiences.md).

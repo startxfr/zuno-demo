@@ -239,8 +239,8 @@ flowchart TB
 One model's request path, the objects KServe generates, and where the GPU slices come from. Drawn from
 `gitops/charts/models/values.yaml`, `gitops/charts/models/templates/` (`llminferenceservice-*.yaml`,
 `_llmisvc-route.tpl`, `_warmup.tpl`, `_models-s3.tpl`, `hardwareprofile-mig-*.yaml`, `inferenceservice-embedding.yaml`),
-`gitops/charts/machines/values.yaml`, `ansible/roles/models/tasks/reconcile.yml`, and the live objects listed in the
-status banner. Node names and placement are those of 2026-11-13.
+`gitops/charts/machines/values.yaml`, `ansible/roles/models/tasks/reconcile.yml`, and the live objects listed under
+Page status. Node names and placement are those of 2026-11-13.
 
 ```mermaid
 flowchart LR
