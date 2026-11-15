@@ -1067,6 +1067,15 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — ADR-0617 Accepted (Phase 57, WP-284 and WP-285, Not started).** Each demo page will show a 40 to 60
+  second silent GIF of its 5-minute version, recorded by a dedicated walkthrough (`make demo record <id>`, then
+  `make demo gif <id>`) and published only with the owner's named "go <id>"; the `.webm` is never published. Every
+  catalogue page takes one order: Introduction, Personas, Presenter lifecycle, the versions, If something goes wrong,
+  Limits, the appendices, `## References`, and `## Page status` last (the status banner). ADR-0617 amends the section
+  order of ADR-0616 clause 4 by a dated note; ADR-0616 stays Implemented. Open WebUI is the pilot of both; the other
+  pages change after the owner's gate. Traps kept for the next change: the recorder deletes the chat it creates, and
+  `record` is refused during a freeze and without a passed `check` of the day; the page-shape checks of
+  `consistency.py` and the `scaffold.py` probe reading go live in the same push as the last page.
 - **2026-11-15 — ADR-0616 Implemented (Phase 56, WP-269 to WP-281, all Done).** Every demo of `docs/demo/` is prepared
   and played through `make demo` (`use`, `status`, `check`, `install`, `start`, `step next|N`, `stop`, `uninstall`,
   `rehearse`): one Ansible file per action and step under `ansible/demos/<id>/`, one page section each, engine in

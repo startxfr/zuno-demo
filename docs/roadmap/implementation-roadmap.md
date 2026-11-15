@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 3 | 42 | WP-224, WP-227, WP-237 |
+| v0.16 | 12 | 4 | 44 | WP-224, WP-227, WP-237, WP-284, WP-285 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1178,6 +1178,19 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Done | none |
 | WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Done | none |
 
+### Phase 57 — Demo GIFs and a presenter's shape for the demo pages (added 2026-11-15)
+
+ADR-0617: each demo page shows a 40 to 60 second silent GIF of its 5-minute version, recorded by a dedicated
+walkthrough and published only with the owner's named "go <id>"; every catalogue page takes one order, with the status
+banner last (`## Page status`) and the ADR and work-package references in `## References`. Open WebUI is the pilot of both
+(the recording, and the page shape on three files); the other 29 scenarios and the 6 workshops change shape after the
+owner's gate on the pilot. The `.webm` is never published.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-284 | [wp-284](work-packages/wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md) | 0617 | none | Not started | the owner's go to record in the demo333 session; the owner's named "go open-webui" to publish |
+| WP-285 | [wp-285](work-packages/wp-285-give-the-demo-pages-a-presenters-shape.md) | 0617 | none | Not started | the owner's gate on the Open WebUI pilot before the rollout |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1322,6 +1335,7 @@ moving.
 
 ## Change log
 
+- 2026-11-15 — ADR-0617, WP-284 and WP-285 added (Phase 57, v0.16) by the owner's decisions of the day: a 40 to 60 second silent GIF of each demo's 5-minute version, recorded by a dedicated walkthrough (Open WebUI first) and published only with the owner's named "go <id>"; every demo page takes a presenter's shape (status banner last as `## Page status`, ADR and WP references in `## References`). ADR-0617 amends the section order of ADR-0616 clause 4 by a dated note; ADR-0616 stays Implemented.
 - 2026-11-15 — Incident on demo333 (WP-260, ADR-0614 update). At the end of a world-model GPU search, the cascade delete of `zuno-machines-world-model-d0` removed two cluster singletons it also tracked, because the machines chart turns `infraPlacement` on by default. Deleting the GitopsService removed the openshift-gitops Argo CD instance. Deleting the image registry Config made the operator delete the registry's S3 bucket. Fix: the world-model Application lists every `infraPlacement` key as false, and the role refuses a cascade delete while the Application tracks anything but MachineSets. A CI test covers both. Argo CD was restored the same night, and the internal images were rebuilt from devel by 03:23 (supply chain 12 of 12 verified, golden path PASS).
 - 2026-11-15 — Phase 56 closed: WP-278 and WP-281 Done, ADR-0616 Implemented. Every catalogue demo (30 scenarios in both versions, 6 workshops) has a `make demo rehearse` report ending with `RESULT: PASS`; the golden path and the browser checks pass (evidence wp-281-full-rehearsal-2026-11-15.md). The reports are the sum of one day's layer runs at four commits; a PASS is not "show-ready" (world model switched off, no `ModelRegistry`).
 - 2026-11-15 — WP-280 Done: the six workshops rehearsed live, 6 of 6 `RESULT: PASS` (evidence wp-280-workshops-rehearsals-2026-11-15.md). `agentic-ai` passed on its second run: inside a workshop the `unifai-live-rag` start and stop files looked for their helper file in the workshop's directory; fixed, with a catalogue test.

@@ -384,6 +384,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Implemented | Keep the repository the only source of cluster state |
 | [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Implemented | Rehearse on canary namespaces of demo333 |
 | [ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) | Implemented | Prepare and play every catalogue demo through one make demo lifecycle |
+| [ADR-0617](0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md) | Accepted | Record the demos and publish them as GIFs only with the owner's go, and give every demo page a presenter's shape |
 
 ## v0.17
 

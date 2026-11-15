@@ -190,3 +190,12 @@ fixed with a test:
   last path has not been seen live, since no check failed after the fix.
 - **Clause 10:** inside a workshop `demo_dir` is the workshop's directory. A scenario file reaches a file of its own
   directory through `demo_unit.dir`; the catalogue test refuses a bare `demo_dir` in a demo file.
+
+## Update 2026-11-15 (ADR-0617): the order of the sections of a page
+
+[ADR-0617](0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md) amends clause 4 for the position of the
+sections only. `## Presenter lifecycle`, its six `###` and their content are unchanged. A catalogue page now follows
+`## Introduction`, `## Personas`, `## Presenter lifecycle`, the version sections, `## If something goes wrong`,
+`## Limits`, the appendices, `## References` and `## Page status` (the status banner, last); the contract is the one
+in `docs/demo/README.md`. This is a dated correction note, not a supersession: every clause of this record stays in
+force and the status stays `Implemented`.
