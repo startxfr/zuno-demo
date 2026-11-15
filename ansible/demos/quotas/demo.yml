@@ -7,5 +7,6 @@ probes: []
 browser: []
 # Units that change the cluster, `<action>: "what it changes"`: the guard prints it and asks for the demo id
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
-mutations: {}
+mutations:
+  start: "Spends token budget, not undone: one short answer through sale-01's OpenClaw assistant (and one through consultant-02's)"
 steps: {}
