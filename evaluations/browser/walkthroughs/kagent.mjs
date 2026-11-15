@@ -38,6 +38,7 @@ export const sends = /\/api\/(a2a|sessions|tasks|agents)(\/|\?|$)/;   // guess
 const AGENT = "zuno-sre";
 const NAMESPACE = "zuno-kagent";
 const TOOLS = [/k8s\.resource\.read/, /k8s\.resource\.list/, /k8s\.events\.read/, /k8s\.logs\.read/, /metrics\.query/];
+const AGENT_NAME = new RegExp(`(^|/)${AGENT}$`);   // the agent as a list shows it: its name, or namespace/name
 const WIZARD = "Skip wizard";                                                                    // seen by the browser check (run.mjs)
 const AGENT_LINK = [`a[href*='/agents/${NAMESPACE}/${AGENT}']`, `a:has-text('${AGENT}')`, `text=${AGENT}`];   // guess
 const INPUT = ["textarea[placeholder*='message' i]", "form textarea", "textarea"];               // guess
@@ -88,23 +89,56 @@ async function openAgent(page) {
 }
 
 // Sign in, skip the onboarding wizard of a new browser, and reach the agent list with zuno-sre on it.
-export async function enter({ page, base, mark, keycloak }) {
+//
+// The wizard comes late: on 2026-11-16 the first scout saw the agent list first and the wizard over it a moment
+// after. So the screen is watched until it has shown zuno-sre and no wizard for three seconds, and "Skip wizard" is
+// clicked each time the wizard shows. That button is the page's own instruction ("of a new browser"): the wizard
+// comes back in every new browser although the browser check has skipped it many times as the same kagent user, so
+// the skip is kept in the browser, not on the server. It is still checked: what the click sends (any request that is
+// not a GET) and what it writes in the browser's storage (key names) are kept in state.wizard; a take stops when the
+// click sent a write, and scout() reports both.
+export async function enter({ page, base, mark, keycloak, state }) {
   await page.goto(`${base}/`);
   await page.waitForSelector("#username", { timeout: 30000 });
   await mark("login");   // the EMPTY form: nothing is marked once the password is typed
   await keycloak(persona);
-  await page.waitForLoadState("networkidle", { timeout: 60000 });
-  const skip = page.getByText(WIZARD).first();
-  if (await skip.isVisible().catch(() => false)) {
-    await click(skip, { changes });
-    await page.waitForLoadState("networkidle", { timeout: 60000 });
+  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  state.wizard = { shown: 0, writes: [], storage_added: [] };
+  const writes = (r) => { if (r.method() !== "GET" && r.method() !== "HEAD" && r.method() !== "OPTIONS") state.wizard.writes.push(`${r.method()} ${new URL(r.url()).pathname}`); };
+  const keys = () => page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
+  const wizard = () => page.getByText(WIZARD).first();
+  const agent = () => page.getByText(AGENT_NAME).first();
+  let quietSince = 0;
+  let wentToList = false;
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    if (await wizard().isVisible().catch(() => false)) {
+      if (state.wizard.shown >= 3) throw new Error("the onboarding wizard came back after three skips");
+      state.wizard.shown += 1;
+      const before = await keys();
+      page.on("request", writes);
+      await click(wizard(), { changes });
+      await page.waitForTimeout(2500);
+      page.off("request", writes);
+      state.wizard.storage_added.push(...(await keys()).filter((k) => !before.includes(k) && !state.wizard.storage_added.includes(k)));
+      quietSince = 0;
+      continue;
+    }
+    if (await agent().isVisible().catch(() => false)) {
+      if (!quietSince) quietSince = Date.now();
+      if (Date.now() - quietSince >= 3000) break;
+    } else {
+      quietSince = 0;
+      // Neither the wizard nor the agent after ten seconds: the list is at /agents.
+      if (!wentToList && Date.now() > deadline - 80000) { wentToList = true; await page.goto(`${base}/agents`); }
+    }
+    await page.waitForTimeout(300);
   }
-  if (!(await page.getByText(AGENT).first().isVisible().catch(() => false))) {
-    await page.goto(`${base}/agents`);
-    await page.waitForLoadState("networkidle", { timeout: 60000 });
+  if (await wizard().isVisible().catch(() => false)) throw new Error("the onboarding wizard is still on screen");
+  if (!(await agent().isVisible().catch(() => false))) throw new Error(`the agent ${AGENT} is not listed after the sign-in`);
+  if (state.wizard.writes.length && !state.scout) {
+    throw new Error(`"Skip wizard" sent ${state.wizard.writes.join(", ")}: it may store something on the server, which a take must not do`);
   }
-  await page.getByText(AGENT).first().waitFor({ timeout: 30000 });
-  if (await page.getByText(WIZARD).first().isVisible().catch(() => false)) throw new Error("the onboarding wizard is still on screen");
   await page.waitForTimeout(1000);
 }
 
@@ -168,8 +202,14 @@ export async function scout({ page, step, state }) {
     before = (await sessions(page, state)).ids.length;
     return { tried, used: state.sessionList, count: before };
   });
+  // What "Skip wizard" did in enter(): how often the wizard showed, the writes the click sent (none expected) and
+  // the storage keys it added in the browser (where the skip is expected to be kept).
+  await step("wizard", async () => {
+    if (state.wizard.writes.length) throw new Error(`"Skip wizard" sent ${state.wizard.writes.join(", ")}`);
+    return { ...state.wizard };
+  });
   await step("agents", async () => ({ url: page.url().replace(/[?#].*/, ""), wizard_on_screen: await page.getByText(WIZARD).first().isVisible().catch(() => false),
-                                      agent_matches: await page.getByText(AGENT).count(), agent_selector: ((await firstVisible(page, AGENT_LINK)) || {}).matched || "",
+                                      agent_matches: await page.getByText(AGENT_NAME).count(), agent_selector: ((await firstVisible(page, AGENT_LINK)) || {}).matched || "",
                                       other_agents: await wordsOnScreen(page, [/my-first-k8s-agent/]), controls: await describe(page, "body", 60) }));
   await step("agent", async () => {
     const selector = await openAgent(page);

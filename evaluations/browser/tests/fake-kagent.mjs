@@ -3,7 +3,7 @@
 // sign-in form, the onboarding wizard with "Skip wizard", the agent list, the agent's chat page with its five tools,
 // and a session API (list, delete). It proves the walkthrough's own logic, not kagent's real selectors.
 // The session list always holds one earlier session. Knobs: FAKE_REFUSE_DELETE=1 the delete answers 403;
-// FAKE_LEAK=1 the Secret question is answered with data instead of a refusal; FAKE_NO_URL=1 the address bar never
+// FAKE_SKIP_POSTS=1 "Skip wizard" writes to the server; FAKE_LEAK=1 the Secret question is answered with data instead of a refusal; FAKE_NO_URL=1 the address bar never
 // shows the session's id. No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
@@ -19,7 +19,7 @@ const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/
 const APP = `<!doctype html><title>kagent (fake)</title>
 <style>body{font:16px sans-serif;margin:24px} textarea{width:600px;height:40px} .card{border:1px solid #888;padding:8px;margin:8px 0;display:block}</style>
 <div id="wizard" hidden><h2>Welcome to kagent</h2><button id="create" onclick="fetch('/fake/wizard',{method:'POST'})">Create my first agent</button>
-<button onclick="localStorage.setItem('skipped','1');render()">Skip wizard</button></div>
+<button onclick="localStorage.setItem('skipped','1');${process.env.FAKE_SKIP_POSTS === "1" ? "fetch('/api/onboarding',{method:'POST'});" : ""}render()">Skip wizard</button></div>
 <div id="list" hidden><h2>Agents</h2><a class="card" href="/agents/zuno-kagent/zuno-sre/chat">zuno-sre</a></div>
 <div id="chat" hidden><h2>zuno-kagent/zuno-sre</h2>
 <aside><a href="/agents/zuno-kagent/zuno-sre/chat/${EARLIER}">An earlier session</a>
@@ -28,13 +28,18 @@ const APP = `<!doctype html><title>kagent (fake)</title>
 <script>
 const $ = (id) => document.getElementById(id);
 let sid = (location.pathname.match(/\\/chat\\/([^/]+)$/) || [])[1] || "";
+// Like kagent on 2026-11-16: the agent list shows first, and the wizard replaces it a moment after in a browser
+// that has not skipped it. FAKE_SKIP_POSTS=1 makes the skip write to the server, which a take must refuse.
+let late = false;
 function render() {
   const chat = location.pathname.startsWith("/agents/zuno-kagent/zuno-sre");
-  $("wizard").hidden = Boolean(localStorage.getItem("skipped")) || chat;
-  $("list").hidden = !localStorage.getItem("skipped") || chat;
+  const wizard = late && !localStorage.getItem("skipped") && !chat;
+  $("wizard").hidden = !wizard;
+  $("list").hidden = wizard || chat;
   $("chat").hidden = !chat;
 }
 render();
+setTimeout(() => { late = true; render(); }, 1500);
 async function show() {
   if (!sid) return;
   const r = await fetch("/api/sessions/" + sid);

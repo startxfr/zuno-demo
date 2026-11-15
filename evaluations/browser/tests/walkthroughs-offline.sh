@@ -5,7 +5,8 @@
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
 # test of the recorder itself.
-#   evaluations/browser/tests/walkthroughs-offline.sh
+#   evaluations/browser/tests/walkthroughs-offline.sh            every demo
+#   ONLY=kagent evaluations    /browser/tests/walkthroughs-offline.sh   one demo
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
@@ -23,6 +24,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
+wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
 }
@@ -44,13 +46,15 @@ exec(sys.argv[2])
 PY
 }
 
+if wanted kagent; then
 echo "== kagent"
 out="$(kagent k-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
 expect "kagent: a scout creates no session and no wizard agent" grep -q 'left: {"sessions":1,"wizard_agents":0}' <<<"$out"
 expect "kagent: scout.json reports every guess" scouted k-scout '
-assert list(steps) == ["enter", "owned", "sessions-api", "agents", "agent", "closed"], list(steps)
+assert list(steps) == ["enter", "owned", "sessions-api", "wizard", "agents", "agent", "closed"], list(steps)
+assert steps["wizard"]["shown"] == 1 and steps["wizard"]["writes"] == [] and steps["wizard"]["storage_added"] == ["skipped"], steps["wizard"]
 api = steps["sessions-api"]
 assert [t["status"] for t in api["tried"]] == [400, 200] and api["used"] == "/api/sessions?user_id=admin@kagent.dev" and api["count"] == 1, api
 assert api["tried"][1]["session_keys"] == ["id", "name"], api
@@ -70,6 +74,12 @@ assert m["persona"] == "ai-ops-01" and m["motion_from"] == "agents" and m["statu
 assert len(m["created"]) == 1 and m["created"][0]["kind"] == "session" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
 assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
 '
+out="$(kagent k-skip FAKE_SKIP_POSTS=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "kagent: a Skip wizard that writes to the server stops the take before anything is sent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL \"Skip wizard\" sent POST /api/onboarding' <<<\"\$0\"" "$out"
+expect "kagent: nothing created, stopped at the sign-in" markers k-skip '
+assert names == ["login"] and m["created"] == [] and m["cleaned"] is None, m
+'
 out="$(kagent k-leak FAKE_LEAK=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: an answer to the Secret question that is not a refusal fails the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the answer to the Secret question does not read as a refusal' <<<\"\$0\"" "$out"
@@ -86,6 +96,8 @@ out="$(kagent k-noid FAKE_NO_URL=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: a session whose id was never read is reported, not silent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL .*a session of zuno-sre starting with \"Which pods of zuno-ai-run are not Running, and how many are?\" may remain' <<<\"\$0\"" "$out"
 
+fi
+if wanted unifai-live-rag; then
 echo "== unifai-live-rag"
 out="$(unifai u-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
@@ -134,6 +146,7 @@ expect "unifai: a refused delete fails the take and names the session" bash -c "
 expect "unifai: markers.json says not cleaned, one more session owned" markers u-refused '
 assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same": False} and len(names) == 8, m
 '
+fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 exit $failed
