@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -20,11 +20,12 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
   podman run --rm -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node "tests/$FAKE" >/dev/null & sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")"; exit $rc'
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
+identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -198,6 +199,58 @@ expect "lightspeed: a refused delete fails the take and names the conversation" 
 expect "lightspeed: markers.json says not cleaned, one more conversation owned" markers l-refused '
 assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same": False} and len(names) == 8, m
 '
+fi
+if wanted identity-personas; then
+echo "== identity-personas"
+out="$(identity i-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "identity: a scout of both personas exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "identity: a scout creates no session, no chat, and clicks no workspace" grep -q 'left: {"sessions":1,"touched":0}{"chats":0,"toggled":0}' <<<"$out"
+expect "identity: one scout.json per take, each as the page says, and takes.json" python3 - "$work/i-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
+assert t["status"] == "done" and [(x["name"], x["persona"], x["dir"], x["status"]) for x in t["takes"]] == [("consultant-02", "consultant-02", "consultant-02", "done"), ("sale-01", "sale-01", "sale-01", "done")], t
+assert not (d / "scout.json").exists()
+for name, teams in (("consultant-02", ["agent-arkos", "agent-tekos", "consultant"]), ("sale-01", ["agent-comage", "sales"])):
+    s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+    assert s["take"] == name and s["persona"] == name and s["status"] == "done" and s["refused_requests"] == [], s
+    assert list(steps) == ["enter", "owned", "unifai", "workspaces", "webui", "closed"], list(steps)
+    w = steps["workspaces"]
+    assert w["as_the_page_says"] is True and sorted(k for k, v in w["listed"].items() if v) == sorted(teams) and w["overlay_on_screen"] is True, w
+    assert steps["webui"]["chat_link_on_screen"] is False and steps["closed"]["chats"] == 1
+PY
+out="$(identity i-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "identity: a good run of both takes exits 0, RESULT: PASS as its only RESULT line" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && test \$(grep -c '^RESULT:' <<<\"\$0\") -eq 1" "$out"
+expect "identity: both chats are gone, no workspace clicked, no tool switch clicked" grep -q 'left: {"sessions":1,"touched":0}{"chats":0,"toggled":0}' <<<"$out"
+expect "identity: the log carries each persona's answer for the page" bash -c "grep -q 'answer of consultant-02 to the 2:30 question' <<<\"\$0\" && grep -q 'answer of sale-01 to the 3:30 question' <<<\"\$0\"" "$out"
+expect "identity: each take's sub-directory follows the single-take contract" python3 - "$work/i-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
+assert t["demo"] == "identity-personas" and t["status"] == "pass" and [x["status"] for x in t["takes"]] == ["pass", "pass"], t
+assert not (d / "markers.json").exists() and not list(d.glob("*.webm"))
+for name in ("consultant-02", "sale-01"):
+    m = json.loads((d / name / "markers.json").read_text())
+    assert [x["name"] for x in m["markers"]] == ["login", "unifai", "workspaces", "webui", "q-sent", "q-done", "end"], m["markers"]
+    assert m["take"] == name and m["persona"] == name and m["kind"] == "browser" and m["status"] == "pass" and m["motion_from"] == "unifai", m
+    assert len(m["created"]) == 1 and m["created"][0]["kind"] == "chat" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+    assert all((d / name / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / name / "recording.webm").stat().st_size > 0
+    assert len(list((d / name).glob("*.webm"))) == 1
+PY
+out="$(identity i-teams FAKE_WRONG_TEAMS=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "identity: a workspace the page does not give sale-01 fails its take, and only its take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL sale-01: the workspace selector of sale-01 is not the page.s: not expected consultant' <<<\"\$0\"" "$out"
+expect "identity: consultant-02 passed, sale-01 stopped before any question, nothing left" python3 - "$work/i-teams" "$out" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
+assert t["status"] == "fail" and [x["status"] for x in t["takes"]] == ["pass", "fail"], t
+m = json.loads((d / "sale-01" / "markers.json").read_text())
+assert [x["name"] for x in m["markers"]] == ["login", "unifai"] and m["created"] == [] and m["cleaned"] is None and m["owned"]["same"] is True, m
+assert '{"chats":0,"toggled":0}' in sys.argv[2]
+PY
+out="$(identity i-refused FAKE_REFUSE_DELETE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "identity: a refused delete fails both takes, each named, the second still played" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL consultant-02: the chat .* was NOT deleted from consultant-02.s history.*; sale-01: the chat .* was NOT deleted from sale-01.s history' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"

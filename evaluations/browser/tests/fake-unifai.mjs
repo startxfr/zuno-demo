@@ -3,7 +3,9 @@
 // scout has run yet): "Login using SSO", the sidebar links, the Document Library with the two demo files Done, the
 // chats page with "Add new chat from flow", its dialog (search box, workflows with a Human-in-the-Loop switch, Cancel,
 // Add) and the session API (/api2/sessions/*). A session exists as soon as Add is clicked, as in UnifAI.
-// The session list always holds one earlier session. Knobs: FAKE_REFUSE_DELETE=1 the delete answers success false;
+// For identity-personas it also has the Personal | Team switch and the workspace selector, whose teams are the
+// signed-in user's (FAKE_WRONG_TEAMS=1 gives sale-01 the workspace `consultant` too); clicking a workspace counts as
+// touched. The session list always holds one earlier session. Knobs: FAKE_REFUSE_DELETE=1 the delete answers success false;
 // FAKE_WRONG_ANSWER=1 the first answer lacks ZN-CAR-7; FAKE_NO_FILES=1 the library is empty; FAKE_REFUSE_MODEL=1 the
 // answer carries a rate-limit error. No cluster, no model.
 import http from "node:http";
@@ -23,7 +25,11 @@ const FILES = process.env.FAKE_NO_FILES === "1" ? "" : ["travel-and-expense-poli
 const APP = `<!doctype html><title>UnifAI (fake)</title>
 <style>body{font:16px sans-serif;margin:0;display:flex} nav{width:200px;padding:16px} main{padding:16px;flex:1} textarea{width:600px;height:40px}
 [role=dialog]{position:fixed;top:40px;left:240px;width:700px;border:1px solid #888;background:#fff;padding:16px} .flow{padding:6px;display:flex;gap:12px}</style>
-<nav><div>Personal</div><div>Team</div><a href="/documents">Documents</a><br><a href="/agentic-chats">Agentic Chats</a></nav>
+<nav><button id="personal">Personal</button><button id="team"><svg width="8" height="8"></svg>Team</button>
+<div id="teambox" hidden><button id="selector"><span id="selected">Select team</span><svg class="lucide lucide-chevron-down" width="8" height="8"></svg></button>
+<div id="overlay" class="fixed inset-0" style="position:fixed;inset:0" hidden></div>
+<div id="teams" style="position:relative;z-index:2" hidden></div></div>
+<a href="/documents">Documents</a><br><a href="/agentic-chats">Agentic Chats</a></nav>
 <main>
 <div id="home" hidden><h2>Get to know UnifAI</h2></div>
 <div id="docs" hidden><h2>Document Library</h2><table>${FILES}</table></div>
@@ -34,6 +40,17 @@ const APP = `<!doctype html><title>UnifAI (fake)</title>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
+// The Team switch and the workspace selector: screen state only, as in UnifAI. The teams are the signed-in user's.
+const USER = (document.cookie.split("; ").find((c) => c.startsWith("u=")) || "u=").slice(2);
+const TEAMS = { "consultant-02": ["agent-arkos", "agent-tekos", "consultant"], "sale-01": __SALE_TEAMS__ }[USER] || [];
+$("team").onclick = () => { $("teambox").hidden = false; $("selected").textContent = "Select team"; };
+$("personal").onclick = () => { $("teambox").hidden = true; };
+$("selector").onclick = () => {
+  $("teams").innerHTML = "";
+  for (const name of TEAMS) { const row = document.createElement("div"); row.textContent = name; row.onclick = () => fetch("/fake/touched", { method: "POST" }); $("teams").appendChild(row); }
+  $("teams").hidden = false; $("overlay").hidden = false;
+};
+$("overlay").onclick = () => { $("teams").hidden = true; $("overlay").hidden = true; };
 const FLOWS = ["consultant-01-my-assistant", "consultant-01-my-documents"];
 let picked = "";
 let sid = (location.pathname.match(/^\\/agentic-chats\\/(.+)$/) || [])[1] || "";
@@ -96,7 +113,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/fake/count") return json(200, { sessions: sessions.size, touched });
   if (u.pathname === "/fake/touched") { touched += 1; return json(200, {}); }
   if (u.pathname === "/api1/auth/login") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
-  if (u.pathname === "/cb") { res.writeHead(302, { "Set-Cookie": "s=1; Path=/", Location: "/" }); return res.end(); }
+  if (u.pathname === "/cb") { res.writeHead(302, { "Set-Cookie": ["s=1; Path=/", `u=${encodeURIComponent(u.searchParams.get("u") || "")}; Path=/`], Location: "/" }); return res.end(); }
   if (!signed) {
     if (u.pathname.startsWith("/api")) return json(401, { error: "not signed in" });
     res.writeHead(200, { "Content-Type": "text/html" }); return res.end(WELCOME);
@@ -133,5 +150,5 @@ http.createServer((req, res) => {
     return json(200, { success: sessions.delete(id) });
   }
   res.writeHead(200, { "Content-Type": "text/html" });
-  return res.end(APP);
+  return res.end(APP.replace("__SALE_TEAMS__", JSON.stringify(process.env.FAKE_WRONG_TEAMS === "1" ? ["agent-comage", "sales", "consultant"] : ["agent-comage", "sales"])));
 }).listen(port, "127.0.0.1");
