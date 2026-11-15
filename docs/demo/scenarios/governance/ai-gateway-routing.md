@@ -1,24 +1,5 @@
 # Scenario: ai-gateway - model routing and fallback
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-routing`: the 5-minute version PASS at
-> 02:21 (11 units, 96 s); the 15-minute version PASS at 02:24 (20 units, 44 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13: Applications
-> `zuno-ai-gateway-d0`/`-d1`, `zuno-llm-d1` and `zuno-open-webui-d1` Synced and Healthy; Deployment `ai-gateway` 1/1;
-> gateway environment `MODEL_TASK_ALIASES=zuno-code=code:Zuno Code`, `MODEL_READINESS_ENABLED=true`,
-> `CIRCUIT_BREAKER_ENABLED=true`, `CIRCUIT_OPEN_SECONDS=60`,
-> `MARKER_FAIL_CLOSED_CLIENTS=open-webui,openclaw-*,dify,kagent`; ConfigMap `ai-gateway-model-routing` (30
-> preferences, `open-webui`/`code`: `prefer: [mistral-codestral]`, not strict) and ConfigMap `zuno-provider-routing`
-> (14 providers) identical to the repository files; ExternalSecret `llm-provider-mistral-codestral` `SecretSynced` (the
-> key itself was not tested);
-> the four `LLMInferenceService` Ready; Deployment `open-webui` 1/1; Grafana 1/1 and `tempo-tempo-0` Running.
-> **paas-ops-01** had still not signed in to OpenShift.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `zuno-code`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One backend,
-> three experiences](../../three-experiences.md).
-
 ## Introduction
 
 The ai-gateway is the only router between the experiences and the models (see [Appendix A](#appendix-a---hld)). For
@@ -36,24 +17,9 @@ seconds. When nothing is left, the gateway answers 503 at once. How the list is 
 **The message:** "The platform picks the model for each task, falls back when a model is down, and never waits on a
 model that is not there."
 
-**Decisions:**
-- [ADR-0419](../../../adr/0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md): a
-  preference is a `preferred` list and a `fallback` list; it only reorders the eligible providers.
-- [ADR-0417](../../../adr/0417-consume-codestral-via-mistral-api.md): Codestral for code tasks; `strict` keeps a task
-  on its listed providers only.
-- [ADR-0581](../../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md): the routing table is
-  generated from the admitted agents release.
-- [ADR-0596](../../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md): "Zuno
-  Code" maps to the task `code`, Codestral first, the local models as fallback.
-- [ADR-0591](../../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md): only ready
-  local models are tried, a circuit breaker skips a provider that just failed, and an empty list is a 503 at once.
-- [ADR-0550](../../../adr/0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md):
-  `local_only_for` per task, and the routing decision published per request.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -69,7 +35,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use ai-gateway-routing 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use ai-gateway-routing 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/ai-gateway-routing/<action>.yml`) has
 run, and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -108,8 +74,7 @@ Nothing is prepared by the file. What only a person does:
 - [ ] Browser profile 2: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, signed in as
   **ai-ops-01**. Dashboard **Zuno Platform / Five experiences**, last 1 hour, `client` = `open-webui`.
 - [ ] 15-minute version: the Tempo search UI `https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr`, signed
-  in as **ai-ops-01**, and the
-  [WP-194 evidence](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md) open at section T5.
+  in as **ai-ops-01**, and the Zuno Code live-proof evidence (listed under References) open at section T5.
 - Known on screen, not a failure: Open WebUI generates the chat title with the model you picked, so one **Zuno
   Code** question makes two Codestral calls.
 - The optional block [The coding pair: C1 and C3](#the-coding-pair-c1-and-c3) is not a step. It is an owner action:
@@ -319,3 +284,47 @@ flowchart TB
   API -.-> REDIS
   REC -.-> TEMPO["Tempo<br/>zuno.provider, zuno.model_kind,<br/>zuno.task, zuno.client"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0419](../../../adr/0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md): a
+  preference is a `preferred` list and a `fallback` list; it only reorders the eligible providers.
+- [ADR-0417](../../../adr/0417-consume-codestral-via-mistral-api.md): Codestral for code tasks; `strict` keeps a task
+  on its listed providers only.
+- [ADR-0581](../../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md): the routing table is
+  generated from the admitted agents release.
+- [ADR-0596](../../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md): "Zuno
+  Code" maps to the task `code`, Codestral first, the local models as fallback.
+- [ADR-0591](../../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md): only ready
+  local models are tried, a circuit breaker skips a provider that just failed, and an empty list is a 503 at once.
+- [ADR-0550](../../../adr/0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md):
+  `local_only_for` per task, and the routing decision published per request.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-194](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md): the live proof of Zuno Code, section T5.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-routing`: the 5-minute version PASS at
+> 02:21 (11 units, 96 s); the 15-minute version PASS at 02:24 (20 units, 44 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
+> `zuno-ai-gateway-d0`/`-d1`, `zuno-llm-d1` and `zuno-open-webui-d1` Synced and Healthy; Deployment `ai-gateway` 1/1;
+> gateway environment `MODEL_TASK_ALIASES=zuno-code=code:Zuno Code`, `MODEL_READINESS_ENABLED=true`,
+> `CIRCUIT_BREAKER_ENABLED=true`, `CIRCUIT_OPEN_SECONDS=60`,
+> `MARKER_FAIL_CLOSED_CLIENTS=open-webui,openclaw-*,dify,kagent`; ConfigMap `ai-gateway-model-routing` (30
+> preferences, `open-webui`/`code`: `prefer: [mistral-codestral]`, not strict) and ConfigMap `zuno-provider-routing`
+> (14 providers) identical to the repository files; ExternalSecret `llm-provider-mistral-codestral` `SecretSynced` (the
+> key itself was not tested);
+> the four `LLMInferenceService` Ready; Deployment `open-webui` 1/1; Grafana 1/1 and `tempo-tempo-0` Running.
+> **paas-ops-01** had still not signed in to OpenShift.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `zuno-code`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One backend,
+> three experiences](../../three-experiences.md).

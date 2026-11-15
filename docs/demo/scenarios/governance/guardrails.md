@@ -1,24 +1,5 @@
 # Scenario: ai-gateway - guardrails on every model call
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse guardrails`: the 5-minute version PASS at 15:15 (11
-> units, 46 s); the 15-minute version PASS at 15:18 (20 units, 56 s). Evidence:
-> [WP-273](../../../roadmap/evidence/wp-273-guardrails-rehearsal-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13: Applications
-> `zuno-trustyai-config-d0`/`-d1`, `zuno-ai-gateway-d0`/`-d1`, `zuno-dify-d1` and `zuno-token-proxy-dify-d1` Synced and
-> Healthy; `NemoGuardrails/zuno-guardrails` phase `Ready` (config `zuno-observe`, ConfigMap `zuno-nemo-rails-observe`);
-> Deployments `zuno-guardrails` and `zuno-guardrails-smoke` 1/1 in `zuno-ai-run`, their pods recreated about 108
-> minutes before the check; gateway environment `GUARDRAILS_BACKEND=nemo`,
-> `GUARDRAILS_MODE_BY_CLASSIFICATION={"C1":"observe","C2":"observe","C3":"observe"}`, `GUARDRAILS_FAIL_CLOSED_FROM=C2`,
-> `GUARDRAILS_SCAN_TOOL_RESULTS=false`; ConfigMap `ai-gateway-guardrails-modes` (minimum `observe` at C1, C2 and C3,
-> `tekos: observe`); DataScienceCluster `zuno-dsc` with `mcpGuardrailsMode: false`; Dify's `zuno-token-proxy` 1/1;
-> GrafanaDashboards `three-experiences` and `trustyai` present, Grafana 1/1. **paas-ops-01** had still not signed in
-> to OpenShift.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `guardrails`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One governed backend,
-> many experiences](../../five-experiences.md).
-
 ## Introduction
 
 Guardrails are detectors that look at what goes into a model and what comes out of it. In Zuno they run inside the
@@ -35,23 +16,9 @@ a detection is logged and counted, and the answer is not changed. How the mode i
 **The message:** "Every experience gets the same guardrails, in one place. Today they watch and record; blocking is a
 policy switch, turned on with evidence."
 
-**Decisions:**
-- [ADR-0567](../../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): guardrails in the ai-gateway, one
-  mode per effective classification, every level shipped as `observe`.
-- [ADR-0534](../../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): TrustyAI for evaluation and
-  guardrails; a level moves to `block` only on measured evidence.
-- [ADR-0540](../../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md): the policy is NeMo rails
-  data, pattern rails with no model.
-- [ADR-0579](../../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md): the agents release
-  sets a minimum mode per level; an agent may only declare a stricter mode.
-- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) (Accepted), clause 8:
-  in `block` mode, a detector outage fails closed from C2, tool results are scanned, streamed replies are cut. Built,
-  not switched on on demo333.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -67,7 +34,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use guardrails 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use guardrails 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/guardrails/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -292,3 +259,42 @@ flowchart TB
   OBS -. "only with GUARDRAILS_BACKEND=builtin" .-> SMOKE
   REC -.-> DASH & TEMPO
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0567](../../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): guardrails in the ai-gateway, one
+  mode per effective classification, every level shipped as `observe`.
+- [ADR-0534](../../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): TrustyAI for evaluation and
+  guardrails; a level moves to `block` only on measured evidence.
+- [ADR-0540](../../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md): the policy is NeMo rails
+  data, pattern rails with no model.
+- [ADR-0579](../../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md): the agents release
+  sets a minimum mode per level; an agent may only declare a stricter mode.
+- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) (Accepted), clause 8:
+  in `block` mode, a detector outage fails closed from C2, tool results are scanned, streamed replies are cut. Built,
+  not switched on on demo333.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse guardrails`: the 5-minute version PASS at 15:15 (11
+> units, 46 s); the 15-minute version PASS at 15:18 (20 units, 56 s). Evidence:
+> [WP-273](../../../roadmap/evidence/wp-273-guardrails-rehearsal-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
+> `zuno-trustyai-config-d0`/`-d1`, `zuno-ai-gateway-d0`/`-d1`, `zuno-dify-d1` and `zuno-token-proxy-dify-d1` Synced and
+> Healthy; `NemoGuardrails/zuno-guardrails` phase `Ready` (config `zuno-observe`, ConfigMap `zuno-nemo-rails-observe`);
+> Deployments `zuno-guardrails` and `zuno-guardrails-smoke` 1/1 in `zuno-ai-run`, their pods recreated about 108
+> minutes before the check; gateway environment `GUARDRAILS_BACKEND=nemo`,
+> `GUARDRAILS_MODE_BY_CLASSIFICATION={"C1":"observe","C2":"observe","C3":"observe"}`, `GUARDRAILS_FAIL_CLOSED_FROM=C2`,
+> `GUARDRAILS_SCAN_TOOL_RESULTS=false`; ConfigMap `ai-gateway-guardrails-modes` (minimum `observe` at C1, C2 and C3,
+> `tekos: observe`); DataScienceCluster `zuno-dsc` with `mcpGuardrailsMode: false`; Dify's `zuno-token-proxy` 1/1;
+> GrafanaDashboards `three-experiences` and `trustyai` present, Grafana 1/1. **paas-ops-01** had still not signed in
+> to OpenShift.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `guardrails`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One governed backend,
+> many experiences](../../five-experiences.md).

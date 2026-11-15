@@ -1,21 +1,5 @@
 # Scenario: ai-gateway - data classification keeps sovereign data on local models
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-sovereignty`: the 5-minute version PASS at
-> 10:38 (11 units, 54 s); the 15-minute version PASS at 10:41 (19 units, 57 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12:
-> Applications `zuno-ai-gateway-d0`/`-d1` Synced and Healthy, Deployment `ai-gateway` 1/1, ConfigMap
-> `ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), gateway environment
-> `CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED=true`, `CIRCUIT_BREAKER_ENABLED=true`, Tempo
-> running. At the time of the check the local models were restarting (one of four Ready) and Grafana was down: run the
-> probe before any session.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `sovereignty`. The 15-minute version also relies on Tempo, which the probe `trace` checks; run
-> it together with `unifai-tekos`, whose run it looks up.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
-> [Agentic AI](../../workshops/agentic-ai.md).
-
 ## Introduction
 
 Every model call in Zuno goes through the ai-gateway, the platform's single policy router (see
@@ -35,22 +19,9 @@ gateway makes that decision is in [Appendix B](#appendix-b---lld).
 **The message:** "Sensitive data stays in the cluster even if the caller says otherwise. When no local model can
 answer, Zuno refuses rather than leaking."
 
-**Decisions:**
-- [ADR-0021](../../../adr/0021-route-models-according-to-c1-c2-c3-classification.md): SaaS for C1, restricted SaaS for C2,
-  local-only for C3.
-- [ADR-0565](../../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): the floor comes from
-  the OKF sheet, and the level can only be raised.
-- [ADR-0560](../../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md): the ai-gateway stays
-  the only policy router.
-- [ADR-0591](../../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md): only ready
-  local models are used; with no candidate left, the gateway answers 503 at once.
-- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
-  signed markers on tool results raise the level.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -62,7 +33,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 ## Presenter lifecycle
 
-`make demo use ai-gateway-sovereignty 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use ai-gateway-sovereignty 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/ai-gateway-sovereignty/<action>.yml`)
 has run, and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -267,3 +238,38 @@ flowchart TB
   REC -.-> TEMPO["Tempo<br/>zuno.classification, zuno.model_kind,<br/>zuno.provider, zuno.request_id"]
   REC -.-> PROM["Prometheus<br/>provider, model, outcome, agent, client<br/>(no classification label)"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0021](../../../adr/0021-route-models-according-to-c1-c2-c3-classification.md): SaaS for C1, restricted SaaS for C2,
+  local-only for C3.
+- [ADR-0565](../../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md): the floor comes from
+  the OKF sheet, and the level can only be raised.
+- [ADR-0560](../../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md): the ai-gateway stays
+  the only policy router.
+- [ADR-0591](../../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md): only ready
+  local models are used; with no candidate left, the gateway answers 503 at once.
+- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
+  signed markers on tool results raise the level.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse ai-gateway-sovereignty`: the 5-minute version PASS at
+> 10:38 (11 units, 54 s); the 15-minute version PASS at 10:41 (19 units, 57 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12:
+> Applications `zuno-ai-gateway-d0`/`-d1` Synced and Healthy, Deployment `ai-gateway` 1/1, ConfigMap
+> `ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), gateway environment
+> `CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED=true`, `CIRCUIT_BREAKER_ENABLED=true`, Tempo
+> running. At the time of the check the local models were restarting (one of four Ready) and Grafana was down: run the
+> probe before any session.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `sovereignty`. The 15-minute version also relies on Tempo, which the probe `trace` checks; run
+> it together with `unifai-tekos`, whose run it looks up.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
+> [Agentic AI](../../workshops/agentic-ai.md).

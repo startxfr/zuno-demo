@@ -1,24 +1,5 @@
 # Scenario: mcp-gateway - the same tools for every experience, filtered by who you are
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse mcp-tools-by-group`: the 5-minute version PASS at
-> 08:35 (12 units, 32 s); the 15-minute version PASS at 08:38 (22 units, 46 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13: Applications
-> `zuno-mcp-d0`/`-d1`, `zuno-mcp-confluence-d0`/`-d1` and `zuno-mcp-k8s-d0`/`-d1` Synced and Healthy; Deployment
-> `mcp-gateway` 1/1 (its pod was 33 minutes old at the check), reading the agents release `okf-corp@sha256:2918e463…`
-> (release 0.14.3) from the internal Quay; gateway environment `AGENT_ENTITLEMENT_EVERY_CALL=true`,
-> `AGENT_CHAIN_VERIFY=true`, `JWT_AUDIENCE=zuno-admin-api`, `JWT_ALLOWED_CLIENTS` listing the experience clients,
-> `zuno-evaluations`, `zuno-stresstest` and `zuno-admin-api`, and nine capabilities in `MCP_FRONTDOOR_CAPABILITIES`;
-> ExternalSecret `zuno-tool-marker-key` SecretSynced; `confluence-mcp`, `k8s-mcp`, `git-forge-mcp`, `aap-mcp` and
-> `diagram-render` 2/2 Running; Deployment `open-webui` 1/1; Grafana 1/1 with the `three-experiences` and
-> `agents-tools-rag` dashboards; the four local models Ready. The tool policy and the experience-client declarations
-> of agents `main` are the same as in release 0.14.3.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `tools` (the 5-minute version also uses Open WebUI: run `open-webui` too).
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
-> [Agentic AI](../../workshops/agentic-ai.md), [One governed backend, many experiences](../../five-experiences.md).
-
 ## Introduction
 
 The mcp-gateway is the one door to company tools: Confluence, the technical documentation, Drive, Gmail, Git, AAP,
@@ -43,28 +24,9 @@ marker. How the gateway runs these steps: see [Appendix B](#appendix-b---lld).
 **The message:** "Same question, different person, different tools. Who you are decides which tools you get, in every
 experience, and every call is recorded in one place."
 
-**Decisions:**
-- [ADR-0010](../../../adr/0010-introduce-a-central-mcp-gateway.md): one central gateway for every MCP tool.
-- [ADR-0011](../../../adr/0011-define-tool-authorization-as-policy-intersection.md): a tool is allowed only when
-  every factor allows it.
-- [ADR-0036](../../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): the gateway
-  enforces the whole intersection and fails closed.
-- [ADR-0040](../../../adr/0040-separate-agent-entitlement-from-business-role-authorization.md): entitlement to an
-  agent is separate from the business role that grants tools.
-- [ADR-0571](../../../adr/0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md): the Connectivity
-  Link MCP gateway (Technology Preview) was evaluated and not adopted; `/mcp` applies the full intersection to callers
-  that declare an agent.
-- [ADR-0592](../../../adr/0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md): experience
-  clients are declared in the agents release, like agents.
-- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
-  the same tools in every experience, filtered by group, behind signed classification markers.
-- [ADR-0208](../../../adr/0208-standardize-enterprise-tool-authentication-and-delegation.md): a tool bound to the
-  user's own credential is refused without it, never served with a shared account.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -86,7 +48,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use mcp-tools-by-group 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use mcp-tools-by-group 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/mcp-tools-by-group/<action>.yml`) has
 run, and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -330,3 +292,47 @@ flowchart TB
   BIND -.-> CRED
   KEY -.-> MARK
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0010](../../../adr/0010-introduce-a-central-mcp-gateway.md): one central gateway for every MCP tool.
+- [ADR-0011](../../../adr/0011-define-tool-authorization-as-policy-intersection.md): a tool is allowed only when
+  every factor allows it.
+- [ADR-0036](../../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): the gateway
+  enforces the whole intersection and fails closed.
+- [ADR-0040](../../../adr/0040-separate-agent-entitlement-from-business-role-authorization.md): entitlement to an
+  agent is separate from the business role that grants tools.
+- [ADR-0571](../../../adr/0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md): the Connectivity
+  Link MCP gateway (Technology Preview) was evaluated and not adopted; `/mcp` applies the full intersection to callers
+  that declare an agent.
+- [ADR-0592](../../../adr/0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md): experience
+  clients are declared in the agents release, like agents.
+- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
+  the same tools in every experience, filtered by group, behind signed classification markers.
+- [ADR-0208](../../../adr/0208-standardize-enterprise-tool-authentication-and-delegation.md): a tool bound to the
+  user's own credential is refused without it, never served with a shared account.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse mcp-tools-by-group`: the 5-minute version PASS at
+> 08:35 (12 units, 32 s); the 15-minute version PASS at 08:38 (22 units, 46 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
+> `zuno-mcp-d0`/`-d1`, `zuno-mcp-confluence-d0`/`-d1` and `zuno-mcp-k8s-d0`/`-d1` Synced and Healthy; Deployment
+> `mcp-gateway` 1/1 (its pod was 33 minutes old at the check), reading the agents release `okf-corp@sha256:2918e463…`
+> (release 0.14.3) from the internal Quay; gateway environment `AGENT_ENTITLEMENT_EVERY_CALL=true`,
+> `AGENT_CHAIN_VERIFY=true`, `JWT_AUDIENCE=zuno-admin-api`, `JWT_ALLOWED_CLIENTS` listing the experience clients,
+> `zuno-evaluations`, `zuno-stresstest` and `zuno-admin-api`, and nine capabilities in `MCP_FRONTDOOR_CAPABILITIES`;
+> ExternalSecret `zuno-tool-marker-key` SecretSynced; `confluence-mcp`, `k8s-mcp`, `git-forge-mcp`, `aap-mcp` and
+> `diagram-render` 2/2 Running; Deployment `open-webui` 1/1; Grafana 1/1 with the `three-experiences` and
+> `agents-tools-rag` dashboards; the four local models Ready. The tool policy and the experience-client declarations
+> of agents `main` are the same as in release 0.14.3.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `tools` (the 5-minute version also uses Open WebUI: run `open-webui` too).
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md),
+> [Agentic AI](../../workshops/agentic-ai.md), [One governed backend, many experiences](../../five-experiences.md).

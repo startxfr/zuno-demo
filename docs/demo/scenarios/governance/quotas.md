@@ -1,24 +1,5 @@
 # Scenario: ai-gateway - one token budget per persona across the experiences
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse quotas`: the 5-minute version PASS at 08:44 (10 units,
-> 37 s); the 15-minute version PASS at 08:47 (19 units, 47 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Its `start` spends token budget and is
-> not undone (sale-01's budget was spent twice in the rehearsals). Prerequisites checked read-only on demo333 on
-> 2026-11-13: Applications
-> `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1` Synced and Healthy; Deployment `ai-gateway` 1/1 with
-> `QUOTA_LEDGER_STORE=redis`, `REDIS_ADDR` on `zuno-redis-master.zuno-auth`, `QUOTA_FAIL_MODES_ENFORCED=true`,
-> `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `MAAS_GATEWAY_IDENTITY=true`,
-> `PERSONA_CLAIM_CLIENTS=openclaw-*,dify,kagent`, `TRUSTED_PLATFORM_CLIENTS=zuno-stresstest`, and no
-> `QUOTA_STRESSTEST_GROUP` (the tight class is off); StatefulSet `zuno-redis-master` 1/1, with a volume (its pod was
-> recreated about 110 minutes before the check); MaaS subscription `gpt-oss-20b-ai-gateway` at 1,000,000 tokens per
-> hour, owned by the ai-gateway ServiceAccount; no `zuno-token-quota` TokenRateLimitPolicy; Grafana 1/1 with the
-> `three-experiences` dashboard; Tempo Ready; the four local models Ready.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> no golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One backend,
-> three experiences](../../three-experiences.md), [One governed backend, many experiences](../../five-experiences.md).
-
 ## Introduction
 
 Every model call of every experience goes through the ai-gateway (see [Appendix A](#appendix-a---hld)). Before it
@@ -38,29 +19,14 @@ The classes come from the signed agents release
 | `stresstest` | members of the group named by `QUOTA_STRESSTEST_GROUP` (off), or the trusted client `zuno-stresstest` when it asks for it | 2,000 per 5 min | 8,000 per 5 min | closed |
 
 MaaS also counts tokens, but per subscription and per model, not per person. Since the amendment of 2026-11-05 to
-ADR-0570, the per-person and per-group budgets live in the gateway's ledger only, by design.
+the decision that delegates quotas, keys and exposure to MaaS, the per-person and per-group budgets live in the gateway's ledger only, by design.
 
 **The message:** "One person, one budget, whatever the screen. Spending it in one experience spends it in all of
 them."
 
-**Decisions:**
-- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): the user
-  budget and the telemetry are keyed by persona across experiences.
-- [ADR-0511](../../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md): quota classes in the agents release,
-  explicit refusals, fail closed by default.
-- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), amendment of
-  2026-11-05: the ledger is the permanent design for the user and group budgets; MaaS keeps the per-subscription
-  limits.
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over one governed backend, with one budget per person.
-- [ADR-0579](../../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md): `zuno.limits`
-  in the agent sheets. The optional per-turn ceiling `max_tokens_per_turn` (R-543) was added to it later, in the
-  agents release.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -81,7 +47,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use quotas 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use quotas 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/quotas/<action>.yml`) has run, and says
 what is left to the presenter. Only `start` changes anything, and it changes a unit the manifest declares: it spends
 a persona's token budget (see Start).
@@ -120,7 +86,7 @@ the budget restarts at 00:00 UTC. What only a person does:
 
 - [ ] Grafana in a browser profile signed in as **ai-ops-01** (OpenShift sign-in), dashboard **Zuno Platform / Five
   experiences**, time range last 24 hours, `client` = All.
-- [ ] Keep the 2026-11-03 evidence open: [WP-190 proof](../../../roadmap/evidence/wp-190-persona-quota-proof.md).
+- [ ] Keep the 2026-11-03 evidence open: the persona quota proof (listed under References).
 - [ ] 15-minute version:
   - [ ] a terminal logged in with `oc` as **paas-ops-01**. If `status` reported that the group `ocp-paas-ops` is
     missing, sign **paas-ops-01** in once to the OpenShift console first;
@@ -349,3 +315,47 @@ flowchart TB
   REDIS -.-> CHK
   CONS -.-> REDIS
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): the user
+  budget and the telemetry are keyed by persona across experiences.
+- [ADR-0511](../../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md): quota classes in the agents release,
+  explicit refusals, fail closed by default.
+- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), amendment of
+  2026-11-05: the ledger is the permanent design for the user and group budgets; MaaS keeps the per-subscription
+  limits.
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over one governed backend, with one budget per person.
+- [ADR-0579](../../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md): `zuno.limits`
+  in the agent sheets. The optional per-turn ceiling `max_tokens_per_turn` (R-543) was added to it later, in the
+  agents release.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-190](../../../roadmap/evidence/wp-190-persona-quota-proof.md): the persona quota proof of 2026-11-03.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse quotas`: the 5-minute version PASS at 08:44 (10 units,
+> 37 s); the 15-minute version PASS at 08:47 (19 units, 47 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Its `start` spends token budget and is
+> not undone (sale-01's budget was spent twice in the rehearsals). Prerequisites checked read-only on demo333 on
+> 2026-11-13: Applications
+> `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1` Synced and Healthy; Deployment `ai-gateway` 1/1 with
+> `QUOTA_LEDGER_STORE=redis`, `REDIS_ADDR` on `zuno-redis-master.zuno-auth`, `QUOTA_FAIL_MODES_ENFORCED=true`,
+> `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `MAAS_GATEWAY_IDENTITY=true`,
+> `PERSONA_CLAIM_CLIENTS=openclaw-*,dify,kagent`, `TRUSTED_PLATFORM_CLIENTS=zuno-stresstest`, and no
+> `QUOTA_STRESSTEST_GROUP` (the tight class is off); StatefulSet `zuno-redis-master` 1/1, with a volume (its pod was
+> recreated about 110 minutes before the check); MaaS subscription `gpt-oss-20b-ai-gateway` at 1,000,000 tokens per
+> hour, owned by the ai-gateway ServiceAccount; no `zuno-token-quota` TokenRateLimitPolicy; Grafana 1/1 with the
+> `three-experiences` dashboard; Tempo Ready; the four local models Ready.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> no golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md), [One backend,
+> three experiences](../../three-experiences.md), [One governed backend, many experiences](../../five-experiences.md).

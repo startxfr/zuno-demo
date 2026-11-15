@@ -1,25 +1,5 @@
 # Scenario: a2a-gateway - agent-to-agent delegation with a human approval
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse a2a-delegation-approval`: the 5-minute version PASS at
-> 02:17 (12 units, 53 s); the 15-minute version PASS at 08:41 (21 units, 72 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13 (about 00:20 CET):
-> Applications `zuno-a2a-gateway-d0`/`-d1`, `zuno-unifai-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
-> Deployment `a2a-gateway` 1/1, reading agents release v0.14.3 (`okf-corp@sha256:2918e463…`) and signing the agent
-> chain through Vault Transit (`AGENT_CHAIN_SIGNER=transit`); its pod, and the `mcp-gateway` pod, had restarted about
-> 30 minutes before the check. UnifAI operator CSV `unifai-operator.v0.1.69` Succeeded; UnifaiAgentBundles `arkos` and
-> `tekos` Ready and verified, `arkos` with `spec.delegation.approval: ask` and the ceiling
-> `tekos/answer-technical-question`. Deployment `aap-mcp` 1/1, with a launch limit of 2 per 900 s and the link base
-> `https://aap.apps.demo333.startx.fr`. AAP 2.7 Running. The four local models were Ready. The OpenShift group `aap_ops`
-> holds consultant-02. `tempo-tempo-0` and Grafana were Running. The last recorded `delegation-approval` pass was in the
-> golden-path run of 2026-11-12 at 17:07 UTC
-> ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `delegation-approval`. The probe proves the request and a refusal, as `eval-consultant-01`.
-> The approval clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Agentic AI](../../workshops/agentic-ai.md).
-
 ## Introduction
 
 Zuno agents can ask other agents for help. Arkos, the architecture agent, may ask Tekos, the technical agent, through
@@ -39,26 +19,9 @@ chain and holds the request is in [Appendix B](#appendix-b---lld).
 **The message:** "An agent can ask another agent for help, but never with more rights than the person who asked. And
 before anything is executed, that person decides."
 
-**Decisions:**
-- [ADR-0401](../../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md): delegation only to
-  the targets an agent declares; the user must hold the target's entitlement.
-- [ADR-0402](../../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md): A2A is the protocol between agents.
-- [ADR-0403](../../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md): the user's
-  token and the chain (`X-Zuno-Delegated-By`, `X-Zuno-Delegation-Depth`) cross every hop, checked and audited.
-- [ADR-0406](../../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md): depth 1 by default, corp ceiling
-  2, no cycle, the cost on the user's quota, a remote task cancelled when nobody waits for it.
-- [ADR-0409](../../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
-  a delegated write asks the initiating user; a silence of 300 s is a refusal; writes are lifted per target
-  (`delegation.write_allowed`).
-- [ADR-0585](../../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md): the
-  a2a-gateway answers with the caller's identity, through the ai-gateway and the mcp-gateway.
-- [ADR-0355](../../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): AAP audits reach agents
-  through an MCP server with a least-privilege AAP account, `zuno-mcp`.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -78,7 +41,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use a2a-delegation-approval 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use a2a-delegation-approval 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/a2a-delegation-approval/<action>.yml`)
 has run, and says what is left to the presenter. No action of this demo changes the cluster: the AAP job is launched by
 you, in the step, when you click **Approve**.
@@ -113,7 +76,7 @@ Nothing is prepared by the file. What only a person does:
   `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` and sign in through Keycloak (realm `zuno`). Check the name at
   the top right.
 - [ ] Rehearse the 5-minute version once the same day as consultant-02 and click **Reject**: nothing runs. Arkos
-  answers without delegating on some turns (one in four in the WP-174 runs), so rehearsal tells you whether the prompt
+  answers without delegating on some turns (one in four in the earlier runs), so rehearsal tells you whether the prompt
   delegates today.
 - [ ] The AAP launch limit is 2 per caller in 15 minutes. If you rehearse with **Approve**, do it at least 15 minutes
   before the session.
@@ -325,3 +288,50 @@ sequenceDiagram
     W-->>UI: event approval_expired
   end
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0401](../../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md): delegation only to
+  the targets an agent declares; the user must hold the target's entitlement.
+- [ADR-0402](../../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md): A2A is the protocol between agents.
+- [ADR-0403](../../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md): the user's
+  token and the chain (`X-Zuno-Delegated-By`, `X-Zuno-Delegation-Depth`) cross every hop, checked and audited.
+- [ADR-0406](../../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md): depth 1 by default, corp ceiling
+  2, no cycle, the cost on the user's quota, a remote task cancelled when nobody waits for it.
+- [ADR-0409](../../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
+  a delegated write asks the initiating user; a silence of 300 s is a refusal; writes are lifted per target
+  (`delegation.write_allowed`).
+- [ADR-0585](../../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md): the
+  a2a-gateway answers with the caller's identity, through the ai-gateway and the mcp-gateway.
+- [ADR-0355](../../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): AAP audits reach agents
+  through an MCP server with a least-privilege AAP account, `zuno-mcp`.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-174](../../../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md): Tekos to Arkos delegation on demo333.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse a2a-delegation-approval`: the 5-minute version PASS at
+> 02:17 (12 units, 53 s); the 15-minute version PASS at 08:41 (21 units, 72 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 CET):
+> Applications `zuno-a2a-gateway-d0`/`-d1`, `zuno-unifai-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
+> Deployment `a2a-gateway` 1/1, reading agents release v0.14.3 (`okf-corp@sha256:2918e463…`) and signing the agent
+> chain through Vault Transit (`AGENT_CHAIN_SIGNER=transit`); its pod, and the `mcp-gateway` pod, had restarted about
+> 30 minutes before the check. UnifAI operator CSV `unifai-operator.v0.1.69` Succeeded; UnifaiAgentBundles `arkos` and
+> `tekos` Ready and verified, `arkos` with `spec.delegation.approval: ask` and the ceiling
+> `tekos/answer-technical-question`. Deployment `aap-mcp` 1/1, with a launch limit of 2 per 900 s and the link base
+> `https://aap.apps.demo333.startx.fr`. AAP 2.7 Running. The four local models were Ready. The OpenShift group `aap_ops`
+> holds consultant-02. `tempo-tempo-0` and Grafana were Running. The last recorded `delegation-approval` pass was in the
+> golden-path run of 2026-11-12 at 17:07 UTC
+> ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `delegation-approval`. The probe proves the request and a refusal, as `eval-consultant-01`.
+> The approval clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Agentic AI](../../workshops/agentic-ai.md).

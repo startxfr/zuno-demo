@@ -1,25 +1,5 @@
 # Scenario: Keycloak - one identity, groups drive every entitlement
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse identity-personas`: the 5-minute version PASS at 02:33
-> (12 units, 46 s); the 15-minute version PASS at 08:32 (21 units, 117 s). Evidence:
-> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13 (about 00:20 CET):
-> Applications `zuno-keycloak-d0`/`-d1`, `zuno-openshift-oauth-d0`/`-d1`, `zuno-openshift-rbac-groups-d0`/`-d1`,
-> `zuno-open-webui-d1` and `zuno-unifai-d0`/`-d1` Synced and Healthy. Keycloak CR `zuno` (built-in instance, internal
-> mode) with pod `zuno-0` Running; KeycloakRealmImport `zuno-realm` Done; Jobs `zuno-keycloak-client-reconcile` and
-> `zuno-keycloak-eval-personas` Complete. ConfigMap `zuno-keycloak-clients` carries the brute-force settings
-> (`bruteForceProtected: true`, `failureFactor: 30`, `waitIncrementSeconds: 60`, `maxFailureWaitSeconds: 900`,
-> `permanentLockout: false`). OAuth `cluster` has the OpenID provider `openshift` (issuer
-> `https://keycloak.apps.demo333.startx.fr/realms/zuno`, `mappingMethod: add`, claim `groups`) and the HTPasswd provider
-> `startx-htpasswd_auth`. OpenShift users consultant-02, ai-ops-01, ai-dev-01 and paas-dev-01 exist; sale-01 and
-> paas-ops-01 do not (no `sales` or `ocp-paas-ops` group yet). RoleBindings `zuno-personas-view` (view: `consultant`,
-> `sales`), `zuno-ocp-ai-dev-edit` and `zuno-ocp-ai-ops-admin` in 23 namespaces; ClusterRoleBindings for `ocp-paas-ops`
-> and `ocp-paas-dev`. `zuno-token-proxy` 1/1 in `zuno-dify` and `zuno-kagent`. Open WebUI and UnifAI 1/1.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> no golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md).
-
 ## Introduction
 
 Zuno has one identity provider: the Keycloak realm `zuno`, run by the Red Hat build of Keycloak operator in
@@ -42,28 +22,9 @@ Open WebUI. How the groups travel from the realm to each application is in [Appe
 **The message:** "One company account, and its groups decide everything: which agents, which tools and data, which
 cluster rights, in every application."
 
-**Decisions:**
-- [ADR-0040](../../../adr/0040-separate-agent-entitlement-from-business-role-authorization.md): agent entitlement and
-  business role are separate group dimensions; neither replaces the other.
-- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the personas and the
-  `ocp-*` cluster-access groups.
-- [ADR-0320](../../../adr/0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md): OpenShift's
-  OAuth server federated to Keycloak, groups synced at sign-in (still in effect for the OAuth part).
-- [ADR-0530](../../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md): the
-  realm import runs once; a Job reconciles the clients and some realm settings on every sync.
-- [ADR-0352](../../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md): Keycloak can run built in
-  (internal) or as an external service.
-- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
-  telemetry are keyed by persona across the experiences.
-- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
-  a token proxy gives an experience that cannot pass a user token the identity of one persona.
-- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) (clause 3):
-  temporary brute-force protection in both security profiles.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -72,7 +33,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | UnifAI team workspaces `agent-comage` and `sales`. Three tools in Open WebUI, no Confluence. `view` on the Zuno namespaces once it has signed in to OpenShift. | Profile 2, in the 5-minute version: the same screens with other groups. |
 | **ai-dev-01**, **ai-ops-01**, **paas-dev-01** | AI developer, AI platform operator, platform developer, back office. Groups `ocp-ai-dev`, `ocp-ai-ops`, `ocp-paas-dev`, each with `agent_tekos`. | `edit` (ai-dev-01) and `admin` (ai-ops-01) on the Zuno namespaces, `cluster-reader` (paas-dev-01). | Named in the 15-minute version: the cluster-access dimension. |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads groups, bindings and ConfigMaps. | The presenter's `oc` terminal in the 15-minute version. |
-| `tekos-entitlement-only-user-01`, `consultant-role-only-user-01` | Negative fixtures of ADR-0040: `agent_tekos` only, `consultant` only. Similar fixtures exist for Arkos, Comage, Advantage, Finage and Naveo. | Each must be refused: the first gets no Confluence, the second no Tekos. | Named in the 15-minute version. Never signed in on stage. |
+| `tekos-entitlement-only-user-01`, `consultant-role-only-user-01` | Negative fixtures of the rule that separates agent entitlement from business role: `agent_tekos` only, `consultant` only. Similar fixtures exist for Arkos, Comage, Advantage, Finage and Naveo. | Each must be refused: the first gets no Confluence, the second no Tekos. | Named in the 15-minute version. Never signed in on stage. |
 
 Other identities:
 - the Keycloak service accounts that carry the groups of one persona, for experiences that cannot pass a user token:
@@ -84,7 +45,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use identity-personas 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use identity-personas 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/identity-personas/<action>.yml`) has run,
 and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -282,7 +243,7 @@ How one realm feeds every entitlement. Drawn from `gitops/charts/keycloak/` (`fi
 `templates/job-eval-personas.yaml`), `gitops/charts/openshift-oauth/templates/oauth.yaml`,
 `gitops/charts/openshift-rbac-groups/templates/` (`rolebindings.yaml`, `clusterrolebinding.yaml`),
 `gitops/charts/zuno-token-proxy/`, `ansible/roles/aap_config/` (`README.md`, `tasks/wire_launch_rbac.yml`) and the
-live objects listed in the status banner.
+live objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -314,3 +275,47 @@ flowchart LR
   OAUTH --> OTHERS["Grafana, Argo CD, Lightspeed,<br/>MaaS subscriptions by group"]
   AAPGW -->|"aap_admin: superuser<br/>aap_ops: aap-ops-team<br/>aap_reader: aap-reader-team"| AAPT["AAP Controller teams"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0040](../../../adr/0040-separate-agent-entitlement-from-business-role-authorization.md): agent entitlement and
+  business role are separate group dimensions; neither replaces the other.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the personas and the
+  `ocp-*` cluster-access groups.
+- [ADR-0320](../../../adr/0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md): OpenShift's
+  OAuth server federated to Keycloak, groups synced at sign-in (still in effect for the OAuth part).
+- [ADR-0530](../../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md): the
+  realm import runs once; a Job reconciles the clients and some realm settings on every sync.
+- [ADR-0352](../../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md): Keycloak can run built in
+  (internal) or as an external service.
+- [ADR-0593](../../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md): quota and
+  telemetry are keyed by persona across the experiences.
+- [ADR-0601](../../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md):
+  a token proxy gives an experience that cannot pass a user token the identity of one persona.
+- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) (clause 3):
+  temporary brute-force protection in both security profiles.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse identity-personas`: the 5-minute version PASS at 02:33
+> (12 units, 46 s); the 15-minute version PASS at 08:32 (21 units, 117 s). Evidence:
+> [WP-276](../../../roadmap/evidence/wp-276-governance-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 CET):
+> Applications `zuno-keycloak-d0`/`-d1`, `zuno-openshift-oauth-d0`/`-d1`, `zuno-openshift-rbac-groups-d0`/`-d1`,
+> `zuno-open-webui-d1` and `zuno-unifai-d0`/`-d1` Synced and Healthy. Keycloak CR `zuno` (built-in instance, internal
+> mode) with pod `zuno-0` Running; KeycloakRealmImport `zuno-realm` Done; Jobs `zuno-keycloak-client-reconcile` and
+> `zuno-keycloak-eval-personas` Complete. ConfigMap `zuno-keycloak-clients` carries the brute-force settings
+> (`bruteForceProtected: true`, `failureFactor: 30`, `waitIncrementSeconds: 60`, `maxFailureWaitSeconds: 900`,
+> `permanentLockout: false`). OAuth `cluster` has the OpenID provider `openshift` (issuer
+> `https://keycloak.apps.demo333.startx.fr/realms/zuno`, `mappingMethod: add`, claim `groups`) and the HTPasswd provider
+> `startx-htpasswd_auth`. OpenShift users consultant-02, ai-ops-01, ai-dev-01 and paas-dev-01 exist; sale-01 and
+> paas-ops-01 do not (no `sales` or `ocp-paas-ops` group yet). RoleBindings `zuno-personas-view` (view: `consultant`,
+> `sales`), `zuno-ocp-ai-dev-edit` and `zuno-ocp-ai-ops-admin` in 23 namespaces; ClusterRoleBindings for `ocp-paas-ops`
+> and `ocp-paas-dev`. `zuno-token-proxy` 1/1 in `zuno-dify` and `zuno-kagent`. Open WebUI and UnifAI 1/1.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> no golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Sovereign and governed AI](../../workshops/sovereign-governed-ai.md).
