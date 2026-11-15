@@ -49,7 +49,7 @@ workshops and the workshop template). Every scenario page and workshop now has `
 last, the decisions and evidence in References, and no ADR or work-package reference in the Introduction, Personas and
 Presenter lifecycle; sentences that cited one were reworded, and the evidence they pointed to is listed under
 References. The page-shape checks of `platform/demo/consistency.py` report 0 problems and 0 warnings on the 36 pages and
-are enforced as problems, `scaffold.py` reads `## Page status`, and the README says nothing more about a pilot. The
+are enforced as problems, `scaffold.py` reads `## Page status`, and the README says nothing more about a pilot. A published GIF is checked too: it is embedded once, as the last line of its Introduction, never another demo's GIF, with no orphan file and at most 8 MB; a published GIF without its `gif.yml` is only a warning. The
 rehearsal generators write to `## Page status`.
 
 Left for the owner, not fixed here: some rows state what a screen shows and may be wrong, as the Open WebUI tools menu
