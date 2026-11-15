@@ -1,6 +1,6 @@
 # ADR-0617: Record the demos and publish them as GIFs only with the owner's go, and give every demo page a presenter's shape
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-15
 - **Decision owners:** Zuno Demo architecture team
@@ -149,3 +149,23 @@ The build of WP-284 fixes four details of clauses 3 to 5. The clauses stay as de
   call and creates no chat, and it refuses any chat request that is not a GET. It is run before a first take to check
   the selectors without spending budget.
 - **The walkthrough never clicks a tool switch:** it only opens the menus and shows the state the persona has.
+
+## Implementation (2026-11-15)
+
+Implemented by [WP-284](../roadmap/work-packages/wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md) and
+[WP-285](../roadmap/work-packages/wp-285-give-the-demo-pages-a-presenters-shape.md).
+
+- **The chain and the pilot (clauses 1 to 9):** the Open WebUI demo was recorded live as sale-01 and published as a
+  42.9 s, 1.3 MB GIF with the owner's named "go open-webui"
+  ([evidence](../roadmap/evidence/wp-284-open-webui-gif-2026-11-15.md)). The pilot also showed what the chain must
+  still learn; those rules are in [ADR-0618](0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md).
+- **The shape of a page (clauses 10 to 13):** after the owner's gate on the pilot, the 30 scenario pages, the 6
+  workshops and both templates follow the order of clause 10, with `## References` and `## Page status` last and no ADR
+  or work-package reference in the Introduction, Personas and Presenter lifecycle. The page-shape checks of
+  `platform/demo/consistency.py` report 0 problems and 0 warnings on the 36 pages, and `scaffold.py` reads the probe
+  names from `## Page status`.
+
+What this does not show: one GIF exists, the pilot's; the others are the work of ADR-0618. The privacy review of that
+GIF looked at 29 of its 429 frames, and the eight marker images were opened after the publication. Some page rows may
+still claim a screen that a take cannot show (the Open WebUI tools menu was the first); they are listed and wait for the
+owner's decision.

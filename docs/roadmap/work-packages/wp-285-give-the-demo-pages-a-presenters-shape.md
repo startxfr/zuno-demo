@@ -1,6 +1,6 @@
 # WP-285: Give the demo pages a presenter's shape
 
-- **State:** Not started
+- **State:** Done (2026-11-15)
 - **ADRs:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)
 - **Depends on:** none (Phase 56 is closed)
 - **Related:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -40,3 +40,18 @@ Every scenario page and workshop follows the order of ADR-0617 clause 10, the co
 - After the rollout, every page under `docs/demo/scenarios/` and `docs/demo/workshops/` passes the new checks.
 - `make demo list`, `make demo check open-webui` and the catalogue tests pass: the parser reads the same sections.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
+
+## Result (2026-11-15)
+
+The owner's gate on the Open WebUI pilot passed the same day, and the rollout followed in six commits, one per layer
+(experiences, governance, RHOAI, foundation, the unifai-live-rag, blender-3d and world-model pages, then the six
+workshops and the workshop template). Every scenario page and workshop now has `## References` and `## Page status`
+last, the decisions and evidence in References, and no ADR or work-package reference in the Introduction, Personas and
+Presenter lifecycle; sentences that cited one were reworded, and the evidence they pointed to is listed under
+References. The page-shape checks of `platform/demo/consistency.py` report 0 problems and 0 warnings on the 36 pages and
+are enforced as problems, `scaffold.py` reads `## Page status`, and the README says nothing more about a pilot. The
+rehearsal generators write to `## Page status`.
+
+Left for the owner, not fixed here: some rows state what a screen shows and may be wrong, as the Open WebUI tools menu
+was. They are the two tools-button rows of `identity-personas`, the Open WebUI rows of `mcp-tools-by-group`, the tool
+lists of `openclaw` and the persona table of the README.

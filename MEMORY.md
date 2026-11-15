@@ -1067,6 +1067,13 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.16) — current status per ADR
 
+- **2026-11-15 — ADR-0617 Implemented (WP-284 and WP-285, both Done).** The Open WebUI GIF is published and every
+  catalogue page has the presenter's shape: `## References` and `## Page status` last, no ADR or WP reference in the
+  Introduction, Personas and Presenter lifecycle. The shape checks of `platform/demo/consistency.py` are problems, not
+  warnings; `scaffold.py` reads probe names from `## Page status`. Traps kept: the banner is only under `## Page status`
+  (a rehearsal result goes there); a sentence that cited an ADR or a WP in a presenter section is reworded and its
+  source listed under References; a page row that says what a screen shows must be checked on the screen (the
+  rows left open: identity-personas 2:30 and 3:30, mcp-tools-by-group, openclaw tool lists, README persona table).
 - **2026-11-15 — ADR-0618 Accepted (Phase 57, WP-286 to WP-290, Not started).** Every catalogue scenario gets a GIF
   by the chain of ADR-0617, terminal demos included; the workshops get none for now. A terminal demo is a real bash
   session on the workstation, captured as an asciicast (bytes and timing), checked as TEXT (masks plus a deny list of

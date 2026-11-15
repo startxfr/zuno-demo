@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 13 | 5 | 49 | WP-224, WP-227, WP-237, WP-285, WP-286, WP-287, WP-288, WP-289, WP-290 |
+| v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237, WP-286, WP-287, WP-288, WP-289, WP-290 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1191,7 +1191,7 @@ ADR-0618 extends it to every scenario of the catalogue (terminal demos included,
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-284 | [wp-284](work-packages/wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md) | 0617 | none | Done | none |
-| WP-285 | [wp-285](work-packages/wp-285-give-the-demo-pages-a-presenters-shape.md) | 0617 | none | Not started | the owner's gate on the Open WebUI pilot before the rollout |
+| WP-285 | [wp-285](work-packages/wp-285-give-the-demo-pages-a-presenters-shape.md) | 0617 | none | Done | none |
 | WP-286 | [wp-286](work-packages/wp-286-improve-the-recording-chain-and-reprove-it-on-open-webui.md) | 0618 | WP-284 | Not started | the owner's go for one scout and one take of Open WebUI in the demo333 session |
 | WP-287 | [wp-287](work-packages/wp-287-record-terminal-demos-as-real-sessions-checked-as-text.md) | 0618 | WP-286 | Not started | the owner's go for the `vault-pki` take; the owner's named "go vault-pki" to publish |
 | WP-288 | [wp-288](work-packages/wp-288-record-the-first-batch-of-browser-demos.md) | 0618 | WP-286, WP-287 | Not started | the owner's go for each take and a named "go <id>" for each of the four GIFs |
@@ -1342,6 +1342,7 @@ moving.
 
 ## Change log
 
+- 2026-11-15 — WP-285 Done and ADR-0617 Implemented: the owner's gate on the Open WebUI pilot passed and the 30 scenario pages, the 6 workshops and both templates take the presenter's shape (`## References` and `## Page status` last, no ADR or WP reference in the Introduction, Personas and Presenter lifecycle). The page-shape checks of `consistency.py` report 0 problems and 0 warnings on the 36 pages and are enforced as problems. Open: the rows that state what a screen shows (the Open WebUI tools lists of `identity-personas` and `mcp-tools-by-group`, the `openclaw` tool lists, the README persona table) wait for the owner's decision.
 - 2026-11-15 — ADR-0618 and WP-286 to WP-290 added (Phase 57, v0.16) by the owner's decisions of the day: a GIF for every catalogue scenario, terminal demos included (a real terminal session captured as bytes and timing, checked as text before any pixel, replayed in a vendored xterm.js and filmed), none for the workshops for now, the pilot's chain rules (a mandatory scout, what the persona owns compared before and after, no click on a settings control), the server-side traces accepted and stated, `record` not reading the budget, and six delicate demos decided by the owner one by one, last. ADR-0618 extends ADR-0617 and supersedes nothing.
 - 2026-11-15 — WP-284 Done: the Open WebUI 5-minute demo is recorded live as sale-01 and published as a 42.9 s, 1.3 MB GIF (`docs/assets/img/demo/open-webui.gif`, commit dd9178fc) with the owner's "go open-webui"; the chat of the take was deleted and sale-01's chat list was unchanged (evidence wp-284-open-webui-gif-2026-11-15.md). The first take failed on a selector and the first cut (sent to the owner) had two defects, so the owner received a re-cut. The page now says the tools menu shows one connection, Zuno tools, not tool names. Limits: one take of one demo, selectors tied to Open WebUI 0.12.5, a sampled privacy review. ADR-0617 stays Accepted: WP-285 (the rollout of the page shape) is pending the owner's gate.
 - 2026-11-15 — ADR-0617, WP-284 and WP-285 added (Phase 57, v0.16) by the owner's decisions of the day: a 40 to 60 second silent GIF of each demo's 5-minute version, recorded by a dedicated walkthrough (Open WebUI first) and published only with the owner's named "go <id>"; every demo page takes a presenter's shape (status banner last as `## Page status`, ADR and WP references in `## References`). ADR-0617 amends the section order of ADR-0616 clause 4 by a dated note; ADR-0616 stays Implemented.
