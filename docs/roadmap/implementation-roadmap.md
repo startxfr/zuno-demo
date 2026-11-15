@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
-| v0.16 | 11 | 4 | 42 | WP-224, WP-227, WP-237, WP-278, WP-281 |
+| v0.16 | 11 | 3 | 42 | WP-224, WP-227, WP-237 |
 | v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1154,7 +1154,7 @@ step waits for the owner's go. Legacy documents are refused with the unifai-oper
 | WP-267 | [wp-267](work-packages/wp-267-release-and-promote-zuno-demo-agents-v1-0-0.md) | 0615 | WP-263, WP-264, WP-265 | Done | none |
 | WP-268 | [wp-268](work-packages/wp-268-refuse-legacy-okf-documents-with-operator-line-0-2.md) | 0615 | WP-267 | Not started | dated 2027-01-05: the reader branch and the unifai-operator 0.2 pin together (the owner's go) |
 
-### Phase 56 — Presenter lifecycle for every demo (added 2026-11-14)
+### Phase 56 — Presenter lifecycle for every demo (added 2026-11-14, closed 2026-11-15)
 
 ADR-0616: every demo of the catalogue `docs/demo/` (30 scenarios in a 5-minute and a 15-minute version, 6 workshops)
 is prepared and played through `make demo` only. Each action (status, check, install, start, stop, uninstall) and each
@@ -1173,10 +1173,10 @@ demo is rehearsed in both versions by 2026-11-18. The owner's seventeen decision
 | WP-275 | [wp-275](work-packages/wp-275-move-the-experience-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-276 | [wp-276](work-packages/wp-276-move-the-governance-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-277 | [wp-277](work-packages/wp-277-move-the-rhoai-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
-| WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Operator pending | 13 of 14 versions rehearsed `RESULT: PASS` on 2026-11-15 ([evidence](evidence/wp-278-foundation-rehearsals-2026-11-15.md)); `service-mesh-kiali` 5-minute awaits the owner's go or his decision to leave it unrehearsed |
+| WP-278 | [wp-278](work-packages/wp-278-move-the-foundation-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-279 | [wp-279](work-packages/wp-279-move-the-blender-and-world-model-demos-to-the-lifecycle.md) | 0616 | WP-273, WP-274 | Done | none |
 | WP-280 | [wp-280](work-packages/wp-280-compose-the-workshops-from-scenario-steps.md) | 0616 | WP-275, WP-276, WP-277, WP-278, WP-279 | Done | none |
-| WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Not started | dated 2026-11-18: full rehearsal, a named go per demo with a changing unit |
+| WP-281 | [wp-281](work-packages/wp-281-rehearse-every-demo-and-workshop-end-to-end.md) | 0616 | WP-280 | Done | none |
 
 ### OKF stream phases
 
@@ -1323,6 +1323,7 @@ moving.
 ## Change log
 
 - 2026-11-15 — Incident on demo333 (WP-260, ADR-0614 update). At the end of a world-model GPU search, the cascade delete of `zuno-machines-world-model-d0` removed two cluster singletons it also tracked, because the machines chart turns `infraPlacement` on by default. Deleting the GitopsService removed the openshift-gitops Argo CD instance. Deleting the image registry Config made the operator delete the registry's S3 bucket. Fix: the world-model Application lists every `infraPlacement` key as false, and the role refuses a cascade delete while the Application tracks anything but MachineSets. A CI test covers both. Argo CD was restored the same night, and the internal images were rebuilt from devel by 03:23 (supply chain 12 of 12 verified, golden path PASS).
+- 2026-11-15 — Phase 56 closed: WP-278 and WP-281 Done, ADR-0616 Implemented. Every catalogue demo (30 scenarios in both versions, 6 workshops) has a `make demo rehearse` report ending with `RESULT: PASS`; the golden path and the browser checks pass (evidence wp-281-full-rehearsal-2026-11-15.md). The reports are the sum of one day's layer runs at four commits; a PASS is not "show-ready" (world model switched off, no `ModelRegistry`).
 - 2026-11-15 — WP-280 Done: the six workshops rehearsed live, 6 of 6 `RESULT: PASS` (evidence wp-280-workshops-rehearsals-2026-11-15.md). `agentic-ai` passed on its second run: inside a workshop the `unifai-live-rag` start and stop files looked for their helper file in the workshop's directory; fixed, with a catalogue test.
 - 2026-11-15 — WP-279 Done: `blender-3d` and `world-model` rehearsed in both versions, 4 of 4 `RESULT: PASS` (evidence wp-279-blender-world-model-rehearsals-2026-11-15.md). The workstation add-on install and removal and the world-model install are skipped by the owner's decision; `world-model` stays "not show-ready" (switched off, no GPU node).
 - 2026-11-15 — Foundation rehearsed: 13 of 14 versions `RESULT: PASS`; WP-278 stays Operator pending for `service-mesh-kiali` 5-minute (the owner's go covered the 15-minute version). Found and fixed on the way: the engine ran queued golden-path probes in queue order, so `trace` ran before `unifai-tekos` and `observability-trace` failed its check; the queue now runs in the probe script's own order, and a failed check names its probe and the reason.

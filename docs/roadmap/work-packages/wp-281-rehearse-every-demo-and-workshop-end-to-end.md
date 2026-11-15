@@ -1,6 +1,6 @@
 # WP-281: Rehearse every demo and workshop end to end
 
-- **State:** Not started
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-280](wp-280-compose-the-workshops-from-scenario-steps.md)
 - **Related:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md), [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
@@ -35,3 +35,16 @@ rehearsal, the pages say so, and ADR-0616 is `Implemented`.
 - `make demo golden-path` and `make demo browser` pass after the rehearsals.
 - No page under `docs/demo/` still says "Not rehearsed" except where a named reason stands (the world model).
 - `python3 platform/docs/check_docs.py` and the catalogue test pass.
+
+## Result (2026-11-15)
+
+Done three days before the date of the brief, by the owner's decision of 2026-11-15 to complete the rehearsals that
+day. 60 scenario reports and 6 workshop reports end with `RESULT: PASS`; `make demo golden-path` passed before the
+last batch (14 moments, the world model as roadmap) and ran again inside the `service-mesh-kiali` start; `make demo
+browser` passed last, five checks ([evidence](../evidence/wp-281-full-rehearsal-2026-11-15.md)). Every page's banner
+gives the date and result of its rehearsals; the "Not rehearsed" that remain name one screen or one row.
+
+Limits of the proof, stated in the evidence file: the reports are the sum of layer runs at four commits (68ed5a62,
+fbdd31c7, b2dd53c1, d105538f), not one pass at one commit; the presenter's screen output was not reviewed; the world
+model and the registry part of `model-catalog-registry` stay "not show-ready"; the path "a failed check names its
+probe" was not seen live.

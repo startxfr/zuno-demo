@@ -1,6 +1,6 @@
 # ADR-0616: Prepare and play every catalogue demo through one make demo lifecycle
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-14
 - **Decision owners:** Zuno Demo architecture team
@@ -174,3 +174,19 @@ one Ansible file of that demo, then prints the matching section of its page, and
   variables the manifest or the step declares.
 - **Clause 14:** `platform/demo/consistency.py` also warns when a page's `### Status` or `### Check` names an object
   its file does not read; the rollout brought the count from 62 to 0.
+
+## Implementation (2026-11-15)
+
+Implemented by WP-269 to WP-281 (Phase 56). Every catalogue demo, 30 scenarios in both versions and 6 workshops, has a
+`make demo rehearse` report ending with `RESULT: PASS`, and `make demo golden-path` and `make demo browser` pass
+([evidence](../roadmap/evidence/wp-281-full-rehearsal-2026-11-15.md)). What the evidence does not show: the reports are
+the sum of one day's layer runs at four commits, not one pass at one commit; nobody reviewed the presenter's screen
+output of the runs; a rehearsal `PASS` is not "show-ready" (the world model is switched off, and
+`model-catalog-registry` has no `ModelRegistry` instance). The live rehearsals found three defects of the files, each
+fixed with a test:
+
+- **Clause 9:** the queued golden-path probes ran in queue order, so `trace` ran before `unifai-tekos`, whose run it
+  reads. The queue now runs in the probe script's own order, and a failed check names its probe and the reason. That
+  last path has not been seen live, since no check failed after the fix.
+- **Clause 10:** inside a workshop `demo_dir` is the workshop's directory. A scenario file reaches a file of its own
+  directory through `demo_unit.dir`; the catalogue test refuses a bare `demo_dir` in a demo file.

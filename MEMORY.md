@@ -1064,3 +1064,15 @@ target; revert to `latest` immediately after proving it.
   all Done). OKF v0.2 (extraction to a standalone `zuno-okf` repo) and
   OKF v0.3 (live reconciliation) remain open future work under this
   stream, not yet started.
+
+### Dated entries (roadmap work packages, v0.16) — current status per ADR
+
+- **2026-11-15 — ADR-0616 Implemented (Phase 56, WP-269 to WP-281, all Done).** Every demo of `docs/demo/` is prepared
+  and played through `make demo` (`use`, `status`, `check`, `install`, `start`, `step next|N`, `stop`, `uninstall`,
+  `rehearse`): one Ansible file per action and step under `ansible/demos/<id>/`, one page section each, engine in
+  `platform/demo/`. The 30 scenarios (both versions) and the 6 workshops have a rehearsal report ending with
+  `RESULT: PASS` (`docs/roadmap/evidence/wp-281-full-rehearsal-2026-11-15.md`). A rehearsal `PASS` is not
+  "show-ready": the world model is switched off and `model-catalog-registry` has no `ModelRegistry`. Traps kept for
+  the next change: queued probes must run in the probe script's order (`platform/demo/probe_order.py`); inside a
+  workshop `demo_dir` is the workshop's directory, a scenario file uses `demo_unit.dir`; a demo `status` never asserts
+  the DSC `Ready` condition while GuardrailsOrchestrator `zuno-guardrails-smoke` is parked in Error.

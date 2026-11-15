@@ -1,6 +1,6 @@
 # WP-278: Move the foundation demos to the lifecycle
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
 - **Depends on:** [WP-273](wp-273-pilot-the-guardrails-demo-on-the-lifecycle.md) and [WP-274](wp-274-pilot-the-unifai-live-rag-demo-on-the-lifecycle.md), and the owner's go at the gate of 2026-11-16
 - **Related:** [WP-271](wp-271-scaffold-every-demo-directory-and-the-catalogue-check.md), [WP-281](wp-281-rehearse-every-demo-and-workshop-end-to-end.md)
@@ -46,3 +46,13 @@ For each demo below, in the order given:
 - The catalogue test passes with every demo of this brief counted as moved.
 - Each demo has a 5-minute and a 15-minute rehearsal report ending with `RESULT: PASS`, or failures the page explains.
 - Every "Nothing to do." and "Nothing to run." is deliberate.
+
+## Result (2026-11-15)
+
+Files by zuno-demo-reorg-assist, pages reviewed against them by zuno-demo-reorg-writer, rehearsals by
+zuno-demo-reorg-demo333 with the owner's go. The seven demos passed both rehearsals, 14 of 14 `RESULT: PASS`
+([evidence](../evidence/wp-278-foundation-rehearsals-2026-11-15.md)). `observability-trace` failed its first two runs
+on a defect of the engine, not of the platform: the queued probes ran in queue order, `trace` before `unifai-tekos`,
+whose run it reads. Fixed by 602b9e24 (the queue runs in the probe script's own order) and fbdd31c7 (a failed check
+names its probe and the reason); the replays passed. `aap-audited-operations` launches one read-only AAP job per run
+and `service-mesh-kiali` runs the whole golden path at start; both ran with the owner's named go.
