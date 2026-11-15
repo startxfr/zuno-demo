@@ -38,6 +38,8 @@ assert all((d / x["png"]).stat().st_size > 0 and x["png"] == x["name"] + ".png" 
 assert m["demo"] == "open-webui" and m["persona"] == "sale-01" and m["viewport"] == {"width": 1280, "height": 800}
 assert m["status"] == "pass" and m["chat_deleted"] is True and m["started"].endswith("Z"), m
 assert m["motion_from"] == "q1-sent" and m["motion_from"] in names, m
+home = [x["t"] for x in m["markers"] if x["name"] == "home"][0]
+assert home >= 2.5, f"home marked at {home} s, before the sign-in toast was gone"
 PY
 out="$(take refused 1)"; rc=$?
 echo "$out" | sed 's/^/    /'

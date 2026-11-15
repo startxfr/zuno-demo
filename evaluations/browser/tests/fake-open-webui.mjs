@@ -1,6 +1,7 @@
 // WP-284: a stand-in for Open WebUI and Keycloak, for the offline test of record.mjs (tests/record-offline.sh).
 // It serves what walkthroughs/open-webui.mjs looks for and nothing more: the sign-in form, a chat page, and the two
-// API calls of a chat (read, delete). FAKE_REFUSE_DELETE=1 makes the delete answer 403; FAKE_NO_URL=1
+// API calls of a chat (read, delete). Like 0.12.5 with its sidebar collapsed, the page keeps a new-chat button on screen
+// and an earlier chat's link off screen; its toggle would bring that link on screen. A sign-in toast shows for 2.5 s. FAKE_REFUSE_DELETE=1 makes the delete answer 403; FAKE_NO_URL=1
 // keeps the address bar on the home page after a send (the chat exists, its id is never shown). No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
@@ -15,6 +16,10 @@ const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
 <style>body{font:16px sans-serif;margin:24px} #chat-input{border:1px solid #888;min-height:40px;padding:8px} .menu{border:1px solid #888;padding:8px;margin:4px 0}</style>
 <button id="model-selector-0-button" aria-label="Select a model">Zuno</button>
 <div id="models" class="menu" hidden><div id="pick-code">Zuno Code</div></div>
+<div id="sidebar" style="position:fixed;top:0;left:-400px;width:300px"><a href="/c/00000000-0000-0000-0000-000000000000">An earlier chat of sale-01</a></div>
+<button id="sidebar-new-chat-button">new chat</button>
+<button id="sidebar-toggle-button" onclick="document.getElementById('sidebar').style.left='0px'">toggle</button>
+<div id="toast">You're now logged in.</div>
 <p>Zuno picks the model</p>
 <div id="messages"></div>
 <div id="chat-input" contenteditable="true"></div>
@@ -22,6 +27,7 @@ const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
 <div id="tools" class="menu" hidden><div>Zuno tools</div><div>Drive search</div><div>Gmail read</div><div>Diagram generation</div></div>
 <script>
 localStorage.setItem("token", "fake-session");
+setTimeout(() => document.getElementById("toast").remove(), 2500);
 const $ = (id) => document.getElementById(id);
 $("model-selector-0-button").onclick = () => { $("models").hidden = !$("models").hidden; };
 $("pick-code").onclick = () => { $("model-selector-0-button").textContent = "Zuno Code"; $("models").hidden = true; };

@@ -84,6 +84,20 @@ async function firstVisible(page, selectors) {
   return null;
 }
 
+// True when a link to an earlier chat can really be seen: inside the viewport and not covered or slid away. The
+// collapsed sidebar of 0.12.5 keeps its buttons (the new-chat pencil stays on the rail) and may keep its chat links in
+// the page, so neither a button nor Playwright's "visible" says whether the list is open.
+async function chatLinkOnScreen(page) {
+  return page.evaluate(() => [...document.querySelectorAll("a[href^='/c/']")].some((a) => {
+    const r = a.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return false;
+    const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
+    const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
+    const top = document.elementFromPoint(x, y);
+    return Boolean(top) && (a.contains(top) || top.contains(a));
+  }));
+}
+
 export async function run({ page, base, mark, log, keycloak, state }) {
   // The sidebar is closed before the first screen is drawn: sale-01's earlier chat titles never appear in the take.
   await page.addInitScript(() => { try { localStorage.setItem("sidebar", "false"); } catch { /* another origin */ } });
@@ -97,14 +111,18 @@ export async function run({ page, base, mark, log, keycloak, state }) {
   await page.waitForSelector("#chat-input", { timeout: 60000 });
   if (CHAT_ID.test(page.url())) await page.goto(`${base}/`);   // a new chat: the home page, no chat open
   await page.waitForSelector("#chat-input", { timeout: 60000 });
-  const chatList = await firstVisible(page, ["#sidebar-new-chat-button", "#sidebar a[href^='/c/']"]);
-  if (chatList) {
+  await page.waitForTimeout(600);   // the sidebar's own animation, when it has one
+  // The toggle is clicked only when an earlier chat is really on screen: on a sidebar already collapsed it would
+  // OPEN the list (first live take, 2026-11-15).
+  if (await chatLinkOnScreen(page)) {
     const toggle = await firstVisible(page, ["#sidebar-toggle-button", "button[aria-label='Toggle Sidebar']", "button[aria-label='Close Sidebar']"]);
     if (!toggle) throw new Error("the sidebar is open and its toggle button was not found");
     await toggle.click();
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(800);
   }
-  if (await page.locator("a[href^='/c/']").first().isVisible().catch(() => false)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
+  if (await chatLinkOnScreen(page)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
+  // The sign-in toast ("You're now logged in.") must be gone before the home marker, or it is in the GIF.
+  await page.getByText("You're now logged in").first().waitFor({ state: "hidden", timeout: 20000 });
   await page.getByText("Zuno picks the model").first().waitFor({ timeout: 30000 });
   if (CHAT_ID.test(page.url())) throw new Error("a chat is already open on the home page: the take must start from a new chat");
   await page.waitForTimeout(1000);
