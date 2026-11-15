@@ -3,29 +3,30 @@
 # otherwise (`any` accepts every value: the startx-cluster-* Applications share resources with the zuno ones and
 # read OutOfSync while healthy).
 # Vars: argo_apps (names, or {name, sync, health}), argo_namespace (default openshift-gitops).
+# One list of the namespace's Applications, selected by name (each k8s_info call starts a module, about 2 s).
 - name: "demo | read the Argo CD Applications"
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1alpha1
     kind: Application
     namespace: "{{ argo_namespace | default('openshift-gitops') }}"
-    name: "{{ item.name if item is mapping else item }}"
-  loop: "{{ argo_apps | default([]) }}"
-  loop_control:
-    label: "{{ item.name if item is mapping else item }}"
   register: _demo_argo
   failed_when: false
+  when: argo_apps | default([]) | length > 0
 
 - name: "demo | record the Applications"
   ansible.builtin.set_fact:
     demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
-  loop: "{{ _demo_argo.results | default([]) }}"
+  loop: "{{ argo_apps | default([]) }}"
   loop_control:
-    label: "{{ item.item.name if item.item is mapping else item.item }}"
+    loop_var: _demo_wanted
+    label: "{{ _demo_name }}"
   vars:
-    _demo_name: "{{ item.item.name if item.item is mapping else item.item }}"
-    _demo_want_sync: "{{ item.item.sync | default('Synced') if item.item is mapping else 'Synced' }}"
-    _demo_want_health: "{{ item.item.health | default('Healthy') if item.item is mapping else 'Healthy' }}"
-    _demo_app: "{{ item.resources | default([]) | first | default({}, true) }}"
+    _demo_name: "{{ _demo_wanted.name if _demo_wanted is mapping else _demo_wanted }}"
+    _demo_want_sync: "{{ _demo_wanted.sync | default('Synced') if _demo_wanted is mapping else 'Synced' }}"
+    _demo_want_health: "{{ _demo_wanted.health | default('Healthy') if _demo_wanted is mapping else 'Healthy' }}"
+    _demo_app: >-
+      {{ _demo_argo.resources | default([]) | selectattr('metadata.name', 'equalto', _demo_name) | first
+         | default({}, true) }}
     _demo_sync: "{{ _demo_app.status.sync.status | default('absent') }}"
     _demo_health: "{{ _demo_app.status.health.status | default('absent') }}"
     _demo_row:

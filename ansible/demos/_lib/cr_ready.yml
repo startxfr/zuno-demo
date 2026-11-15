@@ -11,29 +11,63 @@
 # of `name` matches every object whose name starts with it, and passes when one of them is in the expected state: a
 # ClusterServiceVersion is named after its version (rhtas-operator.v1.5.1), and an OLM upgrade renames it, leaving
 # the old one Replacing for a while.
-- name: "demo | read the custom resources"
-  kubernetes.core.k8s_info:
-    api_version: "{{ item.api_version }}"
-    kind: "{{ item.kind }}"
-    namespace: "{{ item.namespace | default(omit) }}"
-    name: "{{ item.name | default(omit) }}"
+# Reads are grouped (2026-11-15: each k8s_info call starts a module, about 2 s): entries that share an API version,
+# a kind and a namespace are read with ONE list and selected by name; an entry alone in its group is read by name.
+- name: "demo | custom resources: start the list of reads"
+  ansible.builtin.set_fact:
+    _demo_cr_bases: []
+    _demo_cr_reads: []
+
+- name: "demo | custom resources: the group of each entry"
+  ansible.builtin.set_fact:
+    _demo_cr_bases: "{{ _demo_cr_bases + [item.api_version ~ '|' ~ item.kind ~ '|' ~ (item.namespace | default(''))] }}"
   loop: "{{ cr_ready | default([]) }}"
   loop_control:
-    label: "{{ item.kind }} {{ item.namespace | default('-') }}/{{ item.name if item.name is defined else (item.name_prefix ~ '*') }}"
+    label: "{{ item.kind }} {{ item.namespace | default('-') }}"
+
+- name: "demo | custom resources: one read per group"
+  ansible.builtin.set_fact:
+    _demo_cr_reads: "{{ (_demo_cr_reads + [_demo_cr_key]) | unique }}"
+  loop: "{{ cr_ready | default([]) }}"
+  loop_control:
+    index_var: _demo_cr_index
+    label: "{{ _demo_cr_key }}"
+  vars:
+    _demo_cr_base: "{{ _demo_cr_bases[_demo_cr_index] }}"
+    _demo_cr_alone: "{{ _demo_cr_bases | select('equalto', _demo_cr_base) | list | length == 1 }}"
+    _demo_cr_key: "{{ _demo_cr_base }}|{{ item.name if (item.name is defined and _demo_cr_alone | bool) else '' }}"
+
+- name: "demo | read the custom resources"
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.split('|')[0] }}"
+    kind: "{{ item.split('|')[1] }}"
+    namespace: "{{ item.split('|')[2] if item.split('|')[2] | length > 0 else omit }}"
+    name: "{{ item.split('|')[3] if item.split('|')[3] | length > 0 else omit }}"
+  loop: "{{ _demo_cr_reads }}"
   register: _demo_crs
   failed_when: false
 
 - name: "demo | record the custom resources"
   ansible.builtin.set_fact:
     demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
-  loop: "{{ _demo_crs.results | default([]) }}"
+  loop: "{{ cr_ready | default([]) }}"
   loop_control:
-    label: "{{ item.item.kind }} {{ item.item.namespace | default('-') }}/{{ _demo_label }}"
+    loop_var: _demo_cr
+    index_var: _demo_cr_index
+    label: "{{ _demo_cr.kind }} {{ _demo_cr.namespace | default('-') }}/{{ _demo_label }}"
   vars:
+    _demo_cr_base: "{{ _demo_cr_bases[_demo_cr_index] }}"
+    _demo_cr_read: >-
+      {{ _demo_crs.results | selectattr('item', 'in', [_demo_cr_base ~ '|', _demo_cr_base ~ '|' ~ (_demo_cr.name
+         | default(''))]) | first | default({}, true) }}
+    item:
+      item: "{{ _demo_cr }}"
+      resources: "{{ _demo_cr_read.resources | default([]) }}"
     _demo_label: "{{ item.item.name if item.item.name is defined else (item.item.name_prefix ~ '*') }}"
     _demo_candidates: >-
-      {{ (item.resources | default([])) if item.item.name is defined
-         else (item.resources | default([]) | selectattr('metadata.name', 'match', '^' ~ (item.item.name_prefix
+      {{ (item.resources | selectattr('metadata.name', 'equalto', item.item.name) | list)
+         if item.item.name is defined
+         else (item.resources | selectattr('metadata.name', 'match', '^' ~ (item.item.name_prefix
                | regex_escape)) | list) }}
     _demo_in_phase: >-
       {{ _demo_candidates | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto',

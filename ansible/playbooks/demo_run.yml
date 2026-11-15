@@ -79,6 +79,17 @@
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
       when: demo_manifest.cluster | default(true)
 
+    # platform/demo/runner.py keeps the domain per API server (~/.cache/zuno/demo/cluster-domain.json) and passes it
+    # back as cluster_base_domain, so the discovery above (one k8s_info call) runs once per cluster, not per command.
+    - name: "demo | hand the cluster base domain back to the runner"
+      ansible.builtin.copy:
+        content: "{{ cluster_base_domain }}\n"
+        dest: "{{ demo_results_path }}.domain"
+        mode: "0600"
+      when:
+        - demo_manifest.cluster | default(true)
+        - cluster_base_domain is defined
+
     - name: "demo | run each unit"
       ansible.builtin.include_tasks: "{{ demo_lib }}/unit.yml"
       loop: "{{ demo_units }}"

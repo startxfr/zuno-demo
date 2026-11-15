@@ -78,6 +78,51 @@ def _runtime_dir() -> Optional[str]:
     return runtime if runtime and os.path.isdir(runtime) and os.access(runtime, os.W_OK) else None
 
 
+def domain_cache_path() -> pathlib.Path:
+    return session.cache_dir() / "cluster-domain.json"
+
+
+def api_server() -> str:
+    """The API server of the current `oc` context ("" when it cannot be told: then nothing is cached)."""
+    if shutil.which("oc") is None:
+        return ""
+    try:
+        done = subprocess.run(["oc", "whoami", "--show-server"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              universal_newlines=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
+def cached_domain(server: str) -> str:
+    """The apps domain demo_run.yml discovered for this API server on an earlier run, or ""."""
+    if not server:
+        return ""
+    try:
+        data = json.loads(domain_cache_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    value = data.get(server) if isinstance(data, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def remember_domain(server: str, domain: str) -> None:
+    if not server or not domain:
+        return
+    path = domain_cache_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    if data.get(server) == domain:
+        return
+    data[server] = domain
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _parse_time(value: str) -> Optional[datetime.datetime]:
     try:
         return datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -139,6 +184,11 @@ def run_units(demo_id: str, demo_dir: pathlib.Path, units: List[Unit], *, confir
         "demo_confirmed": confirmed,
         "demo_results_path": str(results_path),
     }
+    needs_cluster = _needs_cluster(demo_dir)
+    server = api_server() if needs_cluster else ""
+    domain = cached_domain(server)
+    if domain:
+        data["cluster_base_domain"] = domain
     fd = os.open(str(vars_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(data, handle)
@@ -160,6 +210,9 @@ def run_units(demo_id: str, demo_dir: pathlib.Path, units: List[Unit], *, confir
                         sys.stdout.flush()
             rc = proc.wait()
         raw = json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else []
+        handed = pathlib.Path(str(results_path) + ".domain")
+        if not domain and handed.exists():
+            remember_domain(server, handed.read_text(encoding="utf-8").strip())
     except (OSError, ValueError) as exc:
         return RunResult(1, [], log_path, f"the runner failed: {exc}")
     finally:
@@ -176,6 +229,15 @@ def run_units(demo_id: str, demo_dir: pathlib.Path, units: List[Unit], *, confir
         if unit.name not in ran and not error:
             results.append(UnitResult(unit.name, "failed", error="did not run (see the log)"))
     return RunResult(rc, results, log_path, error)
+
+
+def _needs_cluster(demo_dir: pathlib.Path) -> bool:
+    """False only when the demo's manifest says `cluster: false` (the fixtures)."""
+    try:
+        text = (pathlib.Path(demo_dir) / "demo.yml").read_text(encoding="utf-8")
+    except OSError:
+        return True
+    return not any(line.strip().replace(" ", "") == "cluster:false" for line in text.split("\n"))
 
 
 def _tail(path: pathlib.Path, lines: int) -> str:

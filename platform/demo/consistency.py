@@ -372,7 +372,15 @@ def section_warnings(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
             continue
         try:
             data = " ".join(_data_strings(load_yaml(path)))
-        except yaml.YAMLError:
+            if entry.kind == "workshop":
+                # A workshop's action chains its scenarios' files: what they read and probe counts as read.
+                manifest = load_yaml(catalogue.demo_dir(entry.id, root) / "demo.yml") or {}
+                for name in workshop.scenarios(manifest):
+                    base = catalogue.demo_dir(name, root)
+                    for part in (base / f"{action}.yml", base / "demo.yml"):
+                        if part.is_file():
+                            data += " " + " ".join(_data_strings(load_yaml(part)))
+        except (yaml.YAMLError, OSError):
             continue
         for name in dict.fromkeys(OBJECT_NAME_RE.findall(text)):
             host = APPS_HOST_RE.match(name)

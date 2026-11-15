@@ -189,6 +189,14 @@ class AgendaConsistency(unittest.TestCase):
         step.write_text(step.read_text().replace("git log -1 --format=%s", "git log -1 --format=%h"))
         self.assertTrue(any("`git log -1 --format=%s` is not covered" in p for p in self.found()))
 
+    def test_a_workshop_page_may_name_what_its_scenarios_read(self):
+        page = self.root / "docs/demo/workshops/fixture-workshop.md"
+        page.write_text(page.read_text().replace(
+            "### Status\n\nNothing to do.", "### Status\n\nThe scenarios read `fixture-add-on` and `fixture-nowhere`."))
+        warned = consistency.warnings(self.root, only=["fixture-workshop"])
+        self.assertEqual(len(warned), 1, warned)
+        self.assertIn("`fixture-nowhere`", warned[0])
+
     def test_check_must_flush(self):
         (self.demo / "check.yml").write_text('- ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"\n')
         self.assertTrue(any("check.yml: a workshop's check must include _lib/flush_checks.yml" in p

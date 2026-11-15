@@ -127,6 +127,26 @@ class Guards(TempHome):
         self.assertEqual(guard.step_meta(manifest, "0:00"), {})
 
 
+class DomainCache(TempHome):
+    def test_remember_and_read_back_per_server(self):
+        import runner
+        self.assertEqual(runner.cached_domain("https://api.a:6443"), "")
+        runner.remember_domain("https://api.a:6443", "apps.a.example")
+        runner.remember_domain("https://api.b:6443", "apps.b.example")
+        self.assertEqual(runner.cached_domain("https://api.a:6443"), "apps.a.example")
+        self.assertEqual(runner.cached_domain("https://api.b:6443"), "apps.b.example")
+        self.assertEqual(runner.cached_domain("https://api.c:6443"), "")
+        self.assertEqual(runner.cached_domain(""), "")
+        runner.remember_domain("", "apps.x")
+        runner.domain_cache_path().write_text("{broken")
+        self.assertEqual(runner.cached_domain("https://api.a:6443"), "")
+
+    def test_a_fixture_demo_never_asks_the_cluster(self):
+        import runner
+        self.assertFalse(runner._needs_cluster(FIXTURES / "ansible/demos/fixture-demo"))
+        self.assertTrue(runner._needs_cluster(ROOT / "ansible/demos/guardrails"))
+
+
 class NotRehearsed(unittest.TestCase):
     def test_an_action_listed_not_rehearsed_is_skipped_with_its_reason(self):
         import catalogue
