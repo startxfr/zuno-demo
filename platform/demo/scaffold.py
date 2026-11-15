@@ -140,12 +140,9 @@ def probe_names(root: pathlib.Path) -> List[str]:
 
 
 def page_banner(page: catalogue.Page) -> str:
-    """The status banner: the `## Page status` section (ADR-0617). Until WP-285 has moved every page, a page without
-    it still carries its banner in its first 30 lines; the push that lands the last page removes this fallback."""
+    """The status banner: the `## Page status` section, the last of every page (ADR-0617). None: no banner probes."""
     status = page.section("Page status")
-    if status is not None:
-        return status.text
-    return "\n".join(page.text.split("\n")[:30])
+    return status.text if status is not None else ""
 
 
 def page_probes(page: catalogue.Page, readme_cell: str, known: List[str]) -> List[str]:

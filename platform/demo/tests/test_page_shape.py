@@ -1,8 +1,8 @@
 """The page shape of ADR-0617 (WP-285) and the published GIFs: one case per rule, on a copy of the fixture catalogue.
 
-A page with `## Page status` has its `##` sections in the contract's order, no ADR or WP reference and no link into
-docs/adr/ or docs/roadmap/ in its Introduction, Personas and Presenter lifecycle, and its banner under `## Page status`
-only. A page without it is reported as a warning until SHAPE_ENFORCED. A published GIF belongs to a demo, is embedded
+Every page has its `##` sections in the contract's order, no ADR or WP reference and no link into docs/adr/ or
+docs/roadmap/ in its Introduction, Personas and Presenter lifecycle, and its banner under `## Page status` only (the
+rollout mode, SHAPE_ENFORCED False, reported a page not moved yet as one warning). A published GIF belongs to a demo, is embedded
 once as the last line of its Introduction and weighs at most 8 MB. scaffold.py reads the probes from `## Page status`.
 
 Run from the repository root:
@@ -132,7 +132,14 @@ class Shape(unittest.TestCase):
         title, rest = text.replace(status, "").split("\n", 1)
         self.page.write_text(f"{title}\n\n{banner}\n{rest}".rstrip("\n") + "\n")
 
-    def test_a_page_not_moved_yet_is_a_warning(self):
+    def test_a_page_not_moved_is_a_problem(self):
+        self.unmove()
+        self.assertTrue(any("banner belongs" in p for p in self.problems()))
+        self.assertTrue(any("the contract is" in p for p in self.problems()))
+        self.assertEqual([w for w in self.warnings() if "not moved yet" in w], [])
+
+    @mock.patch.object(consistency, "SHAPE_ENFORCED", False)
+    def test_in_rollout_mode_a_page_not_moved_yet_is_a_warning(self):
         self.unmove()
         self.assertEqual(self.problems(), [])
         detailed = self.warnings()
@@ -142,12 +149,6 @@ class Shape(unittest.TestCase):
         self.assertEqual(len(summary), 1, summary)
         self.assertIn("not in the ADR-0617 page shape yet", summary[0])
         self.assertIn("--only fixture-demo", summary[0])
-
-    def test_once_enforced_a_page_not_moved_is_a_problem(self):
-        self.unmove()
-        with mock.patch.object(consistency, "SHAPE_ENFORCED", True):
-            self.assertTrue(any("banner belongs" in p for p in self.problems()))
-            self.assertEqual([w for w in self.warnings() if "not moved yet" in w], [])
 
     def test_a_page_before_the_presenter_lifecycle_is_not_read(self):
         self.assertEqual(consistency.shape_findings(
@@ -222,11 +223,12 @@ class PageProbes(unittest.TestCase):
     def test_the_top_is_ignored_once_page_status_exists(self):
         self.assertEqual(self.probes("> golden-path probe `stale`.\n\n", "> golden-path probe `fresh`."), ["fresh"])
 
-    def test_fallback_to_the_top_for_a_page_not_moved_yet(self):
+    def test_no_page_status_no_banner_probes(self):
         page = catalogue.Page("x", "scenario", "l", pathlib.Path("x.md"), "", [])
         page.text = "# Scenario: x\n\n> golden-path probe `top`.\n\n## Introduction\n\nText.\n"
         page.sections = catalogue.parse_sections(page.text)
-        self.assertEqual(scaffold.page_probes(page, "none", []), ["top"])
+        self.assertEqual(scaffold.page_probes(page, "none", []), [])
+        self.assertEqual(scaffold.page_probes(page, "`readme`", []), ["readme"])
 
 
 if __name__ == "__main__":

@@ -17,11 +17,10 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   files run the queued probes;
 - a page that has moved has `## Presenter lifecycle` with exactly `### Status` ... `### Uninstall`, none empty;
 - every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile);
-- the page shape of ADR-0617 (WP-285), for a page that has `## Page status`: its `##` sections in the contract's order
-  (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status last), no ADR or
-  WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter lifecycle, and
-  the `> **Status:**` banner under `## Page status` only. Until SHAPE_ENFORCED, a page without `## Page status` gets one
-  warning instead (all its findings with --only);
+- the page shape of ADR-0617 (WP-285), for every page that has `## Presenter lifecycle`: its `##` sections in the
+  contract's order (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status
+  last), no ADR or WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter
+  lifecycle, and the `> **Status:**` banner under `## Page status` only;
 - a published GIF `docs/assets/img/demo/<id>.gif` belongs to a catalogue demo, is at most 8 MB, and is embedded as the
   last line of that demo's Introduction (and only there); a page embeds no other demo's GIF.
 Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
@@ -388,9 +387,9 @@ def _data_strings(node) -> Iterable[str]:
 
 # --- the page shape of ADR-0617 (WP-285) --------------------------------------------------------------------------
 
-# False while WP-285 moves the pages layer by layer: a page without `## Page status` gets a warning. The push that
-# lands the last page sets it to True (every page then needs the shape) and removes scaffold.py's banner fallback.
-SHAPE_ENFORCED = False
+# True since WP-285 moved every page (2026-11-15): every page needs the shape. False was the rollout mode, where a page
+# without `## Page status` got one warning instead of its problems.
+SHAPE_ENFORCED = True
 PAGE_STATUS = "Page status"
 REFERENCES = "References"
 SCENARIO_ORDER = ["Introduction", "Personas", catalogue.LIFECYCLE_SECTION, "5-minute version", "15-minute version",

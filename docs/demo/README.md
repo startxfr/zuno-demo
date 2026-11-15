@@ -9,8 +9,6 @@ This directory holds the demonstrations of the Zuno platform:
 
 Every scenario page has the same structure, in this order ([ADR-0617](../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)). You can open any page and find the same sections in the same place. The Introduction, Personas and Presenter lifecycle carry no ADR or work-package reference and no link into `docs/adr/` or `docs/roadmap/`: those are in References.
 
-During the pilot of this shape, only [Open WebUI](scenarios/experiences/open-webui.md) and the scenario template follow it; the other pages still have the status banner first and their decisions in the Introduction.
-
 | Section | What it gives you |
 |---|---|
 | Introduction | What the brick is, where it sits in Zuno, the message; the GIF of the 5-minute version comes last, when the owner has said "go <id>" |
