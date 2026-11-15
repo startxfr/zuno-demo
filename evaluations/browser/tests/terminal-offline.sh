@@ -43,6 +43,7 @@ assert all((d / x["png"]).stat().st_size > 2000 for x in m["markers"])
 assert m["status"] == "pass" and m["demo"] == "fixture" and m["motion_from"] == "start" and m["persona"] == ""
 assert m["kind"] == "terminal" and m["created"] == [] and m["cleaned"] is None and m["owned"] is None
 assert m["terminal"]["cols"] == 100 and m["terminal"]["rows"] == 30 and len(m["terminal"]["cast_sha256"]) == 64
+assert m["terminal"]["font_px"] == 20 and m["viewport"] == {"width": 1232, "height": 808}, (m["terminal"], m["viewport"])
 # Real timing: the video's distance between two markers is the session's own, plus the holds while images were saved.
 first, last = s["steps"][0], s["steps"][-1]
 session = last["done"] - first["typed"]
@@ -70,6 +71,35 @@ assert len(wrapped) == 2 and len(wrapped[0]) == 100 and wrapped[0].startswith("$
 assert all(len(r) <= 100 for name in ("01-00-done", "02-15-done") for r in screen(name))
 PY
 expect "no credential and no host path went into the container's files" bash -c "! grep -r -l -E 'KUBECONFIG|$HOME' '$work/take' >/dev/null"
+
+# A wide table: the demo asks for a wider window (demo.yml `record: {cols, rows}`), the commands stay as they are.
+mkdir -p "$work/wide"
+python3 - "$here" "$work" <<'PY' || { echo "FAIL  the wide fixture session could not be captured"; exit 1; }
+import pathlib, sys
+here, work = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+sys.path.insert(0, str(here / "terminal"))
+import capture
+line = "NAME" + " " * 60 + "READY   STATUS    VAULT-SEALED   VAULT-ACTIVE   VAULT-VERSION".ljust(70)   # 134 columns
+rows = [capture.Step("0:00", [capture.Command(f"printf '%s|\\n' '{line}'"), capture.Command("stty size")])]
+passed, detail = capture.capture("fixture", rows, work / "wide", capture.clean_env("", {}, str(work / "home")), [],
+                                 cwd=work / "home", cols=136, rows=24)
+sys.exit(0 if passed else 1)
+PY
+out="$(RECORD_TERMINAL_DUMP=1 "$here/record.sh" fixture "$work/wide" --terminal 2>&1)"; rc=$?
+echo "$out" | tail -1 | sed 's/^/    /'
+expect "a 136x24 take exits 0" test "$rc" -eq 0
+expect "the wide table is on one line, the picture follows the window and stays wider than the GIF" python3 - "$work/wide" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); m = json.loads((d / "markers.json").read_text())
+rows = [r.rstrip() for r in (d / "screen-00-00-done.txt").read_text().split("\n") if r.strip()]
+table = [r for r in rows if r.startswith("NAME")]
+assert len(table) == 1 and len(table[0]) == 135 and table[0].endswith("|"), [len(r) for r in rows]
+assert "24 136" in rows, rows
+assert m["terminal"]["cols"] == 136 and m["terminal"]["rows"] == 24 and m["terminal"]["font_px"] == 15, m["terminal"]
+assert 960 <= m["viewport"]["width"] <= 1300 and m["viewport"]["height"] < 808, m["viewport"]
+cast = json.loads((d / "terminal.cast").read_text().splitlines()[0])
+assert (cast["width"], cast["height"]) == (136, 24), cast
+PY
 
 rm -f "$work/take/terminal.cast"
 out="$("$here/record.sh" fixture "$work/take" --terminal 2>&1)"; rc=$?

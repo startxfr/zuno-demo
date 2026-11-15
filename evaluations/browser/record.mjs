@@ -132,23 +132,33 @@ async function terminalTake(id, out) {
     wanted.push({ name: `${name(step.time)}-done`, at: step.done + 0.05 });     // the prompt is back
   }
   wanted.push({ name: "end", at: events[events.length - 1][0] + 0.6 });
-  const viewport = { width: 1232, height: 808 };   // 100x30 at 20 px Liberation Mono, with the page padding
+  // The window is the session's own (100x30 unless the demo asked for another, 80-140 x 20-40). The font is the
+  // largest whole size that keeps the columns within about 1250 px (Liberation Mono advances 0.6 em): 20 px at 100
+  // columns, 15 px at 136. The viewport is then measured on the page itself, before the filmed context exists.
+  if (!(header.width >= 80 && header.width <= 140 && header.height >= 20 && header.height <= 40)) usage(`terminal.cast is ${header.width}x${header.height}: the window must be 80-140 columns by 20-40 rows`);
+  const fontSize = Math.max(12, Math.min(26, Math.floor(1250 / (0.6 * header.width))));
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  const replayUrl = `file://${path.join(here, "terminal", "replay.html")}`;
+  const probe = await browser.newPage({ viewport: { width: 1600, height: 1400 } });
+  await probe.goto(replayUrl);
+  const measured = await probe.evaluate(([header, fontSize]) => window.replay.load(header, [], fontSize), [header, fontSize]);
+  await probe.close();
+  const viewport = { width: measured.width + 16, height: measured.height + 14 };   // the page's padding on the far sides
   const record = { demo: id, kind: "terminal", persona: "", viewport, started: new Date().toISOString(), motion_from: "start",
                    markers: [], created: [], cleaned: null, owned: null,   // nothing is signed in to, created or read
-                   terminal: { cols: header.width, rows: header.height, captured: captured.started,
+                   terminal: { cols: header.width, rows: header.height, font_px: fontSize, captured: captured.started,
                                cast_sha256: crypto.createHash("sha256").update(fs.readFileSync(castFile)).digest("hex") },
                    status: "fail", detail: "" };
   const failures = [];
   if (captured.status !== "done") failures.push(`the capture did not pass (${captured.detail})`);
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const context = await browser.newContext({ locale: "en-US", viewport, recordVideo: { dir: out, size: viewport }, offline: true });
   const page = await context.newPage();
   const t0 = Date.now();
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
   try {
-    await page.goto(`file://${path.join(here, "terminal", "replay.html")}`);
-    const size = await page.evaluate(([header, events]) => window.replay.load(header, events), [header, events]);
+    await page.goto(replayUrl);
+    const size = await page.evaluate(([header, events, fontSize]) => window.replay.load(header, events, fontSize), [header, events, fontSize]);
     if (size.width > viewport.width || size.height > viewport.height) throw new Error(`the ${header.width}x${header.height} terminal is ${size.width}x${size.height} px: it does not fit ${viewport.width}x${viewport.height}`);
     await page.waitForTimeout(300);
     await page.evaluate((stops) => window.replay.play(stops), wanted);

@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- WP-287 / ADR-0618 clause 6: replays a captured terminal session (asciicast v2, written by terminal/capture.py)
      in xterm.js, at its own timing, for evaluations/browser/record.mjs to film. Loaded from disk: no network.
-     The recorder calls replay.load(header, events) then replay.play(stops); replay.clock() is the session's clock in
+     The recorder calls replay.load(header, events, fontSize) then replay.play(stops); replay.clock() is the session's clock in
      seconds, replay.reached the stop the replay is holding at. Nothing here reads or changes the bytes. -->
 <meta charset="utf-8">
 <title>Terminal</title>
@@ -16,10 +16,10 @@
 <script src="vendor/xterm-6.0.0/xterm.js"></script>
 <script>
   const replay = { clock: () => -1, written: 0, total: 0, finished: false, term: null, size: null };
-  replay.load = (header, events) => {
+  replay.load = (header, events, fontSize) => {
     const term = new Terminal({
       cols: header.width, rows: header.height, fontFamily: '"Liberation Mono", "DejaVu Sans Mono", monospace',
-      fontSize: 20, lineHeight: 1.15, cursorBlink: false, scrollback: 0, convertEol: false, allowProposedApi: false,
+      fontSize, lineHeight: 1.15, cursorBlink: false, scrollback: 0, convertEol: false, allowProposedApi: false,
       theme: { background: "#16181d", foreground: "#e6e6e6", cursor: "#e6e6e6" },
     });
     term.open(document.getElementById("terminal"));

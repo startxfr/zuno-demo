@@ -28,7 +28,8 @@ fails naming the command and nothing is typed at all:
 
 The shell (clause 8): `env -i` with only PATH, TERM, LC_ALL=C.UTF-8, KUBECONFIG (by path, never typed) and
 PYTHONUSERBASE, the step variables of the demo (`env:` of demo.yml), HOME an empty temporary directory,
-`bash --noprofile --norc`, the prompt `$ `, no history (switched off, and HISTFILE=/dev/null), the repository root as the working directory, a 100x30 window.
+`bash --noprofile --norc`, a window of 100x30 unless demo.yml says `record: {cols, rows}` (80 to 140 columns, 20 to
+40 rows: a demo whose tables are wider than 100 columns asks for more, its commands stay the page's), the prompt `$ `, no history (switched off, and HISTFILE=/dev/null), the repository root as the working directory.
 The prompt also carries one invisible sequence (an OSC the terminal ignores) holding the exit code of the last command:
 that is how the driver knows the prompt is back, and with which result.
 
@@ -64,7 +65,8 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-COLS, ROWS = 100, 30
+COLS, ROWS = 100, 30                             # the default window
+COLS_RANGE, ROWS_RANGE = (80, 140), (20, 40)     # what demo.yml `record: {cols, rows}` may ask for
 KEY_DELAY = 0.045          # seconds between two keys: a person typing steadily
 AFTER_TYPED = 0.6          # the typed line stays readable before Enter
 BETWEEN_COMMANDS = 0.8
@@ -215,9 +217,9 @@ class Session:
 
 
 def play(steps: List[Step], env: Dict[str, str], cwd: pathlib.Path, timeout: float = COMMAND_TIMEOUT,
-         key_delay: float = KEY_DELAY, clear: bool = True) -> Tuple[List[Tuple[float, str]], str]:
+         key_delay: float = KEY_DELAY, clear: bool = True, cols: int = COLS, rows: int = ROWS) -> Tuple[List[Tuple[float, str]], str]:
     """Type every command of every step in one session. Returns (events, why it stopped or "")."""
-    session = Session(env, cwd)
+    session = Session(env, cwd, cols, rows)
     try:
         try:
             session.wait_prompt(20)
@@ -290,6 +292,7 @@ def capture(demo_id: str, steps: List[Step], out: pathlib.Path, env: Dict[str, s
             cwd: pathlib.Path = ROOT, **options) -> Tuple[bool, str]:
     """Play the steps, check the local values, write the files. Returns (passed, detail)."""
     started = time.time()
+    cols, rows = options.get("cols", COLS), options.get("rows", ROWS)
     events, stopped = play(steps, env, cwd, **options)
     leaked = printed("".join(chunk for _, chunk in events), values)
     failures = [stopped] if stopped else []
@@ -297,9 +300,9 @@ def capture(demo_id: str, steps: List[Step], out: pathlib.Path, env: Dict[str, s
     if leaked:
         failures.insert(0, "the session printed " + ", ".join(leaked) + ": the cast is not written")
     else:
-        write_cast(out / "terminal.cast", events, started)
+        write_cast(out / "terminal.cast", events, started, cols, rows)
     record = {
-        "demo": demo_id, "cols": COLS, "rows": ROWS,
+        "demo": demo_id, "cols": cols, "rows": rows,
         "started": datetime.datetime.utcfromtimestamp(started).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "steps": [{"time": s.time, "typed": s.commands[0].typed, "done": s.commands[-1].done,
                    "commands": [{"cmd": c.cmd, "typed": c.typed, "done": c.done, "rc": c.rc} for c in s.commands]}
@@ -309,6 +312,29 @@ def capture(demo_id: str, steps: List[Step], out: pathlib.Path, env: Dict[str, s
     }
     (out / "terminal-steps.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return not failures, record["detail"]
+
+
+def window(record: dict) -> Tuple[int, int, List[str]]:
+    """(cols, rows, problems) of demo.yml `record: {cols, rows}`: the terminal's window, 100x30 when absent. A wide
+    table needs more columns than 100; the commands stay the page's own, so the window is what adapts."""
+    problems = []
+    size = []
+    for key, default, (low, high) in (("cols", COLS, COLS_RANGE), ("rows", ROWS, ROWS_RANGE)):
+        value = (record or {}).get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+            problems.append(f"demo.yml `record: {{{key}: {value!r}}}` must be a whole number from {low} to {high}")
+            value = default
+        size.append(value)
+    return size[0], size[1], problems
+
+
+def demo_window(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[int, int, List[str]]:
+    sys.path.insert(0, str(root / "platform/demo"))
+    import catalogue
+    import yaml
+
+    manifest = yaml.safe_load((catalogue.demo_dir(demo_id, root) / "demo.yml").read_text(encoding="utf-8")) or {}
+    return window(manifest.get("record") or {})
 
 
 def demo_steps(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[List[Step], Dict[str, str], List[str]]:
@@ -353,6 +379,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("out_dir is required unless --plan")
     try:
         steps, variables, problems = demo_steps(args.demo)
+        cols, rows, size_problems = demo_window(args.demo)
+        problems += size_problems
     except (KeyError, OSError, NoDomain) as exc:   # also for --plan: a plan with an empty host would show wrong URLs
         print(f"{args.demo}: {exc}", file=sys.stderr)
         return 2
@@ -379,7 +407,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     with tempfile.TemporaryDirectory(prefix="zuno-terminal-home-") as home:
         env = clean_env(kubeconfig, variables, home)
         passed, detail = capture(args.demo, steps, out, env, local_values(kubeconfig, variables, token)
-                                 + [("the temporary home", home, False)])
+                                 + [("the temporary home", home, False)], cols=cols, rows=rows)
     print("CAPTURE: done" if passed else f"CAPTURE: failed {detail}")
     return 0 if passed else 1
 

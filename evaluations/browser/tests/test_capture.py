@@ -40,8 +40,8 @@ class Capture(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def take(self, rows, values=(), **options):
-        passed, detail = capture.capture("fixture", rows, self.out, self.env, list(values), cwd=ROOT, key_delay=0.002, **options)
+    def take(self, plan, values=(), **options):
+        passed, detail = capture.capture("fixture", plan, self.out, self.env, list(values), cwd=ROOT, key_delay=0.002, **options)
         record = json.loads((self.out / "terminal-steps.json").read_text())
         cast = self.out / "terminal.cast"
         lines = [json.loads(line) for line in cast.read_text().splitlines()] if cast.exists() else []
@@ -81,6 +81,23 @@ class Capture(unittest.TestCase):
         self.assertEqual(set(self.env) - {"PYTHONUSERBASE"},
                          {"PATH", "TERM", "LC_ALL", "HOME", "PS1", "PS2", "INPUTRC", "HISTFILE", "KUBECONFIG", "ZUNO_NS", "API_TOKEN"})
         self.assertRegex(text, r"(?m)^\$ pwd$")   # the prompt is `$ `: no user, no host, no path
+
+    def test_the_window_is_the_one_asked_for(self):
+        passed, detail, record, lines, text = self.take(steps(("0:00", ["stty size"])), cols=136, rows=24)
+        self.assertTrue(passed, detail)
+        self.assertIn("\n24 136\n", text)
+        self.assertEqual((lines[0]["width"], lines[0]["height"]), (136, 24))
+        self.assertEqual((record["cols"], record["rows"]), (136, 24))
+
+    def test_the_window_of_a_demo_comes_from_its_manifest_within_bounds(self):
+        self.assertEqual(capture.window({}), (100, 30, []))
+        self.assertEqual(capture.window({"kind": "terminal", "cols": 136, "rows": 24}), (136, 24, []))
+        self.assertEqual(capture.window({"cols": 80, "rows": 40}), (80, 40, []))
+        for bad in ({"cols": 79}, {"cols": 141}, {"rows": 19}, {"rows": 41}, {"cols": "120"}, {"cols": 120.5}, {"rows": True}):
+            cols, rows, problems = capture.window(bad)
+            self.assertEqual((cols, rows), (100, 30), bad)
+            self.assertEqual(len(problems), 1, bad)
+            self.assertIn("must be a whole number from", problems[0])
 
     def test_a_failing_command_fails_the_take_and_keeps_its_exit_code(self):
         passed, detail, record, lines, _ = self.take(steps(("0:00", ["false", "echo after"])))
