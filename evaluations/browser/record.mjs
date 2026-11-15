@@ -16,6 +16,13 @@
 // Environment: DEMO (the walkthrough id), APPS_DOMAIN, PERSONA_PASSWORD, OUT; RECORD_BASE_URL replaces the demo's
 // route (the offline test). `node record.mjs --check <id>` only loads the walkthrough and checks its shape and that its
 // prompts are the page's own: no browser, no cluster, no password.
+//
+// RECORD_SCOUT=1 (record.sh <id> [OUT] --scout) plays the walkthrough's scout(ctx) instead: it signs in, reaches the
+// first screen and opens the menus the walkthrough will use, WITHOUT sending a prompt, so a selector is checked for
+// the price of a sign-in. No video, no chat, no model call: every request that would send a chat message is refused
+// and fails the scout. It leaves scout.json ({demo, persona, started, steps: [{step, ok, selector, png, text, ...}],
+// status, detail}) and one scout-<step>.png per step; last line `SCOUT: done` (exit 0) or `SCOUT: failed <steps>`
+// (exit 1).
 // Exit code: 0 every marker reached and the cleanup done, 1 the walkthrough or the cleanup failed, 2 usage/environment.
 // The last line printed is `RESULT: PASS` or `RESULT: FAIL <detail>`.
 import fs from "node:fs";
@@ -58,6 +65,7 @@ export function shapeProblems(walk) {
   if (typeof walk.url !== "function") problems.push("`url(domain)` is missing");
   if (typeof walk.run !== "function") problems.push("`run(ctx)` is missing");
   if (walk.cleanup !== undefined && typeof walk.cleanup !== "function") problems.push("`cleanup` must be a function");
+  if (walk.scout !== undefined && typeof walk.scout !== "function") problems.push("`scout` must be a function");
   return problems;
 }
 
@@ -101,6 +109,57 @@ async function keycloak(page, username) {
 }
 
 const { chromium } = await import("playwright");
+
+if (process.env.RECORD_SCOUT === "1") {
+  if (!walk.scout) usage(`walkthrough ${id} has no scout()`);
+  const report = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
+                   steps: [], status: "fail", detail: "" };
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport });
+  const page = await context.newPage();
+  const t0 = Date.now();
+  const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
+  // A scout never sends a chat message: the calls that would are refused before they leave the browser.
+  const refused = [];
+  await page.route(/\/api\/(chat\/completions|chat\/completed|v1\/chats\/new|v1\/chats\/[^/]+$|v1\/tasks\/)/, (route) => {
+    if (route.request().method() === "GET") return route.continue();
+    refused.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    return route.abort();
+  });
+  // step(name, fn): fn returns what it found ({selector, text, ...}); a step that throws is kept as failed and the
+  // scout goes on, so one run says everything it can.
+  const step = async (name, fn) => {
+    const entry = { step: name, ok: true, png: `scout-${name}.png` };
+    try {
+      Object.assign(entry, (await fn()) || {});
+    } catch (e) {
+      entry.ok = false;
+      entry.error = String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300);
+    }
+    await page.screenshot({ path: path.join(out, entry.png) }).catch(() => { entry.png = null; });
+    report.steps.push(entry);
+    log(`scout ${name}: ${entry.ok ? "ok" : "FAILED " + entry.error}`);
+    return entry;
+  };
+  const ctx = { page, domain, log, step, state: { scout: true }, mark: async () => {},
+                keycloak: (username) => keycloak(page, username), base: process.env.RECORD_BASE_URL || walk.url(domain) };
+  try {
+    await walk.scout(ctx);
+  } catch (e) {
+    report.steps.push({ step: "scout", ok: false, png: null, error: String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300) });
+  }
+  await context.close();
+  await browser.close();
+  const bad = report.steps.filter((s) => !s.ok).map((s) => s.step);
+  if (refused.length) bad.push(`a chat message was about to be sent (${refused.join(", ")})`);
+  report.refused_requests = refused;
+  report.status = bad.length ? "fail" : "done";
+  report.detail = bad.length ? `failed: ${bad.join(", ")}` : `${report.steps.length} steps`;
+  fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify(report, null, 2) + "\n");
+  console.log(bad.length ? `SCOUT: failed ${bad.join(", ")}` : "SCOUT: done");
+  process.exit(bad.length ? 1 : 0);
+}
+
 const record = { demo: id, persona: walk.persona, viewport: walk.viewport, started: new Date().toISOString(),
                  motion_from: walk.motion_from, markers: [], chat_deleted: false, status: "fail", detail: "" };
 const browser = await chromium.launch();

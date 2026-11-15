@@ -1,12 +1,15 @@
 // WP-284: a stand-in for Open WebUI and Keycloak, for the offline test of record.mjs (tests/record-offline.sh).
 // It serves what walkthroughs/open-webui.mjs looks for and nothing more: the sign-in form, a chat page, and the two
 // API calls of a chat (read, delete). Like 0.12.5 with its sidebar collapsed, the page keeps a new-chat button on screen
-// and an earlier chat's link off screen; its toggle would bring that link on screen. A sign-in toast shows for 2.5 s. FAKE_REFUSE_DELETE=1 makes the delete answer 403; FAKE_NO_URL=1
+// and an earlier chat's link off screen; its toggle would bring that link on screen. A sign-in toast shows for 2.5 s.
+// The tools are as seen live on 2026-11-15: the Integrations button opens a role=menu with one row "Tools 1", which
+// opens a panel with the connection "Zuno tools" and its switch (on); the wrench "Available Tools" opens nothing. FAKE_REFUSE_DELETE=1 makes the delete answer 403; FAKE_NO_URL=1
 // keeps the address bar on the home page after a send (the chat exists, its id is never shown). No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
 
 const port = Number(process.env.FAKE_PORT || 8099);
+let toggled = 0;            // clicks on the tool connection's switch: a take or a scout must leave it at 0
 const chats = new Map();   // id -> {title, messages: {id: {role, content, done, timestamp}}}
 
 const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/"><input id="username" name="u">
@@ -14,7 +17,7 @@ const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/
 
 const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
 <style>body{font:16px sans-serif;margin:24px} #chat-input{border:1px solid #888;min-height:40px;padding:8px} .menu{border:1px solid #888;padding:8px;margin:4px 0}</style>
-<button id="model-selector-0-button" aria-label="Select a model">Zuno</button>
+<button id="model-selector-model-button" aria-label="Selected model: Zuno">Zuno</button>
 <div id="models" class="menu" hidden><div id="pick-code">Zuno Code</div></div>
 <div id="sidebar" style="position:fixed;top:0;left:-400px;width:300px"><a href="/c/00000000-0000-0000-0000-000000000000">An earlier chat of sale-01</a></div>
 <button id="sidebar-new-chat-button">new chat</button>
@@ -23,16 +26,20 @@ const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
 <p>Zuno picks the model</p>
 <div id="messages"></div>
 <div id="chat-input" contenteditable="true"></div>
-<button aria-label="Integrations" id="tools-button">+</button>
-<div id="tools" class="menu" hidden><div>Zuno tools</div><div>Drive search</div><div>Gmail read</div><div>Diagram generation</div></div>
+<button aria-label="Integrations" id="integration-menu-button">+</button>
+<button aria-label="Available Tools">wrench 1</button>
+<div id="tools" role="menu" class="menu" hidden><div role="menuitem" id="tools-row"><div>Tools</div><div>1</div></div>
+<div id="tools-panel" hidden><div>Zuno tools</div><button role="switch" aria-checked="true" id="zuno-switch" style="width:30px;height:16px"></button></div></div>
 <script>
 localStorage.setItem("token", "fake-session");
 setTimeout(() => document.getElementById("toast").remove(), 2500);
 const $ = (id) => document.getElementById(id);
-$("model-selector-0-button").onclick = () => { $("models").hidden = !$("models").hidden; };
-$("pick-code").onclick = () => { $("model-selector-0-button").textContent = "Zuno Code"; $("models").hidden = true; };
-$("tools-button").onclick = () => { $("tools").hidden = false; };
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("tools").hidden = true; });
+$("model-selector-model-button").onclick = () => { $("models").hidden = !$("models").hidden; };
+$("pick-code").onclick = () => { $("model-selector-model-button").textContent = "Zuno Code"; $("model-selector-model-button").setAttribute("aria-label", "Selected model: Zuno Code"); $("models").hidden = true; };
+$("integration-menu-button").onclick = () => { $("tools").hidden = false; };
+$("tools-row").onclick = () => { $("tools-panel").hidden = false; };
+$("zuno-switch").onclick = () => { $("zuno-switch").setAttribute("aria-checked", "false"); fetch("/fake/toggled", { method: "POST" }); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("tools").hidden = true; $("tools-panel").hidden = true; } });
 async function show() {
   const m = location.pathname.match(/^\\/c\\/(.+)$/);
   if (!m) return;
@@ -53,7 +60,7 @@ $("chat-input").addEventListener("keydown", async (e) => {
   const text = $("chat-input").textContent;
   $("chat-input").textContent = "";
   const m = location.pathname.match(/^\\/c\\/(.+)$/);
-  const r = await fetch("/fake/send", { method: "POST", body: JSON.stringify({ id: m ? m[1] : null, text, model: $("model-selector-0-button").textContent }) });
+  const r = await fetch("/fake/send", { method: "POST", body: JSON.stringify({ id: m ? m[1] : null, text, model: $("model-selector-model-button").textContent }) });
   const { id } = await r.json();
   if (!m && !__NO_URL__) history.pushState({}, "", "/c/" + id);
 });
@@ -95,7 +102,8 @@ http.createServer((req, res) => {
     if (process.env.FAKE_REFUSE_DELETE === "1") return json(res, 403, { detail: "refused" });
     return json(res, 200, chats.delete(chat[1]));
   }
-  if (url.pathname === "/fake/count") return json(res, 200, { chats: chats.size });
+  if (url.pathname === "/fake/toggled") { toggled += 1; return json(res, 200, {}); }
+  if (url.pathname === "/fake/count") return json(res, 200, { chats: chats.size, toggled });
   if (url.pathname === "/" || url.pathname.startsWith("/c/")) {
     res.writeHead(200, { "content-type": "text/html" });
     return res.end(CHAT.replace("__NO_URL__", process.env.FAKE_NO_URL === "1" ? "true" : "false"));

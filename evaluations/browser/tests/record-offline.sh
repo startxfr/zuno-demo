@@ -3,28 +3,52 @@
 # against tests/fake-open-webui.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves the recorder's own work (video, markers, PNGs, markers.json, exit codes, the chat deleted by its id, a
 # refused delete failing the take with the chat's title, a chat whose id was never read reported and not silent), not
-# Open WebUI's real selectors. The last case waits out the walkthrough's 60 s for the address bar.
+# Open WebUI's real selectors. The first case is the scout: a sign-in and the menus, no prompt, no chat, no video. The last case waits out the walkthrough's 60 s for the address bar.
 #   evaluations/browser/tests/record-offline.sh
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 failed=0
-take() {   # take <name> <FAKE_REFUSE_DELETE> [FAKE_NO_URL]: prints the recorder's output, returns its exit code
+take() {   # take <name> <FAKE_REFUSE_DELETE> [FAKE_NO_URL] [RECORD_SCOUT]: prints the recorder's output, returns its exit code
   mkdir -p "$work/$1"
   podman run --rm -e DEMO=open-webui -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
-    -e RECORD_BASE_URL=http://127.0.0.1:8099 -e FAKE_REFUSE_DELETE="$2" -e FAKE_NO_URL="${3:-0}" \
+    -e RECORD_BASE_URL=http://127.0.0.1:8099 -e FAKE_REFUSE_DELETE="$2" -e FAKE_NO_URL="${3:-0}" -e RECORD_SCOUT="${4:-0}" \
     -v "$here:/work:Z" -v "$work/$1:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
     sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node tests/fake-open-webui.mjs >/dev/null & sleep 1; node record.mjs; rc=$?; echo "chats left: $(curl -s http://127.0.0.1:8099/fake/count)"; exit $rc'
 }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
 }
+out="$(take scout 0 0 1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "a scout exits 0" test "$rc" -eq 0
+expect "its last recorder line is SCOUT: done" grep -q '^SCOUT: done$' <<<"$out"
+expect "a scout creates no chat and clicks no tool switch" grep -q 'chats left: {"chats":0,"toggled":0}' <<<"$out"
+expect "a scout leaves no video and no markers.json" bash -c "! ls '$work/scout' | grep -q -E '\.webm$|^markers\.json$'"
+expect "scout.json names the selectors and what each menu showed" python3 - "$work/scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
+steps = {x["step"]: x for x in s["steps"]}
+assert list(steps) == ["home", "picker", "tools", "closed"], list(steps)
+assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
+assert all((d / x["png"]).stat().st_size > 0 for x in s["steps"])
+assert steps["home"]["chat_link_on_screen"] is False
+near = steps["home"]["buttons"]["prompt_box"] + steps["home"]["buttons"]["elsewhere"]
+assert any(b["aria"] == "Integrations" for b in near) and any(b["id"] == "model-selector-model-button" for b in near), near
+assert steps["picker"]["selector"] == "#model-selector-model-button" and steps["picker"]["label"] == "Zuno"
+assert steps["picker"]["zuno_code_listed"] is True and "Zuno Code" in steps["picker"]["text"]
+assert steps["tools"]["selector"] == "#integration-menu-button" and steps["tools"]["connection_listed"] is True
+assert steps["tools"]["row_selector"].startswith("[role='menu'] [role='menuitem']"), steps["tools"]
+assert steps["tools"]["switches"] == [{"label": "Zuno tools", "on": True}], steps["tools"]["switches"]
+assert not any(steps["tools"]["tool_words_on_screen"].values())
+assert steps["closed"]["menu_still_open"] is False
+PY
 out="$(take pass 0)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "a good take exits 0" test "$rc" -eq 0
 expect "its last recorder line is RESULT: PASS" grep -q '^RESULT: PASS$' <<<"$out"
-expect "the chat it created is gone" grep -q 'chats left: {"chats":0}' <<<"$out"
+expect "the chat it created is gone and no tool switch was clicked" grep -q 'chats left: {"chats":0,"toggled":0}' <<<"$out"
 expect "recording.webm is there and not empty" test -s "$work/pass/recording.webm"
 expect "exactly one webm" test "$(ls "$work/pass" | grep -c '\.webm$')" -eq 1
 expect "markers.json follows the contract" python3 - "$work/pass" <<'PY'
