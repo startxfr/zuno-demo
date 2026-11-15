@@ -1,18 +1,5 @@
 # Scenario: Open WebUI - a familiar chat on governed models and tools
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse open-webui`: the 5-minute version PASS at 15:03 (11
-> units, 40 s); the 15-minute version PASS at 15:06 (19 units, 47 s). Evidence:
-> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-12:
-> Application `zuno-open-webui-d1` Synced and Healthy, Deployment `open-webui` 1/1 (image 0.12.5 pinned by digest),
-> route `open-webui.apps.demo333.startx.fr`, both ExternalSecrets synced, `open-webui` listed in the ai-gateway's
-> experience clients.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probes `open-webui` and `zuno-code`.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
-> many experiences](../../five-experiences.md).
-
 ## Introduction
 
 Open WebUI is the general-purpose chat of Zuno: the screen any employee already knows. In Zuno it is only a
@@ -24,21 +11,10 @@ six other experiences.
 
 **The message:** "Bring any chat UI you like: identity, models, tools and budget stay governed by the platform."
 
-**Decisions:**
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
-  presentation layers over the one governed backend.
-- [ADR-0588](../../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): Open WebUI, user's own
-  token, no RAG, uploads or web search.
-- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
-  the same tools as the agents, filtered by group; a turn that used a tool stays local.
-- [ADR-0596](../../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md):
-  "Zuno Code" is routed to Codestral first.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
-password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password, kept in Vault at
+`keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
@@ -52,8 +28,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use open-webui 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
-Each section below is printed after its action's Ansible file (`ansible/demos/open-webui/<action>.yml`) has run, and
+`make demo use open-webui 5|15` selects this page. Each section below is printed after its action's Ansible file (`ansible/demos/open-webui/<action>.yml`) has run, and
 says what is left to the presenter. No action of this demo installs or removes anything on the cluster.
 
 ### Status
@@ -82,8 +57,7 @@ What only a person does:
   - profile 2: **consultant-02** (15-minute version only).
 - [ ] Open `https://open-webui.apps.demo333.startx.fr` in both profiles and sign in with **Continue with Keycloak**.
   There is no local login form, by design.
-- [ ] Start a **new chat** after signing in. Chats created before 2026-11-03 keep their tool switch off
-  ([WP-193 evidence](../../../roadmap/evidence/wp-193-open-webui-user-experience.md)).
+- [ ] Start a **new chat** after signing in. Chats created before 2026-11-03 keep their tool switch off.
 - [ ] 15-minute version: Grafana in a third tab, signed in as **ai-ops-01**. Grafana sits behind the OpenShift
   sign-in and admits accounts with RBAC on `zuno-monitoring`. Open the dashboard **Zuno Platform / Five experiences**,
   time range last 1 hour, `client` = `open-webui`.
@@ -242,3 +216,41 @@ flowchart LR
   AIGW -->|"Zuno Code = task code<br/>mistral-codestral first"| COD["Codestral<br/>Mistral SaaS"]
   MCPGW -->|"tools allowed for the<br/>persona's groups"| TOOLS["MCP servers<br/>Drive, Gmail, diagram,<br/>Confluence, technical docs"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): experiences are
+  presentation layers over the one governed backend.
+- [ADR-0588](../../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md): Open WebUI, user's own
+  token, no RAG, uploads or web search.
+- [ADR-0594](../../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md):
+  the same tools as the agents, filtered by group; a turn that used a tool stays local.
+- [ADR-0596](../../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md):
+  "Zuno Code" is routed to Codestral first.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the demo personas,
+  their groups and their shared password.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): the
+  `make demo` lifecycle that this page's Presenter lifecycle section follows.
+
+Evidence:
+
+- [WP-193](../../../roadmap/evidence/wp-193-open-webui-user-experience.md): chats created before 2026-11-03 keep their
+  tool switch off.
+- [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md): the rehearsal reports of this page.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse open-webui`: the 5-minute version PASS at 15:03 (11
+> units, 40 s); the 15-minute version PASS at 15:06 (19 units, 47 s). Evidence:
+> [WP-275](../../../roadmap/evidence/wp-275-experiences-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-12:
+> Application `zuno-open-webui-d1` Synced and Healthy, Deployment `open-webui` 1/1 (image 0.12.5 pinned by digest),
+> route `open-webui.apps.demo333.startx.fr`, both ExternalSecrets synced, `open-webui` listed in the ai-gateway's
+> experience clients.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probes `open-webui` and `zuno-code`.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [One backend, three experiences](../../three-experiences.md), [One governed backend,
+> many experiences](../../five-experiences.md).

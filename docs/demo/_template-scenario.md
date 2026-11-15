@@ -1,11 +1,5 @@
 # Scenario: &lt;Brick&gt; - &lt;feature&gt;
 
-> **Status:** Not rehearsed. Prerequisites checked read-only on demo333 on YYYY-MM-DD: &lt;what was checked&gt;.
-> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> Yes, golden-path probe `<name>` - or - No golden-path probe: rehearse before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** &lt;links&gt;
-
 How to use this template (delete this paragraph in a real page):
 
 - One brick, or one feature of a brick, per page. One proof per step.
@@ -22,6 +16,13 @@ How to use this template (delete this paragraph in a real page):
 - Copy Appendix A unchanged and move the `class ... focus` line to the brick of the page.
 - An experience that needs its own installation or preflight on the presenter's side (an add-on, a GPU node switched
   on) may add **Appendix C - Setup** after Appendix B. Keep the scenario sections free of installation steps.
+- The sections come in this order: Introduction, Personas, Presenter lifecycle, the versions, If something goes wrong,
+  Limits, Appendix A, Appendix B, References, and Page status last ([ADR-0617](../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)).
+  The Introduction, Personas and Presenter lifecycle name no ADR and no work package and link nothing under
+  `docs/adr/` or `docs/roadmap/`: those go in References, and a sentence that cited one is reworded so that it still
+  reads.
+- When the demo has a GIF, its image line is the last element of the Introduction. The GIF is added only after the
+  owner's named "go <id>"; a page without a GIF has no image line.
 - Paths below are relative to `docs/demo/`. A page under `scenarios/<layer>/` adds `../../` to every link.
 
 ## Introduction
@@ -31,13 +32,10 @@ see [Appendix A](#appendix-a---hld). What is inside it: see [Appendix B](#append
 
 **The message:** &lt;one sentence the audience should repeat after the demo&gt;.
 
-**Decisions:** [ADR-NNNN](../adr/TEMPLATE.md) &lt;one line each&gt;.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one password,
-kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password, kept in Vault at
+`keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
@@ -47,8 +45,7 @@ Other identities: &lt;service accounts, probe identities, the presenter's `oc` s
 
 ## Presenter lifecycle
 
-`make demo use <id> 5|15` selects this page ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
-Each section below is printed after its action's Ansible file (`ansible/demos/<id>/<action>.yml`) has run, and says
+`make demo use <id> 5|15` selects this page. Each section below is printed after its action's Ansible file (`ansible/demos/<id>/<action>.yml`) has run, and says
 what is left to the presenter. Write "Nothing to do." when the file leaves nothing; never delete a section. Credentials
 are named by their Vault path, never written.
 
@@ -107,7 +104,7 @@ Run the 5-minute version, then:
 ## Limits
 
 - &lt;What this scenario does not show, and why&gt;
-- &lt;Named limits of the brick (ADR-0606 clause 1)&gt;
+- &lt;Named limits of the brick&gt;
 
 ## Appendix A - HLD
 
@@ -188,3 +185,23 @@ its chart and component in this repository. Name the files the diagram was drawn
 flowchart LR
   A["component"] --> B["component"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-NNNN](../adr/TEMPLATE.md): &lt;one line each&gt;.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the demo personas, their
+  groups and their shared password.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): the `make demo`
+  lifecycle that the Presenter lifecycle section follows.
+
+Evidence: &lt;work-package evidence links, one line each, with what each proves&gt;.
+
+## Page status
+
+> **Status:** Not rehearsed. Prerequisites checked read-only on demo333 on YYYY-MM-DD: &lt;what was checked&gt;.
+> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> Yes, golden-path probe `<name>` - or - No golden-path probe: rehearse before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** &lt;links&gt;

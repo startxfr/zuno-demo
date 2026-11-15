@@ -7,12 +7,13 @@ This directory holds the demonstrations of the Zuno platform:
 - **Workshops**: several scenarios played in order by a presenter, from 30 minutes to 2 hours.
 - **Operations documents**: what to check and freeze before showing anything live.
 
-Every scenario page has the same structure. You can open any page and find the same sections in the same place:
+Every scenario page has the same structure, in this order ([ADR-0617](../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)). You can open any page and find the same sections in the same place. The Introduction, Personas and Presenter lifecycle carry no ADR or work-package reference and no link into `docs/adr/` or `docs/roadmap/`: those are in References.
+
+During the pilot of this shape, only [Open WebUI](scenarios/experiences/open-webui.md) and the scenario template follow it; the other pages still have the status banner first and their decisions in the Introduction.
 
 | Section | What it gives you |
 |---|---|
-| Status banner | Date and content of the last read-only check on demo333, whether the page is show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)), workshops that use it |
-| Introduction | What the brick is, where it sits in Zuno, the message, the decisions (ADRs) |
+| Introduction | What the brick is, where it sits in Zuno, the message; the GIF of the 5-minute version comes last, when the owner has said "go <id>" |
 | Personas | Each account used or named in the scenario: who it is, what it may do there, and what the presenter does with it |
 | Presenter lifecycle | `### Status`, `### Check`, `### Install`, `### Start`, `### Stop`, `### Uninstall`: what is left to the presenter once `make demo <action>` has run, or "Nothing to do." Accounts are named by their Vault path, never their password. It replaces "Before you start" ([ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)); pages that still have "Before you start" move by 2026-11-17 (WP-273 to WP-280) |
 | 5-minute version | The message and one visible proof, for any audience: `Time / Do / Say / You should see` |
@@ -21,6 +22,8 @@ Every scenario page has the same structure. You can open any page and find the s
 | Limits | What the scenario does not show, and the brick's named limits |
 | Appendix A - HLD | The platform map, with the brick highlighted |
 | Appendix B - LLD | The brick's internals, drawn from its chart and component |
+| References | The decisions (ADRs, with their one-line meaning) and the work-package evidence the page rests on |
+| Page status | The status banner, last: date and content of the last read-only check on demo333, the rehearsal result, whether the page is show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)), workshops that use it |
 
 New pages start from [`_template-scenario.md`](_template-scenario.md) for a scenario and
 [`_template-workshop.md`](_template-workshop.md) for a workshop. A workshop links its scenarios and the version to
@@ -61,7 +64,7 @@ shows what it will change and asks you to type the demo id.
    demo golden-path` ([golden-path.md](golden-path.md), [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)).
 2. For a demonstration day, apply the [freeze protocol](freeze-protocol.md) and keep the [rollback](rollback.md) page
    open.
-3. Read the status banner of every page you will play. A page that says "rehearse before showing" has no golden-path
+3. Read the status of every page you will play: its status banner at the top, or its `## Page status` section at the end. A page that says "rehearse before showing" has no golden-path
    probe: rehearse it the same day.
 
 ## Status legend
@@ -72,7 +75,7 @@ shows what it will change and asks you to type the demo id.
 - **Not show-ready**: a named reason prevents it today (for example, the GPU node of the world model is off).
 - **Page**:
   - **written**: in the new format;
-- **Rehearsed on 2026-11-15**: the result of the latest valid `make demo rehearse` report for each version, from the evidence file named in the page's status banner. A PASS says the files and the page play; it does not say "show-ready" (see the banner of each page).
+- **Rehearsed on 2026-11-15**: the result of the latest valid `make demo rehearse` report for each version, from the evidence file named in the page's status banner (its `## Page status` section, once the page has one). A PASS says the files and the page play; it does not say "show-ready" (see the banner of each page).
 
 ## Scenarios
 
