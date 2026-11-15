@@ -155,7 +155,7 @@ and what it may see on the cluster. Source of truth: `gitops/charts/keycloak/fil
 
 | Persona | Profile | Keycloak groups | Used in the demonstrations |
 |---|---|---|---|
-| **sale-01** | Salesperson, front office | `sales`, `agent_comage`, `agent_finage` | Open WebUI (three tools), OpenClaw (its own assistant, no Confluence), the shared budget, RAG isolation |
+| **sale-01** | Salesperson, front office | `sales`, `agent_comage`, `agent_finage` | Open WebUI (three tools, named when asked), OpenClaw (its own assistant, no Confluence), the shared budget, RAG isolation |
 | **sale-02** | Salesperson, front office | `sales`, `agent_comage`, `agent_soursage` | not used yet |
 | **consultant-01** | Consultant and architect, front office | `consultant` with six Confluence subgroups, `agent_comage`, `agent_tekos`, `agent_arkos`, `agent_naveo`, `aap_admin` | UnifAI live RAG; copied by the probe identity `eval-consultant-01` |
 | **consultant-02** | Consultant and architect, front office | `consultant` with Confluence build OpenShift and OpenShift AI and the four architecture spaces, `agent_tekos`, `agent_arkos`, `aap_ops` | UnifAI, Dify, OpenClaw (with Confluence), the Open WebUI contrast, delegation with approval |
