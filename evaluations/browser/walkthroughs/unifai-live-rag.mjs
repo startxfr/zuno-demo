@@ -118,7 +118,9 @@ export async function scout({ page, step, state }) {
              input_selector: ((await firstVisible(page, unifai.INPUT)) || {}).matched || "",   // may be absent until a chat is open
              // How many earlier sessions of the persona the take would show beside the chat (their count, never a title).
              available_chats: (text.match(/Available Chats \((\d+)\)/) || [])[1] || "",
-             session_open: unifai.SESSION_ID.test(page.url()), controls: await describe(page, "body", 60) };
+             // No dump of this page's controls: it lists the persona's earlier sessions, and their titles and
+             // previews must not reach scout.json.
+             session_open: unifai.SESSION_ID.test(page.url()) };
   });
   await step("workflows", async () => {
     const text = await page.locator("body").innerText();

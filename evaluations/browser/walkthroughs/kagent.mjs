@@ -182,7 +182,9 @@ export async function scout({ page, step, state }) {
              // Do earlier sessions carry their id in a link as SESSION_ID expects? Their count and the paths' shape.
              session_links: links.length, session_link_shapes: [...new Set(links.map((h) => h.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<uuid>").replace(/\/chat\/[^/?#]+/, (m) => (m.includes("<uuid>") ? m : "/chat/<id>"))))].slice(0, 5),
              busy_on_screen: ((await firstVisible(page, BUSY)) || {}).matched || "", switches: await switches(page),
-             buttons: await buttons(page, input.matched), controls: await describe(page, "body", 80) };
+             // Only the buttons around the input: this page lists everybody's earlier sessions, and a dump of every
+             // control on it would write their titles to scout.json. Ids, counts and shapes only.
+             buttons_near_input: (await buttons(page, input.matched)).near };
   });
   await step("closed", async () => {
     const input = await firstVisible(page, INPUT);
