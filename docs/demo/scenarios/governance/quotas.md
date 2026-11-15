@@ -87,25 +87,30 @@ a persona's token budget (see Start).
 Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1`, the Deployment
 `ai-gateway` and its quota environment (`QUOTA_LEDGER_STORE=redis`, `QUOTA_FAIL_MODES_ENFORCED=true`,
 `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `PERSONA_CLAIM_CLIENTS`, and no
-`QUOTA_STRESSTEST_GROUP`), the StatefulSet `zuno-redis-master` with its volume, the MaaS subscription
-`gpt-oss-20b-ai-gateway`, Grafana, Tempo and the local models. If one is missing or not Healthy, stop and tell the
+`QUOTA_STRESSTEST_GROUP`), the StatefulSet `zuno-redis-master` with its volume
+(the PersistentVolumeClaim `redis-data-zuno-redis-master-0`, `Bound`), the MaaS subscription
+`gpt-oss-20b-ai-gateway`, the Deployment `grafana-deployment`, the pod `tempo-tempo-0` and the `LLMInferenceService`
+local models in `zuno-ai-run` (and how many are Ready). If one is missing or not Healthy, stop and tell the
 platform owner: this demo installs nothing. If `QUOTA_STRESSTEST_GROUP` is set, an old replay was not reverted: tell
 the platform owner before the session.
 
 ### Check
 
 Nothing to do when it passes. This page has no golden-path probe: rehearse it the same day. The file runs reads only,
-the same as the 6:30 row of the 15-minute version. If one fails, see [If something goes wrong](#if-something-goes-wrong).
+the same as the 6:30 row of the 15-minute version: the `QUOTA`, `PERSONA` and `MAAS_QUOTA` environment variables of the
+Deployment `ai-gateway`. If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
-Nothing to do. The quota ledger is part of the shared platform: the file only verifies it.
+Nothing to do. The quota ledger is part of the shared platform: the file runs nothing and installs nothing (Status reads it).
 
 ### Start
 
-The file spends **sale-01**'s token budget, a few hours before the session: one question in Open WebUI and one through
-its OpenClaw assistant ([OpenClaw scenario](../experiences/openclaw.md)), so the Grafana panel and the trace have
-something to show. This is a changing unit, declared in the manifest. The command shows it and asks you to type the
+The file spends token budget, a few hours before the session, so the Grafana panel and the trace have something to
+show. It runs the golden-path moment `openclaw` ([OpenClaw scenario](../experiences/openclaw.md)): one short question
+through **sale-01**'s OpenClaw assistant, and one through **consultant-02**'s. It then prints a line asking you to ask
+one question in Open WebUI as **sale-01** by hand: no automated sign-in to Open WebUI as sale-01 exists. That question
+makes the budget panel show two clients for one persona. This is a changing unit, declared in the manifest. The command shows it and asks you to type the
 demo id `quotas`. Run it hours before the session, not on stage: the spend is not undone, and the 24-hour window of
 the budget restarts at 00:00 UTC. What only a person does:
 

@@ -92,7 +92,8 @@ run, and says what is left to the presenter. No action of this demo changes the 
 Nothing to do. The file reads the Applications `zuno-mcp-d0`/`-d1`, `zuno-mcp-confluence-d0`/`-d1` and
 `zuno-mcp-k8s-d0`/`-d1`, the Deployments `mcp-gateway` and `open-webui`, the MCP servers `confluence-mcp`, `k8s-mcp`,
 `git-forge-mcp`, `aap-mcp` and `diagram-render`, the ExternalSecret `zuno-tool-marker-key`, the gateway environment
-(`AGENT_ENTITLEMENT_EVERY_CALL`, `AGENT_CHAIN_VERIFY`, `MCP_FRONTDOOR_CAPABILITIES`), Grafana and the local models.
+(`AGENT_ENTITLEMENT_EVERY_CALL`, `AGENT_CHAIN_VERIFY`, `MCP_FRONTDOOR_CAPABILITIES`), the Deployment `grafana-deployment` and the
+`LLMInferenceService` local models in `zuno-ai-run` (and how many are Ready).
 If one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
@@ -105,7 +106,7 @@ read. If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
-Nothing to do. The mcp-gateway and the MCP servers are part of the shared platform: the file only verifies them.
+Nothing to do. The mcp-gateway and the MCP servers are part of the shared platform: the file runs nothing and installs nothing (Status reads them).
 
 ### Start
 

@@ -70,9 +70,11 @@ says what is left to the presenter. No action of this demo changes the cluster.
 
 ### Status
 
-Nothing to do. The file reads the Applications `zuno-trustyai-config-d1`, `zuno-ai-gateway-d1`, `zuno-dify-d1` and
-`zuno-token-proxy-dify-d1`, the `NemoGuardrails` phase, the gateway's guardrails environment and the two Grafana
-dashboards (**Five experiences** and **TrustyAI evaluation & guardrails**). If one is missing or not Healthy, stop and
+Nothing to do. The file reads the Applications `zuno-trustyai-config-d0`/`-d1`, `zuno-ai-gateway-d0`/`-d1`, `zuno-dify-d1` and
+`zuno-token-proxy-dify-d1`, the Deployments `zuno-guardrails` and `zuno-guardrails-smoke`, the `NemoGuardrails` phase of
+`zuno-guardrails`, the gateway's guardrails environment and the two GrafanaDashboards `three-experiences` (**Five
+experiences**) and `trustyai` (**TrustyAI evaluation & guardrails**). The Check reads the NemoGuardrails and the two
+dashboards again. If one is missing or not Healthy, stop and
 tell the platform owner: this demo installs nothing.
 The gateway environment lists `GUARDRAILS_DETECTOR_URL`, the address of the smoke service. It belongs to the parked
 fallback and is not an active path: `GUARDRAILS_BACKEND` is `nemo`.
@@ -86,7 +88,7 @@ the dashboard: the live step adds a second one. If it fails, see [If something g
 
 ### Install
 
-Nothing to do. The guardrails are part of the shared platform: the file only verifies them.
+Nothing to do. The guardrails are part of the shared platform: the file runs nothing and installs nothing (Status reads them).
 
 ### Start
 

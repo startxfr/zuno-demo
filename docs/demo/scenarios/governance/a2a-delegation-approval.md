@@ -84,7 +84,8 @@ you, in the step, when you click **Approve**.
 
 Nothing to do. The file reads the Applications `zuno-a2a-gateway-d0`/`-d1`, `zuno-unifai-d0`/`-d1` and
 `zuno-mcp-aap-d0`/`-d1`, the Deployments `a2a-gateway` and `aap-mcp`, the UnifaiAgentBundles `arkos` and `tekos`, the
-`LLMInferenceService` models in `zuno-ai-run` and the pods `tempo-tempo-0` and Grafana. If one is missing or not
+`LLMInferenceService` models in `zuno-ai-run` (and how many are Ready), the pod `tempo-tempo-0` and the Deployment
+`grafana-deployment`. If one is missing or not
 Healthy, stop and tell the platform owner: this demo installs nothing. At least one local model must be `Ready=True`:
 Arkos is floored at C3, so it answers on local models only.
 
@@ -98,8 +99,8 @@ clicked by consultant-02, the AAP job and the trace steps have no probe: rehears
 
 ### Install
 
-Nothing to do. The a2a-gateway, UnifAI, the mcp-gateway and AAP are part of the shared platform: the file only
-verifies them.
+Nothing to do. The a2a-gateway, UnifAI, the mcp-gateway and AAP are part of the shared platform: the file runs
+nothing and installs nothing (Status reads them).
 
 ### Start
 

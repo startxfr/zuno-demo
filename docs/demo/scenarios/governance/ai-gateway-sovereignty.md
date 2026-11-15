@@ -67,21 +67,22 @@ has run, and says what is left to the presenter. No action of this demo changes 
 
 Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1`, the Deployment `ai-gateway`, the ConfigMap
 `ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), the gateway environment
-(`CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`), Tempo and the
-`LLMInferenceService` models in `zuno-ai-run`. If one is missing or not Healthy, stop and tell the platform owner:
+(`CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`), the pod `tempo-tempo-0` and the
+`LLMInferenceService` models in `zuno-ai-run` (and how many are Ready). If one is missing or not Healthy, stop and tell the platform owner:
 this demo installs nothing. At least one local model must be `Ready=True` for a C3 answer. On 2026-11-12 the local
 models were restarting (one of four Ready) and Grafana was down: read this section before any session.
 
 ### Check
 
-Nothing to do when it passes. It runs the golden-path probes `sovereignty` and `trace` (see
+Nothing to do when it passes. It runs the golden-path probes `unifai-tekos`, `sovereignty` and `trace` (see
 [golden-path.md](../../golden-path.md)). The probe `trace` looks up the run of `unifai-tekos`, so the file runs them
-together; the 15-minute version relies on Tempo, which `trace` checks. Both must print `PASS`. If `sovereignty` fails,
+together; the 15-minute version relies on Tempo, which `trace` checks. All three must print `PASS`. If `sovereignty` fails,
 read [If something goes wrong](#if-something-goes-wrong) now, not on stage.
 
 ### Install
 
-Nothing to do. The classification is part of the shared platform: the file only verifies it.
+Nothing to do. The classification is part of the shared platform: the file runs nothing and
+installs nothing (Status reads it).
 
 ### Start
 

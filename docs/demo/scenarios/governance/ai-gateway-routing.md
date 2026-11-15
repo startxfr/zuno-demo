@@ -76,7 +76,8 @@ Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1`, `zuno
 the Deployments `ai-gateway` and `open-webui`, the gateway environment (`MODEL_TASK_ALIASES`,
 `MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`, `CIRCUIT_OPEN_SECONDS`), the ConfigMaps
 `ai-gateway-model-routing` and `zuno-provider-routing`, the ExternalSecret `llm-provider-mistral-codestral`, the
-`LLMInferenceService` models in `zuno-ai-run`, Grafana and `tempo-tempo-0`. The key of Codestral itself is not
+`LLMInferenceService` models in `zuno-ai-run` (and how many are Ready), the Deployment `grafana-deployment` and the pod
+`tempo-tempo-0`. The key of Codestral itself is not
 tested. If one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing. The four
 local models were `READY True` on 2026-11-13.
 
@@ -88,7 +89,8 @@ It asks "Write a one-line Python function that adds two numbers." with the `zuno
 
 ### Install
 
-Nothing to do. The routing is part of the shared platform: the file only verifies it.
+Nothing to do. The routing is part of the shared platform: the file runs nothing and
+installs nothing (Status reads it).
 
 ### Start
 

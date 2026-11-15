@@ -89,8 +89,8 @@ and says what is left to the presenter. No action of this demo changes the clust
 
 Nothing to do. The file reads the Applications `zuno-keycloak-d0`/`-d1`, `zuno-openshift-oauth-d0`/`-d1`,
 `zuno-openshift-rbac-groups-d0`/`-d1`, `zuno-open-webui-d1` and `zuno-unifai-d0`/`-d1`, the Keycloak CR `zuno` and its
-pod `zuno-0`, and the Deployments `zuno-token-proxy` (in `zuno-dify` and `zuno-kagent`), Open WebUI and UnifAI. If
-one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
+pod `zuno-0`, the UnifaiStack `unifai`, and the Deployments `zuno-token-proxy` (in `zuno-dify` and `zuno-kagent`), `open-webui` and
+`unifai-backend`. If one is missing or not Healthy, stop and tell the platform owner: this demo installs nothing.
 
 ### Check
 
@@ -101,15 +101,16 @@ workspace step (1:30) in particular, which is not in a recorded run. The file ru
 - the Jobs `zuno-keycloak-client-reconcile` and `zuno-keycloak-eval-personas` (`Complete`);
 - the OAuth `cluster` provider `openshift` (issuer `https://keycloak.apps.demo333.startx.fr/realms/zuno`,
   `mappingMethod: add`, claim `groups`);
-- the RoleBindings `zuno-personas-view`, `zuno-ocp-ai-dev-edit` and `zuno-ocp-ai-ops-admin`, and the
-  ClusterRoleBindings for `ocp-paas-ops` and `ocp-paas-dev`.
+- the RoleBindings `zuno-personas-view`, `zuno-ocp-ai-dev-edit` and `zuno-ocp-ai-ops-admin` in `zuno-ai-run`, and the
+  ClusterRoleBindings `zuno-ocp-paas-ops-cluster-admin` and `zuno-ocp-paas-dev-cluster-reader` (for `ocp-paas-ops` and
+  `ocp-paas-dev`).
 
 If one fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 
 Nothing to do. Keycloak, the OpenShift identity provider and the RBAC groups are part of the shared platform: the file
-only verifies them.
+runs nothing and installs nothing (Status and Check read them).
 
 ### Start
 
