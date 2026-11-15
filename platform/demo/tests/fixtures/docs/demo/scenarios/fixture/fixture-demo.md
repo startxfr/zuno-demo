@@ -1,11 +1,14 @@
 # Scenario: fixture - the presenter lifecycle end to end
 
-> **Status:** Test fixture of platform/demo/tests (WP-270). It needs no cluster: its files read the local git history
-> and write a marker under the test's HOME.
-
 ## Introduction
 
-A demo page that follows the ADR-0616 contract, used to prove the path action, runner playbook, results, page section.
+A demo page that follows the page contract, used to prove the path action, runner playbook, results, page section.
+
+## Personas
+
+| Persona | Used for |
+|---|---|
+| **fixture-01** | Every step: no sign-in, no cluster. |
 
 ## Presenter lifecycle
 
@@ -68,3 +71,20 @@ Run the 5-minute version, then:
 ## Limits
 
 - A fixture shows the engine, not a demo.
+
+## Appendix A - HLD
+
+The fixture has no platform map.
+
+## Appendix B - LLD
+
+The fixture has no internals.
+
+## References
+
+- ADR-0616: the presenter lifecycle (WP-270).
+
+## Page status
+
+> **Status:** Test fixture of platform/demo/tests (WP-270). It needs no cluster: its files read the local git history
+> and write a marker under the test's HOME.

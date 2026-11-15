@@ -3,10 +3,10 @@
     python3 platform/demo/scaffold.py [--write] [--only <id>] [--inventory <yaml>] [--dryrun <yaml>]
 
 For each scenario of the catalogue, under `ansible/demos/<id>/`:
-- `demo.yml`: kind, page, golden-path probes (the README column and the status banner), browser checks, `mutations: {}`,
-  the step variables some pages need (`env:`), and `steps:` metadata for optional rows, rows that change the cluster
-  (never run by `step`) and rows the presenter runs partly by hand. Every time key is quoted: YAML 1.1 reads 9:30 as
-  the integer 570.
+- `demo.yml`: kind, page, golden-path probes (the README column and the `## Page status` banner), browser checks,
+  `mutations: {}`, the step variables some pages need (`env:`), and `steps:` metadata for optional rows, rows that
+  change the cluster (never run by `step`) and rows the presenter runs partly by hand. Every time key is quoted: YAML
+  1.1 reads 9:30 as the integer 570.
 - the six action files: `status.yml` and `check.yml` pre-filled from demo333's live inventory (`oc get` only,
   2026-11-14) when it is given, the others `nothing_to_run`, each naming its page section;
 - one `steps/MM-SS.yml` per timed row: the Do cell's commands that platform/demo/readonly.py accepts go into
@@ -139,9 +139,18 @@ def probe_names(root: pathlib.Path) -> List[str]:
     return re.findall(r'^\s*"([a-z][a-z0-9-]*)"\s*:', block.group(1), re.M) if block else []
 
 
+def page_banner(page: catalogue.Page) -> str:
+    """The status banner: the `## Page status` section (ADR-0617). Until WP-285 has moved every page, a page without
+    it still carries its banner in its first 30 lines; the push that lands the last page removes this fallback."""
+    status = page.section("Page status")
+    if status is not None:
+        return status.text
+    return "\n".join(page.text.split("\n")[:30])
+
+
 def page_probes(page: catalogue.Page, readme_cell: str, known: List[str]) -> List[str]:
     names: List[str] = []
-    banner = "\n".join(page.text.split("\n")[:30])
+    banner = page_banner(page)
     for phrase in re.findall(r"golden-path probes? ((?:`[a-z0-9-]+`(?:, | and )?)+)", banner):
         names += re.findall(r"`([a-z0-9-]+)`", phrase)
     if not readme_cell.lower().startswith("none"):
@@ -365,7 +374,7 @@ def check_action(page: catalogue.Page, entry: Optional[dict], probes: List[str],
     for why in skipped:
         lines += comment(f"Skipped: {why}.")
     if not probes:
-        lines += comment("No golden-path probe covers this demo: rehearse it the same day (status banner).")
+        lines += comment("No golden-path probe covers this demo: rehearse it the same day (Page status).")
     if ready:
         tasks += include(f"{page.id} check | resources ready", "cr_ready.yml", "cr_ready", ready)
     if probes:

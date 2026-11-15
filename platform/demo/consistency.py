@@ -16,7 +16,14 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   exist, inline section with a timed table), its own and inline rows have their step files, and its check and start
   files run the queued probes;
 - a page that has moved has `## Presenter lifecycle` with exactly `### Status` ... `### Uninstall`, none empty;
-- every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile).
+- every backticked `make demo <verb>` under docs/ is a verb of DEMO_VERBS (the Makefile);
+- the page shape of ADR-0617 (WP-285), for a page that has `## Page status`: its `##` sections in the contract's order
+  (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status last), no ADR or
+  WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter lifecycle, and
+  the `> **Status:**` banner under `## Page status` only. Until SHAPE_ENFORCED, a page without `## Page status` gets one
+  warning instead (all its findings with --only);
+- a published GIF `docs/assets/img/demo/<id>.gif` belongs to a catalogue demo, is at most 8 MB, and is embedded as the
+  last line of that demo's Introduction (and only there); a page embeds no other demo's GIF.
 Warnings, never failures: an object a moved page's `### Status` or `### Check` names in backticks that its file does
 not read (warnings()). ADRs and roadmap records
   are history and are not read; a demo page that has not moved yet is not read; a retired verb may be named on a
@@ -33,6 +40,7 @@ from typing import Dict, Iterable, List, Optional, Set
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import catalogue  # noqa: E402
+import gif  # noqa: E402
 import guard  # noqa: E402
 import probe_order  # noqa: E402
 import readonly  # noqa: E402
@@ -378,6 +386,168 @@ def _data_strings(node) -> Iterable[str]:
         yield str(node)
 
 
+# --- the page shape of ADR-0617 (WP-285) --------------------------------------------------------------------------
+
+# False while WP-285 moves the pages layer by layer: a page without `## Page status` gets a warning. The push that
+# lands the last page sets it to True (every page then needs the shape) and removes scaffold.py's banner fallback.
+SHAPE_ENFORCED = False
+PAGE_STATUS = "Page status"
+REFERENCES = "References"
+SCENARIO_ORDER = ["Introduction", "Personas", catalogue.LIFECYCLE_SECTION, "5-minute version", "15-minute version",
+                  catalogue.IF_WRONG_SECTION, "Limits", "Appendix A - HLD", "Appendix B - LLD", REFERENCES, PAGE_STATUS]
+WORKSHOP_HEAD = ["Introduction", "Personas", "Agenda", catalogue.LIFECYCLE_SECTION]
+WORKSHOP_TAIL = [REFERENCES, PAGE_STATUS]
+PRESENTER_SECTIONS = ("Introduction", "Personas", catalogue.LIFECYCLE_SECTION)
+REFERENCE_RES = (
+    (re.compile(r"\bADR-\d{4}\b"), "an ADR reference"),
+    (re.compile(r"\bWP-\d{2,3}\b"), "a work-package reference"),
+    (re.compile(r"\]\((?:[^)\s]*/)?(?:adr|roadmap)/[^)]*\)"), "a link into docs/adr/ or docs/roadmap/"),
+)
+BANNER_RE = re.compile(r"^>\s*\*\*Status:\*\*")
+EMBED_RE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
+GIF_RE = re.compile(r"(?:^|/)assets/img/demo/([a-z0-9-]+)\.gif$")
+
+
+def gif_dir(root: pathlib.Path) -> pathlib.Path:
+    return root / "docs" / "assets" / "img" / "demo"
+
+
+def _fenced(lines: List[str]) -> List[bool]:
+    """Per line: inside a fenced code block (the fence lines included)."""
+    flags, inside = [], False
+    for line in lines:
+        fence = line.lstrip().startswith(("```", "~~~"))
+        flags.append(inside or fence)
+        if fence:
+            inside = not inside
+    return flags
+
+
+def has_page_status(page: catalogue.Page) -> bool:
+    return page.section(PAGE_STATUS) is not None
+
+
+def shape_findings(entry: catalogue.Entry, page: catalogue.Page, root: pathlib.Path) -> List[str]:
+    """What keeps a page from the ADR-0617 shape, one line each (`<page>:<line>: ...`). A page that has not moved to
+    `## Presenter lifecycle` yet (ADR-0616) is not read."""
+    if page.section(catalogue.LIFECYCLE_SECTION) is None:
+        return []
+    rel = entry.path.resolve().relative_to(root.resolve()) if root.resolve() in entry.path.resolve().parents \
+        else entry.path
+    found: List[str] = []
+    titles = [s.title for s in page.sections if s.level == 2]
+    if entry.kind == "scenario":
+        if titles != SCENARIO_ORDER:
+            found.append(f"{rel}:1: the `##` sections are {', '.join(titles)}; the contract is "
+                         f"{', '.join(SCENARIO_ORDER)}")
+    elif titles[:len(WORKSHOP_HEAD)] != WORKSHOP_HEAD or titles[-len(WORKSHOP_TAIL):] != WORKSHOP_TAIL:
+        found.append(f"{rel}:1: a workshop's `##` sections start with {', '.join(WORKSHOP_HEAD)} and end with "
+                     f"{', '.join(WORKSHOP_TAIL)}; they are {', '.join(titles)}")
+    for title in PRESENTER_SECTIONS:
+        section = page.section(title)
+        if section is None:
+            continue
+        for k, (line, fenced) in enumerate(zip(section.lines, _fenced(section.lines))):
+            if fenced:
+                continue
+            hits = [(what, pattern.search(line)) for pattern, what in REFERENCE_RES]
+            hits = [(what, hit) for what, hit in hits if hit]
+            if hits:
+                kinds = " and ".join(what for what, _ in hits)
+                found.append(f"{rel}:{section.line + 1 + k}: `## {title}` holds {kinds} ({hits[0][1].group(0)[:50]}): "
+                             "it belongs in `## References`")
+    lines = page.text.split("\n")
+    status = page.section(PAGE_STATUS)
+    inside = range(status.line, status.line + 1 + len(status.lines)) if status else range(0)
+    for number, (line, fenced) in enumerate(zip(lines, _fenced(lines)), 1):
+        if not fenced and BANNER_RE.match(line) and number not in inside:
+            found.append(f"{rel}:{number}: the `> **Status:**` banner belongs under `## {PAGE_STATUS}`, the last "
+                         "section")
+    return found
+
+
+def gif_problems(entries: List[catalogue.Entry], root: pathlib.Path, everything: bool) -> List[str]:
+    """The published GIFs and their embeds (ADR-0617): pairing, owner, size. `everything`: also the orphan files."""
+    found: List[str] = []
+    directory = gif_dir(root)
+    for entry in entries:
+        page = catalogue.load(entry)
+        rel = entry.path.resolve().relative_to(root.resolve()) if root.resolve() in entry.path.resolve().parents \
+            else entry.path
+        published = directory / f"{entry.id}.gif"
+        lines = page.text.split("\n")
+        own: List[int] = []
+        for number, (line, fenced) in enumerate(zip(lines, _fenced(lines)), 1):
+            if fenced:
+                continue
+            for target in EMBED_RE.findall(line):
+                m = GIF_RE.search(target)
+                if not m:
+                    continue
+                if m.group(1) != entry.id:
+                    found.append(f"{rel}:{number}: embeds the GIF of another demo ({m.group(1)})")
+                else:
+                    own.append(number)
+        intro = page.section("Introduction")
+        body = [(intro.line + 1 + k, line) for k, line in enumerate(intro.lines)] if intro else []
+        body = [(n, line) for n, line in body if line.strip()]
+        last = body[-1] if body else None
+        last_embeds = bool(last and any(GIF_RE.search(t) and GIF_RE.search(t).group(1) == entry.id
+                                        for t in EMBED_RE.findall(last[1])))
+        if published.is_file():
+            if not last_embeds:
+                found.append(f"{rel}: docs/assets/img/demo/{entry.id}.gif is published: embed it as the last line of "
+                             "`## Introduction`")
+            if published.stat().st_size > gif.MAX_BYTES:
+                found.append(f"docs/assets/img/demo/{entry.id}.gif: {published.stat().st_size / 1048576:.1f} MB, over "
+                             f"the {gif.MAX_BYTES // 1048576} MB limit")
+            for number in own:
+                if not (last_embeds and number == last[0]):
+                    found.append(f"{rel}:{number}: the GIF is embedded once, as the last line of `## Introduction`")
+        else:
+            for number in own:
+                found.append(f"{rel}:{number}: embeds docs/assets/img/demo/{entry.id}.gif, which is not published "
+                             "(the owner's go comes first)")
+    if everything and directory.is_dir():
+        ids = {e.id for e in catalogue.discover(root)}
+        for path in sorted(directory.iterdir()):
+            if path.suffix != ".gif" or path.stem not in ids:
+                found.append(f"docs/assets/img/demo/{path.name}: no catalogue demo has this GIF")
+            elif path.stat().st_size > gif.MAX_BYTES and path.stem not in {e.id for e in entries}:
+                found.append(f"docs/assets/img/demo/{path.name}: {path.stat().st_size / 1048576:.1f} MB, over the "
+                             f"{gif.MAX_BYTES // 1048576} MB limit")
+    return found
+
+
+def shape_problems(entries: List[catalogue.Entry], root: pathlib.Path) -> List[str]:
+    found: List[str] = []
+    for entry in entries:
+        page = catalogue.load(entry)
+        if SHAPE_ENFORCED or has_page_status(page):
+            found += shape_findings(entry, page, root)
+    return found
+
+
+def shape_warnings(entries: List[catalogue.Entry], root: pathlib.Path, detailed: bool) -> List[str]:
+    """A page not moved to the ADR-0617 shape yet: one line, or all its findings when the run names it (--only). A
+    published GIF whose demo has no cut list (no provenance)."""
+    found: List[str] = []
+    for entry in entries:
+        page = catalogue.load(entry)
+        if not SHAPE_ENFORCED and not has_page_status(page):
+            findings = shape_findings(entry, page, root)
+            if findings and detailed:
+                found += [f"not moved yet: {f}" for f in findings]
+            elif findings:
+                rel = entry.path.resolve().relative_to(root.resolve()) \
+                    if root.resolve() in entry.path.resolve().parents else entry.path
+                found.append(f"{rel}: not in the ADR-0617 page shape yet ({len(findings)} finding(s); "
+                             f"`python3 platform/demo/consistency.py --only {entry.id}` lists them)")
+        if (gif_dir(root) / f"{entry.id}.gif").is_file() and not gif.cut_list_path(entry.id, root).is_file():
+            found.append(f"docs/assets/img/demo/{entry.id}.gif: no ansible/demos/{entry.id}/gif.yml says how it was cut")
+    return found
+
+
 def section_warnings(entry: catalogue.Entry, root: pathlib.Path) -> List[str]:
     """The backticked object names (Kubernetes-style, with a hyphen) of a moved page's `### Status` and `### Check`
     that appear in no value of its status.yml or check.yml: the page says the file reads them, the file does not."""
@@ -423,6 +593,11 @@ def warnings(root: Optional[pathlib.Path] = None, only: Optional[List[str]] = No
             found += section_warnings(entry, root)
         except catalogue.ParseError:
             continue
+    entries = [e for e in catalogue.discover(root) if not only or e.id in only]
+    try:
+        found += shape_warnings(entries, root, detailed=bool(only))
+    except catalogue.ParseError:
+        pass
     return found
 
 
@@ -440,6 +615,11 @@ def problems(root: Optional[pathlib.Path] = None, only: Optional[List[str]] = No
     for entry in catalogue.discover(root):
         if catalogue.load(entry).section(catalogue.LIFECYCLE_SECTION) is None:
             unmoved.add(entry.path.resolve())
+    try:
+        found += shape_problems(entries, root)
+        found += gif_problems(entries, root, everything=not only)
+    except catalogue.ParseError as exc:
+        found.append(str(exc))
     if not only:
         ids = {e.id for e in catalogue.discover(root)}
         demos = root / "ansible" / "demos"

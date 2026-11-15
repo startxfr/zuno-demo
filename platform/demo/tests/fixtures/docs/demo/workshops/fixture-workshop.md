@@ -1,6 +1,14 @@
 # Workshop: fixture - a workshop composed from scenario steps
 
-> **Status:** Test fixture of platform/demo/tests (WP-280). It needs no cluster.
+## Introduction
+
+A workshop page that follows the page contract: one scenario played twice, then its own rows.
+
+## Personas
+
+| Persona | Used for |
+|---|---|
+| **fixture-01** | Every block: no sign-in, no cluster. |
 
 ## Agenda
 
@@ -52,3 +60,11 @@ The scenario's uninstall removes the fixture add-on marker.
 | Symptom | Fallback | Say |
 |---|---|---|
 | Anything | Read the log under ~/.cache/zuno/demo/logs. | "Let me check." |
+
+## References
+
+- The workshop lifecycle (WP-280).
+
+## Page status
+
+> **Status:** Test fixture of platform/demo/tests (WP-280). It needs no cluster.

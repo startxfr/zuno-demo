@@ -87,7 +87,8 @@ jobs:
       # ADR-0616 (WP-270, WP-271): the demo pages parse into steps, the read-only allowlist of the steps, the guards
       # and the session, and the pages agree with ansible/demos/ (every row its step file, every Do command covered,
       # no read-only unit changing anything, no stale `make demo` verb in the docs), and the GIF cut of a recording
-      # (ADR-0617, WP-284: no ffmpeg or podman needed). The end-to-end cases on the
+      # (ADR-0617, WP-284: no ffmpeg or podman needed), and the page shape and published GIFs (ADR-0617, WP-285).
+      # The end-to-end cases on the
       # fixture skip here (no ansible-playbook in this job); they run in the ansible job below. The smoke test lists
       # the catalogue and selects a demo from an empty HOME.
       - name: Demo lifecycle engine tests (ADR-0616)
@@ -99,6 +100,7 @@ jobs:
           python3 platform/demo/tests/test_workshop.py
           python3 platform/demo/tests/test_argo_health.py
           python3 platform/demo/tests/test_gif.py
+          python3 platform/demo/tests/test_page_shape.py
           home="$(mktemp -d)"
           HOME="$home" make demo list
           HOME="$home" make demo use guardrails 15
