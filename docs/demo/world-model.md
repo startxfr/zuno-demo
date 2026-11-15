@@ -91,7 +91,7 @@ other egress, Route up. It must be green.
 The file never creates the GPU node. While `zuno_world_model_enabled` is not `true` on `origin/devel`
 (`ansible/clusters/demo333.yml`, as of the last `git fetch`), it fails with `REFUSED` and nothing is installed: use the
 recording. When the flag is true, it only reads what exists (the node, the Application, the pods) and prints the owner's
-four actions below. A GPU node is cluster infrastructure: it needs the platform owner's **double approval**, given
+actions below. A GPU node is cluster infrastructure: it needs the platform owner's **double approval**, given
 before anything runs, and the owner does the following by hand, never the step. `make demo rehearse` does not run
 Install either: it refuses while the demo is off.
 
