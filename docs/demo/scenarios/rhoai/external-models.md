@@ -16,6 +16,8 @@ it is the next step. The objects, the key and the two paths are in [Appendix B](
 **The message:** "SaaS models are governed like our own: one catalogue, and one caller allowed, the platform's router.
 Nobody sends data to a SaaS model without the classification check."
 
+![The 5-minute version of the external models demo, recorded live in a terminal: two SaaS models declared as platform objects, published on the same gateway as the local models, and callable by one identity only, the platform's router. The routing file of row 3:00 is not in the recording.](../../../assets/img/demo/external-models.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
