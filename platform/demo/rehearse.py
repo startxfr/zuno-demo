@@ -1,7 +1,8 @@
 """`make demo rehearse <id> 5|15`: the whole sequence without pauses, with a report (ADR-0616 clause 11, WP-270).
 
 status, check, install, start, every step, stop, uninstall, in one runner playbook run. A step the manifest declares
-changing is never run: it is recorded `SKIPPED (mutating)`, optional or not. An action the manifest lists under
+changing is never run: it is recorded `SKIPPED (mutating)`, optional or not. When the sequence queues golden-path probes or browser checks, the
+command lists them and asks for the demo id first, in the same prompt as the changing units (2026-11-15). An action the manifest lists under
 `not_rehearsed:` (world-model's install: ADR-0616 clause 11) is recorded `SKIPPED` with its reason. The report goes to
 `~/.cache/zuno/demo/rehearsals/<id>-<version>-<date>.md` and ends with `RESULT: PASS` or `RESULT: FAIL`. The session is
 never touched.
@@ -130,3 +131,54 @@ def last_rehearsal(demo_id: str, version: str) -> Optional[Tuple[str, str]]:
             result = line.split(": ", 1)[1].strip()
     date = newest.stem[len(demo_id) + len(version) + 2:][:10]
     return date, result
+
+
+def queued_checks(units: List[Unit], demo_dir: pathlib.Path) -> Tuple[List[str], List[str]]:
+    """(golden-path probes, browser checks) the check and start files of these units queue, read from the files.
+
+    A rehearsal that runs at least one asks for the demo id first (the owner's decision of 2026-11-15): the probes
+    change nothing, but they call the models and spend the probe personas' budgets.
+    """
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    Loader.add_constructor("!unsafe", lambda loader, node: loader.construct_scalar(node))
+    probes: List[str] = []
+    browser: List[str] = []
+
+    def walk(tasks) -> None:
+        for task in tasks or []:
+            if not isinstance(task, dict):
+                continue
+            variables = task.get("vars") if isinstance(task.get("vars"), dict) else {}
+            for name in variables.get("queue_probes") or []:
+                if name not in probes:
+                    probes.append(str(name))
+            for name in variables.get("queue_browser") or []:
+                if name not in browser:
+                    browser.append(str(name))
+            for key in ("block", "rescue", "always"):
+                walk(task.get(key))
+
+    for unit in units:
+        action = unit.action or unit.name
+        if unit.kind != "action" or action not in ("check", "start"):
+            continue
+        path = pathlib.Path(unit.dir or demo_dir) / unit.file
+        try:
+            walk(yaml.load(path.read_text(encoding="utf-8"), Loader=Loader))
+        except (OSError, yaml.YAMLError):
+            continue
+    return probes, browser
+
+
+def check_notices(probes: List[str], browser: List[str]) -> List[str]:
+    notices = []
+    if probes:
+        what = "every golden-path probe" if "all" in probes else f"golden-path probes: {', '.join(probes)}"
+        notices.append(f"{what} (real model calls, they spend the probe personas' budgets)")
+    if browser:
+        notices.append(f"browser checks: {', '.join(browser)}")
+    return notices

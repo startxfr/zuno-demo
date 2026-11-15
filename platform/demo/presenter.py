@@ -57,7 +57,7 @@ Usage: make demo <verb> [arguments]
   stop [<id>]                Clean up what the session created
   uninstall [<id>]           Remove the demo's own add-on; never a shared component
   freeze on|off              Mark a freeze on this workstation: install, uninstall and rehearse refuse
-  rehearse <id> 5|15         The whole sequence without pauses, with a report
+  rehearse <id> 5|15         The whole sequence without pauses, with a report (asks for the id when it runs probes)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
 
@@ -253,7 +253,8 @@ def workshop_rehearse(entry: catalogue.Entry, page: catalogue.Page) -> int:
     except workshop.AgendaError as exc:
         raise RuntimeError(str(exc))
     changing = workshop.changing(to_run, manifests)
-    confirmed = guard.confirm(entry.id, changing)
+    confirmed = guard.confirm(entry.id, changing,
+                              notices=rehearse.check_notices(*rehearse.queued_checks(to_run, demo_dir)))
     refusal = next((r for r in (cluster_ready(m) for m in manifests.values()) if r), None)
     if refusal and to_run:
         raise guard.Refused(refusal)
@@ -505,7 +506,8 @@ def cmd_rehearse(args: List[str]) -> int:
     manifest = load_manifest(demo_dir)
     to_run, decided = rehearse.plan_units(page, version, demo_dir, manifest)
     changing = guard.changing_units(manifest, [u.name for u in to_run])
-    confirmed = guard.confirm(entry.id, changing)
+    confirmed = guard.confirm(entry.id, changing,
+                              notices=rehearse.check_notices(*rehearse.queued_checks(to_run, demo_dir)))
     refusal = cluster_ready(manifest)
     if refusal and to_run:
         raise guard.Refused(refusal)

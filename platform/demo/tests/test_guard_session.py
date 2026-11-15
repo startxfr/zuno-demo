@@ -110,6 +110,29 @@ class Guards(TempHome):
         with self.assertRaises(guard.Refused):
             guard.confirm("fixture-demo", self.CHANGES, env={}, stdin=tty, out=io.StringIO(), ask=lambda p: "y")
 
+    def test_notices_alone_need_the_confirmation(self):
+        out = io.StringIO()
+        notices = ["golden-path probes: dify, tools"]
+        self.assertEqual(guard.confirm("dify", {}, env={"DEMO_CONFIRM": "dify"}, out=out, notices=notices), "dify")
+        self.assertIn("This runs on the live platform (dify):\n  - golden-path probes: dify, tools", out.getvalue())
+        self.assertNotIn("This changes the cluster", out.getvalue())
+        with self.assertRaises(guard.Refused):
+            guard.confirm("dify", {}, env={}, stdin=io.StringIO(""), out=io.StringIO(), notices=notices)
+        with self.assertRaises(guard.Refused):
+            guard.confirm("dify", {}, env={"DEMO_CONFIRM": "other"}, out=io.StringIO(), notices=notices)
+        self.assertEqual(guard.confirm("dify", {}, env={}, out=io.StringIO(), notices=[]), "")
+
+    def test_one_prompt_covers_changes_and_notices(self):
+        out = io.StringIO()
+        asked = []
+        tty = mock.Mock()
+        tty.isatty.return_value = True
+        guard.confirm("quotas", {"start": "Spends budget"}, env={}, stdin=tty, out=out, notices=["browser checks: x"],
+                      ask=lambda prompt: asked.append(prompt) or "quotas")
+        self.assertEqual(len(asked), 1)
+        self.assertIn("browser checks: x", out.getvalue())
+        self.assertIn("start: Spends budget", out.getvalue())
+
     def test_infra_unit_prints_double_approval(self):
         out = io.StringIO()
         guard.confirm("world-model", {"install": {"summary": "Adds a GPU node", "infra": True}},
@@ -145,6 +168,67 @@ class DomainCache(TempHome):
         import runner
         self.assertFalse(runner._needs_cluster(FIXTURES / "ansible/demos/fixture-demo"))
         self.assertTrue(runner._needs_cluster(ROOT / "ansible/demos/guardrails"))
+
+
+class RehearsalProbes(TempHome):
+    """A rehearsal that queues probes asks first; these cases stop at the refusal and never run a probe."""
+
+    def setUp(self):
+        super().setUp()
+        self.root = pathlib.Path(tempfile.mkdtemp(prefix="zuno-probes-"))
+        shutil.copytree(FIXTURES / "docs", self.root / "docs")
+        shutil.copytree(FIXTURES / "ansible", self.root / "ansible")
+        (self.root / "ansible/demos/fixture-demo/check.yml").write_text(
+            '- ansible.builtin.include_tasks: "{{ demo_lib }}/queue_probes.yml"\n  vars:\n'
+            '    queue_probes: ["fixture-probe"]\n'
+            '- ansible.builtin.include_tasks: "{{ demo_lib }}/queue_browser.yml"\n  vars:\n'
+            '    queue_browser: ["fixture-ui"]\n'
+            '- ansible.builtin.include_tasks: "{{ demo_lib }}/flush_checks.yml"\n')
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        super().tearDown()
+
+    def presenter(self, *args, env=None):
+        full = dict(os.environ, ZUNO_DEMO_ROOT=str(self.root), ZUNO_REPO_ROOT=str(ROOT), HOME=self.home)
+        full.pop("DEMO_CONFIRM", None)
+        full.update(env or {})
+        done = subprocess.run([sys.executable, str(PRESENTER)] + list(args), stdin=subprocess.DEVNULL,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=full,
+                              cwd=str(ROOT), timeout=120)
+        return done.returncode, done.stdout
+
+    def test_queued_checks_are_read_from_the_files(self):
+        import rehearse
+        import runner
+        demo = self.root / "ansible/demos/fixture-demo"
+        units = [runner.Unit("status", "status.yml"), runner.Unit("check", "check.yml"),
+                 runner.Unit("0:00", "steps/00-00.yml", "step")]
+        self.assertEqual(rehearse.queued_checks(units, demo), (["fixture-probe"], ["fixture-ui"]))
+        self.assertEqual(rehearse.queued_checks(units[:1], demo), ([], []))
+        self.assertEqual(rehearse.check_notices(["all", "x"], [])[0][:23], "every golden-path probe")
+
+    def test_scenario_rehearsal_refuses_without_the_id(self):
+        rc, text = self.presenter("rehearse", "fixture-demo", "5")
+        self.assertEqual(rc, 2, text)
+        self.assertIn("This runs on the live platform (fixture-demo):", text)
+        self.assertIn("golden-path probes: fixture-probe", text)
+        self.assertIn("browser checks: fixture-ui", text)
+        self.assertIn("install: Writes the fixture add-on marker", text)
+        self.assertIn("No terminal to confirm on", text)
+        rc, text = self.presenter("rehearse", "fixture-demo", "5", env={"DEMO_CONFIRM": "other"})
+        self.assertEqual(rc, 2, text)
+        self.assertFalse(pathlib.Path(self.home, ".cache/zuno/demo/logs").exists(), "nothing may have run")
+
+    def test_workshop_rehearsal_refuses_without_the_id(self):
+        rc, text = self.presenter("rehearse", "fixture-workshop")
+        self.assertEqual(rc, 2, text)
+        self.assertIn("golden-path probes: fixture-probe", text)
+        self.assertIn("set DEMO_CONFIRM=fixture-workshop", text)
+
+    def test_check_and_start_alone_are_unchanged(self):
+        import rehearse
+        self.assertEqual(rehearse.check_notices([], []), [])
 
 
 class NotRehearsed(unittest.TestCase):

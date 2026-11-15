@@ -52,17 +52,25 @@ def changing_units(manifest: dict, units: Iterable[str]) -> Dict[str, object]:
 
 def confirm(demo_id: str, changes: Dict[str, object], *, env: Optional[Dict[str, str]] = None,
             stdin: Optional[TextIO] = None, out: Optional[TextIO] = None,
-            ask: Optional[Callable[[str], str]] = None) -> str:
+            ask: Optional[Callable[[str], str]] = None, notices: Optional[Iterable[str]] = None) -> str:
     """Print what will change and return the confirmed demo id, or raise Refused.
 
-    `changes`: unit -> mutations entry. Nothing to confirm when it is empty (returns "").
+    `changes`: unit -> mutations entry. `notices`: what a rehearsal runs on the live platform without changing it
+    (its golden-path probes and browser checks: they spend persona budgets). One prompt covers both. Nothing to
+    confirm when both are empty (returns "").
     """
-    if not changes:
+    notices = [n for n in (notices or []) if n]
+    if not changes and not notices:
         return ""
     env = os.environ if env is None else env
     stdin = stdin or sys.stdin
     out = out or sys.stdout
-    out.write(f"This changes the cluster ({demo_id}):\n")
+    if notices:
+        out.write(f"This runs on the live platform ({demo_id}):\n")
+        for notice in notices:
+            out.write(f"  - {notice}\n")
+    if changes:
+        out.write(f"This changes the cluster ({demo_id}):\n")
     for unit, value in changes.items():
         out.write(f"  - {unit}: {mutation_summary(value)}\n")
     for unit, value in changes.items():
