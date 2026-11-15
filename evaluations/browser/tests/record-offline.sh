@@ -34,7 +34,7 @@ assert list(steps) == ["home", "picker", "tools", "closed"], list(steps)
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 assert all((d / x["png"]).stat().st_size > 0 for x in s["steps"])
 assert steps["home"]["chat_link_on_screen"] is False
-near = steps["home"]["buttons"]["prompt_box"] + steps["home"]["buttons"]["elsewhere"]
+near = steps["home"]["buttons"]["near"] + steps["home"]["buttons"]["elsewhere"]
 assert any(b["aria"] == "Integrations" for b in near) and any(b["id"] == "model-selector-model-button" for b in near), near
 assert steps["picker"]["selector"] == "#model-selector-model-button" and steps["picker"]["label"] == "Zuno"
 assert steps["picker"]["zuno_code_listed"] is True and "Zuno Code" in steps["picker"]["text"]

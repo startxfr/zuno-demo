@@ -10,6 +10,8 @@
 // no chat is open, so the id is the new chat's), and the delete is one call for that id to Open WebUI's own API, in
 // the page, with the persona's own session. No list is walked and no menu is clicked, so no other chat can be hit.
 // When the delete does not succeed the take fails and names the chat by its title.
+import { buttons, closeMenus, firstVisible, newText, onScreen, pageApi as api, switches, wordsOnScreen } from "./_helpers.mjs";
+
 export const persona = "sale-01";
 export const page = "docs/demo/scenarios/experiences/open-webui.md";
 export const viewport = { width: 1280, height: 800 };
@@ -33,17 +35,9 @@ const CONNECTION = "Zuno tools";   // the one entry sale-01 sees: the governed c
 const TOOL_WORDS = [/drive/i, /gmail/i, /diagram/i];   // the page's three tool names: reported by scout(), see run()
 const CHAT_ID = /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
 const ANSWER_TIMEOUT_MS = 180000;
-
-// One call to Open WebUI's API from the page, with the signed-in session. The token stays in the browser.
-async function api(page, method, path) {
-  return page.evaluate(async ([method, path]) => {
-    const token = localStorage.getItem("token") || "";
-    const r = await fetch(path, { method, credentials: "include", headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    let body = null;
-    try { body = await r.json(); } catch { /* not JSON */ }
-    return { status: r.status, body };
-  }, [method, path]);
-}
+// A link to an earlier chat. The collapsed sidebar of 0.12.5 keeps its buttons (the new-chat pencil stays on the
+// rail) and may keep its chat links in the page: only a link really on screen says the list is open.
+const CHAT_LINK = "a[href^='/c/']";
 
 // The assistant messages of the chat, as its API stores them: [{content, done}], oldest first; null when the
 // answer has another shape than expected.
@@ -85,29 +79,6 @@ async function ask(page, prompt, state) {
   await page.keyboard.press("Enter");
 }
 
-// The first of these selectors that is on screen, or null; the locator carries the selector that matched.
-async function firstVisible(page, selectors) {
-  for (const selector of selectors) {
-    const found = page.locator(selector).first();
-    if (await found.isVisible().catch(() => false)) return Object.assign(found, { matched: selector });
-  }
-  return null;
-}
-
-// True when a link to an earlier chat can really be seen: inside the viewport and not covered or slid away. The
-// collapsed sidebar of 0.12.5 keeps its buttons (the new-chat pencil stays on the rail) and may keep its chat links in
-// the page, so neither a button nor Playwright's "visible" says whether the list is open.
-async function chatLinkOnScreen(page) {
-  return page.evaluate(() => [...document.querySelectorAll("a[href^='/c/']")].some((a) => {
-    const r = a.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return false;
-    const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1);
-    const y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
-    const top = document.elementFromPoint(x, y);
-    return Boolean(top) && (a.contains(top) || top.contains(a));
-  }));
-}
-
 // Open the tools panel: the Integrations button, then the menu's "Tools" row. Returns the selectors that matched.
 // Nothing in the panel is clicked: its entries are switches, and a click would turn sale-01's tools off.
 async function openToolsPanel(page) {
@@ -124,27 +95,6 @@ async function openToolsPanel(page) {
   await row.click();
   await page.getByText(CONNECTION, { exact: true }).first().waitFor({ timeout: 15000 });
   return { button: button.matched, row: row.matched };
-}
-
-// The switches on screen ([role=switch]) with their state and the text beside them: [{label, on}].
-async function connectionSwitches(page) {
-  return page.evaluate(() => [...document.querySelectorAll("[role='switch']")].filter((sw) => {
-    const r = sw.getBoundingClientRect();
-    return r.width > 1 && r.height > 1;
-  }).map((sw) => {
-    let box = sw.parentElement;
-    for (let i = 0; box && i < 4 && !(box.innerText || "").trim(); i += 1) box = box.parentElement;
-    return { label: ((box && box.innerText) || "").trim().split("\n")[0].slice(0, 60),
-             on: sw.getAttribute("aria-checked") === "true" || sw.getAttribute("data-state") === "checked" };
-  }));
-}
-
-async function closeMenus(page) {
-  for (let i = 0; i < 3 && await page.locator("[role='menu']").first().isVisible().catch(() => false); i += 1) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(400);
-  }
-  if (await page.locator("[role='menu']").first().isVisible().catch(() => false)) throw new Error("the tools menu did not close");
 }
 
 // Sign in and reach the home page of a new chat, sidebar closed, sign-in toast gone: where run() marks `home` and
@@ -165,13 +115,13 @@ async function home({ page, base, mark, keycloak }) {
   await page.waitForTimeout(600);   // the sidebar's own animation, when it has one
   // The toggle is clicked only when an earlier chat is really on screen: on a sidebar already collapsed it would
   // OPEN the list (first live take, 2026-11-15).
-  if (await chatLinkOnScreen(page)) {
+  if (await onScreen(page, CHAT_LINK)) {
     const toggle = await firstVisible(page, ["#sidebar-toggle-button", "button[aria-label='Toggle Sidebar']", "button[aria-label='Close Sidebar']"]);
     if (!toggle) throw new Error("the sidebar is open and its toggle button was not found");
     await toggle.click();
     await page.waitForTimeout(800);
   }
-  if (await chatLinkOnScreen(page)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
+  if (await onScreen(page, CHAT_LINK)) throw new Error("an earlier chat is still listed on screen: the sidebar did not close");
   // The sign-in toast ("You're now logged in.") must be gone before the home marker, or it is in the GIF.
   await page.getByText("You're now logged in").first().waitFor({ state: "hidden", timeout: 20000 });
   await page.getByText("Zuno picks the model").first().waitFor({ timeout: 30000 });
@@ -212,39 +162,14 @@ export async function run({ page, base, mark, log, keycloak, state }) {
   // does not show tool names here: the panel lists the connection "Zuno tools" with its switch (seen live,
   // 2026-11-15). The moment is that panel, the connection listed and switched on; the switch is never clicked.
   await openToolsPanel(page);
-  const switches = await connectionSwitches(page);
-  if (switches.some((sw) => !sw.on)) throw new Error(`a tool connection is switched off in the tools panel: ${JSON.stringify(switches)}`);
+  const found = await switches(page);
+  if (found.some((sw) => !sw.on)) throw new Error(`a tool connection is switched off in the tools panel: ${JSON.stringify(found)}`);
   await page.waitForTimeout(800);
   await mark("tools");
 
   await closeMenus(page);
   await page.waitForTimeout(800);
   await mark("end");
-}
-
-// The lines of text on screen now that were not there before: what a menu just showed.
-async function newText(page, before) {
-  const seen = new Set(before.split("\n").map((l) => l.trim()));
-  const after = await page.locator("body").innerText();
-  return [...new Set(after.split("\n").map((l) => l.trim()).filter((l) => l && !seen.has(l)))].slice(0, 60);
-}
-
-// The buttons around the prompt box (the nearest ancestor of #chat-input that holds at least three), then every
-// other labelled button on screen: what a selector can be built from.
-async function buttons(page) {
-  return page.evaluate(() => {
-    const describe = (b) => {
-      const r = b.getBoundingClientRect();
-      return { id: b.id || "", aria: b.getAttribute("aria-label") || "", title: b.getAttribute("title") || "",
-               text: (b.innerText || "").trim().slice(0, 60), x: Math.round(r.left), y: Math.round(r.top),
-               on_screen: r.width > 1 && r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight };
-    };
-    let box = document.querySelector("#chat-input");
-    for (let i = 0; box && i < 10 && box.querySelectorAll("button").length < 3; i += 1) box = box.parentElement;
-    const near = box ? [...box.querySelectorAll("button")] : [];
-    const others = [...document.querySelectorAll("button")].filter((b) => !near.includes(b) && (b.id || b.getAttribute("aria-label")));
-    return { prompt_box: near.map(describe), elsewhere: others.map(describe).filter((b) => b.on_screen).slice(0, 60) };
-  });
 }
 
 // What a take will meet, for the price of a sign-in: the home page, the model picker's menu and the tools panel with
@@ -254,7 +179,7 @@ export async function scout({ page, base, keycloak, step, state, mark }) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   const entered = await step("home", async () => {
     await home({ page, base, mark, keycloak });
-    return { url: page.url().replace(/[?#].*/, ""), chat_link_on_screen: await chatLinkOnScreen(page), buttons: await buttons(page) };
+    return { url: page.url().replace(/[?#].*/, ""), chat_link_on_screen: await onScreen(page, CHAT_LINK), buttons: await buttons(page, "#chat-input") };
   });
   if (!entered.ok) return;
   await step("picker", async () => {
@@ -278,7 +203,7 @@ export async function scout({ page, base, keycloak, step, state, mark }) {
     return { selector: matched.button, row_selector: matched.row, text: await newText(page, before),
              menu_text: (await page.locator("[role='menu']").first().innerText().catch(() => "")).split("\n").map((l) => l.trim()).filter(Boolean),
              connection_listed: await page.getByText(CONNECTION, { exact: true }).first().isVisible().catch(() => false),
-             switches: await connectionSwitches(page), tool_words_on_screen: await wordsOnScreen(page) };
+             switches: await switches(page), tool_words_on_screen: await wordsOnScreen(page, TOOL_WORDS) };
   });
   await closeMenus(page).catch(() => {});
   await step("closed", async () => {
@@ -287,15 +212,8 @@ export async function scout({ page, base, keycloak, step, state, mark }) {
     const typed = (await page.locator("#chat-input").innerText().catch(() => "")).trim();
     if (typed) throw new Error("the chat input is not empty after the scout");
     return { url: page.url().replace(/[?#].*/, ""), menu_still_open: await page.locator("[role='menu']").first().isVisible().catch(() => false),
-             switches_after: await connectionSwitches(page) };
+             switches_after: await switches(page) };
   });
-}
-
-// Which of the page's three tool words can be read on screen now.
-async function wordsOnScreen(page) {
-  const found = {};
-  for (const word of TOOL_WORDS) found[word.source] = await page.getByText(word).first().isVisible().catch(() => false);
-  return found;
 }
 
 // Delete the chat this take created, by its id, and nothing else. Nothing sent: nothing to delete. Sent but the id
