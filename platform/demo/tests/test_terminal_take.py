@@ -33,8 +33,8 @@ import textgate  # noqa: E402
 PROMPT = "\x1b]1337;rc=0\x07$ "
 
 
-def cast_text(*outputs: str) -> str:
-    header = {"version": 2, "width": 100, "height": 30, "timestamp": 1763200000, "env": {"TERM": "xterm-256color"}}
+def cast_text(*outputs: str, width: int = 100) -> str:
+    header = {"version": 2, "width": width, "height": 30, "timestamp": 1763200000, "env": {"TERM": "xterm-256color"}}
     lines = [json.dumps(header)]
     t = 0.0
     for chunk in outputs:
@@ -72,6 +72,32 @@ class Gate(unittest.TestCase):
         self.assertNotIn("1337", text)                       # the prompt's invisible exit-code sequence
         self.assertNotIn("\r", text)
         self.assertEqual(textgate.passed(self.dir), (True, ""))
+
+    def test_a_typed_command_that_wrapped_reads_as_typed(self):
+        # readline echoes key by key; at the 20th column it prints a space (first on the next row) and a lone CR,
+        # and the next key overwrites the space. 20 columns: "$ " + "echo " + 13 a's fill the first row.
+        keys = list("echo " + "a" * 13) + [" \r"] + list("bbb") + ["\r\n", "aaaaaaaaaaaaabbb\r\n", PROMPT]
+        record = self.take(cast_text(PROMPT, *keys, width=20))
+        self.assertEqual(record["status"], "pass")
+        lines = (self.dir / textgate.TRANSCRIPT).read_text().split("\n")
+        self.assertEqual(lines[0], "$ echo aaaaaaaaaaaaabbb")
+        self.assertEqual(lines[1], "aaaaaaaaaaaaabbb")
+
+    def test_only_the_wrap_space_goes(self):
+        self.assertEqual(textgate.plain("50% \r100%\n", 20), "50% 100%\n")       # not at the margin: kept
+        self.assertEqual(textgate.plain("a" * 20 + " \r\nb\n", 20), "a" * 20 + " \nb\n")   # CR LF: a real space
+        self.assertEqual(textgate.plain("a" * 40 + " \rb\n", 20), "a" * 40 + "b\n")   # a second wrap of one line
+        self.assertEqual(textgate.plain("a" * 20 + " \rb\n"), "a" * 20 + " b\n")     # width unknown: nothing removed
+
+    def test_showing_the_command_as_typed_never_hides_a_hit(self):
+        # A JWT that begins the next row after a full one: joined, it loses its word boundary in the transcript;
+        # the stream as written still has it. A password key split by the wrap is found joined.
+        jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzYWxlLTAxIn0.c2lnbmF0dXJlLXZhbHVl"
+        record = self.take(cast_text("x" * 20 + " \r" + jwt + "\r\n", width=20))
+        self.assertEqual([h["detector"] for h in record["hits"]], ["JWT"])
+        record = self.take(cast_text(PROMPT, "echo " + "a" * 7 + " passw" + " \r" + "ord=hunter2\r\n", width=20))
+        self.assertEqual([h["detector"] for h in record["hits"]], ["a password value"])
+        self.assertNotIn("hunter2", (self.dir / textgate.GATE).read_text())
 
     def test_both_clear_screen_forms(self):
         self.assertIn(textgate.CLEAR_LINE, textgate.plain("a\x1b[H\x1b[Jb"))

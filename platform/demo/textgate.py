@@ -5,7 +5,8 @@ WP-287).
 
 Reads `terminal.cast` (asciicast v2, written by evaluations/browser/terminal/capture.py), removes the escape codes,
 and writes in the same directory:
-    transcript.txt   the session as plain text, for the recording session to read before anything is rendered
+    transcript.txt   the session as plain text, for the recording session to read before anything is rendered (a
+                     typed command that the terminal wrapped reads as it was typed)
     gate.json        {status: "pass"|"refused", hits: [{line, detector}], lines, cast_sha256, steps_status}
 A hit names its transcript line and its detector, never the value. The cast is never edited: what is rendered is
 what happened, so a hit refuses the take and the presenter records again after fixing the cause.
@@ -53,8 +54,8 @@ class GateError(Exception):
     """No cast, or one that cannot be read."""
 
 
-def read_cast(path: pathlib.Path) -> str:
-    """The output stream of an asciicast v2 file: every "o" event, in order."""
+def read_cast(path: pathlib.Path) -> Tuple[int, str]:
+    """The terminal's width and the output stream of an asciicast v2 file: every "o" event, in order."""
     try:
         lines = path.read_text(encoding="utf-8").split("\n")
     except FileNotFoundError:
@@ -77,15 +78,48 @@ def read_cast(path: pathlib.Path) -> str:
             raise GateError(f"{path}:{number}: not a JSON event")
         if isinstance(event, list) and len(event) == 3 and event[1] == "o" and isinstance(event[2], str):
             chunks.append(event[2])
-    return "".join(chunks)
+    width = header.get("width")
+    return (width if isinstance(width, int) and not isinstance(width, bool) and width > 0 else 0), "".join(chunks)
 
 
-def plain(stream: str) -> str:
-    """The stream as a reader sees it: no escape codes, no carriage returns, a line where the screen was cleared."""
+def unwrap(text: str, width: int) -> str:
+    """Drop the space bash's readline echoes when a typed line fills the row. At the right margin readline prints a
+    space, which the terminal puts first on the next row, then a lone carriage return, and the next typed character
+    overwrites that space: the screen never shows it. Such a space sits at a column that is a multiple of `width`,
+    counted since the last line feed or carriage return, and is followed by a CR that is not a CR LF."""
+    if width <= 0:
+        return text
+    out = []
+    column = 0
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if (char == " " and column and column % width == 0 and text[index + 1:index + 2] == "\r"
+                and text[index + 2:index + 3] != "\n"):
+            index += 2
+            column = 0
+            continue
+        out.append(char)
+        if char in "\n\r":
+            column = 0
+        elif char == "\t":
+            column += 8 - column % 8
+        elif char == "\b":
+            column = max(column - 1, 0)
+        elif char >= " " and char != "\x7f":
+            column += 1
+        index += 1
+    return "".join(out)
+
+
+def plain(stream: str, width: int = 0) -> str:
+    """The stream as a reader sees it: no escape codes, no carriage returns, a line where the screen was cleared, and
+    a typed command that wrapped at `width` columns shown as typed (see unwrap; 0: no unwrapping)."""
     text = CLEAR_RE.sub(f"\n{CLEAR_LINE}\n", stream)
     text = OSC_RE.sub("", text)
     text = CSI_RE.sub("", text)
     text = ESC_RE.sub("", text)
+    text = unwrap(text, width)
     text = text.replace("\r\n", "\n").replace("\r", "")
     text = CONTROL_RE.sub("", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip("\n") + "\n"
@@ -109,9 +143,14 @@ def hits(text: str) -> List[Dict[str, object]]:
 def gate(directory: pathlib.Path) -> dict:
     """Check the take in `directory`; write transcript.txt and gate.json; return the gate record. Raises GateError."""
     cast = directory / CAST
-    text = plain(read_cast(cast))
+    width, stream = read_cast(cast)
+    text = plain(stream, width)
     (directory / TRANSCRIPT).write_text(text, encoding="utf-8")
+    # The detectors read the transcript and the stream with readline's wrap spaces kept: unwrap only removes spaces
+    # inside a line, so the line numbers are the same, and showing a command as typed can add a hit, never hide one.
     found = hits(text)
+    found += [hit for hit in hits(plain(stream)) if hit not in found]
+    found.sort(key=lambda hit: hit["line"])
     steps_status: Optional[str] = None
     try:
         steps_status = json.loads((directory / STEPS).read_text(encoding="utf-8")).get("status")
