@@ -1,25 +1,5 @@
 # Scenario: Ansible Automation Platform - audited operations
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse aap-audited-operations`: the 5-minute version PASS at
-> 10:15 (11 units, 386 s); the 15-minute version PASS at 10:23 (21 units, 389 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` launches one read-only AAP
-> job and takes about six minutes. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:45
-> UTC): Applications `zuno-aap-d0`/`-d1`, `zuno-aap-config-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
-> `AnsibleAutomationPlatform` `aap` at version 2.7.20261019, `Running` and `Successful`, controller 4.8.13, operator CSV
-> `aap-operator.v2.7.0-0.1794269743`; Route `aap.apps.demo333.startx.fr`; 17 `JobTemplate` and 8 `WorkflowTemplate`
-> resources in `zuno-aap`; the `AnsibleProject` `zuno-demo` on branch `devel`; Hub `storage_type: s3`; 10
-> ExternalSecrets; no ServiceMonitor or PodMonitor. Every AAP pod was Running. They had been recreated between 21:27 and
-> 22:37 UTC on 2026-11-12, during a node incident, and the seven AAP operator managers had restarted 15 to 24 times
-> since. No `automation-job` pod was running. Deployment `aap-mcp` 1/1 in `zuno-ai-run`, with a launch limit of 2 per
-> 900 s and the link base `https://aap.apps.demo333.startx.fr`. The OpenShift group `aap_ops` holds consultant-02 and
-> paas-dev-01; **paas-ops-01** had not signed in to OpenShift. The AAP API was not queried: the job history, the Teams,
-> the authenticator maps and the content of EDA were not checked.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience. (The `delegation-approval` probe rejects its approval,
-> so it never launches an AAP job.)
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Ansible Automation Platform (AAP) 2.7 is where Zuno's operations can run as recorded jobs. The Day 0 check and the Day
@@ -49,35 +29,18 @@ The 8 workflow templates chain one job template over several components in depen
 **The message:** "Our operations run as jobs defined in Git, and each job is recorded with who launched it. People get
 the rights of their group. An agent may read that history and launch one read-only audit, nothing more."
 
-**Decisions:**
-- [ADR-0354](../../../adr/0354-add-ansible-automation-platform-as-a-day-1-component.md): AAP as a platform component:
-  Gateway, Controller, Hub and EDA together, one replica each, Keycloak sign-in.
-- [ADR-0421](../../../adr/0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md): AAP and its configuration
-  move to Day 0, with PostgreSQL and Keycloak.
-- [ADR-0418](../../../adr/0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md): every Day 1 to Day 3
-  playbook is a job template; two credential tiers; launch rights from Keycloak groups (WP-103); `make` routes through
-  AAP according to `zuno_make_aap_mode`.
-- [ADR-0355](../../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): AAP audits reach agents
-  through `aap-mcp`, as the least-privilege AAP user `zuno-mcp`: `is_platform_auditor` for the reads, and execute on
-  `zuno-day0-check` alone.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) M15: at most
-  2 audit launches per caller in 900 s.
-- [ADR-0409](../../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
-  a launch requested through a delegation waits for the person's approval.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **consultant-03** | Consultant (run), front office. Groups `consultant` with Confluence run OpenShift and Keycloak, `agent_tekos`, `aap_reader`. | AAP Team `aap-reader-team`: views the job templates, the workflow templates and the project `zuno-demo`. Launches nothing: every template showed `start: false` for this persona in the WP-103 test. | Signs in to AAP in the 5-minute version. |
+| **consultant-03** | Consultant (run), front office. Groups `consultant` with Confluence run OpenShift and Keycloak, `agent_tekos`, `aap_reader`. | AAP Team `aap-reader-team`: views the job templates, the workflow templates and the project `zuno-demo`. Launches nothing: every template showed `start: false` for this persona in the AAP launch-rights test of 2026-08-30. | Signs in to AAP in the 5-minute version. |
 | **consultant-02** | Consultant and architect, front office. Groups `consultant` with its Confluence subgroups, `agent_tekos`, `agent_arkos`, `aap_ops`. | AAP Team `aap-ops-team`: views and launches every job template and workflow template, approves a workflow's approval node, views and syncs the project. The person of the [delegation scenario](../governance/a2a-delegation-approval.md). | Launches `zuno-day0-check` in the 15-minute version. |
 | **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | AAP superuser through `aap_admin`. Reads every object of `zuno-aap` and `zuno-ai-run`. | The presenter's `oc` terminal in the 15-minute version. Does not sign in to AAP on stage. |
 | **consultant-01** | Consultant and architect, front office. Groups `consultant` with six Confluence subgroups, four `agent_*` groups, `aap_admin`. | AAP superuser. | Named only: a business persona with superuser rights in AAP. |
-| **paas-dev-01** | Platform developer, back office. Groups `ocp-paas-dev` (cluster-reader), `agent_tekos`, `aap_ops`. | Same AAP rights as consultant-02. | Named only: the persona the ops tier was tested with (WP-103). |
+| **paas-dev-01** | Platform developer, back office. Groups `ocp-paas-dev` (cluster-reader), `agent_tekos`, `aap_ops`. | Same AAP rights as consultant-02. | Named only: the persona the ops tier was tested with. |
 
 | Keycloak group | Members | In AAP |
 |---|---|---|
@@ -89,7 +52,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 Other identities:
 - `zuno-mcp`, the AAP user of `aap-mcp`. It is not a superuser: `is_platform_auditor` gives it read access to the job
   templates, projects, inventories and the organization; the role `zuno-day0-check-executor` lets it launch
-  `zuno-day0-check` and nothing else (403 on any other template, ADR-0355). Its token is in Vault at `aap/mcp-token`.
+  `zuno-day0-check` and nothing else (403 on any other template). Its token is in Vault at `aap/mcp-token`.
   AAP shows the agents' jobs as launched by `zuno-mcp`.
 - The ServiceAccounts jobs run as: `aap-day0-check` (credential `zuno-cluster-reader`, ClusterRole `cluster-reader`)
   for checks and tests, and `aap-installer` (credential `zuno-aap-installer`, ClusterRole `zuno-aap-installer`, limited
@@ -99,7 +62,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use aap-audited-operations 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use aap-audited-operations 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/aap-audited-operations/<action>.yml`) has run, and says
 what is left to the presenter. Start changes the cluster: it launches one AAP job.
 
@@ -133,18 +96,18 @@ job takes several minutes (about six in the delegation scenario). Green AAP reso
 
 - [ ] Two browser profiles, one for **consultant-03** and one for **consultant-02** (password in Vault,
   `keycloak/demo-personas`). Open `https://aap.apps.demo333.startx.fr` and sign in through Keycloak (authenticator
-  `Keycloak zuno`). Neither sign-in is recorded on demo333: WP-103 tested consultant-03 and paas-dev-01 on 2026-08-30,
+  `Keycloak zuno`). Neither sign-in is recorded on demo333: the AAP launch-rights test tried consultant-03 and paas-dev-01 on 2026-08-30,
   before demo333's first install. Rehearse both, and check the menu names below in AAP 2.7.
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If
   **paas-ops-01** has never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser
   first, then log the terminal in.
 - [ ] **Templates**, `zuno-day0-check`: no Survey. A required Survey question typed by hand in AAP on 2026-09-29 made
-  every agent launch fail with `'env' value missing` until 2026-11-06 ([WP-174](../../../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md)).
+  every agent launch fail with `'env' value missing` until 2026-11-06.
 - [ ] **Jobs** lists at least one `zuno-day0-check` run launched by `zuno-mcp`. If none exists, rehearse the
   [delegation scenario](../governance/a2a-delegation-approval.md) with **Approve** at least 15 minutes before the
   session (2 launches per caller in 900 s).
 - Known on screen, not a failure: the report of `zuno-day0-check` always says `vault is NOT installed`. The
-  read-only identity cannot exec into the Vault pod for `vault status` (ADR-0354, accepted limitation).
+  read-only identity cannot exec into the Vault pod for `vault status`.
 
 ### Stop
 
@@ -311,7 +274,7 @@ AAP's components, the three ways in (a person, `make`, an agent) and the identit
 `Makefile`, `components/mcp-servers/aap/server.py`, `gitops/charts/mcp-aap/values.yaml`,
 `gitops/charts/keycloak/files/realm-zuno.json`, the agents release's
 [policies/tools/tool-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/tools/tool-policy.yaml),
-and the live objects listed in the status banner.
+and the live objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -346,3 +309,51 @@ flowchart LR
   ARGO["Argo CD: zuno-aap-d0, -d1,<br/>zuno-aap-config-d0, -d1"] -. "CRs: templates, project, credentials" .-> CTRL
   ROLE["role aap_config, AAP API:<br/>organization, Teams, maps,<br/>user zuno-mcp and its token"] -.-> GW
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0354](../../../adr/0354-add-ansible-automation-platform-as-a-day-1-component.md): AAP as a platform component:
+  Gateway, Controller, Hub and EDA together, one replica each, Keycloak sign-in.
+- [ADR-0421](../../../adr/0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md): AAP and its configuration
+  move to Day 0, with PostgreSQL and Keycloak.
+- [ADR-0418](../../../adr/0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md): every Day 1 to Day 3
+  playbook is a job template; two credential tiers; launch rights from Keycloak groups (WP-103); `make` routes through
+  AAP according to `zuno_make_aap_mode`.
+- [ADR-0355](../../../adr/0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md): AAP audits reach agents
+  through `aap-mcp`, as the least-privilege AAP user `zuno-mcp`: `is_platform_auditor` for the reads, and execute on
+  `zuno-day0-check` alone.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) M15: at most
+  2 audit launches per caller in 900 s.
+- [ADR-0409](../../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md):
+  a launch requested through a delegation waits for the person's approval.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-174](../../../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md): Arkos to Tekos delegation on demo333 (the file keeps its first name; direction reversed 2026-11-01).
+- [WP-103](../../../roadmap/work-packages/wp-103-aap-launch-rbac.md): AAP launch rights from Keycloak groups.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse aap-audited-operations`: the 5-minute version PASS at
+> 10:15 (11 units, 386 s); the 15-minute version PASS at 10:23 (21 units, 389 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` launches one read-only AAP
+> job and takes about six minutes. Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:45
+> UTC): Applications `zuno-aap-d0`/`-d1`, `zuno-aap-config-d0`/`-d1` and `zuno-mcp-aap-d0`/`-d1` Synced and Healthy;
+> `AnsibleAutomationPlatform` `aap` at version 2.7.20261019, `Running` and `Successful`, controller 4.8.13, operator CSV
+> `aap-operator.v2.7.0-0.1794269743`; Route `aap.apps.demo333.startx.fr`; 17 `JobTemplate` and 8 `WorkflowTemplate`
+> resources in `zuno-aap`; the `AnsibleProject` `zuno-demo` on branch `devel`; Hub `storage_type: s3`; 10
+> ExternalSecrets; no ServiceMonitor or PodMonitor. Every AAP pod was Running. They had been recreated between 21:27 and
+> 22:37 UTC on 2026-11-12, during a node incident, and the seven AAP operator managers had restarted 15 to 24 times
+> since. No `automation-job` pod was running. Deployment `aap-mcp` 1/1 in `zuno-ai-run`, with a launch limit of 2 per
+> 900 s and the link base `https://aap.apps.demo333.startx.fr`. The OpenShift group `aap_ops` holds consultant-02 and
+> paas-dev-01; **paas-ops-01** had not signed in to OpenShift. The AAP API was not queried: the job history, the Teams,
+> the authenticator maps and the content of EDA were not checked.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience. (The `delegation-approval` probe rejects its approval,
+> so it never launches an AAP job.)
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).

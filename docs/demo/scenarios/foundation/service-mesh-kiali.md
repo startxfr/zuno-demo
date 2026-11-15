@@ -1,29 +1,5 @@
 # Scenario: Service mesh - mutual TLS, workload identity and the Kiali graph
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse service-mesh-kiali`: the 5-minute version PASS at
-> 15:29 (11 units, 111 s); the 15-minute version PASS at 10:27 (20 units, 115 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` runs the whole golden path
-> (read-only). Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:30
-> UTC): Applications `zuno-service-mesh-d0`/`-d1`, `zuno-kiali-d0`/`-d1`, `zuno-mesh-monitoring-d0`/`-d1`,
-> `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1` Synced and Healthy. Operator `servicemeshoperator3.v3.5.0`;
-> `Istio` `default` Healthy (Istio 1.30.3, one revision); `IstioCNI` Healthy on all 7 nodes; `istiod` 1/1 (HPA 1 to 5);
-> `cert-manager-istio-csr` 2/2, both pods still signing (`CertificateIssued` events) but restarting: 20 and 10 restarts
-> (exit 1) since the master cordon of 2026-11-12, the last at 00:24Z, while the `etcd` ClusterOperator had changed
-> state at about 23:38Z. Certificate `istiod` Ready, one hour, from ClusterIssuer `vault-issuer-istio` (Ready). 71
-> running pods carry a sidecar: `redhat-ods-applications` 32, `zuno-ai-run` 20, `zuno-data` 6, `zuno-mlops` 5,
-> `openshift-ingress` 4, `zuno-auth` 3, `rhoai-model-registries` 1. PeerAuthentication `default` `STRICT` in
-> `zuno-ai-run`, `zuno-auth` and `zuno-data`, with 12 workload exceptions; no AuthorizationPolicy. Seven namespaces
-> labelled `istio-injection=enabled`, all in the `zuno-mesh` allowlist (10 entries). Kiali CR `kiali` (operator
-> v2.33.1) reconciled, `auth.strategy: openshift`, Route `kiali-zuno-mesh.apps.demo333.startx.fr` (passthrough);
-> MonitoringStack `mesh-monitoring` (Prometheus 2/2); GrafanaDashboard `mesh-gateway` synchronized. Gateways
-> `maas-default-gateway` and `zuno-agent-gateway` (class `istio`) Programmed; the MaaS gateway pod takes its
-> configuration from `istiod.zuno-mesh.svc:15012`. **ai-ops-01** exists as an OpenShift user; **paas-ops-01** does
-> not. Kiali and Grafana were not opened.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Zuno runs Red Hat OpenShift Service Mesh 3 (the Sail operator, Istio 1.30.3) with one control plane in `zuno-mesh`
@@ -45,26 +21,9 @@ mesh's own Prometheus. How the parts connect is in [Appendix B](#appendix-b---ll
 **The message:** "Inside Zuno, the services that hold data, identities and models accept only mutual TLS, and each
 proves who it is with a one-hour certificate from our own PKI."
 
-**Decisions:**
-- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) clause 4:
-  `STRICT` on `zuno-data`, `zuno-auth` and `zuno-ai-run` only, not mesh-wide; every exception is one workload's port
-  with a `zuno.io/permissive-reason`; `platform/security/check_mesh_mtls.py` enforces both. No fine-grained
-  AuthorizationPolicy (decision of 2026-11-06).
-- [ADR-0037](../../../adr/0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md): MCP servers
-  accept traffic only from the MCP gateway, enforced by NetworkPolicy and workload identity.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md): M2
-  (databases in the mesh with `DISABLE` rules) and M7 (one PKI root, one ServiceAccount for all Vault issuers) are
-  open, planned by
-  [ADR-0613](../../../adr/0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md).
-- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): the MaaS gateway and
-  its governance plane.
-- [ADR-0413](../../../adr/0413-consolidate-grafana-dashboards-into-six-platform-views.md): the mesh and API-gateway
-  dashboards merged into **Mesh & gateway**.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -81,7 +40,7 @@ Other identities, none of which signs in on stage:
 
 ## Presenter lifecycle
 
-`make demo use service-mesh-kiali 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use service-mesh-kiali 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/service-mesh-kiali/<action>.yml`) has run, and says
 what is left to the presenter. Start runs every golden-path probe (the whole `make demo golden-path`) to create traffic. It is read-only and allowed during a freeze, so it is not a changing unit: no demo id is typed.
 
@@ -123,8 +82,7 @@ It is read-only and allowed during a freeze, so it is not a changing unit and ne
   Mesh & gateway**, last 1 hour, row **Mesh traffic & control plane** open.
 - Known, not a failure: every sidecar logs a repeating SDS error about a missing `service-ca.crt`. It is benign
   and never wired to a real certificate
-  ([ADR-0411](../../../adr/0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) follow-ups,
-  [WP-124](../../../roadmap/work-packages/wp-124-ai-gateway-external-saas-mesh-egress.md)). This page shows no logs.
+  (see References). This page shows no logs.
 
 ### Stop
 
@@ -282,8 +240,8 @@ The control plane, the certificate path, where mutual TLS is enforced, and where
 `gitops/charts/mesh-monitoring/templates/` (`monitoringstack.yaml`, `podmonitor-istio-proxy.yaml`,
 `servicemonitor-istiod.yaml`), `gitops/charts/grafana/templates/dashboard-mesh-gateway.yaml`,
 `gitops/charts/models/templates/destinationrule-external-model-plaintext.yaml`, `platform/security/check_mesh_mtls.py`,
-the [WP-224 evidence](../../../roadmap/evidence/wp-224-live-rehearsal-2026-11-07.md), and the live objects listed in
-the status banner.
+the [WP-224 evidence](../../../roadmap/evidence/wp-224-live-rehearsal-2026-11-07.md), and the live objects listed under
+Page status.
 
 ```mermaid
 flowchart LR
@@ -328,3 +286,55 @@ flowchart LR
   ISTIOD -. "Telemetry mesh-default, 100 %" .-> OTEL["OTel collector, then Tempo<br/>zuno-monitoring"]
   CNI -. "traffic redirection" .-> GWS
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) clause 4:
+  `STRICT` on `zuno-data`, `zuno-auth` and `zuno-ai-run` only, not mesh-wide; every exception is one workload's port
+  with a `zuno.io/permissive-reason`; `platform/security/check_mesh_mtls.py` enforces both. No fine-grained
+  AuthorizationPolicy (decision of 2026-11-06).
+- [ADR-0037](../../../adr/0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md): MCP servers
+  accept traffic only from the MCP gateway, enforced by NetworkPolicy and workload identity.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md): M2
+  (databases in the mesh with `DISABLE` rules) and M7 (one PKI root, one ServiceAccount for all Vault issuers) are
+  open, planned by
+  [ADR-0613](../../../adr/0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md).
+- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): the MaaS gateway and
+  its governance plane.
+- [ADR-0413](../../../adr/0413-consolidate-grafana-dashboards-into-six-platform-views.md): the mesh and API-gateway
+  dashboards merged into **Mesh & gateway**.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+- [ADR-0411](../../../adr/0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md): trust the Vault PKI root for the Tekos frontend OIDC client (the SDS error follow-ups).
+
+Evidence:
+
+- [WP-124](../../../roadmap/work-packages/wp-124-ai-gateway-external-saas-mesh-egress.md): the SDS error follow-up: the ai-gateway external SaaS mesh egress.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse service-mesh-kiali`: the 5-minute version PASS at
+> 15:29 (11 units, 111 s); the 15-minute version PASS at 10:27 (20 units, 115 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Its `start` runs the whole golden path
+> (read-only). Prerequisites checked read-only on demo333 on 2026-11-13 (00:10 to 00:30
+> UTC): Applications `zuno-service-mesh-d0`/`-d1`, `zuno-kiali-d0`/`-d1`, `zuno-mesh-monitoring-d0`/`-d1`,
+> `zuno-grafana-d0`/`-d1` and `zuno-namespaces-d0`/`-d1` Synced and Healthy. Operator `servicemeshoperator3.v3.5.0`;
+> `Istio` `default` Healthy (Istio 1.30.3, one revision); `IstioCNI` Healthy on all 7 nodes; `istiod` 1/1 (HPA 1 to 5);
+> `cert-manager-istio-csr` 2/2, both pods still signing (`CertificateIssued` events) but restarting: 20 and 10 restarts
+> (exit 1) since the master cordon of 2026-11-12, the last at 00:24Z, while the `etcd` ClusterOperator had changed
+> state at about 23:38Z. Certificate `istiod` Ready, one hour, from ClusterIssuer `vault-issuer-istio` (Ready). 71
+> running pods carry a sidecar: `redhat-ods-applications` 32, `zuno-ai-run` 20, `zuno-data` 6, `zuno-mlops` 5,
+> `openshift-ingress` 4, `zuno-auth` 3, `rhoai-model-registries` 1. PeerAuthentication `default` `STRICT` in
+> `zuno-ai-run`, `zuno-auth` and `zuno-data`, with 12 workload exceptions; no AuthorizationPolicy. Seven namespaces
+> labelled `istio-injection=enabled`, all in the `zuno-mesh` allowlist (10 entries). Kiali CR `kiali` (operator
+> v2.33.1) reconciled, `auth.strategy: openshift`, Route `kiali-zuno-mesh.apps.demo333.startx.fr` (passthrough);
+> MonitoringStack `mesh-monitoring` (Prometheus 2/2); GrafanaDashboard `mesh-gateway` synchronized. Gateways
+> `maas-default-gateway` and `zuno-agent-gateway` (class `istio`) Programmed; the MaaS gateway pod takes its
+> configuration from `istiod.zuno-mesh.svc:15012`. **ai-ops-01** exists as an OpenShift user; **paas-ops-01** does
+> not. Kiali and Grafana were not opened.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).

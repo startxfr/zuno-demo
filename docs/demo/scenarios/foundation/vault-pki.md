@@ -1,28 +1,5 @@
 # Scenario: Vault and PKI - secrets and certificates without static credentials
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
-> units, 35 s); the 15-minute version PASS at 10:06 (21 units, 53 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13 (about 00:20 UTC):
-> Applications `zuno-vault-d0`/`-d1`, `zuno-external-secrets-d0`/`-d1` and `zuno-cert-manager-d0`/`-d1` Synced and
-> Healthy. Pod `zuno-vault-0` 1/1 Running, Vault 1.17.2, labels `vault-sealed=false`, `vault-active=true`,
-> `vault-initialized=true`. The pod was recreated at 21:27:55Z on 2026-11-12, during the master cordon, and came back
-> unsealed with no human step: four readiness-probe timeouts between 21:35Z and 22:38Z, Ready since 22:38Z. Its rendered
-> configuration has `storage "raft"`, `seal "awskms"` (region eu-central-1) and a TLS listener. No Route in
-> `zuno-vault`. CronJobs `vault-backup` and `vault-raft-snapshot` last ran 20 h and 19 h earlier (Complete); seven
-> daily VolumeSnapshots plus `vault-pre-kms-raft-20261107092607`. 97 ExternalSecrets in 19 namespaces, all
-> `SecretSynced`: 95 on a namespace `SecretStore` `vault`, 2 generator-only. 20 SecretStores `vault`, all Valid and
-> Ready; no ClusterSecretStore. ClusterIssuers `letsencrypt-route53`, `letsencrypt-route53-staging`, `vault-issuer`
-> and `vault-issuer-istio` Ready. Certificates `router-wildcard-tls`, `api-server-tls` and `keycloak-wildcard-tls`
-> (Let's Encrypt) Ready until 2027-02-04; `istiod` (one hour, `vault-issuer-istio`) Ready. The `a2a-gateway` runs
-> `AGENT_CHAIN_SIGNER=transit` (key `agent-chain`) and the `mcp-gateway` `MCP_CALL_ASSERTION_SIGNER=transit` (key
-> `mcp-call-assertion`); the Secrets `a2a-gateway-agent-chain` and `mcp-gateway-call-assertion` do not exist.
-> **paas-ops-01** had not signed in to OpenShift (no user `paas-ops-01`).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Every credential of Zuno lives in one HashiCorp Vault, in the namespace `zuno-vault` (see
@@ -42,34 +19,9 @@ the parts connect is in [Appendix B](#appendix-b---lld).
 **The message:** "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the
 cluster does not hold, and its signing keys never leave it."
 
-**Decisions:**
-- [ADR-0024](../../../adr/0024-use-vault-for-application-secrets.md): credentials stay out of Git; workloads read them
-  through the External Secrets Operator. Its text still names one `ClusterSecretStore` and an unseal Secret; ADR-0602
-  replaced both.
-- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md):
-  - clause 1: AWS KMS auto-unseal, Raft, TLS, the root token revoked after bootstrap, the UI Route off;
-  - clause 2: one `SecretStore` per namespace, each reading only the keys listed in `platform/vault/secret-access.yaml`;
-  - clauses 3 and 12: the `demo` and `hardened` security profiles.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md): M7 (the PKI
-  root, open, [ADR-0613](../../../adr/0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)),
-  M8 (the Vault UI Route, closed), M9 (credentials out of command strings, closed), M14 (Transit signing, closed).
-- [ADR-0211](../../../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md): Let's Encrypt
-  wildcard and API certificates through Route53 DNS-01, staging first.
-- [ADR-0316](../../../adr/0316-keycloak-route-tls-via-cert-manager.md): Keycloak's Route gets its certificate from
-  cert-manager.
-- [ADR-0345](../../../adr/0345-make-self-generated-vault-credentials-idempotent.md): seeding writes only the Vault
-  paths that are missing; a re-run never rotates a value.
-- [ADR-0420](../../../adr/0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md): the in-cluster Transit
-  signing pattern (superseded for images by RHTAS, reused by
-  [WP-247](../../../roadmap/work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) for the gateways).
-- [ADR-0112](../../../adr/0112-implement-production-grade-backup-and-recovery.md): daily backups, RPO 24 h.
-- [ADR-0352](../../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md): the External Secrets
-  Operator and cert-manager can also run in external mode (rehearsed on 2026-11-07, internal on demo333).
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -94,7 +46,7 @@ Other identities, none of which signs in on stage:
 
 ## Presenter lifecycle
 
-`make demo use vault-pki 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use vault-pki 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/vault-pki/<action>.yml`) has run, and says
 what is left to the presenter.
 
@@ -293,7 +245,7 @@ its templates (`cronjob-backup.yaml`, `cronjob-raft-snapshot.yaml`, `route.yaml`
 `acme-cluster-patches.yaml`, `acme-externalsecret.yaml`), `gitops/charts/service-mesh/templates/clusterissuer-istio.yaml`,
 the `zuno-vault` entry of `gitops/charts/namespaces/values.yaml`, `docs/platform/vault-kms-raft-migration.md`,
 [WP-247](../../../roadmap/work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md), and the live objects
-listed in the status banner.
+listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -345,3 +297,57 @@ flowchart LR
   A2A -. "signed agent chain,<br/>public key in verifiers" .-> VERIF["mcp-gateway, ai-gateway<br/>AGENT_CHAIN_VERIFY=true"]
   MCPG -. "signed call assertion" .-> MCPSRV["aap-mcp, git-forge-mcp,<br/>confluence-mcp"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0024](../../../adr/0024-use-vault-for-application-secrets.md): credentials stay out of Git; workloads read them
+  through the External Secrets Operator. Its text still names one `ClusterSecretStore` and an unseal Secret; ADR-0602
+  replaced both.
+- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md):
+  - clause 1: AWS KMS auto-unseal, Raft, TLS, the root token revoked after bootstrap, the UI Route off;
+  - clause 2: one `SecretStore` per namespace, each reading only the keys listed in `platform/vault/secret-access.yaml`;
+  - clauses 3 and 12: the `demo` and `hardened` security profiles.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md): M7 (the PKI
+  root, open, [ADR-0613](../../../adr/0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)),
+  M8 (the Vault UI Route, closed), M9 (credentials out of command strings, closed), M14 (Transit signing, closed).
+- [ADR-0211](../../../adr/0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md): Let's Encrypt
+  wildcard and API certificates through Route53 DNS-01, staging first.
+- [ADR-0316](../../../adr/0316-keycloak-route-tls-via-cert-manager.md): Keycloak's Route gets its certificate from
+  cert-manager.
+- [ADR-0345](../../../adr/0345-make-self-generated-vault-credentials-idempotent.md): seeding writes only the Vault
+  paths that are missing; a re-run never rotates a value.
+- [ADR-0420](../../../adr/0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md): the in-cluster Transit
+  signing pattern (superseded for images by RHTAS, reused by
+  [WP-247](../../../roadmap/work-packages/wp-247-sign-gateway-assertions-with-vault-transit.md) for the gateways).
+- [ADR-0112](../../../adr/0112-implement-production-grade-backup-and-recovery.md): daily backups, RPO 24 h.
+- [ADR-0352](../../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md): the External Secrets
+  Operator and cert-manager can also run in external mode (rehearsed on 2026-11-07, internal on demo333).
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
+> units, 35 s); the 15-minute version PASS at 10:06 (21 units, 53 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (about 00:20 UTC):
+> Applications `zuno-vault-d0`/`-d1`, `zuno-external-secrets-d0`/`-d1` and `zuno-cert-manager-d0`/`-d1` Synced and
+> Healthy. Pod `zuno-vault-0` 1/1 Running, Vault 1.17.2, labels `vault-sealed=false`, `vault-active=true`,
+> `vault-initialized=true`. The pod was recreated at 21:27:55Z on 2026-11-12, during the master cordon, and came back
+> unsealed with no human step: four readiness-probe timeouts between 21:35Z and 22:38Z, Ready since 22:38Z. Its rendered
+> configuration has `storage "raft"`, `seal "awskms"` (region eu-central-1) and a TLS listener. No Route in
+> `zuno-vault`. CronJobs `vault-backup` and `vault-raft-snapshot` last ran 20 h and 19 h earlier (Complete); seven
+> daily VolumeSnapshots plus `vault-pre-kms-raft-20261107092607`. 97 ExternalSecrets in 19 namespaces, all
+> `SecretSynced`: 95 on a namespace `SecretStore` `vault`, 2 generator-only. 20 SecretStores `vault`, all Valid and
+> Ready; no ClusterSecretStore. ClusterIssuers `letsencrypt-route53`, `letsencrypt-route53-staging`, `vault-issuer`
+> and `vault-issuer-istio` Ready. Certificates `router-wildcard-tls`, `api-server-tls` and `keycloak-wildcard-tls`
+> (Let's Encrypt) Ready until 2027-02-04; `istiod` (one hour, `vault-issuer-istio`) Ready. The `a2a-gateway` runs
+> `AGENT_CHAIN_SIGNER=transit` (key `agent-chain`) and the `mcp-gateway` `MCP_CALL_ASSERTION_SIGNER=transit` (key
+> `mcp-call-assertion`); the Secrets `a2a-gateway-agent-chain` and `mcp-gateway-call-assertion` do not exist.
+> **paas-ops-01** had not signed in to OpenShift (no user `paas-ops-01`).
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).

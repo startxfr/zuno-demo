@@ -1,30 +1,5 @@
 # Scenario: OKF agents release - agents signed in their own repository, admitted by digest
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse okf-signed-agent-release`: the 5-minute version PASS
-> at 09:57 (11 units, 33 s); the 15-minute version PASS at 10:00 (20 units, 80 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). `platform/okf/agents.lock` now pins
-> release v1.0.1. The release names, digests and agent versions in the older check below are those of v0.14.3 on
-> 2026-11-13 and are not repeated by the rehearsal reports. Prerequisites checked read-only on demo333 on 2026-11-13:
-> [`platform/okf/agents.lock`](../../../../platform/okf/agents.lock) pins release v0.14.3,
-> `quay.io/zuno/okf-corp@sha256:2918e463...`, and `admit_okf_bundle.py latest` names the same release as the newest on
-> `quay.io`; `make d3 admit agents`, run from the workstation (no cluster access), printed 13 warnings about knowledge
-> domains that no UnifAI RAG source serves, then `RESULT: PASS - v0.14.3 (quay.io/zuno/okf-corp@sha256:2918e463...) is
-> verified and servable.` in about 35 s; Deployments `mcp-gateway` and `a2a-gateway` in `zuno-ai-run` 2/2 Running, and
-> the `okf-fetch` init container of each printed `VERIFIED
-> quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/okf-corp@sha256:2918e463...: release 0.14.3 (release), 8
-> agent(s): advantage 0.2.1, arkos 0.2.2, cognos 0.2.1, comage 0.2.1, finage 0.2.2, naveo 0.1.1, soursage 0.1.0, tekos
-> 0.5.0`; `OKF_MIRROR_PREFIX=quay-quay-zuno-registry.apps.demo333.startx.fr/zuno` on `okf-fetch`; the `zuno-ai-run`
-> EgressFirewall allows that host, has no `quay.io` rule and ends with `Deny 0.0.0.0/0`; eight `UnifaiAgentBundle`s in
-> `zuno-unifai`, all `Verified=True` (`SignatureValid`), `arkos`, `comage` and `tekos` `Ready`, the five others
-> `Pending` (`PlaceholderNotServed`); ConfigMap `unifai-agent-revocations` key `revoked` is `[]`; `unifai-operator.v0.1.69`;
-> `QuayRegistry` `quay` available, its application pod with 20 restarts. **paas-ops-01** had still not signed in to
-> OpenShift (no `User` object): the checks ran as `kube:admin`.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md),
-> [Agentic AI](../../workshops/agentic-ai.md).
-
 ## Introduction
 
 The agents of Zuno are not written in this repository. Their sheets (purpose, tasks, tools, data classification) and
@@ -38,28 +13,9 @@ platform: see [Appendix A](#appendix-a---hld). The chain from the tag to a runni
 **The message:** "Agents run only from a signed release, owned by the business, chosen by digest and reviewed like code.
 If the signature does not verify, the component does not start."
 
-**Decisions:**
-- [ADR-0576](../../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md):
-  agent definitions and corp policies live in `zuno-demo-agents`.
-- [ADR-0577](../../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md): one artifact per
-  agent, plus a corp artifact that indexes them.
-- [ADR-0578](../../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md):
-  signed keyless with GitHub OIDC by `publish.yml` on a `v*` tag; verified offline by that identity against a trust
-  root committed here.
-- [ADR-0580](../../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md): one
-  digest in `platform/okf/agents.lock`, moved by a promotion pull request.
-- [ADR-0564](../../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md): UnifAI's operator
-  receives each agent as a signed OCI artifact and verifies it before it creates anything.
-- [ADR-0611](../../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) and
-  [ADR-0612](../../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md): the
-  admitted release is copied to the internal Red Hat Quay and read from there; the verification does not change.
-- [ADR-0584](../../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md): lifecycle states
-  (`placeholder`, `active`, `deprecated`, `retired`) and incident revocation within one hour.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -83,7 +39,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use okf-signed-agent-release 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use okf-signed-agent-release 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/okf-signed-agent-release/<action>.yml`) has run, and says
 what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset). The `tail` of row 1:15 reads a repository file (`platform/okf/agents.lock`): the step runs it, as an allowed read.
 
@@ -330,3 +286,53 @@ flowchart TB
   LOCK -->|"stack-config, make d2 install unifai"| UAB
   QIO -->|"per-agent artifacts"| OP
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0576](../../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md):
+  agent definitions and corp policies live in `zuno-demo-agents`.
+- [ADR-0577](../../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md): one artifact per
+  agent, plus a corp artifact that indexes them.
+- [ADR-0578](../../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md):
+  signed keyless with GitHub OIDC by `publish.yml` on a `v*` tag; verified offline by that identity against a trust
+  root committed here.
+- [ADR-0580](../../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md): one
+  digest in `platform/okf/agents.lock`, moved by a promotion pull request.
+- [ADR-0564](../../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md): UnifAI's operator
+  receives each agent as a signed OCI artifact and verifies it before it creates anything.
+- [ADR-0611](../../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md) and
+  [ADR-0612](../../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md): the
+  admitted release is copied to the internal Red Hat Quay and read from there; the verification does not change.
+- [ADR-0584](../../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md): lifecycle states
+  (`placeholder`, `active`, `deprecated`, `retired`) and incident revocation within one hour.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse okf-signed-agent-release`: the 5-minute version PASS
+> at 09:57 (11 units, 33 s); the 15-minute version PASS at 10:00 (20 units, 80 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). `platform/okf/agents.lock` now pins
+> release v1.0.1. The release names, digests and agent versions in the older check below are those of v0.14.3 on
+> 2026-11-13 and are not repeated by the rehearsal reports. Prerequisites checked read-only on demo333 on 2026-11-13:
+> [`platform/okf/agents.lock`](../../../../platform/okf/agents.lock) pins release v0.14.3,
+> `quay.io/zuno/okf-corp@sha256:2918e463...`, and `admit_okf_bundle.py latest` names the same release as the newest on
+> `quay.io`; `make d3 admit agents`, run from the workstation (no cluster access), printed 13 warnings about knowledge
+> domains that no UnifAI RAG source serves, then `RESULT: PASS - v0.14.3 (quay.io/zuno/okf-corp@sha256:2918e463...) is
+> verified and servable.` in about 35 s; Deployments `mcp-gateway` and `a2a-gateway` in `zuno-ai-run` 2/2 Running, and
+> the `okf-fetch` init container of each printed `VERIFIED
+> quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/okf-corp@sha256:2918e463...: release 0.14.3 (release), 8
+> agent(s): advantage 0.2.1, arkos 0.2.2, cognos 0.2.1, comage 0.2.1, finage 0.2.2, naveo 0.1.1, soursage 0.1.0, tekos
+> 0.5.0`; `OKF_MIRROR_PREFIX=quay-quay-zuno-registry.apps.demo333.startx.fr/zuno` on `okf-fetch`; the `zuno-ai-run`
+> EgressFirewall allows that host, has no `quay.io` rule and ends with `Deny 0.0.0.0/0`; eight `UnifaiAgentBundle`s in
+> `zuno-unifai`, all `Verified=True` (`SignatureValid`), `arkos`, `comage` and `tekos` `Ready`, the five others
+> `Pending` (`PlaceholderNotServed`); ConfigMap `unifai-agent-revocations` key `revoked` is `[]`; `unifai-operator.v0.1.69`;
+> `QuayRegistry` `quay` available, its application pod with 20 restarts. **paas-ops-01** had still not signed in to
+> OpenShift (no `User` object): the checks ran as `kube:admin`.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md),
+> [Agentic AI](../../workshops/agentic-ai.md).

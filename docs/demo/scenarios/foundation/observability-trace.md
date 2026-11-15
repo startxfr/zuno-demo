@@ -1,25 +1,5 @@
 # Scenario: Observability - one turn traced, every call counted
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse observability-trace`: the 5-minute version PASS at
-> 10:32 (11 units, 117 s); the 15-minute version PASS at 10:35 (20 units, 64 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13: Applications
-> `zuno-observability-d0`/`-d1`, `zuno-tempo-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-perses-d1` Synced and
-> Healthy; OpenTelemetryCollector `zuno-otel-collector` 1/1 (0.158.0), traces exported to `debug`, `otlp/tempo` and
-> `otlp/rhoai`, metrics to `debug` and `prometheus`; ServiceMonitor `zuno-otel-collector-metrics` selecting the base
-> Service only; namespace `zuno-monitoring` labelled `openshift.io/cluster-monitoring=true`; TempoMonolithic `tempo`
-> Ready (Tempo 2.10.8, 10Gi volume) with its Jaeger UI route; Grafana 1/1 with 12 GrafanaDashboards and the
-> datasources `prometheus`, `mesh-prometheus` and `tempo`; 19 PersesDashboards in `redhat-ods-monitoring`, the 11
-> `zuno-*` ones Available and RHOAI's `data-science-tempo-traces` Degraded; UIPlugin `dashboards` Available;
-> `ai-gateway`, `mcp-gateway` and `a2a-gateway` 1/1; UnifaiStack `unifai` exporting to the collector; the four local
-> models Ready; OpenShift group `ocp-ai-ops` holding ai-ops-01, and no group `ocp-paas-ops` yet. The collector, Tempo,
-> Grafana and Prometheus pods had restarted about 2 h 40 min before the check.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `trace`, run together with `unifai-tekos`, which gives it its run id. The probe proves that
-> the trace exists. The Tempo search, the dashboards and Perses have no probe: rehearse them the same day.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Every Zuno service sends its traces and metrics over OTLP to one OpenTelemetry collector in `zuno-monitoring` (see
@@ -32,26 +12,9 @@ are in [Appendix B](#appendix-b---lld).
 **The message:** "Every model and tool call leaves a count and a trace: who asked, from which experience, which agent
 and model, and what it cost."
 
-**Decisions:**
-- [ADR-0029](../../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md): measure tokens, cost, latency
-  and decisions by user, agent, task, model and provider with OpenTelemetry.
-- [ADR-0543](../../../adr/0543-propagate-a-per-run-id-across-every-service-span.md): one run id on every service span;
-  the per-run dashboard is TraceQL only; Tempo's Jaeger UI is exposed behind an oauth-proxy.
-- [ADR-0566](../../../adr/0566-instrument-unifai-with-opentelemetry.md): UnifAI emits OpenTelemetry and passes
-  `traceparent` to the gateways, which extract it.
-- [ADR-0523](../../../adr/0523-dual-export-traces-into-the-rhoai-monitoring-stack.md): a copy of every trace goes to
-  OpenShift AI's Tempo.
-- [ADR-0413](../../../adr/0413-consolidate-grafana-dashboards-into-six-platform-views.md): Grafana dashboards are
-  platform views with filters, declared in Git (six then, twelve today).
-- [ADR-0552](../../../adr/0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md): Zuno's
-  dashboards are duplicated onto OpenShift AI's Perses instance, never onto a second one.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M15): no
-  metric carries a person; the persona is on the trace only.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -72,7 +35,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use observability-trace 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use observability-trace 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/observability-trace/<action>.yml`) has run, and says
 what is left to the presenter.
 
@@ -356,3 +319,46 @@ The twelve Grafana dashboards, folder **Zuno Platform**:
 | `dashboard-data.yaml` | Data | PostgreSQL, MariaDB and Redis exporters |
 | `dashboard-gitops.yaml` | GitOps | Argo CD sync and health |
 | `dashboard-infra-data.yaml` | Infrastructure | Nodes, pods and deployments |
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0029](../../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md): measure tokens, cost, latency
+  and decisions by user, agent, task, model and provider with OpenTelemetry.
+- [ADR-0543](../../../adr/0543-propagate-a-per-run-id-across-every-service-span.md): one run id on every service span;
+  the per-run dashboard is TraceQL only; Tempo's Jaeger UI is exposed behind an oauth-proxy.
+- [ADR-0566](../../../adr/0566-instrument-unifai-with-opentelemetry.md): UnifAI emits OpenTelemetry and passes
+  `traceparent` to the gateways, which extract it.
+- [ADR-0523](../../../adr/0523-dual-export-traces-into-the-rhoai-monitoring-stack.md): a copy of every trace goes to
+  OpenShift AI's Tempo.
+- [ADR-0413](../../../adr/0413-consolidate-grafana-dashboards-into-six-platform-views.md): Grafana dashboards are
+  platform views with filters, declared in Git (six then, twelve today).
+- [ADR-0552](../../../adr/0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md): Zuno's
+  dashboards are duplicated onto OpenShift AI's Perses instance, never onto a second one.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M15): no
+  metric carries a person; the persona is on the trace only.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse observability-trace`: the 5-minute version PASS at
+> 10:32 (11 units, 117 s); the 15-minute version PASS at 10:35 (20 units, 64 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: Applications
+> `zuno-observability-d0`/`-d1`, `zuno-tempo-d0`/`-d1`, `zuno-grafana-d0`/`-d1` and `zuno-perses-d1` Synced and
+> Healthy; OpenTelemetryCollector `zuno-otel-collector` 1/1 (0.158.0), traces exported to `debug`, `otlp/tempo` and
+> `otlp/rhoai`, metrics to `debug` and `prometheus`; ServiceMonitor `zuno-otel-collector-metrics` selecting the base
+> Service only; namespace `zuno-monitoring` labelled `openshift.io/cluster-monitoring=true`; TempoMonolithic `tempo`
+> Ready (Tempo 2.10.8, 10Gi volume) with its Jaeger UI route; Grafana 1/1 with 12 GrafanaDashboards and the
+> datasources `prometheus`, `mesh-prometheus` and `tempo`; 19 PersesDashboards in `redhat-ods-monitoring`, the 11
+> `zuno-*` ones Available and RHOAI's `data-science-tempo-traces` Degraded; UIPlugin `dashboards` Available;
+> `ai-gateway`, `mcp-gateway` and `a2a-gateway` 1/1; UnifaiStack `unifai` exporting to the collector; the four local
+> models Ready; OpenShift group `ocp-ai-ops` holding ai-ops-01, and no group `ocp-paas-ops` yet. The collector, Tempo,
+> Grafana and Prometheus pods had restarted about 2 h 40 min before the check.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> yes, golden-path probe `trace`, run together with `unifai-tekos`, which gives it its run id. The probe proves that
+> the trace exists. The Tempo search, the dashboards and Perses have no probe: rehearse them the same day.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).

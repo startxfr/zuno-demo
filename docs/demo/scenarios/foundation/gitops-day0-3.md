@@ -1,27 +1,5 @@
 # Scenario: GitOps and Day 0-3 - the install and operations contract
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse gitops-day0-3`: the 5-minute version PASS at 09:38 (11
-> units, 127 s); the 15-minute version PASS at 09:43 (22 units, 151 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13 (00:10 to 00:45
-> UTC): 114 Argo CD Applications in `openshift-gitops`, all tracking `devel`: 106 `zuno-*` from `startxfr/zuno-demo`
-> and 8 `startx-cluster-*` from `startxfr/helm-repository`. 111 were Synced and Healthy. `startx-cluster-auth` and
-> `startx-cluster-infra-config` were OutOfSync and Healthy (no self-heal; the same pair was OutOfSync on 2026-11-04).
-> `zuno-postgresql-d1` was Synced and Progressing, with 2 of 3 PostgreSQL instances Ready. AppProjects: `zuno-platform`
-> (62 Applications), `zuno-apps` (44), `cluster-admin` (8), `zuno-bootstrap` (none). The synced commit of
-> `zuno-ai-gateway-d1` moved from `0a713411` to `24da7de3` during the check: a push reached the cluster. OpenShift
-> GitOps 1.22.3 (`Manual`, `AtLatestKnown`); the Argo CD pods had not restarted since 2026-11-12 21:27 UTC, but the
-> operator's `manager` container had restarted 25 times in 162 minutes (failed probes, last exit at 23:47 UTC). 30
-> Subscriptions; two of them are named by no repository file and are missing from
-> `platform/olm/known-good-demo333.yaml`: `elasticsearch-eck-operator-certified` (created again on 2026-11-12 at 14:17
-> UTC, after the owner's uninstall of 2026-11-11) and `kubevirt-hyperconverged` (created on 2026-11-12 at 14:40 UTC).
-> `zuno_drift_strict: true` on demo333. No canary namespace. **paas-ops-01** had not signed in to OpenShift (no
-> `ocp-paas-ops` group). No `make` target was run for this page.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Zuno is installed and operated through one entry point: `make`, then a day, a verb and a component. Ansible runs the
@@ -44,37 +22,14 @@ Which verbs are safe on stage:
 
 | Read-only, allowed during a freeze | Changes the cluster: rehearsal only, never during a freeze, with the platform owner's go |
 |---|---|
-| Every `check` (Day 2 `agents` runs the ADR-0053 acceptance gate); `make d3 test`; `make d3 admit agents` (no cluster; `UPDATE_LOCK=1` rewrites the lock file); `make demo list`, `use`, `status`, `check`, `step next|<N>`, `freeze on|off`, `make demo golden-path` (creates test sessions and deletes them), `make demo browser` | `install`, `uninstall`, `reinstall`, `all`, `reconcile`, `build` (an in-cluster build rolls the pods that run `:latest`); `make d3 stresstest`, `make d3 restore`, `make d3 run`, `make d3 release`, `make d3 scenario-failover-node`; `make demo install`, `uninstall` and `rehearse` (refused while the freeze marker is set); `make demo start` and `stop` of a demo that declares a changing unit (they ask for the typed demo id). `make d3 backup` writes a backup to S3; the freeze protocol does not freeze it |
+| Every `check` (Day 2 `agents` runs its acceptance gate); `make d3 test`; `make d3 admit agents` (no cluster; `UPDATE_LOCK=1` rewrites the lock file); `make demo list`, `use`, `status`, `check`, `step next|<N>`, `freeze on|off`, `make demo golden-path` (creates test sessions and deletes them), `make demo browser` | `install`, `uninstall`, `reinstall`, `all`, `reconcile`, `build` (an in-cluster build rolls the pods that run `:latest`); `make d3 stresstest`, `make d3 restore`, `make d3 run`, `make d3 release`, `make d3 scenario-failover-node`; `make demo install`, `uninstall` and `rehearse` (refused while the freeze marker is set); `make demo start` and `stop` of a demo that declares a changing unit (they ask for the typed demo id). `make d3 backup` writes a backup to S3; the freeze protocol does not freeze it |
 
 **The message:** "The platform is the repository. One command installs or checks any piece of it, Argo CD keeps the
 cluster equal to Git, and before any live session we prove each moment with a real answer."
 
-**Decisions:**
-- [ADR-0003](../../../adr/0003-use-ansible-and-make-as-the-deployment-entry-point.md) and
-  [ADR-0030](../../../adr/0030-use-a-command-dispatch-makefile-interface.md): Ansible behind `make`, one dispatch
-  shape.
-- [ADR-0060](../../../adr/0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md): four days;
-  [ADR-0421](../../../adr/0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) moved PostgreSQL, Keycloak and
-  AAP to Day 0.
-- [ADR-0311](../../../adr/0311-stop-applying-the-root-app-of-apps-from-ansible.md) and
-  [ADR-0312](../../../adr/0312-route-operator-installs-through-argocd-applications.md): no app-of-apps; each role
-  applies its own Applications, operators included.
-- [ADR-0418](../../../adr/0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md): Day 1 to Day 3 verbs can
-  run as AAP job templates (see the [AAP scenario](aap-audited-operations.md)).
-- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) clause 5: the
-  AppProjects `zuno-platform`, `zuno-apps` and `zuno-bootstrap`.
-- [ADR-0605](../../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): the golden path
-  and the freeze window.
-- [ADR-0607](../../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md): pre-GA pins and the known-good gate
-  (`make d3 check operators`).
-- [ADR-0608](../../../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md): the repository is the only
-  source of cluster state (`make d3 check drift`).
-- [ADR-0609](../../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md): rehearsals in canary namespaces.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -93,7 +48,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use gitops-day0-3 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use gitops-day0-3 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/gitops-day0-3/<action>.yml`) has run, and says
 what is left to the presenter. The steps run `make help` (0:00), `make d0 check argocd` (3:00), `make d3 check operators` (9:00), `make d3 check drift` (10:30) and `make demo list` (14:15) through their local playbooks. The 11:45 step does not run `make demo golden-path`: it is a 15-minute run, so the page shows the morning's output.
 
@@ -102,7 +57,7 @@ what is left to the presenter. The steps run `make help` (0:00), `make d0 check 
 Nothing to do. The file reads the Argo CD Applications `startx-cluster-auth` and `startx-cluster-infra-config` (any
 sync state allowed), counts every Application of `openshift-gitops`, lists those that are not Synced and Healthy, and
 lists the pods of `openshift-gitops`. A few are not Synced and Healthy on
-purpose (see the status banner): they are known on screen, not a failure. If many are missing or Degraded, stop and
+purpose (see Page status): they are known on screen, not a failure. If many are missing or Degraded, stop and
 tell the platform owner: this demo installs nothing.
 
 ### Check
@@ -138,7 +93,7 @@ Nothing is prepared by the file. What only a person does:
   **paas-ops-01**. Not rehearsed. Look only: never press Sync, Hard Refresh or Delete.
 - [ ] Open [freeze-protocol.md](../../freeze-protocol.md) and
   [docs/platform/canary-rehearsal.md](../../../platform/canary-rehearsal.md) in a browser tab.
-- Known on screen, not a failure: the three Applications that are not Synced and Healthy (see the status banner).
+- Known on screen, not a failure: the three Applications that are not Synced and Healthy (see Page status).
 
 ### Stop
 
@@ -304,7 +259,7 @@ How a `make` verb reaches the cluster, and what the read-only checks read. Drawn
 (`platform/olm/audit_operator_updates.py`, `platform/olm/known-good-demo333.yaml`),
 `ansible/roles/drift/tasks/precheck.yml` (`platform/drift/check_drift.py`,
 `platform/drift/external-operators.yaml`), `ansible/playbooks/demo_golden_path.yml`, `ansible/tasks/canary_namespace.yml`,
-`gitops/apps/README.md`, and the live objects listed in the status banner.
+`gitops/apps/README.md`, and the live objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -335,3 +290,55 @@ flowchart LR
   EXTOP["external-operators.yaml"] -. allow-list .-> CHK
   CAN["canary_namespace.yml<br/>zuno-canary-WP: quota, default-deny"] -->|"owner's go, never in a freeze"| NSS
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0003](../../../adr/0003-use-ansible-and-make-as-the-deployment-entry-point.md) and
+  [ADR-0030](../../../adr/0030-use-a-command-dispatch-makefile-interface.md): Ansible behind `make`, one dispatch
+  shape.
+- [ADR-0060](../../../adr/0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md): four days;
+  [ADR-0421](../../../adr/0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) moved PostgreSQL, Keycloak and
+  AAP to Day 0.
+- [ADR-0311](../../../adr/0311-stop-applying-the-root-app-of-apps-from-ansible.md) and
+  [ADR-0312](../../../adr/0312-route-operator-installs-through-argocd-applications.md): no app-of-apps; each role
+  applies its own Applications, operators included.
+- [ADR-0418](../../../adr/0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md): Day 1 to Day 3 verbs can
+  run as AAP job templates (see the [AAP scenario](aap-audited-operations.md)).
+- [ADR-0602](../../../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) clause 5: the
+  AppProjects `zuno-platform`, `zuno-apps` and `zuno-bootstrap`.
+- [ADR-0605](../../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md): the golden path
+  and the freeze window.
+- [ADR-0607](../../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md): pre-GA pins and the known-good gate
+  (`make d3 check operators`).
+- [ADR-0608](../../../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md): the repository is the only
+  source of cluster state (`make d3 check drift`).
+- [ADR-0609](../../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md): rehearsals in canary namespaces.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+- [ADR-0053](../../../adr/0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md): `make check` as an end-to-end acceptance and security gate.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse gitops-day0-3`: the 5-minute version PASS at 09:38 (11
+> units, 127 s); the 15-minute version PASS at 09:43 (22 units, 151 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13 (00:10 to 00:45
+> UTC): 114 Argo CD Applications in `openshift-gitops`, all tracking `devel`: 106 `zuno-*` from `startxfr/zuno-demo`
+> and 8 `startx-cluster-*` from `startxfr/helm-repository`. 111 were Synced and Healthy. `startx-cluster-auth` and
+> `startx-cluster-infra-config` were OutOfSync and Healthy (no self-heal; the same pair was OutOfSync on 2026-11-04).
+> `zuno-postgresql-d1` was Synced and Progressing, with 2 of 3 PostgreSQL instances Ready. AppProjects: `zuno-platform`
+> (62 Applications), `zuno-apps` (44), `cluster-admin` (8), `zuno-bootstrap` (none). The synced commit of
+> `zuno-ai-gateway-d1` moved from `0a713411` to `24da7de3` during the check: a push reached the cluster. OpenShift
+> GitOps 1.22.3 (`Manual`, `AtLatestKnown`); the Argo CD pods had not restarted since 2026-11-12 21:27 UTC, but the
+> operator's `manager` container had restarted 25 times in 162 minutes (failed probes, last exit at 23:47 UTC). 30
+> Subscriptions; two of them are named by no repository file and are missing from
+> `platform/olm/known-good-demo333.yaml`: `elasticsearch-eck-operator-certified` (created again on 2026-11-12 at 14:17
+> UTC, after the owner's uninstall of 2026-11-11) and `kubevirt-hyperconverged` (created on 2026-11-12 at 14:40 UTC).
+> `zuno_drift_strict: true` on demo333. No canary namespace. **paas-ops-01** had not signed in to OpenShift (no
+> `ocp-paas-ops` group). No `make` target was run for this page.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).

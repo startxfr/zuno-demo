@@ -1,28 +1,5 @@
 # Scenario: Supply chain - signed images, admission policy and the internal Quay
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse image-signing-admission`: the 5-minute version PASS at
-> 09:45 (11 units, 38 s); the 15-minute version PASS at 09:48 (21 units, 55 s). Evidence:
-> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
-> demo333 on 2026-11-13: `Securesign`
-> `zuno-securesign` `Ready` in `zuno-rhtas` (`rhtas-operator.v1.5.1`), routes `fulcio-server`, `rekor-server`, `tuf` and
-> `console-ui` on `*-zuno-rhtas.apps.demo333.startx.fr`, nine RHTAS pods Running; `policy-controller-operator.v1.1.2`,
-> Deployment `zuno-policy-controller-webhook` 1/1, webhook `policy.rhtas.com` with `failurePolicy: Ignore` and a 10 s
-> timeout, `no-match-policy: warn`; nine `clusterimagepolicies.policy.sigstore.dev`, all in `enforce`:
-> `zuno-first-party-images` (images `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/**`, identity
-> `zuno-signer@zuno-demo.internal`) and eight `zuno-unifai-images-<repository>` that read the signatures from
-> `quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/<repository>`; a bare `oc get clusterimagepolicy` lists only
-> OpenShift's own `openshift` object; namespaces labelled `policy.rhtas.com/include=true`: `unifai-operator`,
-> `zuno-unifai`, `zuno-wp226-cip-test`; `QuayRegistry` `quay` `v3.18.3` available in `zuno-registry`, its application
-> pod with 20 restarts; `ImageDigestMirrorSet`s `zuno-unifai-via-registry` (8 sources) and `zuno-public-via-registry`
-> (20 sources), all `AllowContactingSource`; the UnifAI pods of `zuno-unifai` on `quay.io/zuno/unifai-*@sha256:...`;
-> Job `supply-chain-verify-images` in `zuno-ai-build` `Complete` 16 hours earlier; the release ledger holds 12
-> releases, the last `v0.15.0` (2026-11-11, 13 pins, `signed: true`); both machine config pools `Updated`, 7 nodes
-> Ready. **paas-ops-01** had still not signed in to OpenShift (no `User` object): the checks ran as `kube:admin`.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
-
 ## Introduction
 
 Zuno signs what it runs and checks the signature before it runs it. Red Hat Trusted Artifact Signer (RHTAS) runs in
@@ -37,27 +14,9 @@ admission and mirror paths: see [Appendix B](#appendix-b---lld).
 **The message:** "What runs here is signed, and the signer is named. In the namespaces that opted in, the cluster
 refuses an image whose signature does not match, and it reads images and signatures from our own registry."
 
-**Decisions:**
-- [ADR-0535](../../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md): RHTAS signs the
-  images built in the cluster, keyless, with the `zuno-signer` Keycloak identity.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M16, M17):
-  the image policy moves to `enforce` after a clean `warn` run; release digests can be rendered into the charts.
-- [ADR-0586](../../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md):
-  UnifAI images are pinned by digest and verified (signature, provenance, SBOM) before they are deployed, then checked
-  again at admission ([WP-178](../../../roadmap/work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md)).
-- [ADR-0549](../../../adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md): a named
-  release rebuilds, signs and records every component in an append-only ledger.
-- [ADR-0612](../../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md): one
-  internal Red Hat Quay, backed by an S3 bucket, serves the zuno images.
-- [ADR-0611](../../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md): measured on 2026-11-09,
-  the OpenShift internal registry cannot hold the signatures of OCI artifacts.
-- [ADR-0115](../../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) (Deferred): the
-  original goal of immutable, verifiable artifacts published by CI.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -77,7 +36,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use image-signing-admission 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use image-signing-admission 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/image-signing-admission/<action>.yml`) has run, and says
 what is left to the presenter. `make d2 check supply-chain` writes a Job, so it is a changing unit and no step runs it. The two `grep` commands of row 11:30 read a repository file (`platform/supply-chain/pinned-releases.yaml`): the step runs them, as an allowed read.
 
@@ -112,8 +71,8 @@ Nothing is prepared by the file. What only a person does:
 - [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. If **paas-ops-01** has
   never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
   terminal in.
-- [ ] 15-minute version: open [WP-178](../../../roadmap/work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md)
-  at step 4 of its Steps, and [`platform/supply-chain/pinned-releases.yaml`](../../../../platform/supply-chain/pinned-releases.yaml)
+- [ ] 15-minute version: open the brief that admits only signed UnifAI images
+  (listed under References) at step 4 of its Steps, and [`platform/supply-chain/pinned-releases.yaml`](../../../../platform/supply-chain/pinned-releases.yaml)
   at its last entry.
 - Known on screen, not a failure: `oc get clusterimagepolicy` alone lists only `openshift`, OpenShift's own
   resource of the same name. Always type `clusterimagepolicies.policy.sigstore.dev`.
@@ -279,7 +238,7 @@ The three paths: signing what the cluster builds, verifying and mirroring the Un
 `ansible/roles/supply_chain/tasks/check.yml`, `platform/supply-chain/` (`tag_local_release.py`,
 `check_release_ledger.py`, `verify_unifai_images.py`, `mirror_unifai_images.py`, `admission_preflight.py`,
 `image-identities.yaml`), `gitops/charts/quay-registry/templates/`, `ansible/clusters/demo333.yml` and the live objects
-of the status banner.
+listed under Page status.
 
 ```mermaid
 flowchart TB
@@ -336,3 +295,50 @@ flowchart TB
   WH -->|"unsigned, wrong signer or tag"| NO["denied"]
   POD -.-> NODE
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0535](../../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md): RHTAS signs the
+  images built in the cluster, keyless, with the `zuno-signer` Keycloak identity.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M16, M17):
+  the image policy moves to `enforce` after a clean `warn` run; release digests can be rendered into the charts.
+- [ADR-0586](../../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md):
+  UnifAI images are pinned by digest and verified (signature, provenance, SBOM) before they are deployed, then checked
+  again at admission ([WP-178](../../../roadmap/work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md)).
+- [ADR-0549](../../../adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md): a named
+  release rebuilds, signs and records every component in an append-only ledger.
+- [ADR-0612](../../../adr/0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md): one
+  internal Red Hat Quay, backed by an S3 bucket, serves the zuno images.
+- [ADR-0611](../../../adr/0611-mirror-the-admitted-okf-release-into-the-internal-registry.md): measured on 2026-11-09,
+  the OpenShift internal registry cannot hold the signatures of OCI artifacts.
+- [ADR-0115](../../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) (Deferred): the
+  original goal of immutable, verifiable artifacts published by CI.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse image-signing-admission`: the 5-minute version PASS at
+> 09:45 (11 units, 38 s); the 15-minute version PASS at 09:48 (21 units, 55 s). Evidence:
+> [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
+> demo333 on 2026-11-13: `Securesign`
+> `zuno-securesign` `Ready` in `zuno-rhtas` (`rhtas-operator.v1.5.1`), routes `fulcio-server`, `rekor-server`, `tuf` and
+> `console-ui` on `*-zuno-rhtas.apps.demo333.startx.fr`, nine RHTAS pods Running; `policy-controller-operator.v1.1.2`,
+> Deployment `zuno-policy-controller-webhook` 1/1, webhook `policy.rhtas.com` with `failurePolicy: Ignore` and a 10 s
+> timeout, `no-match-policy: warn`; nine `clusterimagepolicies.policy.sigstore.dev`, all in `enforce`:
+> `zuno-first-party-images` (images `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/**`, identity
+> `zuno-signer@zuno-demo.internal`) and eight `zuno-unifai-images-<repository>` that read the signatures from
+> `quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/<repository>`; a bare `oc get clusterimagepolicy` lists only
+> OpenShift's own `openshift` object; namespaces labelled `policy.rhtas.com/include=true`: `unifai-operator`,
+> `zuno-unifai`, `zuno-wp226-cip-test`; `QuayRegistry` `quay` `v3.18.3` available in `zuno-registry`, its application
+> pod with 20 restarts; `ImageDigestMirrorSet`s `zuno-unifai-via-registry` (8 sources) and `zuno-public-via-registry`
+> (20 sources), all `AllowContactingSource`; the UnifAI pods of `zuno-unifai` on `quay.io/zuno/unifai-*@sha256:...`;
+> Job `supply-chain-verify-images` in `zuno-ai-build` `Complete` 16 hours earlier; the release ledger holds 12
+> releases, the last `v0.15.0` (2026-11-11, 13 pins, `signed: true`); both machine config pools `Updated`, 7 nodes
+> Ready. **paas-ops-01** had still not signed in to OpenShift (no `User` object): the checks ran as `kube:admin`.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [Trusted platform and operations](../../workshops/trusted-platform-ops.md).
