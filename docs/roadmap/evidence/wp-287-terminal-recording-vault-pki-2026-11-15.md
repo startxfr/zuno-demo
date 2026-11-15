@@ -60,6 +60,8 @@ The review was done by `zuno-demo-reorg-demo333` (relayed by `zuno-demo-reorg`; 
 - The refusal of the text gate (a hit refuses the take) was proven offline only. The two live takes had no hit.
 - The refusals of always-refused commands were not exercised in these takes.
 - The privacy review is a sample (the whole transcript, every marker image, 21 of 420 frames), not every frame.
+- The capture's shell used the workstation's `oc` login (`kube:admin`), not a persona. The six read-only gets print the same
+  for any user and no frame names the user.
 - No persona budget was used and nothing was created on the cluster.
 
 ADR-0618 stays Accepted: WP-288, WP-289 and WP-290 are open.
