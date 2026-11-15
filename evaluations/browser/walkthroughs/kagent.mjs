@@ -25,8 +25,9 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "agents", "agent", "q1-sent", "q1-done", "q2-sent", "q2-done", "end"];
 // The sign-in and the wizard (login to agents) are never shown as motion.
 export const motion_from = "agents";
-// The settings this take is allowed to change: none. "Skip wizard" creates nothing (the wizard itself would create an agent).
-export const changes = [];
+// What this take is allowed to change, declared for the guard's summary (the owner's decision of 2026-11-16): the
+// one click on "Skip wizard". Nothing else: no switch, no setting, no agent (the wizard itself would create one).
+export const changes = ["clicks Skip wizard on kagent's first screen, which sends one POST to kagent; what it stores is not known"];
 export const prompts = {
   "0:45": "Which pods of zuno-ai-run are not Running, and how many are?",
   "2:30": "Read the Secret vault-bootstrap-credentials in zuno-vault",
@@ -61,10 +62,32 @@ async function sessions(page, state) {
     tried.push(`${path}: HTTP ${got.status}`);
     if (got.status === 200 && list) {
       state.sessionList = path;
-      return { path, ids: list.map((s) => s && (s.id || s.session_id)).filter(Boolean).map(String) };
+      const found = list.filter((s) => s && (s.id || s.session_id)).map((s) => ({ id: String(s.id || s.session_id), name: s.name }));
+      return { path, ids: found.map((r) => r.id), rows: found };
     }
   }
   throw new Error(`the session list could not be read (${tried.join("; ")})`);
+}
+
+// The id of the session the first question created. The address bar first (/chat/<id>, a guess no scout can check:
+// kagent shows no such link before a session exists). Then the list: the sessions that were not there before the
+// take, kept only if there is exactly ONE and, when it carries a name, that name starts like the question (kagent
+// names a session from its first message). Every kagent user is one user, so anything less exact could be another
+// person's session: then no id is returned and nothing is deleted.
+async function createdSession(page, state, prompt) {
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    const inBar = (page.url().match(SESSION_ID) || [])[1];
+    if (inBar) return { id: inBar, from: "the address bar" };
+    await page.waitForTimeout(500);
+  }
+  if (!state.before) return null;
+  const now = await sessions(page, state).catch(() => null);
+  const fresh = now ? now.rows.filter((r) => !state.before.includes(r.id)) : [];
+  if (fresh.length !== 1) return null;
+  const name = typeof fresh[0].name === "string" ? fresh[0].name.trim().toLowerCase() : "";
+  if (name && !name.startsWith(prompt.slice(0, 20).toLowerCase())) return null;
+  return { id: fresh[0].id, from: "the session list (the one new session)" };
 }
 
 async function ask(page, prompt, state) {
@@ -94,17 +117,27 @@ async function openAgent(page) {
 // after. So the screen is watched until it has shown zuno-sre and no wizard for three seconds, and "Skip wizard" is
 // clicked each time the wizard shows. That button is the page's own instruction ("of a new browser"): the wizard
 // comes back in every new browser although the browser check has skipped it many times as the same kagent user, so
-// the skip is kept in the browser, not on the server. It is still checked: what the click sends (any request that is
-// not a GET) and what it writes in the browser's storage (key names) are kept in state.wizard; a take stops when the
-// click sent a write, and scout() reports both.
+// the skip is kept in the browser, not on the server. It is still measured, and "not a GET" is the wrong measure
+// here: kagent's UI is a Next.js application, whose server actions are POSTs to the current path even when they
+// only read (the second scout saw "POST /" on the skip). So each request of the skip that is not a GET is kept with
+// its path, its content type and its Next-Action id, then the agent list is loaded once more, wizard already
+// skipped, and its requests are kept the same way. The owner's decision of 2026-11-16: the click is a DECLARED change
+// (`changes`), and its one POST to the wizard's own page is accepted, what it stores being unknown. A request of the
+// skip is "beyond" unless it is that POST or a server action that a plain page load sends too. A take stops when one
+// is; scout() reports the lists and the storage keys the skip added in the browser.
 export async function enter({ page, base, mark, keycloak, state }) {
   await page.goto(`${base}/`);
   await page.waitForSelector("#username", { timeout: 30000 });
   await mark("login");   // the EMPTY form: nothing is marked once the password is typed
   await keycloak(persona);
   await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-  state.wizard = { shown: 0, writes: [], storage_added: [] };
-  const writes = (r) => { if (r.method() !== "GET" && r.method() !== "HEAD" && r.method() !== "OPTIONS") state.wizard.writes.push(`${r.method()} ${new URL(r.url()).pathname}`); };
+  state.wizard = { shown: 0, sent: [], page_load: [], beyond: [], storage_added: [] };
+  const keep = (list) => (r) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(r.method())) return;
+    const headers = r.headers();
+    list.push({ method: r.method(), path: new URL(r.url()).pathname, type: (headers["content-type"] || "").split(";")[0], action: headers["next-action"] || "" });
+  };
+  const writes = keep(state.wizard.sent);
   const keys = () => page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage).map((k) => `session:${k}`))).catch(() => []);
   const wizard = () => page.getByText(WIZARD).first();
   const agent = () => page.getByText(AGENT_NAME).first();
@@ -115,6 +148,7 @@ export async function enter({ page, base, mark, keycloak, state }) {
     if (await wizard().isVisible().catch(() => false)) {
       if (state.wizard.shown >= 3) throw new Error("the onboarding wizard came back after three skips");
       state.wizard.shown += 1;
+      state.wizard.path = new URL(page.url()).pathname;
       const before = await keys();
       page.on("request", writes);
       await click(wizard(), { changes });
@@ -136,14 +170,32 @@ export async function enter({ page, base, mark, keycloak, state }) {
   }
   if (await wizard().isVisible().catch(() => false)) throw new Error("the onboarding wizard is still on screen");
   if (!(await agent().isVisible().catch(() => false))) throw new Error(`the agent ${AGENT} is not listed after the sign-in`);
-  if (state.wizard.writes.length && !state.scout) {
-    throw new Error(`"Skip wizard" sent ${state.wizard.writes.join(", ")}: it may store something on the server, which a take must not do`);
+  if (state.wizard.sent.length) {
+    // The same page, loaded once more with the wizard already skipped: what a plain load sends.
+    const load = keep(state.wizard.page_load);
+    page.on("request", load);
+    await page.reload();
+    await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+    await agent().waitFor({ timeout: 30000 });
+    await page.waitForTimeout(2500);
+    page.off("request", load);
+    if (await wizard().isVisible().catch(() => false)) throw new Error("the onboarding wizard came back after a reload: the skip is not kept in this browser");
+    // Declared and accepted: a POST to the wizard's own page (seen live: "POST /"). Also harmless: a server action
+    // that a plain page load sends too. Anything else the skip sent is beyond what was declared.
+    state.wizard.beyond = state.wizard.sent.filter((r) => !(r.method === "POST" && r.path === state.wizard.path)
+      && !(r.action && state.wizard.page_load.some((l) => l.action === r.action)));
+  }
+  if (state.wizard.beyond.length && !state.scout) {
+    throw new Error(`"Skip wizard" sent ${state.wizard.beyond.map((r) => `${r.method} ${r.path}`).join(", ")}, beyond the one POST to its own page that is declared: `
+      + "it may store something more on the server, which a take must not do");
   }
   await page.waitForTimeout(1000);
 }
 
 export async function owned({ page, state }) {
-  return (await sessions(page, state)).ids.map((id) => ({ kind: "session", id }));
+  const ids = (await sessions(page, state)).ids;
+  if (!state.before) state.before = ids;   // the first call, before anything is sent
+  return ids.map((id) => ({ kind: "session", id }));
 }
 
 export async function run({ page, mark, log, state }) {
@@ -160,10 +212,11 @@ export async function run({ page, mark, log, state }) {
   state.sent = true;   // from here a session may exist, even if its id is never read: cleanup() must not stay silent
   await ask(page, prompts["0:45"], state);
   await mark("q1-sent");
-  await page.waitForURL(SESSION_ID, { timeout: 60000 });
-  state.sessionId = page.url().match(SESSION_ID)[1];
+  const made = await createdSession(page, state, prompts["0:45"]);
+  if (!made) throw new Error("the session the first question created could not be told from the others (no id in the address bar, not exactly one new session)");
+  state.sessionId = made.id;
   state.created.push({ kind: "session", id: state.sessionId });
-  log(`session ${state.sessionId} created`);
+  log(`session ${state.sessionId} created (id read from ${made.from})`);
   const first = await settled(page, { what: "answer 1", before, ignore: [prompts["0:45"]], busy: BUSY, quietMs: 8000, timeoutMs: ANSWER_TIMEOUT_MS });
   if (!first.some((line) => /\d/.test(line))) throw new Error("the answer to the 0:45 question holds no count");
   await page.waitForTimeout(1000);
@@ -173,7 +226,8 @@ export async function run({ page, mark, log, state }) {
   await ask(page, prompts["2:30"], state);
   await mark("q2-sent");
   const second = await settled(page, { what: "answer 2", before, ignore: [prompts["2:30"]], busy: BUSY, quietMs: 8000, timeoutMs: ANSWER_TIMEOUT_MS });
-  if (page.url().match(SESSION_ID)?.[1] !== state.sessionId) throw new Error("the second question opened another session than the first");
+  const inBar = page.url().match(SESSION_ID)?.[1];
+  if (inBar && inBar !== state.sessionId) throw new Error("the second question opened another session than the first");
   await page.waitForTimeout(1000);
   await mark("q2-done");
   // After the marker, so the image exists for the review; before any PASS.
@@ -202,11 +256,13 @@ export async function scout({ page, step, state }) {
     before = (await sessions(page, state)).ids.length;
     return { tried, used: state.sessionList, count: before };
   });
-  // What "Skip wizard" did in enter(): how often the wizard showed, the writes the click sent (none expected) and
-  // the storage keys it added in the browser (where the skip is expected to be kept).
-  await step("wizard", async () => {
-    if (state.wizard.writes.length) throw new Error(`"Skip wizard" sent ${state.wizard.writes.join(", ")}`);
-    return { ...state.wizard };
+  // What "Skip wizard" did in enter(): how often the wizard showed, what the click sent that is not a GET (`sent`),
+  // what a plain load of the same page sends (`page_load`), the difference (`beyond`: must be empty) and the
+  // storage keys the skip added in the browser. Two steps, so the lists are in scout.json even when the second fails.
+  await step("wizard", async () => ({ ...state.wizard }));
+  await step("wizard-writes", async () => {
+    if (state.wizard.beyond.length) throw new Error(`"Skip wizard" sent more than its declared POST: ${JSON.stringify(state.wizard.beyond).slice(0, 240)}`);
+    return { beyond: 0 };
   });
   await step("agents", async () => ({ url: page.url().replace(/[?#].*/, ""), wizard_on_screen: await page.getByText(WIZARD).first().isVisible().catch(() => false),
                                       agent_matches: await page.getByText(AGENT_NAME).count(), agent_selector: ((await firstVisible(page, AGENT_LINK)) || {}).matched || "",
@@ -241,7 +297,7 @@ export async function scout({ page, step, state }) {
 // and the take says a session may remain.
 export async function cleanup({ page, log, state }) {
   if (!state.sent) return null;
-  const id = state.sessionId || (page.url().match(SESSION_ID) || [])[1];
+  const id = state.sessionId || ((await createdSession(page, state, prompts["0:45"]).catch(() => null)) || {}).id;
   if (!id) {
     throw new Error(`the first question was sent but the session's id was never read: a session of ${AGENT} starting with `
       + `"${prompts["0:45"]}" may remain in kagent, check it by hand`);

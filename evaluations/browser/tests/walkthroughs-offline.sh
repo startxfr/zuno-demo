@@ -43,7 +43,8 @@ scouted() {   # scouted <dir> <python assertions on s and steps>
 import json, pathlib, sys
 d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
-assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [] and s["changes"] == [], s
+assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
+assert s["changes"] == ([] if s["demo"] != "kagent" else [c for c in s["changes"] if c.startswith("clicks Skip wizard")]) and len(s["changes"]) <= 1, s["changes"]
 exec(sys.argv[2])
 PY
 }
@@ -55,8 +56,10 @@ echo "$out" | sed 's/^/    /'
 expect "kagent: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
 expect "kagent: a scout creates no session and no wizard agent" grep -q 'left: {"sessions":1,"wizard_agents":0}' <<<"$out"
 expect "kagent: scout.json reports every guess" scouted k-scout '
-assert list(steps) == ["enter", "owned", "sessions-api", "wizard", "agents", "agent", "closed"], list(steps)
-assert steps["wizard"]["shown"] == 1 and steps["wizard"]["writes"] == [] and steps["wizard"]["storage_added"] == ["skipped"], steps["wizard"]
+assert list(steps) == ["enter", "owned", "sessions-api", "wizard", "wizard-writes", "agents", "agent", "closed"], list(steps)
+wz = steps["wizard"]
+assert wz["shown"] == 1 and wz["beyond"] == [] and wz["storage_added"] == ["skipped"], wz
+assert wz["sent"] == [{"method": "POST", "path": "/", "type": "text/plain", "action": "list-agents"}] and wz["sent"] == wz["page_load"], wz
 api = steps["sessions-api"]
 assert [t["status"] for t in api["tried"]] == [400, 200] and api["used"] == "/api/sessions?user_id=admin@kagent.dev" and api["count"] == 1, api
 assert api["tried"][1]["session_keys"] == ["id", "name"], api
@@ -78,7 +81,7 @@ assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "re
 '
 out="$(kagent k-skip FAKE_SKIP_POSTS=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "kagent: a Skip wizard that writes to the server stops the take before anything is sent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL \"Skip wizard\" sent POST /api/onboarding' <<<\"\$0\"" "$out"
+expect "kagent: a Skip wizard that sends more than its declared POST stops the take before anything is sent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL \"Skip wizard\" sent POST /api/onboarding, beyond the one POST' <<<\"\$0\"" "$out"
 expect "kagent: nothing created, stopped at the sign-in" markers k-skip '
 assert names == ["login"] and m["created"] == [] and m["cleaned"] is None, m
 '
@@ -96,8 +99,10 @@ assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same":
 '
 out="$(kagent k-noid FAKE_NO_URL=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "kagent: a session whose id was never read is reported, not silent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL .*a session of zuno-sre starting with \"Which pods of zuno-ai-run are not Running, and how many are?\" may remain' <<<\"\$0\"" "$out"
-
+expect "kagent: with no id in the address bar the session is found as the one new session, and deleted" bash -c "test $rc -eq 0 && grep -q 'id read from the session list' <<<\"\$0\" && grep -q 'left: {\"sessions\":1,' <<<\"\$0\"" "$out"
+out="$(kagent k-other FAKE_NO_URL=1 FAKE_OTHER_NAME=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "kagent: a new session that is not named like the question is not taken for the take's, and nothing is deleted" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the session the first question created could not be told from the others.*may remain in kagent' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,' <<<\"\$0\"" "$out"
 fi
 if wanted unifai-live-rag; then
 echo "== unifai-live-rag"

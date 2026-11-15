@@ -4,7 +4,8 @@
 // and a session API (list, delete). It proves the walkthrough's own logic, not kagent's real selectors.
 // The session list always holds one earlier session. Knobs: FAKE_REFUSE_DELETE=1 the delete answers 403;
 // FAKE_SKIP_POSTS=1 "Skip wizard" writes to the server; FAKE_LEAK=1 the Secret question is answered with data instead of a refusal; FAKE_NO_URL=1 the address bar never
-// shows the session's id. No cluster, no model.
+// shows the session's id (the walkthrough then finds it as the one new session of the list, named like its question);
+// FAKE_OTHER_NAME=1 names that session otherwise, so it cannot be told apart. No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
 
@@ -34,6 +35,8 @@ let late = false;
 function render() {
   const chat = location.pathname.startsWith("/agents/zuno-kagent/zuno-sre");
   const wizard = late && !localStorage.getItem("skipped") && !chat;
+  // The agent list is read by a server action: a POST to the current path with a Next-Action id, like Next.js.
+  if ($("list").hidden && !wizard && !chat) fetch(location.pathname, { method: "POST", headers: { "next-action": "list-agents", "content-type": "text/plain;charset=UTF-8" }, body: "[]" });
   $("wizard").hidden = !wizard;
   $("list").hidden = wizard || chat;
   $("chat").hidden = !chat;
@@ -74,10 +77,12 @@ http.createServer((req, res) => {
   if (u.pathname === "/fake/wizard") { wizardAgents += 1; return json(200, {}); }
   if (u.pathname === "/signin") { res.writeHead(302, { "Set-Cookie": "s=1; Path=/", Location: "/" }); return res.end(); }
   if (!signed) { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
+  if (req.method === "POST" && req.headers["next-action"]) return json(200, { agents: ["zuno-sre"] });
+  if (u.pathname === "/api/onboarding") return json(200, {});
   if (u.pathname === "/api/sessions" && req.method === "GET") {
     // Like the guess: the bare path answers only with the user id the UI uses.
     if (u.searchParams.get("user_id") !== "admin@kagent.dev") return json(400, { error: "user_id is required" });
-    return json(200, { data: [...sessions.keys()].map((id) => ({ id, name: "a session" })) });
+    return json(200, { data: [...sessions.keys()].map((id) => ({ id, name: sessions.get(id).name || "a session" })) });
   }
   if (one && req.method === "GET") return sessions.has(one[1]) ? json(200, { data: sessions.get(one[1]) }) : json(404, {});
   if (one && req.method === "DELETE") {
@@ -90,7 +95,7 @@ http.createServer((req, res) => {
     req.on("end", () => {
       const { text, session } = JSON.parse(raw);
       const id = session || crypto.randomUUID();
-      if (!sessions.has(id)) sessions.set(id, { messages: [] });
+      if (!sessions.has(id)) sessions.set(id, { messages: [], name: process.env.FAKE_OTHER_NAME === "1" ? "Somebody else's question" : text.slice(0, 40) });
       const s = sessions.get(id);
       s.messages.push({ text });
       setTimeout(() => { if (sessions.has(id)) s.messages.push({ text: answer(text) }); }, 1200);
