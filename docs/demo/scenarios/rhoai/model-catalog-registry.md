@@ -1,28 +1,5 @@
 # Scenario: RHOAI model catalog and model registry - from a curated model to a recorded version
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-catalog-registry`: the 5-minute version PASS at
-> 09:25 (11 units, 30 s); the 15-minute version PASS at 09:28 (19 units, 47 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). This PASS is not show-ready for the
-> registry: demo333 has no ModelRegistry instance, so only the catalog reads were exercised and the registry part is
-> told. Prerequisites checked read-only on demo333 on 2026-11-13: in
-> `rhoai-model-registries`, Deployments `model-catalog` and `model-catalog-postgres` 1/1, the `Catalog` `catalog`
-> Available, Route `model-catalog-https` (`model-catalog.apps.demo333.startx.fr`, reencrypt), ConfigMap
-> `default-catalog-sources` with three model sources (Red Hat AI, Red Hat AI validated, Other) and
-> `model-catalog-sources` empty (`catalogs: []`), RoleBinding `model-catalog-authenticated` (group
-> `system:authenticated`); HTTPRoute `zuno-portal-dashboard` Accepted on `rh-ai.apps.demo333.startx.fr` with `/`,
-> `/mlflow` and `/catalog/`; Deployment `model-registry-ui` 1/1; Applications `zuno-openshift-ai-d0`/`-d1`,
-> `zuno-mlops-d0`/`-d1` and `zuno-models-d1` Synced and Healthy; DSPA `mlops-dspa` in `zuno-mlops`. **No model
-> registry exists:** the DSC has `modelregistry` `Managed` (`registriesNamespace: rhoai-model-registries`), but there is
-> no `ModelRegistry` object in any namespace, and the operator `model-registry-operator-controller-manager` restarted
-> 25 times between 21:29 and 23:55 UTC on 2026-11-12 (exit code 1, logs not read; `ModelRegistryReady` went from
-> `False` to `True` when it last came up). `zuno-models-d1` passes `loraAdapters: []`, and `qwen35-9b` runs without
-> `--enable-lora`. **ai-dev-01** is a member of `ocp-ai-dev`; **paas-ops-01** had not signed in to OpenShift.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** not
-> show-ready: demo333 has no model registry (no `ModelRegistry` object, an unstable operator), so the registry part
-> can only be told. The catalog part has no golden-path probe: rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 Red Hat OpenShift AI ships two services for the start and the end of a model's life (see
@@ -40,20 +17,9 @@ previous cluster, demo222. The routes, the catalog server and the pipeline's reg
 **The message:** "A developer starts from a curated catalog. A trained model is recorded with its version and its
 artifact, and it serves only after a reviewed change."
 
-**Decisions:**
-- [ADR-0302](../../../adr/0302-build-dataset-to-model-mlops-pipelines.md): the dataset-to-model pipeline, its
-  evaluation gate, registration in the Model Registry, and promotion by a human-reviewed GitOps change.
-- [ADR-0301](../../../adr/0301-introduce-lora-and-peft-model-customization.md): an adapter is selected statically, its
-  artifact is registered, and it inherits the classification of its training data.
-- [ADR-0331](../../../adr/0331-revert-openshift-ai-to-the-default-applications-namespace.md): OpenShift AI keeps its
-  default namespaces; the registries live in `rhoai-model-registries`.
-- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the fine-tune Zuno
-  serves, qwen3.5-9b-wesh, is merged weights run as its own model, not an adapter attached from the registry.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -68,7 +34,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use model-catalog-registry 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use model-catalog-registry 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/model-catalog-registry/<action>.yml`)
 has run, and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -103,7 +69,7 @@ The file prepares nothing. What only a person does:
 - [ ] Find the model catalog in the dashboard's left menu and open one card before the audience arrives. The
   navigation of the 3.6.0-ea.2 dashboard was not checked.
 - [ ] Play the registry steps of the 15-minute version as told, with the evidence: open
-  [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md) at its State line, and
+  the adapter live-proof evidence (listed under References) at its State line, and
   `components/mlops/src/mlops.py` at the function `stage_push_registry`.
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. If **paas-ops-01**
   has never signed in to the OpenShift console (on 2026-11-13 its group `ocp-paas-ops` did not exist yet), sign in once
@@ -250,7 +216,7 @@ The catalog path, the registry, and how a registered adapter would reach serving
 `gitops/charts/openshift-ai/values.yaml` (`modelregistry`), `gitops/charts/openshift-ai/templates/maas-portal-dashboard-route.yaml`,
 `gitops/charts/mlops/values.yaml` (`modelRegistry`) and `files/pipeline.py.tpl`, `components/mlops/src/mlops.py`
 (`stage_push_registry`), `gitops/charts/models/values.yaml` (`loraAdapters`) and
-`templates/llminferenceservice-qwen35.yaml`, and the live objects listed in the status banner. The registry box shows
+`templates/llminferenceservice-qwen35.yaml`, and the live objects listed under Page status. The registry box shows
 what demo222 had; demo333 has none.
 
 ```mermaid
@@ -284,3 +250,47 @@ flowchart LR
   PR --> QWEN["LLMInferenceService qwen35-9b<br/>init container download-adapter,<br/>vLLM --enable-lora --lora-modules"]
   S3 --> QWEN
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0302](../../../adr/0302-build-dataset-to-model-mlops-pipelines.md): the dataset-to-model pipeline, its
+  evaluation gate, registration in the Model Registry, and promotion by a human-reviewed GitOps change.
+- [ADR-0301](../../../adr/0301-introduce-lora-and-peft-model-customization.md): an adapter is selected statically, its
+  artifact is registered, and it inherits the classification of its training data.
+- [ADR-0331](../../../adr/0331-revert-openshift-ai-to-the-default-applications-namespace.md): OpenShift AI keeps its
+  default namespaces; the registries live in `rhoai-model-registries`.
+- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the fine-tune Zuno
+  serves, qwen3.5-9b-wesh, is merged weights run as its own model, not an adapter attached from the registry.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md): the live proof of the LoRA adapter.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-catalog-registry`: the 5-minute version PASS at
+> 09:25 (11 units, 30 s); the 15-minute version PASS at 09:28 (19 units, 47 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). This PASS is not show-ready for the
+> registry: demo333 has no ModelRegistry instance, so only the catalog reads were exercised and the registry part is
+> told. Prerequisites checked read-only on demo333 on 2026-11-13: in
+> `rhoai-model-registries`, Deployments `model-catalog` and `model-catalog-postgres` 1/1, the `Catalog` `catalog`
+> Available, Route `model-catalog-https` (`model-catalog.apps.demo333.startx.fr`, reencrypt), ConfigMap
+> `default-catalog-sources` with three model sources (Red Hat AI, Red Hat AI validated, Other) and
+> `model-catalog-sources` empty (`catalogs: []`), RoleBinding `model-catalog-authenticated` (group
+> `system:authenticated`); HTTPRoute `zuno-portal-dashboard` Accepted on `rh-ai.apps.demo333.startx.fr` with `/`,
+> `/mlflow` and `/catalog/`; Deployment `model-registry-ui` 1/1; Applications `zuno-openshift-ai-d0`/`-d1`,
+> `zuno-mlops-d0`/`-d1` and `zuno-models-d1` Synced and Healthy; DSPA `mlops-dspa` in `zuno-mlops`. **No model
+> registry exists:** the DSC has `modelregistry` `Managed` (`registriesNamespace: rhoai-model-registries`), but there is
+> no `ModelRegistry` object in any namespace, and the operator `model-registry-operator-controller-manager` restarted
+> 25 times between 21:29 and 23:55 UTC on 2026-11-12 (exit code 1, logs not read; `ModelRegistryReady` went from
+> `False` to `True` when it last came up). `zuno-models-d1` passes `loraAdapters: []`, and `qwen35-9b` runs without
+> `--enable-lora`. **ai-dev-01** is a member of `ocp-ai-dev`; **paas-ops-01** had not signed in to OpenShift.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** not
+> show-ready: demo333 has no model registry (no `ModelRegistry` object, an unstable operator), so the registry part
+> can only be told. The catalog part has no golden-path probe: rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

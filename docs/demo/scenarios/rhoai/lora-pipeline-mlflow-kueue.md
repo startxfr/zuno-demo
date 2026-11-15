@@ -1,34 +1,5 @@
 # Scenario: RHOAI pipelines - from a dataset to a fine-tuned LoRA adapter
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lora-pipeline-mlflow-kueue`: the 5-minute version PASS
-> at 09:14 (12 units, 30 s); the 15-minute version PASS at 09:17 (21 units, 48 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). The optional run of the day before (`make
-> d3 run mlops`) is a changing unit that `make demo` does not declare and the rehearsal did not run. Prerequisites
-> checked read-only on demo333 on 2026-11-13:
-> - `DataSciencePipelinesApplication/mlops-dspa` in `zuno-mlops`: `APIServerReady=True` but `Ready=False`. Its
->   workflow controller was in CrashLoopBackOff (15 restarts in 69 minutes), so a new run would not execute.
-> - Route `ds-pipeline-mlops-dspa-zuno-mlops.apps.demo333.startx.fr`.
-> - Pipelines `mlops`, `mlops-comage` and `mlops-tekos`, with the versions `v0-3-0-*` and `v0-4-0-*` (the `v0-4-0` pair
->   was created on 2026-11-09). No Argo Workflow object is left in the namespace.
-> - One TrainJob, `lora-comage-4c28m` (run `wp126-20260908-195101`): `Complete` on 2026-09-08 after 29 minutes, on the
->   TrainingRuntime `mlops-lora`.
-> - MachineSet `zuno-gpu-burst-a` at 0, with a MachineAutoscaler from 0 to 1.
-> - `MLflow/mlflow` Available, version 3.15.2, `status.address.url` ending in `/mlflow`. MLflowConfigs in `zuno-mlops`
->   and `zuno-ai-run`.
-> - Kueue: ClusterQueue `default` (750m CPU and 1536Mi; MIG slices 4 x `1g.24gb` and 2 x `2g.48gb`), LocalQueues in
->   `zuno-ai-build` and `zuno-ai-run` only, no Workload in `zuno-mlops`.
-> - **No ModelRegistry instance.** The DSC component `modelregistry` is Managed, but only the model catalog runs in
->   `rhoai-model-registries`.
-> - `qwen35-9b` Ready, without an adapter: `loraAdapters: []` on demo333, by design.
->
-> At the time of the check (about 00:50 CET), the DSC `zuno-dsc` was `Ready=False`. The controllers of JobSet, the
-> Kubeflow Trainer, the model registry operator and TrustyAI had been in CrashLoopBackOff since their pods were
-> recreated, about 21:30Z on 2026-11-12. Check them before any session.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 LoRA adapts a model to one agent with a few megabytes of extra weights trained on top of a frozen base model. In Zuno
@@ -47,26 +18,9 @@ This scenario shows past runs. Starting a run is a cluster change: rehearse only
 **The message:** "A fine-tuned model is a build artefact like any other. A pipeline trains it, MLflow records it, the
 agent's own tests gate it, and it is served only after a human approves the change in Git."
 
-**Decisions:**
-- [ADR-0302](../../../adr/0302-build-dataset-to-model-mlops-pipelines.md): a KFP pipeline, S3 storage, an evaluation
-  gate before the registry, human-reviewed promotion. Decisions 1, 3 and 5-7 were verified live by WP-133.
-- [ADR-0301](../../../adr/0301-introduce-lora-and-peft-model-customization.md): adapters are versioned, registered
-  artefacts, selected statically, and inherit the classification of their training data (decisions 2-4).
-- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the other serving path.
-  The adapter is merged into a standalone model, served as `qwen35-9b-wesh`.
-- [ADR-0539](../../../adr/0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md): KFP still
-  orchestrates. The training step submits a TrainJob to a namespaced TrainingRuntime and waits.
-- [ADR-0538](../../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md): MLflow tracking that
-  never fails a run; Kueue's first consumers are evaluation Jobs, not training.
-- [ADR-0321](../../../adr/0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md): Kueue is run by
-  the Red Hat build of Kueue operator.
-- [ADR-0351](../../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): a
-  whole-GPU burst node that scales from zero.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -82,7 +36,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use lora-pipeline-mlflow-kueue 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use lora-pipeline-mlflow-kueue 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/lora-pipeline-mlflow-kueue/<action>.yml`)
 has run, and says what is left to the presenter. No step of this demo changes the cluster. One optional action does,
 and it is a human one: see [Start](#start).
@@ -129,8 +83,8 @@ The file prepares nothing and starts no run. What only a person does:
 - [ ] A second tab on the MLflow UI, `https://rh-ai.apps.demo333.startx.fr/mlflow` (the HTTPRoute
   `zuno-portal-dashboard` routes `/mlflow` on that host), workspace `zuno-mlops`, experiment `mlops-comage`. Not opened
   in the 2026-11-13 check.
-- [ ] A third tab on the evidence of the registered adapter:
-  [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md). demo333 has no Model Registry instance.
+- [ ] A third tab on the evidence of the registered adapter (listed
+  under References). demo333 has no Model Registry instance.
 - [ ] Optional, the day before, by hand and outside `make demo`: a fresh run with `make d3 run mlops` (agent `comage`
   by default). It is a changing unit: **run it only with the owner's go**, never during a freeze. It scales up the
   burst GPU node (billed). Expect 2 to 7 minutes for the node and about 30 minutes of training. The run then stops at
@@ -290,7 +244,7 @@ One pipeline run, from the trigger to a served adapter. Drawn from `gitops/chart
 `download_adapter.py`), `ansible/roles/mlops/tasks/run.yml`, `gitops/charts/mlflow/` (`values.yaml`,
 `templates/mlflow.yaml`, `templates/workspace-rbac.yaml`), `gitops/charts/kueue/` (`values.yaml`,
 `templates/queue-resources.yaml`), `gitops/charts/models/templates/llminferenceservice-qwen35.yaml` and
-`ansible/clusters/demo333.yml`, with the live objects listed in the status banner.
+`ansible/clusters/demo333.yml`, with the live objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -329,3 +283,59 @@ flowchart LR
   KQ["Kueue ClusterQueue default<br/>BatchJob only, LocalQueues in<br/>zuno-ai-run and zuno-ai-build"]
   KQ -. "not admitted: no LocalQueue,<br/>TrainJob not integrated" .- TJ
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0302](../../../adr/0302-build-dataset-to-model-mlops-pipelines.md): a KFP pipeline, S3 storage, an evaluation
+  gate before the registry, human-reviewed promotion. Decisions 1, 3 and 5-7 were verified live by WP-133.
+- [ADR-0301](../../../adr/0301-introduce-lora-and-peft-model-customization.md): adapters are versioned, registered
+  artefacts, selected statically, and inherit the classification of their training data (decisions 2-4).
+- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the other serving path.
+  The adapter is merged into a standalone model, served as `qwen35-9b-wesh`.
+- [ADR-0539](../../../adr/0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md): KFP still
+  orchestrates. The training step submits a TrainJob to a namespaced TrainingRuntime and waits.
+- [ADR-0538](../../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md): MLflow tracking that
+  never fails a run; Kueue's first consumers are evaluation Jobs, not training.
+- [ADR-0321](../../../adr/0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md): Kueue is run by
+  the Red Hat build of Kueue operator.
+- [ADR-0351](../../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): a
+  whole-GPU burst node that scales from zero.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-133](../../../roadmap/work-packages/wp-133-lora-adapter-live-proof.md): the live proof of the LoRA adapter.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse lora-pipeline-mlflow-kueue`: the 5-minute version PASS
+> at 09:14 (12 units, 30 s); the 15-minute version PASS at 09:17 (21 units, 48 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). The optional run of the day before (`make
+> d3 run mlops`) is a changing unit that `make demo` does not declare and the rehearsal did not run. Prerequisites
+> checked read-only on demo333 on 2026-11-13:
+> - `DataSciencePipelinesApplication/mlops-dspa` in `zuno-mlops`: `APIServerReady=True` but `Ready=False`. Its
+>   workflow controller was in CrashLoopBackOff (15 restarts in 69 minutes), so a new run would not execute.
+> - Route `ds-pipeline-mlops-dspa-zuno-mlops.apps.demo333.startx.fr`.
+> - Pipelines `mlops`, `mlops-comage` and `mlops-tekos`, with the versions `v0-3-0-*` and `v0-4-0-*` (the `v0-4-0` pair
+>   was created on 2026-11-09). No Argo Workflow object is left in the namespace.
+> - One TrainJob, `lora-comage-4c28m` (run `wp126-20260908-195101`): `Complete` on 2026-09-08 after 29 minutes, on the
+>   TrainingRuntime `mlops-lora`.
+> - MachineSet `zuno-gpu-burst-a` at 0, with a MachineAutoscaler from 0 to 1.
+> - `MLflow/mlflow` Available, version 3.15.2, `status.address.url` ending in `/mlflow`. MLflowConfigs in `zuno-mlops`
+>   and `zuno-ai-run`.
+> - Kueue: ClusterQueue `default` (750m CPU and 1536Mi; MIG slices 4 x `1g.24gb` and 2 x `2g.48gb`), LocalQueues in
+>   `zuno-ai-build` and `zuno-ai-run` only, no Workload in `zuno-mlops`.
+> - **No ModelRegistry instance.** The DSC component `modelregistry` is Managed, but only the model catalog runs in
+>   `rhoai-model-registries`.
+> - `qwen35-9b` Ready, without an adapter: `loraAdapters: []` on demo333, by design.
+>
+> At the time of the check (about 00:50 CET), the DSC `zuno-dsc` was `Ready=False`. The controllers of JobSet, the
+> Kubeflow Trainer, the model registry operator and TrustyAI had been in CrashLoopBackOff since their pods were
+> recreated, about 21:30Z on 2026-11-12. Check them before any session.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

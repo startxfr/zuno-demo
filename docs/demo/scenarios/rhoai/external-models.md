@@ -1,28 +1,5 @@
 # Scenario: RHOAI external models - SaaS models published through MaaS, callable by the router only
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse external-models`: the 5-minute version PASS at 09:02
-> (11 units, 38 s); the 15-minute version PASS at 09:05 (20 units, 50 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
-> on 2026-11-13: Applications
-> `zuno-models-d0`/`-d1` and `zuno-llm-d1` Synced and Healthy; ExternalModels (`maas.opendatahub.io`) `mistral-large`
-> (provider `mistral`, target `mistral-large-4`, endpoint `api.mistral.ai`) and `gpt-oss-120b-ovhcloud` (provider
-> `openai-compatible`, target `gpt-oss-120b`, endpoint `oai.endpoints.kepler.ai.cloud.ovh.net`), phase `Migrated`,
-> each owning an `inference.opendatahub.io` ExternalModel and an ExternalProvider, both `Ready`; MaaSModelRefs
-> `mistral-large` and `gpt-oss-120b-ovhcloud` `Ready`; MaaSSubscriptions `mistral-large-ai-gateway` and
-> `gpt-oss-120b-ovhcloud-ai-gateway` Active, owner the ai-gateway's service account only, 1,000,000 tokens per hour,
-> priority 100; MaaSAuthPolicies `mistral-large-entitlement` and `gpt-oss-120b-ovhcloud-entitlement` Active with that
-> one subject; TokenRateLimitPolicies `maas-trlp-mistral-large` and `maas-trlp-gpt-oss-120b-ovhcloud` present;
-> ExternalSecrets `llm-provider-mistral-maas` and `llm-provider-ovhcloud-maas` `SecretSynced`, their target template
-> labelled `inference.llm-d.ai/ipp-managed: "true"` (the Secrets were not read); `payload-processing` 1/1 in
-> `openshift-ingress`; Deployment `ai-gateway` 1/1 with `MAAS_EXTERNAL_EGRESS_ENABLED=false`; ConfigMap
-> `zuno-provider-routing` identical to the repository file, `via_maas: true` on the four local `-maas` entries only. Not
-> healthy at the time of the check: `maas-controller` in CrashLoopBackOff (21 restarts). No model was called.
-> **paas-ops-01** had still not signed in to OpenShift.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 Two SaaS models are published in Models-as-a-Service like the local ones: Mistral Large on Mistral's own API, and
@@ -39,31 +16,16 @@ it is the next step. The objects, the key and the two paths are in [Appendix B](
 **The message:** "SaaS models are governed like our own: one catalogue, and one caller allowed, the platform's router.
 Nobody sends data to a SaaS model without the classification check."
 
-**Decisions:**
-- [ADR-0541](../../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md): Mistral and OVHcloud
-  gpt-oss-120b are MaaS `ExternalModel`s. Implemented on 2026-11-07: real completions through both, after the
-  credential label fix and the move to `mistral-large-4`.
-- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): every provider
-  should become a MaaS model. Its amendment of 2026-10-24 keeps the chat SaaS providers direct, as a named exception,
-  with the MaaS objects in place and only the ai-gateway subscribed.
-- [ADR-0021](../../../adr/0021-route-models-according-to-c1-c2-c3-classification.md): routing by C1/C2/C3; C3 never
-  leaves the cluster.
-- [ADR-0416](../../../adr/0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md): gpt-oss-120b on OVHcloud, C1 and C2,
-  Finage excluded.
-- [ADR-0417](../../../adr/0417-consume-codestral-via-mistral-api.md): Codestral on the Mistral API, with a dedicated
-  key, C1 and C2.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
 | **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads the MaaS objects in `zuno-ai-run` and `models-as-a-service`. MaaS subscription `gpt-oss-20b-ocp-paas-ops` on gpt-oss-20b only: no SaaS model. | The presenter's `oc` terminal in both versions. In the 15-minute version its own OpenShift token is refused on a SaaS model. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana. | Shows in the 15-minute version which SaaS providers served calls. |
-| **finance-01** | Finance, middle office. Groups `finance`, `agent_finage`. | Its agent, Finage, is excluded from gpt-oss-120b (ADR-0416). The ai-gateway enforces it. | Named only. |
+| **finance-01** | Finance, middle office. Groups `finance`, `agent_finage`. | Its agent, Finage, is excluded from gpt-oss-120b. The ai-gateway enforces it. | Named only. |
 | **consultant-01** | Consultant and architect, front office. Group `consultant` and its Confluence subgroups. | Open WebUI user; **Zuno Code** goes to Codestral first. | Named only: asked the question of the Codestral-down drill of 2026-11-05. |
 
 Other identities:
@@ -73,7 +35,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use external-models 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use external-models 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/external-models/<action>.yml`) has run,
 and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -113,9 +75,9 @@ The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) fr
   editor, at the SaaS entries (`- name: openai` and below).
 - [ ] 15-minute version: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr` as **ai-ops-01**,
   dashboard **AI models & serving**, last 24 hours.
-- [ ] 15-minute version: open [WP-125](../../../roadmap/work-packages/wp-125-external-models-through-maas.md) at
-  "Live verification (2026-11-07, demo333, RHOAI 3.6.0-ea.2)" and the
-  [WP-194 evidence](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md) at section T5.
+- [ ] 15-minute version: open the external-models brief at
+  "Live verification (2026-11-07, demo333, RHOAI 3.6.0-ea.2)" and the Zuno Code live-proof evidence at section T5
+  (both listed under References).
 - Known on screen, not a failure: the two ExternalModels show phase `Migrated`. RHOAI 3.6 converted each one to its
   new API group (`inference.opendatahub.io`) and keeps ours as the owner.
 
@@ -262,7 +224,7 @@ The objects behind one SaaS model, the key path, and the two call paths: the dir
 and not yet used. Drawn from `gitops/charts/models/templates/externalmodel.yaml`, `maas.yaml` and
 `destinationrule-external-model-plaintext.yaml`, `gitops/charts/models/values.yaml` (`externalModels`, the SaaS entries
 of `maas.models`, `maas.saasSubscriptions.gatewayOnly`), `platform/ai-gateway/provider-routing.yaml`, and the live
-objects listed in the status banner.
+objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -304,3 +266,52 @@ flowchart LR
   DRP -.-> AIGW
   CALLER -->|"not a subscriber: refused"| GW
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0541](../../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md): Mistral and OVHcloud
+  gpt-oss-120b are MaaS `ExternalModel`s. Implemented on 2026-11-07: real completions through both, after the
+  credential label fix and the move to `mistral-large-4`.
+- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): every provider
+  should become a MaaS model. Its amendment of 2026-10-24 keeps the chat SaaS providers direct, as a named exception,
+  with the MaaS objects in place and only the ai-gateway subscribed.
+- [ADR-0021](../../../adr/0021-route-models-according-to-c1-c2-c3-classification.md): routing by C1/C2/C3; C3 never
+  leaves the cluster.
+- [ADR-0416](../../../adr/0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md): gpt-oss-120b on OVHcloud, C1 and C2,
+  Finage excluded.
+- [ADR-0417](../../../adr/0417-consume-codestral-via-mistral-api.md): Codestral on the Mistral API, with a dedicated
+  key, C1 and C2.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-125](../../../roadmap/work-packages/wp-125-external-models-through-maas.md): external models through MaaS, with its live verification of 2026-11-07.
+- [WP-194](../../../roadmap/evidence/wp-194-zuno-code-live-proof.md): the live proof of Zuno Code, section T5.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse external-models`: the 5-minute version PASS at 09:02
+> (11 units, 38 s); the 15-minute version PASS at 09:05 (20 units, 50 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
+> `zuno-models-d0`/`-d1` and `zuno-llm-d1` Synced and Healthy; ExternalModels (`maas.opendatahub.io`) `mistral-large`
+> (provider `mistral`, target `mistral-large-4`, endpoint `api.mistral.ai`) and `gpt-oss-120b-ovhcloud` (provider
+> `openai-compatible`, target `gpt-oss-120b`, endpoint `oai.endpoints.kepler.ai.cloud.ovh.net`), phase `Migrated`,
+> each owning an `inference.opendatahub.io` ExternalModel and an ExternalProvider, both `Ready`; MaaSModelRefs
+> `mistral-large` and `gpt-oss-120b-ovhcloud` `Ready`; MaaSSubscriptions `mistral-large-ai-gateway` and
+> `gpt-oss-120b-ovhcloud-ai-gateway` Active, owner the ai-gateway's service account only, 1,000,000 tokens per hour,
+> priority 100; MaaSAuthPolicies `mistral-large-entitlement` and `gpt-oss-120b-ovhcloud-entitlement` Active with that
+> one subject; TokenRateLimitPolicies `maas-trlp-mistral-large` and `maas-trlp-gpt-oss-120b-ovhcloud` present;
+> ExternalSecrets `llm-provider-mistral-maas` and `llm-provider-ovhcloud-maas` `SecretSynced`, their target template
+> labelled `inference.llm-d.ai/ipp-managed: "true"` (the Secrets were not read); `payload-processing` 1/1 in
+> `openshift-ingress`; Deployment `ai-gateway` 1/1 with `MAAS_EXTERNAL_EGRESS_ENABLED=false`; ConfigMap
+> `zuno-provider-routing` identical to the repository file, `via_maas: true` on the four local `-maas` entries only. Not
+> healthy at the time of the check: `maas-controller` in CrashLoopBackOff (21 restarts). No model was called.
+> **paas-ops-01** had still not signed in to OpenShift.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

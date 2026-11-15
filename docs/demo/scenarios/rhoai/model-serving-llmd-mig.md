@@ -1,27 +1,5 @@
 # Scenario: KServe and llm-d - local models on MIG GPU slices
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-serving-llmd-mig`: the 5-minute version PASS at
-> 09:30 (11 units, 38 s); the 15-minute version PASS at 09:33 (20 units, 52 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
-> on 2026-11-13: Applications
-> `zuno-models-d0` and `zuno-models-d1` Synced and Healthy; the four `LLMInferenceService` (`gpt-oss-20b`,
-> `qwen35-9b`, `qwen35-9b-wesh`, `qwen36-27b-instruct`) and the `InferenceService` `embeddings` Ready; two GPU nodes
-> `g7e.4xlarge` (MachineSet `zuno-gpu-a`, 2 replicas, both in eu-central-1a), MIG `all-balanced` applied
-> (`success`), each advertising `nvidia.com/mig-1g.24gb: 2`, `nvidia.com/mig-2g.48gb: 1`, `nvidia.com/gpu: 0`;
-> ResourceQuota `zuno-ai-run-gpu-cap` at `mig-1g.24gb` 3/3 and `mig-2g.48gb` 2/2; HardwareProfiles `mig-1g-24gb` and
-> `mig-2g-48gb`; ScaledObject `gpt-oss-20b-kserve-keda` Ready, min 1, max 1; MachineSet `zuno-gpu-burst-a` at 0 with a
-> MachineAutoscaler 0 to 1; DSC `kserve.modelCache` `Removed`; ClusterPolicy `mig.strategy: mixed` but `Ready=False`
-> (a reconcile timeout) while both nodes advertised their slices. The local models restarted between 21:38 and 22:03
-> UTC on 2026-11-12, after a master was cordoned; during that window the new `qwen36-27b-instruct` pod was refused by
-> the quota (`FailedCreate ... exceeded quota: zuno-ai-run-gpu-cap`) for several minutes. **One rollout was still
-> wedged:** `gpt-oss-20b` has a new ReplicaSet (a new vLLM image) that the quota has refused for about 8 days
-> (`ProgressDeadlineExceeded`). The old pod keeps serving, on the previous vLLM image. **paas-ops-01** had not signed
-> in to OpenShift (no group `ocp-paas-ops`).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 Zuno serves its own models on its own GPUs with Red Hat OpenShift AI. Each chat model is one `LLMInferenceService`:
@@ -42,33 +20,9 @@ S3, never from Hugging Face at start. How the objects, the route and the quota f
 **The message:** "Five models run on two GPUs we own. Each is declared in Git, sized to a GPU slice and capped by a
 quota."
 
-**Decisions:**
-- [ADR-0351](../../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): MIG
-  `mixed`, the `all-balanced` partition (2 x 1g.24gb + 1 x 2g.48gb), permanent inference nodes, a scale-from-zero
-  full-GPU node for training.
-- [ADR-0414](../../../adr/0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md): tiered predictors on MIG
-  slices; gpt-oss-20b becomes an `LLMInferenceService`.
-- [ADR-0518](../../../adr/0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md): Qwen3.6-27B FP8
-  on the 48 GB slice, Qwen3-Embedding-0.6B, weights staged in S3.
-- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): every chat model is an
-  `LLMInferenceService`, and local traffic goes through MaaS.
-- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the fine-tune is served
-  as merged weights next to its unmodified base, on another node.
-- [ADR-0531](../../../adr/0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md):
-  qwen3.5-9b is the fleet-wide default.
-- [ADR-0536](../../../adr/0536-live-node-failover-drill-for-qwen-model-fallback.md): the node failover drill,
-  `make d3 scenario-failover-node`.
-- [ADR-0537](../../../adr/0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md): one HardwareProfile per
-  MIG tier, in `redhat-ods-applications`.
-- [ADR-0542](../../../adr/0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md): `spec.scaling`
-  on gpt-oss-20b only, minimum and maximum 1.
-- [ADR-0546](../../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md): the
-  weights live in the shared bucket `zuno-demo-sources`.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -88,7 +42,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use model-serving-llmd-mig 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use model-serving-llmd-mig 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/model-serving-llmd-mig/<action>.yml`) has
 run, and says what is left to the presenter. No action of this demo changes the cluster, and every step is a read.
 `make d2 reconcile models` is owner-only and is never run by a step or on stage.
@@ -125,10 +79,10 @@ The file prepares nothing. What only a person does:
   **Zuno Platform / AI models & serving**, last 1 hour, rows **vLLM serving** and **GPU (DCGM)** open.
 - [ ] Optional, 15-minute version: the OpenShift console `https://console-openshift-console.apps.demo333.startx.fr` as
   **paas-ops-01**, **Observe**, **Dashboards**, the RHOAI Perses dashboards **LLM Performance** and **LLM
-  Utilization** ([ADR-0552](../../../adr/0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md)).
+  Utilization**.
   Their content was not checked.
-- [ ] Open the [failover drill evidence](../../../roadmap/evidence/adr-0536-node-failover-drill.md) and the
-  [24 GB slice bench](../../../roadmap/evidence/model-bench-24gb-slice-2026-10-25.md).
+- [ ] Open the failover drill evidence and the 24 GB slice bench (both listed under
+  References).
 - Known on screen, not a failure: `oc get clusterpolicy` may say `notReady` (on 2026-11-13: a reconcile timeout). If
   both nodes advertise their slices, serving is fine.
 
@@ -321,3 +275,61 @@ flowchart LR
   BURST["MachineSet zuno-gpu-burst-a<br/>g7e.2xlarge, MIG off, tainted<br/>0 to 1, LoRA training only"]
   CAS["ClusterAutoscaler and<br/>MachineAutoscaler"] -. scale from zero .-> BURST
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0351](../../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md): MIG
+  `mixed`, the `all-balanced` partition (2 x 1g.24gb + 1 x 2g.48gb), permanent inference nodes, a scale-from-zero
+  full-GPU node for training.
+- [ADR-0414](../../../adr/0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md): tiered predictors on MIG
+  slices; gpt-oss-20b becomes an `LLMInferenceService`.
+- [ADR-0518](../../../adr/0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md): Qwen3.6-27B FP8
+  on the 48 GB slice, Qwen3-Embedding-0.6B, weights staged in S3.
+- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): every chat model is an
+  `LLMInferenceService`, and local traffic goes through MaaS.
+- [ADR-0526](../../../adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md): the fine-tune is served
+  as merged weights next to its unmodified base, on another node.
+- [ADR-0531](../../../adr/0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md):
+  qwen3.5-9b is the fleet-wide default.
+- [ADR-0536](../../../adr/0536-live-node-failover-drill-for-qwen-model-fallback.md): the node failover drill,
+  `make d3 scenario-failover-node`.
+- [ADR-0537](../../../adr/0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md): one HardwareProfile per
+  MIG tier, in `redhat-ods-applications`.
+- [ADR-0542](../../../adr/0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md): `spec.scaling`
+  on gpt-oss-20b only, minimum and maximum 1.
+- [ADR-0546](../../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md): the
+  weights live in the shared bucket `zuno-demo-sources`.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+- [ADR-0552](../../../adr/0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md): Reuse RHOAI's Perses instance instead of running an independent one.
+
+Evidence:
+
+- [Failover drill](../../../roadmap/evidence/adr-0536-node-failover-drill.md): the live node-loss drill.
+- [24 GB slice bench](../../../roadmap/evidence/model-bench-24gb-slice-2026-10-25.md): the bench of the 24 GB MIG slice.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse model-serving-llmd-mig`: the 5-minute version PASS at
+> 09:30 (11 units, 38 s); the 15-minute version PASS at 09:33 (20 units, 52 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
+> `zuno-models-d0` and `zuno-models-d1` Synced and Healthy; the four `LLMInferenceService` (`gpt-oss-20b`,
+> `qwen35-9b`, `qwen35-9b-wesh`, `qwen36-27b-instruct`) and the `InferenceService` `embeddings` Ready; two GPU nodes
+> `g7e.4xlarge` (MachineSet `zuno-gpu-a`, 2 replicas, both in eu-central-1a), MIG `all-balanced` applied
+> (`success`), each advertising `nvidia.com/mig-1g.24gb: 2`, `nvidia.com/mig-2g.48gb: 1`, `nvidia.com/gpu: 0`;
+> ResourceQuota `zuno-ai-run-gpu-cap` at `mig-1g.24gb` 3/3 and `mig-2g.48gb` 2/2; HardwareProfiles `mig-1g-24gb` and
+> `mig-2g-48gb`; ScaledObject `gpt-oss-20b-kserve-keda` Ready, min 1, max 1; MachineSet `zuno-gpu-burst-a` at 0 with a
+> MachineAutoscaler 0 to 1; DSC `kserve.modelCache` `Removed`; ClusterPolicy `mig.strategy: mixed` but `Ready=False`
+> (a reconcile timeout) while both nodes advertised their slices. The local models restarted between 21:38 and 22:03
+> UTC on 2026-11-12, after a master was cordoned; during that window the new `qwen36-27b-instruct` pod was refused by
+> the quota (`FailedCreate ... exceeded quota: zuno-ai-run-gpu-cap`) for several minutes. **One rollout was still
+> wedged:** `gpt-oss-20b` has a new ReplicaSet (a new vLLM image) that the quota has refused for about 8 days
+> (`ProgressDeadlineExceeded`). The old pod keeps serving, on the previous vLLM image. **paas-ops-01** had not signed
+> in to OpenShift (no group `ocp-paas-ops`).
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

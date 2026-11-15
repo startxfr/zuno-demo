@@ -1,20 +1,5 @@
 # Scenario: RHOAI Models-as-a-Service - a self-service API key with a governed budget
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse maas-portal-api-keys`: the 5-minute version PASS at
-> 09:19 (11 units, 30 s); the 15-minute version PASS at 09:22 (18 units, 40 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
-> on 2026-11-12: DSC
-> `ModelsAsAServiceReady=True` and `MaaSConsumerPortalAvailable=True`, Deployments `maas-api`, `maas-ui`,
-> `maas-consumer-portal` and `kube-auth-proxy` available, Gateway `maas-default-gateway` with its external listener
-> `maas.apps.demo333.startx.fr`, MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` Active,
-> AuthPolicy `maas-gateway-auth` Enforced. At the time of the check `gpt-oss-20b` was not Ready (the local models were
-> restarting). The human subscriptions cover that model only, so a key had nothing to call. Check it before any
-> session.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 Models-as-a-Service (MaaS) is the part of Red Hat OpenShift AI that publishes models behind one gateway, with API keys,
@@ -31,20 +16,9 @@ revoked at any time. The gateway, the Kuadrant policies and the custom resources
 **The message:** "A developer gets a governed model key in one minute, without a ticket. The platform still decides
 which models, how many tokens per hour, and can revoke it."
 
-**Decisions:**
-- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
-  access and consumption plane; Zuno's business policy router sits in front of it.
-- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): all local-model traffic of the ai-gateway
-  goes through MaaS.
-- [ADR-0541](../../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md): Mistral and OVHcloud
-  gpt-oss-120b are published as MaaS external models.
-- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): keys,
-  per-subscription quotas and exposure belong to MaaS. Per-persona budgets stay in the ai-gateway.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -59,7 +33,7 @@ one on the SaaS models). It carries the traffic of every chat experience.
 
 ## Presenter lifecycle
 
-`make demo use maas-portal-api-keys 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use maas-portal-api-keys 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/maas-portal-api-keys/<action>.yml`) has
 run, and says what is left to the presenter. Nothing in this demo changes the cluster by itself: the presenter creates
 the API key live, in the portal, at row 1:00, and that is the proof of the demo.
@@ -237,7 +211,7 @@ flowchart TB
 
 The portal, the key path and the model path. Drawn from `gitops/charts/openshift-ai/templates/` (`maas-gateway.yaml`,
 `maas-portal-*.yaml`), `gitops/charts/models/templates/maas.yaml` and `externalmodel.yaml`, `gitops/charts/models/values.yaml`
-(subscriptions), and the live objects listed in the status banner.
+(subscriptions), and the live objects listed under Page status.
 
 ```mermaid
 flowchart LR
@@ -268,3 +242,35 @@ flowchart LR
   TRLP --> EXTM["ExternalModel<br/>mistral-large, gpt-oss-120b-ovhcloud<br/>(published; the gateway still calls SaaS directly)"]
   AIGW["ai-gateway service account<br/>subscription 1M tokens per hour"] --> GWY
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
+  access and consumption plane; Zuno's business policy router sits in front of it.
+- [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): all local-model traffic of the ai-gateway
+  goes through MaaS.
+- [ADR-0541](../../../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md): Mistral and OVHcloud
+  gpt-oss-120b are published as MaaS external models.
+- [ADR-0570](../../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md): keys,
+  per-subscription quotas and exposure belong to MaaS. Per-persona budgets stay in the ai-gateway.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse maas-portal-api-keys`: the 5-minute version PASS at
+> 09:19 (11 units, 30 s); the 15-minute version PASS at 09:22 (18 units, 40 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-12: DSC
+> `ModelsAsAServiceReady=True` and `MaaSConsumerPortalAvailable=True`, Deployments `maas-api`, `maas-ui`,
+> `maas-consumer-portal` and `kube-auth-proxy` available, Gateway `maas-default-gateway` with its external listener
+> `maas.apps.demo333.startx.fr`, MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` Active,
+> AuthPolicy `maas-gateway-auth` Enforced. At the time of the check `gpt-oss-20b` was not Ready (the local models were
+> restarting). The human subscriptions cover that model only, so a key had nothing to call. Check it before any
+> session.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

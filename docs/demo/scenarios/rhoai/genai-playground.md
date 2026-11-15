@@ -1,29 +1,5 @@
 # Scenario: RHOAI GenAI playground - chat, a cited document and governed MCP tools
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse genai-playground`: the 5-minute version PASS at 09:08
-> (11 units, 42 s); the 15-minute version PASS at 09:11 (20 units, 53 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
-> on 2026-11-13: Applications
-> `zuno-openshift-ai-d0`/`-d1`, `zuno-mcp-d1` and `zuno-models-d1` Synced and Healthy; in `zuno-playground`, OGXServer
-> `lsd-genai-playground` `Ready` without a `spec.tls` block, its pod 1/1 with 0 restarts and 9 ReplicaSets (no
-> growth), `genai-pgvector` 1/1 on the Bound 5Gi claim `genai-pgvector-storage`, ExternalSecret
-> `genai-pgvector-credentials` `SecretSynced`; ConfigMap `llama-stack-config` registers
-> `publishers/zuno-ai-run/models/` `gpt-oss-20b`, `qwen3.5-9b`, `qwen3.5-9b-wesh` and `qwen3.6-27b-instruct`;
-> ConfigMap `gen-ai-aa-mcp-servers` holds one entry, `zuno-mcp-gateway`; Deployment `mcp-gateway` 1/1 with the nine
-> `MCP_FRONTDOOR_CAPABILITIES`, and its NetworkPolicy admits `zuno-playground` and `redhat-ods-applications` on 8080;
-> DSC `MaaSConsumerPortalAvailable=True`, `OGXReady=True`, `ModelsAsAServiceReady=True`; Deployments
-> `maas-consumer-portal`, `gen-ai-ui`, `maas-ui` and `rhods-dashboard` available; HTTPRoutes `zuno-portal-genai`,
-> `zuno-portal-dashboard` and `zuno-portal-oauth-callback` present; the four `LLMInferenceService` Ready;
-> MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` Active; OpenShift groups `ocp-ai-ops`
-> (ai-ops-01) and `ocp-ai-dev` (ai-dev-01) present. Not healthy at the time of the check: the DSC was `Ready=False`
-> (TrustyAI: the guardrails smoke object in Error) and `maas-controller` was in CrashLoopBackOff (21 restarts). Their
-> effect on the playground was not tested: check both before any session. **paas-ops-01** had still not signed in to
-> OpenShift (no group `ocp-paas-ops`).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 The GenAI playground is the page of Red Hat OpenShift AI where a person tries a model, a document and MCP tools before
@@ -41,24 +17,9 @@ in [Appendix B](#appendix-b---lld).
 **The message:** "Developers and operators try our models, their own documents and our tools in Red Hat's playground.
 The platform still decides which model budget and which tools each person gets."
 
-**Decisions:**
-- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): the playground is
-  a model and MCP testing tool, not an end-user experience; it may be shown as the operator's tool.
-- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
-  access plane; the playground's chat consumes the person's subscription.
-- [ADR-0524](../../../adr/0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md): the mcp-gateway's `/mcp`
-  front door accepts an OpenShift user token (TokenReview) and derives `tools/list` from that user's groups.
-- [ADR-0036](../../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): every tool
-  offered or called is the intersection of the front door's ceiling and the tool policy.
-- [ADR-0322](../../../adr/0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md): the OGX
-  operator is active in the DataScienceCluster.
-- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M3): the
-  playground's OGX server keeps TLS verification off, a documented exception for a demo-only vendor UI.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -75,7 +36,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use genai-playground 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use genai-playground 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/genai-playground/<action>.yml`) has run,
 and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -136,9 +97,7 @@ The file prepares nothing; the two browser windows are the presenter's. What onl
 - [ ] 15-minute version: a terminal logged in with `oc` as **paas-ops-01**, at the repository root. On 2026-11-13
   paas-ops-01 had never signed in to OpenShift: sign it in once to the console first.
 - Known on screen, not a failure: a RAG answer can show a malformed citation marker such as `{{cit[1]ation:1}}`. The
-  model wrote the marker badly; the citation itself works
-  ([WP-220](../../../roadmap/work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md),
-  section 18).
+  model wrote the marker badly; the citation itself works.
 
 ### Stop
 
@@ -295,7 +254,7 @@ from `gitops/charts/openshift-ai/templates/playground.yaml`, `gen-ai-mcp-servers
 and `values.yaml` (`playground`, `genAiMcpServers`), `gitops/charts/mcp-gateway/values.yaml` (`frontdoorCapabilities`,
 `playground`) and `templates/networkpolicy.yaml`, `components/mcp-gateway/app/mcp_frontdoor.py` and `app/auth.py`
 (`validate_token_or_kubernetes`), `gitops/charts/mcp-k8s/values.yaml`, the agents release's
-`policies/tools/tool-policy.yaml`, and the live objects listed in the status banner. How the portal's backend
+`policies/tools/tool-policy.yaml`, and the live objects listed under Page status. How the portal's backend
 authenticates to MaaS was not traced.
 
 ```mermaid
@@ -335,3 +294,52 @@ flowchart LR
   FD --> TR --> POL
   POL -->|"ocp-ai-ops: 9 tools<br/>ocp-ai-dev: 0 tools"| SRV
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0587](../../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md): the playground is
+  a model and MCP testing tool, not an end-user experience; it may be shown as the operator's tool.
+- [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
+  access plane; the playground's chat consumes the person's subscription.
+- [ADR-0524](../../../adr/0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md): the mcp-gateway's `/mcp`
+  front door accepts an OpenShift user token (TokenReview) and derives `tools/list` from that user's groups.
+- [ADR-0036](../../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md): every tool
+  offered or called is the intersection of the front door's ceiling and the tool policy.
+- [ADR-0322](../../../adr/0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md): the OGX
+  operator is active in the DataScienceCluster.
+- [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) (M3): the
+  playground's OGX server keeps TLS verification off, a documented exception for a demo-only vendor UI.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+Evidence:
+
+- [WP-220](../../../roadmap/work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md): Evaluate the RHOAI 3.6 MCP lifecycle, MaaS consumer portal and WorkbenchesV2 components.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse genai-playground`: the 5-minute version PASS at 09:08
+> (11 units, 42 s); the 15-minute version PASS at 09:11 (20 units, 53 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13: Applications
+> `zuno-openshift-ai-d0`/`-d1`, `zuno-mcp-d1` and `zuno-models-d1` Synced and Healthy; in `zuno-playground`, OGXServer
+> `lsd-genai-playground` `Ready` without a `spec.tls` block, its pod 1/1 with 0 restarts and 9 ReplicaSets (no
+> growth), `genai-pgvector` 1/1 on the Bound 5Gi claim `genai-pgvector-storage`, ExternalSecret
+> `genai-pgvector-credentials` `SecretSynced`; ConfigMap `llama-stack-config` registers
+> `publishers/zuno-ai-run/models/` `gpt-oss-20b`, `qwen3.5-9b`, `qwen3.5-9b-wesh` and `qwen3.6-27b-instruct`;
+> ConfigMap `gen-ai-aa-mcp-servers` holds one entry, `zuno-mcp-gateway`; Deployment `mcp-gateway` 1/1 with the nine
+> `MCP_FRONTDOOR_CAPABILITIES`, and its NetworkPolicy admits `zuno-playground` and `redhat-ods-applications` on 8080;
+> DSC `MaaSConsumerPortalAvailable=True`, `OGXReady=True`, `ModelsAsAServiceReady=True`; Deployments
+> `maas-consumer-portal`, `gen-ai-ui`, `maas-ui` and `rhods-dashboard` available; HTTPRoutes `zuno-portal-genai`,
+> `zuno-portal-dashboard` and `zuno-portal-oauth-callback` present; the four `LLMInferenceService` Ready;
+> MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` Active; OpenShift groups `ocp-ai-ops`
+> (ai-ops-01) and `ocp-ai-dev` (ai-dev-01) present. Not healthy at the time of the check: the DSC was `Ready=False`
+> (TrustyAI: the guardrails smoke object in Error) and `maas-controller` was in CrashLoopBackOff (21 restarts). Their
+> effect on the playground was not tested: check both before any session. **paas-ops-01** had still not signed in to
+> OpenShift (no group `ocp-paas-ops`).
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).

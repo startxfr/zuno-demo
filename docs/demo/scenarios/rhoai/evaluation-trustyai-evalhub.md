@@ -1,32 +1,5 @@
 # Scenario: RHOAI TrustyAI - evaluating models and agents before they change
 
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse evaluation-trustyai-evalhub`: the 5-minute version
-> PASS at 08:53 (12 units, 124 s); the 15-minute version PASS at 08:59 (22 units, 140 s). Evidence:
-> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
-> on 2026-11-13:
-> - **0 LMEvalJobs** on the cluster and no `lmeval-hf-cache` PVC: `lmEval.enabled: false` since 2026-11-05 (see
->   [Limits](#limits)).
-> - `EvalHub/zuno-evalhub` in `zuno-ai-run`: `Ready=True`. Active collections `standard-llm-evals-v1`,
->   `safety-and-fairness-v1`, `reasoning-v1` and `leaderboard-v2`; providers `lm-evaluation-harness` and `garak`. Its
->   pod had been recreated about 140 minutes before the check. Its run history is an in-memory database, so it starts
->   empty after each restart.
-> - Route `zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr` (reencrypt, to the instance's kube-rbac-proxy) and the
->   RoleBinding `zuno-evalhub-user` for `ocp-ai-ops` and `ocp-ai-dev`.
-> - Jobs `garak-smoke`, `garak-security` and `ragas-eval` `Complete` on 2026-11-09. Job `zuno-acceptance-gate-tekos`
->   `Complete` on 2026-11-11 (14:30Z, 2 minutes). Kueue admitted all four (ClusterQueue `default`). Their pods were
->   already gone, so their logs were not available.
-> - DSC `zuno-dsc` with `mcpGuardrailsMode: false`; dashboard flags `disableLMEval: false` and `guardrails: true`.
-> - GrafanaDashboard `trustyai` present, Grafana 1/1. EgressFirewall `default` in `zuno-ai-run` applied.
->
-> At the time of the check (about 00:50 CET), the DSC was `Ready=False` with `TrustyAIReady=False`.
-> `trustyai-service-operator-controller-manager` and `trustyai-operator-module-controller-manager` had been in
-> CrashLoopBackOff since about 21:30Z on 2026-11-12, and the GuardrailsOrchestrator `zuno-guardrails-smoke` was in
-> phase `Error`. **paas-ops-01** had still not signed in to OpenShift.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
-> golden-path probe. Rehearse it before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
-
 ## Introduction
 
 TrustyAI is the evaluation and guardrails part of Red Hat OpenShift AI. In Zuno it measures models and agents before
@@ -46,23 +19,9 @@ This scenario shows past results. Running an evaluation is a cluster change: reh
 **The message:** "Models and agents are measured before they change: a benchmark, the quality of the RAG answers,
 jailbreak resistance, and twenty scenarios per agent with a 75% bar. The results stay visible, failures included."
 
-**Decisions:**
-- [ADR-0027](../../../adr/0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md): twenty acceptance scenarios
-  per agent.
-- [ADR-0028](../../../adr/0028-require-a-seventy-five-percent-evaluation-threshold.md): 75% is the release threshold.
-- [ADR-0108](../../../adr/0108-automate-model-evaluation-with-lm-eval.md): LM-Eval benchmarks as Git-managed
-  LMEvalJobs, one input of the model quality gate.
-- [ADR-0534](../../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): TrustyAI for evaluation with
-  LM-Eval, RAGAS and Garak; `mcpGuardrailsMode` stays `false`; a fine-tune must not regress its base model.
-- [ADR-0567](../../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): the guardrails moved into the
-  ai-gateway; the evaluation Jobs stay in TrustyAI.
-- [ADR-0107](../../../adr/0107-introduce-automated-model-quality-gates.md): the quality gate that blocks a promotion
-  below the threshold.
-
 ## Personas
 
-The personas are fictional role accounts of the Keycloak realm `zuno`
-([ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md)). They share one
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
 password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../README.md#personas) lists all of them.
 
 | Persona | Profile | What it can do here | Role in this demo |
@@ -79,7 +38,7 @@ Other identities:
 
 ## Presenter lifecycle
 
-`make demo use evaluation-trustyai-evalhub 5|15` selects this page ([ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)).
+`make demo use evaluation-trustyai-evalhub 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/evaluation-trustyai-evalhub/<action>.yml`)
 has run, and says what is left to the presenter. No action of this demo changes the cluster.
 
@@ -318,3 +277,50 @@ flowchart TB
   OTEL & KSM --> PROM["Prometheus"] --> GRAF["Grafana<br/>TrustyAI evaluation and guardrails"]
   LMEJ -. "status.results" .-> PEFT["evaluations/peft_regression.py<br/>candidate vs base, max drop 0.05"]
 ```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-0027](../../../adr/0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md): twenty acceptance scenarios
+  per agent.
+- [ADR-0028](../../../adr/0028-require-a-seventy-five-percent-evaluation-threshold.md): 75% is the release threshold.
+- [ADR-0108](../../../adr/0108-automate-model-evaluation-with-lm-eval.md): LM-Eval benchmarks as Git-managed
+  LMEvalJobs, one input of the model quality gate.
+- [ADR-0534](../../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md): TrustyAI for evaluation with
+  LM-Eval, RAGAS and Garak; `mcpGuardrailsMode` stays `false`; a fine-tune must not regress its base model.
+- [ADR-0567](../../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md): the guardrails moved into the
+  ai-gateway; the evaluation Jobs stay in TrustyAI.
+- [ADR-0107](../../../adr/0107-introduce-automated-model-quality-gates.md): the quality gate that blocks a promotion
+  below the threshold.
+- [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
+- [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
+
+## Page status
+
+> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse evaluation-trustyai-evalhub`: the 5-minute version
+> PASS at 08:53 (12 units, 124 s); the 15-minute version PASS at 08:59 (22 units, 140 s). Evidence:
+> [WP-277](../../../roadmap/evidence/wp-277-rhoai-rehearsals-2026-11-15.md). Prerequisites checked read-only on demo333
+> on 2026-11-13:
+> - **0 LMEvalJobs** on the cluster and no `lmeval-hf-cache` PVC: `lmEval.enabled: false` since 2026-11-05 (see
+>   [Limits](#limits)).
+> - `EvalHub/zuno-evalhub` in `zuno-ai-run`: `Ready=True`. Active collections `standard-llm-evals-v1`,
+>   `safety-and-fairness-v1`, `reasoning-v1` and `leaderboard-v2`; providers `lm-evaluation-harness` and `garak`. Its
+>   pod had been recreated about 140 minutes before the check. Its run history is an in-memory database, so it starts
+>   empty after each restart.
+> - Route `zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr` (reencrypt, to the instance's kube-rbac-proxy) and the
+>   RoleBinding `zuno-evalhub-user` for `ocp-ai-ops` and `ocp-ai-dev`.
+> - Jobs `garak-smoke`, `garak-security` and `ragas-eval` `Complete` on 2026-11-09. Job `zuno-acceptance-gate-tekos`
+>   `Complete` on 2026-11-11 (14:30Z, 2 minutes). Kueue admitted all four (ClusterQueue `default`). Their pods were
+>   already gone, so their logs were not available.
+> - DSC `zuno-dsc` with `mcpGuardrailsMode: false`; dashboard flags `disableLMEval: false` and `guardrails: true`.
+> - GrafanaDashboard `trustyai` present, Grafana 1/1. EgressFirewall `default` in `zuno-ai-run` applied.
+>
+> At the time of the check (about 00:50 CET), the DSC was `Ready=False` with `TrustyAIReady=False`.
+> `trustyai-service-operator-controller-manager` and `trustyai-operator-module-controller-manager` had been in
+> CrashLoopBackOff since about 21:30Z on 2026-11-12, and the GuardrailsOrchestrator `zuno-guardrails-smoke` was in
+> phase `Error`. **paas-ops-01** had still not signed in to OpenShift.
+> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):** no
+> golden-path probe. Rehearse it before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** [RHOAI end to end](../../workshops/rhoai-end-to-end.md).
