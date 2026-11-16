@@ -103,7 +103,7 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Say what the pipeline does | "We adapt a model to one agent with LoRA: a few megabytes of extra weights on a frozen base model. One pipeline does it, and every step leaves a record." | |
-| 0:45 | Profile **ai-dev-01**, RHOAI dashboard, project **Zuno MLOps**, **Pipelines**: open `mlops-tekos`, version `v0-4-0-tekos`, and show its graph | "Four steps: prepare the data, train, run the agent's own acceptance tests, register. If the tests fail, nothing is registered." | `prepare-dataset` → `train-lora` → `evaluate` → `push-registry`. `mlops-comage` has a fifth step, `merge-export`, before `evaluate`. |
+| 0:45 | Profile **ai-dev-01**, RHOAI dashboard, project **Zuno MLOps**, **Pipelines**: open **MLOps: dataset-to-model LoRA/PEFT pipeline (tekos)** (the object `mlops-tekos`), version `v0-3-0-tekos`, and show its graph | "Four steps: prepare the data, train, run the agent's own acceptance tests, register. If the tests fail, nothing is registered." | `prepare-dataset` → `train-lora` → `evaluate` → `push-registry`. `mlops-comage` has a fifth step, `merge-export`, before `evaluate`. One version per agent is listed, `v0-3-0-tekos` and `v0-3-0-comage` (on 2026-11-16; see [Limits](#limits)). |
 | 1:45 | **Training jobs** page of the same project, or `oc get trainjob -n zuno-mlops` | "Training needs a whole GPU. The cluster added a GPU node for this run, the job finished in half an hour, and the node went away ten minutes later. Nobody pays for an idle GPU." | `lora-comage-4c28m`, `Complete`, created 2026-09-08. |
 | 2:45 | MLflow tab, experiment `mlops-comage` | "Every run is recorded with its parameters and its training loss. Two runs can be compared side by side. If tracking is down, training still runs: the record of truth is in S3." | Runs named by their run id (for example `wp126-20260908-195101`), with `base_model`, `lora_r`, `lora_alpha`, `lora_dropout`, `example_count` and the training metrics. A run that stopped at `merge-export` has no `gate_passed`. Not opened in the 2026-11-13 check. |
 | 3:45 | Evidence tab, WP-133 | "This is the registered adapter for Tekos. It passed the gate, it was registered, and it was served after a reviewed change in Git: vLLM loaded it next to its base model and answered with it. That proof was made on our previous cluster; this cluster has no registry instance yet." | Model Registry version `wp126-20260904-201830`, the log line `Loaded new LoRA adapter: name 'tekos-lora'`. |
@@ -115,7 +115,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Terminal: `oc get dspa,pipelines,pipelineversions -n zuno-mlops` | "The pipeline server is OpenShift AI's own, one per project. The pipeline is compiled from a template in Git, one version per agent. A version is immutable: any change gets a new version number." | `mlops-dspa`; `mlops`, `mlops-comage`, `mlops-tekos`; `v0-3-0-*` and `v0-4-0-*`. |
+| 5:00 | Terminal: `oc get dspa,pipelines,pipelineversions -n zuno-mlops` | "The pipeline server is OpenShift AI's own, one per project. The pipeline is compiled from a template in Git, one version per agent. A version is immutable: any change gets a new version number." | `mlops-dspa`; `mlops`, `mlops-comage`, `mlops-tekos`; `v0-3-0-comage` and `v0-3-0-tekos`. |
 | 6:15 | `oc get trainingruntime mlops-lora -n zuno-mlops -o yaml`, then `oc get machineautoscaler zuno-gpu-burst-a -n openshift-machine-api` | "KFP orchestrates. Only the GPU step is a TrainJob, and its GPU, node selector and toleration are chart configuration, not code. Asking for a whole GPU is what makes the autoscaler add the burst node." | `nvidia.com/gpu: "1"`, toleration `zuno.io/gpu-burst`, node selector `machine.startx.io/group: gpu-burst`; the autoscaler with MIN 0 and MAX 1. |
 | 7:30 | `oc get clusterqueue,localqueue -A`, then `oc get workloads -n zuno-mlops` | "Kueue does not queue this training. The operand integrates plain batch Jobs only, and `zuno-mlops` has no queue. Kueue queues the evaluation Jobs in `zuno-ai-run`. There the queue is deliberately small: one multi-gigabyte image pull at a time on nodes with little disk." | ClusterQueue `default`; LocalQueues in `zuno-ai-build` and `zuno-ai-run`; `No resources found in zuno-mlops`. |
 | 8:45 | `oc get job zuno-acceptance-gate-tekos -n zuno-ai-run -o jsonpath='{.metadata.labels}'` | "A trap we hit: labelling a namespace for Kueue is not an opt-in per Job. This gate Job never asked for a queue. Kueue enrolled it because its namespace is labelled." | `kueue.x-k8s.io/queue-name: default`. |
@@ -148,6 +148,10 @@ Run the 5-minute version, then:
   - `comage` trains, then `merge-export` refuses to overwrite the weights that `qwen35-9b-wesh` serves. `evaluate` and
     `push-registry` never run, and the run ends `FAILED` by design, as in
     [WP-126](../../../roadmap/work-packages/wp-126-finalize-lora-trainjob.md).
+- **The pipeline versions on the cluster are older than the chart's.** The chart declares `v0-4-0`, bumped on
+  2026-11-09 because the compiled pipeline changed with the image references; its steps are those of `v0-3-0`. The
+  `v0-4-0` pair was listed on 2026-11-13. On 2026-11-16 the cluster lists only `v0-3-0-comage` and `v0-3-0-tekos`, and
+  why the `v0-4-0` pair is gone is not known.
 - **Kueue does not queue the training.**
   - The Kueue operand integrates `BatchJob` only, and `zuno-mlops` has no LocalQueue. The burst MachineSet (0 to 1)
     is what bounds training.
@@ -251,7 +255,7 @@ flowchart LR
   OP["make d3 run mlops<br/>trigger_run.py, or the dashboard"] -->|"route ds-pipeline-mlops-dspa<br/>KFP API"| API
   subgraph NS["namespace zuno-mlops"]
     API["DSPA mlops-dspa<br/>API server, persistence agent,<br/>workflow controller"]
-    subgraph DAG["PipelineVersion v0-4-0-agent, one Argo Workflow per run"]
+    subgraph DAG["PipelineVersion v0-3-0-agent on the cluster, v0-4-0 in the chart,<br/>one Argo Workflow per run"]
       PREP["prepare-dataset<br/>style corpus (comage) or<br/>knowledge domains (tekos)"]
       TRAIN["train-lora<br/>submitter only, 100m CPU"]
       MERGE["merge-export, comage only<br/>refuses to overwrite<br/>a served model"]
@@ -320,7 +324,8 @@ Evidence:
 >   workflow controller was in CrashLoopBackOff (15 restarts in 69 minutes), so a new run would not execute.
 > - Route `ds-pipeline-mlops-dspa-zuno-mlops.apps.demo333.startx.fr`.
 > - Pipelines `mlops`, `mlops-comage` and `mlops-tekos`, with the versions `v0-3-0-*` and `v0-4-0-*` (the `v0-4-0` pair
->   was created on 2026-11-09). No Argo Workflow object is left in the namespace.
+>   was created on 2026-11-09). No Argo Workflow object is left in the namespace. On 2026-11-16 (01:25 CET) only
+>   `v0-3-0-comage` and `v0-3-0-tekos` were listed: rows 0:45 and 5:00 name those.
 > - One TrainJob, `lora-comage-4c28m` (run `wp126-20260908-195101`): `Complete` on 2026-09-08 after 29 minutes, on the
 >   TrainingRuntime `mlops-lora`.
 > - MachineSet `zuno-gpu-burst-a` at 0, with a MachineAutoscaler from 0 to 1.
