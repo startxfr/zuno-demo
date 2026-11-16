@@ -27,3 +27,10 @@ Every sign-in flow other than the Keycloak form and every delete-by-id call outs
 - Each demo has a scout, a take that lists what it created and cleaned, a reviewed set of images and a stated number of sampled frames, and a GIF inside the limits.
 - Each GIF is published only after the owner's named go; the page rows that could not appear on screen are settled.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
+
+## Decision of 2026-11-16: the kagent first-run wizard
+
+The first-run wizard of kagent stops the `kagent` scout. The owner allowed the **Skip wizard** click as a declared
+change of the walkthrough. The click sends a `POST /` to kagent. What kagent stores because of it is not known. The
+decision is stated in the guard summary of the take, and the stored effect stays an open point.
+
