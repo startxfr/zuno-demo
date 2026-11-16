@@ -22,10 +22,19 @@ take() {   # take <name> [VAR=1 ...]: one recorder run with these knobs set; pri
   mkdir -p "$work/$1"
   local knobs=()
   for knob in "${@:2}"; do knobs+=(-e "$knob"); done
-  podman run --rm --label "$label" -e DEMO=open-webui -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
+  # podman's network helper sometimes fails to start ("pasta failed with exit code 1", seen on 2026-11-16 on two
+  # machines' worth of runs): that is not the recorder; the run is made once more.
+  local attempt output rc
+  for attempt in 1 2; do
+    output="$(podman run --rm --label "$label" -e DEMO=open-webui -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL=http://127.0.0.1:8099 "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$1:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node tests/fake-open-webui.mjs >/dev/null & sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "chats left: $(curl -s http://127.0.0.1:8099/fake/count)"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node tests/fake-open-webui.mjs >/dev/null & sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "chats left: $(curl -s http://127.0.0.1:8099/fake/count)"; exit $rc' 2>"$work/.stderr")"; rc=$?
+    grep -q "pasta failed" "$work/.stderr" && [[ $attempt -eq 1 ]] && { echo "podman's network helper failed: running $1 once more" >&2; sleep 2; continue; }
+    break
+  done
+  printf '%s\n' "$output"; cat "$work/.stderr" >&2
+  return $rc
 }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi

@@ -102,6 +102,8 @@ for (const a of document.querySelectorAll("nav a")) a.onclick = async (e) => {
     const list = await (await fetch("/api2/sessions/session.user.list?limit=100&offset=0&userId=team-" + team + "&teamId=team-" + team)).json();
     if (!list.sessions.length) return;
     sid = list.sessions[0].session_id; history.replaceState(null, "", "/agentic-chats/" + sid);
+    // the hub validates the workflow of the session it shows, by a POST that is a read
+    fetch("/api2/blueprints/blueprint.validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blueprintId: "tekos" }) }).catch(() => {});
     const toast = document.createElement("div"); toast.textContent = "Validation Error: Failed to validate the workflow. Please try again."; toast.style.cssText = "position:fixed;right:8px;bottom:8px;background:#fdd;padding:8px";
     document.body.appendChild(toast); setTimeout(() => toast.remove(), 3000);
   }
@@ -250,6 +252,7 @@ http.createServer((req, res) => {
       return json(200, {});
     });
   }
+  if (u.pathname === "/api2/blueprints/blueprint.validate" && req.method === "POST") return json(200, { valid: true });
   if (u.pathname === "/api2/sessions/session.cancel") return json(409, {});
   if (u.pathname === "/api2/sessions/session.delete" && req.method === "DELETE") {
     if (process.env.FAKE_REFUSE_DELETE === "1") return json(200, { success: false });

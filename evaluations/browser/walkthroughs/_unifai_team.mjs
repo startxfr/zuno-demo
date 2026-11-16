@@ -38,6 +38,10 @@ export const teamAllows = [
   { method: "DELETE", path: /^\/api2\/sessions\/session\.delete\/?$/, what: "delete own session" },
   { method: "POST", path: /^\/api2\/collaboration\/session\.(join|leave|heartbeat|typing)\/?$/, what: "presence in the hub" },
   { method: "POST", path: /^\/api2\/collaboration\/edit_lock\.statuses\/?$/, what: "the locks' states (a read)" },
+  // Sent by the hub for the workflow of the session it shows (scouts of 2026-11-16, refused by the first guard). Read
+  // in the fork (endpoints/blueprints.py, validate_blueprint): it checks a saved workflow and answers the result,
+  // it stores nothing. Refused, the hub says "Workflow Unavailable" and disables the message box.
+  { method: "POST", path: /^\/api2\/blueprints\/blueprint\.validate\/?$/, what: "the workflow's validation (a read)" },
 ];
 export const TEAM = ["button:text-is('Team')"];                                                             // guess (Sidebar.tsx)
 export const SELECTOR = ["button:has(svg.lucide-chevron-down)", "button:has-text('Select team')"];          // guess (Sidebar.tsx)

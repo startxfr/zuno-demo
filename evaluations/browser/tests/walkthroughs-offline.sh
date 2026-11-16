@@ -24,10 +24,19 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
   mkdir -p "$work/$name"
   local knobs=()
   for knob in "${@:5}"; do knobs+=(-e "$knob"); done
-  podman run --rm --label "$label" -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
+  # podman's network helper sometimes fails to start ("pasta failed with exit code 1", seen on 2026-11-16 on two
+  # machines' worth of runs): that is not the recorder; the run is made once more.
+  local attempt output rc
+  for attempt in 1 2; do
+    output="$(podman run --rm --label "$label" -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc' 2>"$work/.stderr")"; rc=$?
+    grep -q "pasta failed" "$work/.stderr" && [[ $attempt -eq 1 ]] && { echo "podman's network helper failed: running $name once more" >&2; sleep 2; continue; }
+    break
+  done
+  printf '%s\n' "$output"; cat "$work/.stderr" >&2
+  return $rc
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
