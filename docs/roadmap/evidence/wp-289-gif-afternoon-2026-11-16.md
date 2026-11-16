@@ -248,3 +248,7 @@ The take failed after the Agent turn: the workflow step went to the web-app page
 - `observability-trace`: the chat take passed. The trace take **failed**: it opened the OpenClaw error trace again, not its own. One `tekos` answer was spent.
 - `lora-pipeline-mlflow-kueue`, rescout at `396c4440`: the pipeline step is fine with versions shown `[v0-4-0-tekos]`. MLflow's own UI (workspace `zuno-mlops`) lists no experiment in its default view. Update (rescout of 20:41 CET, as relayed): the switch to the Model training view was made, and MLflow's own UI lists no experiment in workspace `zuno-mlops` in either view; the dashboard's Experiments page says "No experiments". The Jobs page lists `lora-comage-4c28m` as Complete. Row 2:45 has nothing to show; the GIF ends at the training job (the assist's `32b5342a` drops the moment). Deferred entry o.
 
+## Scouts at `d80f25ef` and the re-cut (as relayed)
+
+`openclaw` 7 of 7; `maas-portal-api-keys` 6 of 6 (empty key list, Create dialog seen and cancelled, nothing created); `dify` 9 of 9; `guardrails` both paths fine; `observability-trace`: the search finds one recent Tekos trace of `consultant-02`, but the click opened Jaeger's Compare page (selector bug). The `unifai-agents` re-cut was refused once by `gif.py` because a caption was 64 characters, and redone at `2b9f3dfb`. The owner's decision on the `openclaw` session cleanup is in the WP-290 brief.
+

@@ -51,5 +51,21 @@ Nothing is recorded yet for these four: each is a take to scout and review like 
 
 `genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-The other five are not recorded. `maas-portal-api-keys` failed its scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 6 of 6. `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
+The other five are not recorded. `maas-portal-api-keys` failed its scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
+
+### Owner's decision on `openclaw`, session cleanup (2026-11-16, answered just before 21:01:38 CET)
+
+Given in `zuno-demo-reorg`'s session by an answer to a question with options, and relayed by it (the time is read from its clock right after the answer). The answer: **"Yes, session deleted"**.
+
+- The take asks one question and deletes its own session through the UI's **Delete…** entry. That click is declared.
+- The take fails if the session remains after the delete.
+- What the assistant may have memorised stays in its memory. This is declared.
+
+### Scouts at `d80f25ef` (as relayed)
+
+- `openclaw`: 7 of 7. The session menu lists Pin session, Mark as unread, Rename…, Fork, Move to group, Archive session and Delete….
+- `maas-portal-api-keys`: 6 of 6. The key list was empty. The Create dialog was seen and cancelled. Nothing was created.
+- `dify`: 9 of 9. `guardrails`: both paths fine.
+- `observability-trace`: the bounded search finds one recent Tekos trace of `consultant-02`, but the click opened Jaeger's Compare page (a selector bug).
+- `unifai-agents`: the re-cut was refused once because a caption was too long (64 characters); redone at `2b9f3dfb`.
 
