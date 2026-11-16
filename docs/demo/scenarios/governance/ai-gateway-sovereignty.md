@@ -86,10 +86,10 @@ Nothing to do.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Show the C1/C2/C3 table of the introduction | "Every request gets a level. C3 is data that must never leave our infrastructure: finance, HR, sovereign projects." | |
+| 0:00 | `git show HEAD:platform/ai-gateway/provider-routing.yaml \| awk '/^  - name:/{n=$3} /^    eligible_for:/{print n, $2, $3, $4}'` *(untested command)* | "Every request gets a level. C3 is data that must never leave our infrastructure: finance, HR, sovereign projects. Each provider lists the levels it may serve: only our own models carry C3." | One line per provider. The local models (`local-maas`, `local`, `local-gpt-oss-maas`, ...) `[C1, C2, C3]`; `openai`, `anthropic`, `mistral-codestral` and `ovhcloud-gpt-oss-120b` `[C1, C2]`; `gemini` and `mistral` `[C1]`. No SaaS provider carries C3. |
 | 1:00 | Run `ONLY=sovereignty make demo golden-path` | "I call Arkos, our architecture agent, and I lie: I label the request C1, public. Arkos works on client architectures, so its signed sheet says C3." | The probe runs. A local model may take a few seconds. |
 | 2:30 | Read the result line | "The platform ignored my label and raised it to C3. The answer came from a model running on our GPUs." | `PASS sovereignty ... Arkos C1 raised to C3 -> <provider>/<model> (local)`, then `RESULT: PASS`. |
-| 3:30 | Contrast, in words or on the Open WebUI tab | "The same gateway sent a public code question to Mistral Codestral a minute ago. The level decides, not the application." | |
+| 3:30 | `git show HEAD:gitops/charts/ai-gateway/files/classification-floors.generated.yaml \| awk '/^  [a-z]+:$/{a=$1} /^    floor:/{print a, $2}'` *(untested command)* | "Contrast: every agent has a floor, declared by its owner. Tekos is at C1: its public questions may go to a SaaS model of the C1 list, such as Mistral Codestral. Arkos is at C3: never. The level decides, not the application." | One line per agent: `arkos: C3`, `cognos: C3`, `tekos: C1`, `naveo: C1`, and `C2` for `advantage`, `comage`, `finage` and `soursage`. This is the file in Git that the gateway mounts; the live ConfigMap is shown at 6:00 of the 15-minute version. |
 | 4:15 | Close | "Sensitive data stays here even if the caller says otherwise. And if no local model is ready, Zuno refuses: it never falls back to the cloud." | |
 
 ## 15-minute version
