@@ -27,6 +27,8 @@ Which verbs are safe on stage:
 **The message:** "The platform is the repository. One command installs or checks any piece of it, Argo CD keeps the
 cluster equal to Git, and before any live session we prove each moment with a real answer."
 
+![The 5-minute version of the GitOps Day 0 to 3 demo, recorded live in a terminal: every Argo CD Application with the Git branch it follows and its sync and health state, then the exceptions by name. The `make help` and `make d0 check argocd` rows are not in the recording.](../../../assets/img/demo/gitops-day0-3.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
