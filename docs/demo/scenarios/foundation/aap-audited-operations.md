@@ -29,6 +29,8 @@ The 8 workflow templates chain one job template over several components in depen
 **The message:** "Our operations run as jobs defined in Git, and each job is recorded with who launched it. People get
 the rights of their group. An agent may read that history and launch one read-only audit, nothing more."
 
+![The 5-minute version of the audited operations demo, recorded live as consultant-03, a reader of the automation platform: the sign-in with the company account, the job templates it may see but not launch, the runs of the Day 0 check, one run launched by the agents' tool gateway with who launched it and with which credential, and the project that follows the Git branch. The job's output is not in the recording.](../../../assets/img/demo/aap-audited-operations.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
