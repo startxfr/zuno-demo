@@ -34,7 +34,7 @@ const APP = `<!doctype html><title>UnifAI (fake)</title>
 <div id="home" hidden><h2>Get to know UnifAI</h2></div>
 <div id="docs" hidden><h2>Document Library</h2><table>${FILES}</table></div>
 <div id="chats" hidden><span id="count"></span> <button title="Add new chat from flow" id="add">+</button>
-<div id="messages"></div><textarea id="in" hidden placeholder="Type your message..."></textarea><div id="live"></div></div>
+<div id="thread" style="height:140px;overflow-y:auto;border:1px solid #888"><div id="messages"></div></div><textarea id="in" hidden placeholder="Type your message..."></textarea><div id="live"></div></div>
 <div role="dialog" id="notice" hidden style="top:200px"><h3>AI Disclosure</h3><p>You are about to use a Red Hat tool that utilizes AI technology.</p>
 <input type="checkbox" id="dont-show-again" onclick="fetch('/fake/touched',{method:'POST'})"><label for="dont-show-again">Don't show message again</label>
 <button id="accept">Accept</button></div>
@@ -97,9 +97,22 @@ async function show() {
   const r = await fetch("/api2/sessions/session.chat.get?sessionId=" + sid);
   if (r.status !== 200) return;
   const chat = await r.json();
-  if ($("messages").children.length === chat.messages.length) return;
+  // As UnifAI on 2026-11-16: the thread does not follow, and an answer is behind the agent's card, drawn only once
+  // the thread has been scrolled to its end (FAKE_STUCK=1: never drawn). An answer once drawn stays drawn.
+  const end = $("thread").scrollTop + $("thread").clientHeight >= $("thread").scrollHeight - 4;
+  const sig = chat.messages.length + ":" + end;
+  if (sig === show.sig) return;
+  show.sig = sig;
+  show.revealed = show.revealed || new Set();
   $("messages").innerHTML = "";
-  for (const m of chat.messages) { const p = document.createElement("p"); p.textContent = m.role + ": " + m.content; $("messages").appendChild(p); }
+  chat.messages.forEach((m, i) => {
+    if (m.role === "assistant") {
+      const card = document.createElement("div"); card.style.height = "160px"; card.textContent = "Consultant-01-Rag Complete ... Show full log"; $("messages").appendChild(card);
+      if (end && !${process.env.FAKE_STUCK === "1"}) show.revealed.add(i);
+      if (!show.revealed.has(i)) { const hole = document.createElement("div"); hole.style.height = "60px"; $("messages").appendChild(hole); return; }
+    }
+    const p = document.createElement("p"); p.textContent = m.role === "user" ? m.content : m.role + ": " + m.content; $("messages").appendChild(p);
+  });
   if (chat.messages.some((m) => m.role === "assistant")) $("live").textContent = "Live workflow: retriever consultant-01-documents";
 }
 if (!$("chats").hidden) setInterval(show, 300);

@@ -152,6 +152,9 @@ assert names == ["login"] and m["created"] == [] and m["cleaned"] is None, m
 out="$(unifai u-nofiles FAKE_NO_FILES=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "unifai: a library without the demo files fails before anything is created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the Document Library does not show both demo files Done .*make demo start unifai-live-rag' <<<\"\$0\"" "$out"
+out="$(unifai u-stuck FAKE_STUCK=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "unifai: an answer the page never draws fails the take, and its session is deleted" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the answer holds ZN-CAR-7 but the page never drew it in the window within 60 s (its text is not on the page; 1 scrolling box' <<<\"\$0\" && grep -q 'left: {\"sessions\":1,' <<<\"\$0\"" "$out"
 expect "unifai: nothing created, nothing to clean" markers u-nofiles '
 assert names == ["login", "home"] and m["created"] == [] and m["cleaned"] is None and m["owned"]["same"] is True, m
 '

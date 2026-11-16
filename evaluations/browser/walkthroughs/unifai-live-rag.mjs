@@ -14,7 +14,7 @@
 // NOT yet scouted: every selector is a guess read from the fork's UI source (see _helpers.mjs, "UnifAI"). The sign-in,
 // the session list, the new chat, the question, the wait for an answer and the delete are the shared unifai* helpers,
 // for unifai-agents, observability-trace and a2a-delegation-approval to reuse.
-import { click, describe, firstVisible, newText, switches, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiGo,
+import { click, describe, firstVisible, newText, read, switches, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiGo,
          unifaiNewChat, unifaiOpenWorkflows, unifaiSessions, unifaiSignIn, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "consultant-01";
@@ -52,6 +52,43 @@ export async function owned({ page }) {
   return unifaiSessions(page);
 }
 
+// Scroll the chat thread to its end: every scrolling box around the question's bubble, and no other (the list of
+// earlier sessions is not moved). A scroll of the view: nothing is changed. Returns how many boxes were moved.
+async function toBottom(page, question) {
+  const bubble = page.getByText(question, { exact: true }).last();
+  if (!(await bubble.count())) return 0;
+  return read(bubble, (el) => {
+    let moved = 0;
+    for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) {
+      if (box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY)) { box.scrollTop = box.scrollHeight; moved += 1; }
+    }
+    return moved;
+  });
+}
+
+// Bring the answer on screen. On 2026-11-16 the first take had its answer (the session COMPLETED, ZN-CAR-7 in it) and
+// never saw it: the thread had not followed, the answer sat under the fold of the chat pane behind the agent's card
+// ("...", "Show full log"), and its text was not found on the page. So the thread is scrolled to its end until the
+// expected words are drawn, and they must then be INSIDE the window: a marker without the answer proves nothing.
+async function showAnswer(page, question, expected) {
+  const words = page.getByText(expected).last();
+  const deadline = Date.now() + 60000;
+  let moved = 0;
+  while (Date.now() < deadline) {
+    moved = Math.max(moved, await toBottom(page, question));
+    if (await words.count()) {
+      await read(words, (el) => el.scrollIntoView({ block: "center" }));
+      await page.waitForTimeout(600);
+      const box = await words.boundingBox().catch(() => null);
+      const view = page.viewportSize();
+      if (box && box.height > 0 && box.y >= 0 && box.y + box.height <= view.height && box.x >= 0 && box.x + box.width <= view.width) return;
+    }
+    await page.waitForTimeout(700);
+  }
+  throw new Error(`the answer holds ${expected} but the page never drew it in the window within 60 s `
+    + `(${await words.count() ? "its text is on the page, outside the window" : "its text is not on the page"}; ${moved} scrolling box(es) around the question moved to their end)`);
+}
+
 export async function run({ page, mark, log, state }) {
   await mark("home");
 
@@ -76,7 +113,7 @@ export async function run({ page, mark, log, state }) {
   await mark("q1-sent");
   const first = await unifaiAnswered(page, id, 1);
   if (!first.includes(EXPECTED)) throw new Error(`the answer to the 2:00 question does not hold ${EXPECTED}: not the page's answer`);
-  await page.getByText(EXPECTED).first().waitFor({ timeout: 30000 });
+  await showAnswer(page, prompts["2:00"], EXPECTED);
   await page.waitForTimeout(1500);
   log(`the retriever ${RETRIEVER} is ${(await wordsOnScreen(page, [new RegExp(RETRIEVER)]))[RETRIEVER] ? "" : "NOT "}named on screen`);
   await mark("q1-done");
@@ -85,6 +122,8 @@ export async function run({ page, mark, log, state }) {
   const second = await unifaiAnswered(page, id, 2);
   if (!second.trim()) throw new Error("the answer to the 3:15 question is empty");
   await page.waitForTimeout(2500);   // the last tokens drawn
+  await toBottom(page, prompts["3:15"]);
+  await page.waitForTimeout(1000);
   if ((page.url().match(unifai.SESSION_ID) || [])[1] !== id) log(`the address bar does not show the session ${id}`);
   await mark("q2-done");
 
