@@ -129,7 +129,14 @@ export async function scout({ page, base, step, state }) {
     const count = await menus.count();
     if (!count) return { menus: 0 };
     const before = await describe(page, "body", 200);
-    await menus.first().click({ timeout: 10000 });   // a menu button (it may carry aria-haspopup, never a switch)
+    // The button shows only when its session's row is hovered (rescout of 2026-11-16: a plain click timed out): the
+    // row is hovered first; if the button still does not show, it is clicked where it is (a menu button, never a
+    // switch).
+    const button = menus.first();
+    await button.locator("xpath=..").hover({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    if (await button.isVisible().catch(() => false)) await button.click({ timeout: 5000 });
+    else await button.dispatchEvent("click");
     await page.waitForTimeout(800);
     const items = page.locator("[role='menuitem'], [role='menu'] button, [role='menu'] a, [role='menu'] li");
     const labels = [];

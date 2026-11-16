@@ -13,7 +13,8 @@ const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/
 <input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`;
 const UI = `<!doctype html><title>OpenClaw Control UI</title><body style="font:16px sans-serif;margin:24px">
 <div id="gate"><label>Password <input type="text" id="pw" placeholder="optional"></label><button id="connect">Connect</button><p id="error"></p></div>
-<div id="app" hidden><button id="new">New session</button><ul><li><a href="#s1" title="">FAKE-EARLIER-SESSION-TITLE</a><button aria-label="Pin session"></button><button aria-label="Open session menu" id="menu-open"></button></li></ul>
+<div id="app" hidden><button id="new">New session</button><ul><li><a href="#s1" title="">FAKE-EARLIER-SESSION-TITLE</a><button aria-label="Pin session"></button><button aria-label="Open session menu" id="menu-open" style="visibility:hidden">m</button></li></ul>
+<style>li:hover #menu-open { visibility: visible !important; }</style>
 <div role="menu" id="menu" hidden><button role="menuitem">Rename</button><button role="menuitem" id="del">Delete</button></div>
 <textarea placeholder="Message"></textarea><span>zuno</span></div>
 <script>

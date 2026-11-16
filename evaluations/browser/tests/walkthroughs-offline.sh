@@ -836,6 +836,9 @@ expect "trace: an Authorize Access page of another client stops the scout, nothi
 out="$(trace t-addresses FAKE_ADDRESSES=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a span whose Process line holds an address fails the trace take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'trace: .*the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
+out="$(trace t-error FAKE_ERROR_SPAN=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "trace: a newest span that is a failed call fails the take: not the picture of a traced answer" bash -c "test $rc -eq 1 && grep -q 'trace: .*is a FAILED call' <<<\"\$0\"" "$out"
 out="$(trace t-notags FAKE_NO_TAGS=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a span without its zuno tags fails the take before its marker" bash -c "test $rc -eq 1 && grep -q 'trace: .*the model_call span does not show its tags' <<<\"\$0\"" "$out"
@@ -886,7 +889,7 @@ expect "maas: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '
 expect "maas: a scout creates no key" grep -q 'left: {"keys":1,"live":1,"checks":0}' <<<"$out"
 expect "maas: scout.json reports the list's shape and the dialog, no key value" scouted m-scout '
 assert list(steps) == ["enter", "owned", "portal", "keys", "create-dialog", "closed"], list(steps)
-assert steps["keys"]["list_path"] == "/maas-consumer-portal/maas/api/v1/api-keys" and steps["keys"]["list_request"] == {"method": "POST", "path": "/maas-consumer-portal/maas/api/v1/api-keys/search", "envelope": ["data"], "search_body_keys": ["filters", "pagination"]} and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
+assert steps["keys"]["list_path"] == "/maas-consumer-portal/maas/api/v1/api-keys" and steps["keys"]["list_request"] == {"method": "POST", "path": "/maas-consumer-portal/maas/api/v1/api-keys/search", "envelope": {"data": {"items": "list(1)", "total": "number"}}, "search_body_keys": ["filters", "pagination"]} and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
 assert steps["create-dialog"]["subscription_on_screen"] is True and steps["create-dialog"]["submit_selector"] and steps["create-dialog"]["name_selector"], steps["create-dialog"]
 assert "sk-oai-" not in json.dumps(s)
 '

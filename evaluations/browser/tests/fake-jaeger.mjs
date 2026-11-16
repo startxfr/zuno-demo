@@ -21,7 +21,8 @@ const LOGIN = page("Sign in", `<form method="get" action="/cb"><input id="userna
 const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account ${process.env.FAKE_AUTHORIZE === "other" ? "some-other-proxy" : "tempo-tempo"} in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
 <form action="/approve"><label><input type="checkbox" checked value="user:info"> user:info</label><label><input type="checkbox" checked value="user:check-access"> user:check-access</label>
 <input type="submit" name="approve" value="Allow selected permissions"> <input type="submit" name="deny" value="Deny"></form>`);   // as seen live on 2026-11-16
-const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [["zuno.persona", "consultant-02"], ["zuno.client", "unifai"], ["zuno.agent", "tekos"], ["zuno.task", "answer-technical-question"],
+// FAKE_ERROR_SPAN=1: the newest span is a failed call, as the one the rescout of 2026-11-16 opened.
+const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [...(process.env.FAKE_ERROR_SPAN === "1" ? [["error", "true"], ["otel.status_code", "ERROR"]] : []), ["zuno.persona", "consultant-02"], ["zuno.client", "unifai"], ["zuno.agent", "tekos"], ["zuno.task", "answer-technical-question"],
   ["zuno.classification", "C2"], ["zuno.model_kind", "local"], ["zuno.provider", "local-gpt-oss-maas"], ["zuno.model", "gpt-oss-20b"], ["zuno.latency_ms", "912"],
   ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"]];
 const PROCESS = process.env.FAKE_ADDRESSES === "1" ? "Process: ip = 10.131.2.14 k8s.node.name = ip-10-18-3-7.eu-west-3.compute.internal" : "Process: service.name = ai-gateway";
@@ -42,7 +43,9 @@ http.createServer((req, res) => {
   if (u.pathname === "/" ) return to("/search");
   if (u.pathname === "/search") {
     const asked = u.searchParams.get("service") === "ai-gateway" && u.searchParams.get("operation") === "model_call"
-      && (u.searchParams.get("tags") || "") === JSON.stringify({ "zuno.persona": "consultant-02" }) && u.searchParams.get("lookback") === "15m";
+      && (u.searchParams.get("tags") || "") === JSON.stringify({ "zuno.persona": "consultant-02", "zuno.agent": "tekos" }) && u.searchParams.get("lookback") === "15m"
+      // the 15 minutes as two instants in microseconds, or the search is not bounded (as on 2026-11-16)
+      && Math.abs(Number(u.searchParams.get("end")) / 1000 - Date.now()) < 120000 && Math.abs(Number(u.searchParams.get("end")) - Number(u.searchParams.get("start")) - 15 * 60e6) < 5e6;
     if (u.searchParams.has("service")) searches += 1;
     const listed = asked && process.env.FAKE_NO_TRACE !== "1" && (searches >= 2 || process.env.FAKE_TRACE_NOW === "1");
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><form class="SearchForm"><label>Service <input value="${u.searchParams.get("service") || ""}"></label>

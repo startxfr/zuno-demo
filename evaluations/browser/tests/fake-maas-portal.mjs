@@ -30,7 +30,7 @@ async function list() {
   // As the portal on 2026-11-16: the list is read by a POST to .../api-keys/search.
   const body = await (await fetch("/maas-consumer-portal/maas/api/v1/api-keys/search", { method: "POST", headers: { "Content-Type": "application/json", "X-Portal": "1" }, body: JSON.stringify({ filters: {}, pagination: { limit: 50 } }) })).json();
   $("list").innerHTML = "";
-  for (const k of body.data) { const li = document.createElement("li"); li.textContent = k.name + " (" + k.status + ")"; $("list").appendChild(li); }
+  for (const k of body.data.items) { const li = document.createElement("li"); li.textContent = k.name + " (" + k.status + ")"; $("list").appendChild(li); }
 }
 $("nav-keys").onclick = (e) => { e.preventDefault(); $("keys").hidden = false; list(); };
 $("create").onclick = () => { $("dialog").hidden = false; };
@@ -66,7 +66,8 @@ http.createServer((req, res) => {
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/check") { checks += 1; return json(200, {}); }
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys/search" && req.method === "POST") {
     if (req.headers["x-portal"] !== "1") return json(400, { error: "the portal's own header is missing" });
-    return json(200, { data: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })) });
+    // As the portal on 2026-11-16: the list is not `data` itself but inside it.
+    return json(200, { data: { items: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })), total: keys.size } });
   }
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys" && req.method === "POST") {
     return body((raw) => {

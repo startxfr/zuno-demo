@@ -32,7 +32,7 @@ export const takes = [
   { name: "chat", persona: "consultant-02", markers: ["login", "hub", "q-sent", "q-done", "end"], motion_from: "hub" },
   { name: "trace", persona: "ai-ops-01", markers: ["login", "search", "trace", "tags", "end"], motion_from: "search" },
 ];
-export const page = "docs/demo/scenarios/governance/observability-trace.md";
+export const page = "docs/demo/scenarios/foundation/observability-trace.md";
 export const viewport = { width: 1280, height: 800 };
 export const markers = takes[0].markers;
 export const motion_from = takes[0].motion_from;
@@ -50,7 +50,10 @@ export const sends = unifai.sends;
 const WORKSPACE = "agent-tekos";
 const WORKFLOW = "tekos";
 const TEAMS = ["agent-arkos", "agent-tekos", "consultant"];   // consultant-02's workspaces (the unifai-agents page)
-const SEARCH = { service: "ai-gateway", operation: "model_call", tags: { "zuno.persona": "consultant-02" }, lookback: "15m" };   // the page's row 1:45
+// The page's row 1:45, plus the agent: on 2026-11-16 the newest model_call of consultant-02 in 15 minutes was a FAILED
+// call of its OpenClaw assistant, not the Tekos answer. The search names the agent too, so the trace is the turn the
+// first take asked (the page's own recovery row narrows the search the same way, by tags).
+const SEARCH = { service: "ai-gateway", operation: "model_call", tags: { "zuno.persona": "consultant-02", "zuno.agent": "tekos" }, lookback: "15m" };
 const SPAN = "model_call";
 // The tags the page's row 3:00 names; the first three must be drawn inside the window at the `tags` marker.
 const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.classification", "zuno.model_kind", "zuno.provider", "zuno.model",
@@ -63,8 +66,10 @@ const DETAIL = [".detail-row", ".SpanDetail", "[data-testid='span-detail']"];   
 const TAGS_HEADER = [".detail-row .AccordianKeyValues--header:has-text('Tags')", ".AccordianKeyValues--header:has-text('Tags')", "[role='switch']:has-text('Tags')"];   // guess
 
 const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
+// The 15 minutes are given as two instants too (microseconds, as the form's "Find Traces" writes them): with
+// `lookback` alone the search answered traces hours old (the take of 2026-11-16 opened one from 3 h 30 before).
 const searchAddress = (base) => `${base}/search?service=${SEARCH.service}&operation=${SEARCH.operation}`
-  + `&tags=${encodeURIComponent(JSON.stringify(SEARCH.tags))}&lookback=${SEARCH.lookback}&limit=20`;
+  + `&tags=${encodeURIComponent(JSON.stringify(SEARCH.tags))}&lookback=${SEARCH.lookback}&start=${(Date.now() - 15 * 60000) * 1000}&end=${Date.now() * 1000}&limit=20`;
 
 export async function enter(ctx) {
   const { page, domain, take, state } = ctx;
@@ -150,8 +155,13 @@ async function openSpan(page) {
   const header = await firstVisible(page, TAGS_HEADER);
   if (header) { await fold(page.locator(header.matched).first(), "tags"); await page.waitForTimeout(800); }
   await page.mouse.move(640, 790);
+  // The tags are a long list, in alphabetical order: it is scrolled so that its zuno.* rows are in the window.
+  const middle = page.locator(detail.matched).first().getByText("zuno.model", { exact: true }).first();
+  if (await middle.count()) await read(middle, (el) => el.scrollIntoView({ block: "center" }));
+  await page.waitForTimeout(500);
   const text = await page.locator(detail.matched).first().innerText().catch(() => "");
-  return { detail: detail.matched, tags_header: header ? header.matched : "", tags: TAGS.filter((tag) => text.includes(tag)) };
+  return { detail: detail.matched, tags_header: header ? header.matched : "", tags: TAGS.filter((tag) => text.includes(tag)),
+           error: /\berror\s*=?\s*true\b|otel\.status_code\s*=?\s*ERROR/i.test(text.replace(/\s+/g, " ")) };
 }
 
 async function runTrace({ page, domain, mark, log, state }) {
@@ -170,6 +180,7 @@ async function runTrace({ page, domain, mark, log, state }) {
   await openTrace(page, found);
   await mark("trace");
   const span = await openSpan(page);
+  if (span.error) throw new Error(`the newest ${SPAN} span of the search is a FAILED call (its tags say error): not the picture of a traced answer; take again once a Tekos answer is the newest`);
   const missing = TAGS.filter((tag) => !span.tags.includes(tag));
   if (span.tags.length < 3 || !span.tags.includes("zuno.persona")) throw new Error(`the ${SPAN} span does not show its tags (seen: ${span.tags.join(", ") || "none"})`);
   if (missing.length) log(`tags of the page's row 3:00 NOT in the span's detail: ${missing.join(", ")}`);
@@ -214,7 +225,7 @@ export async function scout({ page, domain, step, state, take }) {
       const span = await openSpan(page);
       const inside = {};
       for (const tag of ["zuno.persona", "zuno.client", "zuno.agent"]) inside[tag] = await grafanaInWindow(page, tag);
-      return { ...span, in_window: inside, process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
+      return { ...span, span_is_an_error: span.error, in_window: inside, process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
     });
     await step("closed", async () => {
       if (state.writes.length) throw new Error(`the scout sent ${[...new Set(state.writes)].join(", ")} to the Tempo search UI`);

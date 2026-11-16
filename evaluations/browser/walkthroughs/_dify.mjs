@@ -140,21 +140,34 @@ export async function difyRuns(page, appId) {
 
 // Open an application from Studio by its card: the address reached, without its query.
 export async function difyOpen(page, base, name, { changes = [], ready = [] } = {}) {
-  if (!/\/apps(\/|\?|$)/.test(page.url())) await page.goto(`${base}/apps`);
+  // Studio is reached by its own link (the left menu's, or the editor's breadcrumb), never by an address typed and
+  // never by a card of Home: the first take (2026-11-16) opened the workflow from a place that was not Studio and
+  // landed on its web app. Studio is proved by its address before a card is looked for.
+  const onStudio = () => new URL(page.url()).pathname.replace(/\/$/, "") === "/apps";
+  if (!onStudio()) {
+    const studio = await firstVisible(page, dify.STUDIO);
+    if (studio) await click(studio, { changes }); else await page.goto(`${base}/apps`);
+    await waitUntil(page, { what: "Dify's Studio", timeoutMs: 30000, done: async () => onStudio() || undefined })
+      .catch(() => { throw new Error(`Studio was not reached (the address is ${new URL(page.url()).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>")})`); });
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  }
   // Dify's left menu lists the published web apps by the same names (scout of 2026-11-16): the card is the match in
   // the page's body, right of that menu, not the menu's entry (which opens the web app, not its editor).
+  // Studio draws grey skeleton cards first (rescout of 2026-11-16): the card is waited for, a minute.
   const named = page.getByText(name, { exact: true });
-  await named.first().waitFor({ timeout: 30000 });
+  const find = async () => {
+    for (let i = 0; i < Math.min(await named.count(), 10); i += 1) {
+      const box = await named.nth(i).boundingBox().catch(() => null);
+      if (box && box.width > 0 && box.x >= 260) return named.nth(i);   // 260: the menu's width at 1280 px
+    }
+    return null;
+  };
+  const card = await waitUntil(page, { what: `the card of ${name} in Studio`, timeoutMs: 60000, done: async () => (await find()) || undefined })
+    .catch(() => { throw new Error(`Studio shows no card named ${name} within a minute (only the left menu names it, or the cards never loaded)`); });
   await page.waitForTimeout(800);
-  let card = null;
-  let left = 260;   // the menu's width at 1280 px
-  for (let i = 0; i < Math.min(await named.count(), 10); i += 1) {
-    const box = await named.nth(i).boundingBox().catch(() => null);
-    if (box && box.width > 0 && box.x >= left) { card = named.nth(i); left = box.x + 1e6; }
-  }
-  if (!card) throw new Error(`Studio shows no card named ${name} (only the left menu names it)`);
   await click(card, { changes });
-  await page.waitForURL(/\/app\/[0-9a-f-]{8,}\//, { timeout: 30000 });
+  await page.waitForURL(/\/app\/[0-9a-f-]{8,}\//, { timeout: 30000 })
+    .catch(() => { throw new Error(`the card of ${name} did not open its editor (the address is ${new URL(page.url()).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>")}): not the application's page in Studio`); });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   // The editor draws after its shell (scout of 2026-11-16: a spinner under the breadcrumb when the page was read):
   // when the caller says what it needs (`ready`), it is waited for, 90 s, and the caller checks it afterwards.

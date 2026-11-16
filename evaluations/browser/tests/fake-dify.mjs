@@ -32,10 +32,11 @@ document.getElementById("f").onsubmit = async (e) => {
 // The left menu lists the web apps by the same names as Studio's cards; its entries open the web app, not the editor.
 const MENU = `<aside style="position:fixed;left:0;top:60px;width:240px"><p>WEB APPS</p><a href="/webapp/agent" style="display:block">Zuno Agent</a><a href="/webapp/flow" style="display:block">Zuno Confluence Search</a></aside>`;
 const shell = (body) => `<!doctype html><title>Dify</title><body style="font:16px sans-serif;margin:24px 24px 24px 280px">${MENU}<nav><a href="/">Home</a> <a href="/apps">Studio</a> <a href="/datasets">Knowledge</a></nav>${body}`;
-const APPS = shell(`<main><h1>Studio</h1>
+const APPS = shell(`<main><h1>Studio</h1><div id="skeleton">loading cards</div><div id="cards" hidden>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${AGENT}/configuration'"><div>Zuno Agent</div><small>AGENT</small></div>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${DOCS}/workflow'"><div>Zuno Technical Documentation</div><small>CHATFLOW</small></div>
-<div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${FLOW}/workflow'"><div>Zuno Confluence Search</div><small>WORKFLOW</small></div></main>`);
+<div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${FLOW}/workflow'"><div>Zuno Confluence Search</div><small>WORKFLOW</small></div></div></main>
+<script>setTimeout(() => { document.getElementById("skeleton").remove(); document.getElementById("cards").hidden = false; }, 3000);   // skeleton cards first, as on 2026-11-16</script>`);
 const csrf = `(document.cookie.split("; ").map((c) => c.split("=")).find(([n]) => n === "csrf_token") || [])[1] || ""`;
 const AGENT_PAGE = shell(`<main><h1>Zuno Agent</h1><div id="spin" role="status">loading</div><section id="editor" hidden><button>Publish</button><h2>Debug & Preview</h2><div id="thread"></div>
 <textarea placeholder="Talk to Bot" id="in" style="width:500px"></textarea></section></main>
@@ -113,7 +114,11 @@ http.createServer((req, res) => {
   if (/\/workflows\/draft$|\/model-config$/.test(u.pathname) && req.method !== "GET") { saved += 1; return json(200, {}); }
   if (u.pathname === "/signin") { res.writeHead(302, { Location: "/" }); return res.end(); }
   // As Dify on 2026-11-16: the first page is Home, with Studio in its left menu and the web apps listed.
-  if (u.pathname === "/") return html(shell(`<main><h1>Welcome back, x</h1><h2>Recents</h2><div>Zuno Agent</div><div>Zuno Confluence Search</div></main>`));
+  // Its Recents cards carry the applications' names and open the WEB APP, not the editor (the trap of 2026-11-16).
+  if (u.pathname === "/") return html(shell(`<main><h1>Welcome back, x</h1><h2>Recents</h2><div onclick="location.href='/webapp/agent'">Zuno Agent</div><div onclick="location.href='/webapp/flow'">Zuno Confluence Search</div></main>`));
+  if (u.pathname.startsWith("/webapp/")) return html(shell(`<main><h1>Run Once</h1><button>Execute</button></main>`));
+  // An address typed for Studio lands on Home, as a guess of what happened on 2026-11-16: Studio is reached by its link.
+  if (u.pathname === "/apps" && req.headers["sec-fetch-site"] === "none") { res.writeHead(302, { Location: "/" }); return res.end(); }
   if (u.pathname === "/apps") return html(APPS);
   if (u.pathname === `/app/${AGENT}/configuration`) return html(AGENT_PAGE);
   if (u.pathname === `/app/${FLOW}/workflow` || u.pathname === `/app/${DOCS}/workflow`) return html(FLOW_PAGE);

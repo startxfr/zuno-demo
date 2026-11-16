@@ -61,7 +61,20 @@ const CHAT_BODY = prompts["3:00"].match(/-d '(.*)'$/)[1];
 const esc = (text) => String(text).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
 // The rows of a key list, whatever its envelope, and the ids of those that are not revoked.
-const rows = (body) => (Array.isArray(body) ? body : body && [body.data, body.items, body.api_keys, body.keys, body.object === "list" ? body.data : null].find(Array.isArray)) || null;
+// (the search answers {data: ...} whose value is not itself the list, rescout of 2026-11-16: the list is looked for
+// one level deeper too; an envelope that holds nothing, null or {}, is an empty list.)
+const NAMES = ["data", "items", "api_keys", "apiKeys", "keys", "results", "object_list"];
+function rows(body, depth = 0) {
+  if (Array.isArray(body)) return body;
+  if (body === null || body === undefined) return depth ? [] : null;
+  if (typeof body !== "object") return null;
+  for (const name of NAMES) if (Array.isArray(body[name])) return body[name];
+  if (depth < 2) for (const name of NAMES) if (name in body) { const inner = rows(body[name], depth + 1); if (inner) return inner; }
+  return depth && !Object.keys(body).length ? [] : null;
+}
+// The shape of an answer, two levels of key names and the kind of each value: never a value.
+const shape = (body, depth = 0) => (Array.isArray(body) ? `list(${body.length})` : body === null ? "null" : typeof body !== "object" ? typeof body
+  : depth >= 2 ? "object" : Object.fromEntries(Object.keys(body).slice(0, 12).map((key) => [key, shape(body[key], depth + 1)])));
 const strictId = (row) => String(row.id || row.key_id || row.keyId || row.jti || "");
 const idOf = (row) => strictId(row) || String(row.name || "");
 // Is this text on screen as a whole text of its own, anywhere (an <option> of a closed select is not)?
@@ -84,14 +97,14 @@ async function openKeys(page, state) {
   if (!response) throw new Error("the portal fetched no key list (no GET whose path holds api-keys, no POST to api-keys/search): the take could not tell what it creates");
   const body = await response.json().catch(() => null);
   const list = rows(body);
-  if (!list) throw new Error(`the portal's key list is not a list (its answer holds: ${body && typeof body === "object" ? Object.keys(body).slice(0, 10).join(", ") : typeof body})`);
+  if (!list) throw new Error(`the portal's key list is not a list (its answer's shape: ${JSON.stringify(shape(body)).slice(0, 200)})`);
   // The same request is made again later to read the list: its address, its method, its body and its own headers
   // (never logged; the session's cookies are the browser's).
   const request = response.request();
   const headers = Object.fromEntries(Object.entries(await request.allHeaders()).filter(([name]) => /^(content-type|accept|authorization|x-)/i.test(name)));
   state.list = { url: response.url(), method: request.method(), data: request.postData() || undefined, headers };
   state.keysPath = new URL(response.url()).pathname.replace(/\/search\/?$/i, "");
-  state.listShape = { method: request.method(), path: new URL(response.url()).pathname, envelope: Array.isArray(body) ? [] : Object.keys(body).slice(0, 10),
+  state.listShape = { method: request.method(), path: new URL(response.url()).pathname, envelope: shape(body),
                       search_body_keys: (() => { try { return Object.keys(JSON.parse(request.postData() || "{}")); } catch { return []; } })() };
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   return list;

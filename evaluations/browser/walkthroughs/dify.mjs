@@ -56,9 +56,21 @@ export async function owned({ page, state }) {
 }
 
 export async function run({ page, base, mark, log, state }) {
-  const shown = await wordsOnScreen(page, Object.values(APPS).map((name) => new RegExp(name)));
-  const hidden = Object.keys(shown).filter((name) => !shown[name]);
-  if (hidden.length) throw new Error(`Studio does not show ${hidden.join(", ")} on screen`);
+  // Studio draws skeleton cards first: its three applications are waited for, right of the left menu (which names
+  // the web apps too), a minute.
+  const cards = async () => {
+    const missing = [];
+    for (const name of Object.values(APPS)) {
+      const named = page.getByText(name, { exact: true });
+      let seen = false;
+      for (let i = 0; i < Math.min(await named.count(), 10) && !seen; i += 1) { const box = await named.nth(i).boundingBox().catch(() => null); seen = Boolean(box && box.width > 0 && box.x >= 260); }
+      if (!seen) missing.push(name);
+    }
+    return missing;
+  };
+  await waitUntil(page, { what: "Studio's cards", timeoutMs: 60000, done: async () => !(await cards()).length || undefined })
+    .catch(async () => { throw new Error(`Studio does not show the card of ${(await cards()).join(", ")} within a minute`); });
+  await page.waitForTimeout(800);
   await mark("studio");
 
   await difyOpen(page, base, APPS.agent, { changes, ready: dify.CHAT_INPUT });
@@ -73,8 +85,7 @@ export async function run({ page, base, mark, log, state }) {
   if (!answer.some((line) => line && !line.includes(prompts["0:45"]))) throw new Error("the Agent's answer shows no text");
   await mark("q-done");
 
-  await page.goto(`${base}/apps`);
-  await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });
+  await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });   // back to Studio by its own link
   const runs = await difyRuns(page, state.apps[APPS.workflow].id);
   await mark("workflow");
   const open = await firstVisible(page, dify.RUN);
@@ -128,8 +139,7 @@ export async function scout({ page, base, step, state }) {
              controls: (await describe(page, "main, body", 60)).filter((el) => el.attrs.placeholder || el.attrs["aria-label"]).slice(0, 30) };
   });
   await step("workflow", async () => {
-    await page.goto(`${base}/apps`);
-    const address = await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });
+    const address = await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });   // back to Studio by its own link, as a take
     const open = await firstVisible(page, dify.RUN);
     return { url: address.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>"), run_selector: open ? open.matched : null,
              words: await wordsOnScreen(page, [/confluence\.page\.search/, /Summarise/, /Start/, /End/, /Test Run/, /Publish/]) };
