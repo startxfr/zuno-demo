@@ -12,7 +12,9 @@ record_notice: >-
   two recorded browser sessions: on Dify (consultant-02 at the front door, then Dify's single administrator, a second
   credential typed by the recorder and never shown) one jailbreak sentence is sent to Zuno Agent, one Agent turn on
   consultant-02's budget; it leaves ONE guardrails detection in the platform's metrics and the gateway's log, which
-  is the demo's proof and cannot be removed; the Agent's conversation is deleted at the end when Dify lists it; then
+  is the demo's proof and cannot be removed; the Agent's conversation is deleted at the end when Dify lists it; no configuration is
+  sent to Dify and the editor's saves are refused, but the Zuno Agent's edited date moves at the turn (Dify's server
+  does it); then
   ai-ops-01 on Grafana, read only (sign-in through OpenShift and Keycloak; if OpenShift shows its Authorize Access
   page for Grafana's proxy the take approves it, and Grafana's product announcement, if it shows, is closed by its
   cross, which stores in Grafana's user storage of ai-ops-01 that the notice was seen)

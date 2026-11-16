@@ -20,6 +20,10 @@ import { click, firstVisible, read, waitUntil } from "./_helpers.mjs";
 
 export const dify = {
   url: (domain) => `https://dify.${domain}`,
+  // The declared effect of an Agent turn (measured on three takes of 2026-11-16, the owner's decision of that day):
+  // the card of Zuno Agent reads "Edited at" the minute of the turn, although the browser sent no configuration (the
+  // take of 21:50 sent login, chat-messages, the workflow run and the conversation's delete, nothing else).
+  TURN_CHANGE: "an Agent turn in Dify's Debug & Preview moves the Zuno Agent's edited date (Dify's server does it; no configuration is sent by the browser)",
   ADMIN: "dify-admin@zuno.local",   // the page: Dify's single local administrator; not a secret
   SECRET: "DIFY_ADMIN_PASSWORD",    // the environment variable the recorder reads (walkthrough `secrets`)
   EMAIL: ["input#email", "input[type='email']", "input[name='email']"],                                   // guess

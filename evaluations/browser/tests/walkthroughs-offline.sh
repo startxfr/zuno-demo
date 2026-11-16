@@ -68,7 +68,8 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
+turn = "an Agent turn in Dify\x27s Debug & Preview moves the Zuno Agent\x27s edited date"
+declared = {"dify": [turn], "kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": [turn] + grafana, "quotas": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY

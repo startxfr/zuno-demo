@@ -12,8 +12,9 @@
 //
 // What it costs and leaves: one Agent turn and one workflow run, model and tool calls made as consultant-02 through
 // the token proxy (its budget). The Agent's conversation is deleted by its id when Dify's API lists it. The
-// workflow's run stays in the application's run log: Dify has no way to delete one. The applications themselves are
-// never changed: the editor's own saves are refused before they leave the browser (_dify.mjs).
+// workflow's run stays in the application's run log: Dify has no way to delete one. No configuration is sent to
+// Dify: every write but the few a take needs is refused in the browser (_dify.mjs). The Agent's edited date moves
+// all the same at each turn: Dify's server does it; it is the declared effect (`changes`).
 //
 // The answer shows real Confluence page titles of the space SXSI: the owner accepts them on a public picture
 // (2026-11-16). NOTHING was seen live when this was written: every selector is a guess; scout() reports what is there,
@@ -27,7 +28,8 @@ export const page = "docs/demo/scenarios/experiences/dify.md";
 export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "studio", "agent", "q-sent", "q-done", "workflow", "run-form", "run-done", "end"];
 export const motion_from = "studio";   // the two sign-in forms are never shown as motion
-export const changes = [];
+// The one declared effect: see dify.TURN_CHANGE (_dify.mjs).
+export const changes = [dify.TURN_CHANGE];
 export const prompts = { "0:45": "Find our onboarding pages in Confluence", "2:30": "onboarding" };
 export const url = dify.url;
 export const sends = dify.sends;

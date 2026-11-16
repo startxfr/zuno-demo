@@ -11,7 +11,8 @@ record_notice: >-
   credential, typed by the recorder, never shown); one Zuno Agent turn and one run of Zuno Confluence Search, model
   and tool calls made as consultant-02 on its budget; real Confluence page titles show in the answers; the Agent's
   conversation is deleted at the end when Dify lists it, but the workflow's run stays in Dify's run log, which
-  cannot be deleted; the applications are not changed (the editor's own saves are refused in the browser); traces
+  cannot be deleted; no configuration is sent to Dify and the editor's own saves are refused in the browser, but the Zuno Agent's
+  edited date moves at each Agent turn (Dify's server does it); traces
   and metrics of the calls remain, as for any use
 target_seconds: [45, 60]
 width: 960
