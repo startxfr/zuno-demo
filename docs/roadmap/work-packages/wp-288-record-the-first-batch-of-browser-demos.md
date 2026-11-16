@@ -1,6 +1,6 @@
 # WP-288: Record the first batch of browser demos
 
-- **State:** Not started
+- **State:** Done (2026-11-16)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-286](wp-286-improve-the-recording-chain-and-reprove-it-on-open-webui.md), [WP-287](wp-287-record-terminal-demos-as-real-sessions-checked-as-text.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -34,3 +34,24 @@ The first-run wizard of kagent stops the `kagent` scout. The owner allowed the *
 change of the walkthrough. The click sends a `POST /` to kagent. What kagent stores because of it is not known. The
 decision is stated in the guard summary of the take, and the stored effect stays an open point.
 
+## Result (2026-11-16)
+
+The four demos are recorded, reviewed and published on `devel`. Facts are in the
+[sprint evidence](../evidence/wp-289-gif-sprint-2026-11-16.md).
+
+| Demo | Take | Published in | Owner's go |
+|---|---|---|---|
+| `kagent` | `kagent-20261116-112558` | `6b130198` | the advance go "Go de publication pour kagent, unifai-live-rag et lightspeed" |
+| `unifai-live-rag` | `unifai-live-rag-20261116-104643` | `2df2bf90` | "Les 12" at about 13:05 CET, with the earlier session titles visible (7.2 MB) |
+| `identity-personas` | `identity-personas-20261116-101640` | `517a92ce` | "Les 12" |
+| `model-serving-llmd-mig` | `model-serving-llmd-mig-20261116-095927` | `21bca7e2` | "Les 12" |
+
+The `kagent` GIF also stands on a declared change: the **Skip wizard** click (decision above). The click sends one `POST` that a plain
+reload also sends; the browser key is `kagent-onboarding` (as relayed from the scout). What kagent stores on the server is still
+not known: an open point, not a blocker. `identity-personas` shows the contrast by a question, one chat per persona, deleted by
+its id: `consultant-02` gets six tool names and `sale-01` three. `unifai-live-rag` is the pilot page
+`docs/demo/unifai-live-rag.md`, not a page of the scenario catalogue. The first take of `model-serving-llmd-mig` was replaced by a
+re-take whose commands print no node name.
+
+The acceptance holds: each demo has a scout, a take that lists what it created and cleaned, a reviewed set of images with a stated
+number of sampled frames, and a GIF under 8 MB. The owner's go is given in the owner's own words and relayed by `zuno-demo-reorg`.
