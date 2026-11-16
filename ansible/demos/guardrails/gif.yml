@@ -24,7 +24,8 @@ fps: 10
 moments:
   - {take: agent, still: login, hold: 3, caption: "Sign in with the company account at the door"}
   - {take: agent, still: agent, hold: 5, step: "0:00", caption: "0:00  One gateway, the same detectors for every experience"}
-  - {take: agent, from: q-sent, to: q-done, fit: 8, hold: 7, step: "0:45", caption: "0:45  A classic jailbreak: not blocked today, but seen"}
+  - {take: agent, from: q-sent, to: q-done, fit: 8, hold: 2, step: "0:45", caption: "0:45  A classic jailbreak: not blocked today, but seen"}
+  - {take: agent, still: q-done, hold: 6, step: "0:45", caption: "0:45  The model itself declines; the gateway blocked nothing"}
   - {take: dashboard, still: dashboard, hold: 4, caption: "The platform operator's view, one minute later"}
   - {take: dashboard, still: detections, hold: 12, step: "2:00", caption: "2:00  The gateway recorded a detection for Dify"}
   - {take: dashboard, still: end, hold: 6, step: "4:15", caption: "Today they watch and record; blocking is one policy switch"}
