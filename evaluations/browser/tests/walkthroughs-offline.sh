@@ -39,6 +39,7 @@ dify() { local name="$1"; shift; take dify fake-dify.mjs 8094 "$name" DIFY_ADMIN
 guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafana.mjs" 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret RECORD_BASE_URL_DIFY=http://127.0.0.1:8094 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095 "$@"; }
 agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
 trace() { take observability-trace "fake-unifai.mjs fake-jaeger.mjs" 8097 "$@" FAKE_TEAM_MODE=1 RECORD_BASE_URL_TEMPO=http://127.0.0.1:8093; }
+maas() { take maas-portal-api-keys fake-maas-portal.mjs 8092 "$@" RECORD_BASE_URL=http://127.0.0.1:8092/maas-consumer-portal RECORD_BASE_URL_MAAS=http://127.0.0.1:8092/zuno-ai-run/gpt-oss-20b; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -849,7 +850,48 @@ out="$(genai g-create FAKE_CREATE_ONLY=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "genai: a project with no playground fails the take, Create playground never pressed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*shows \"Create playground\" instead of its playground' <<<\"\$0\" && grep -q 'left: {\"answers\":0,\"writes\":0,' <<<\"\$0\"" "$out"
 fi
+if wanted maas-portal-api-keys; then
+echo "== maas-portal-api-keys (a secret created during the take)"
+out="$(maas m-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "maas: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "maas: a scout creates no key" grep -q 'left: {"keys":1,"live":1,"checks":0}' <<<"$out"
+expect "maas: scout.json reports the list's shape and the dialog, no key value" scouted m-scout '
+assert list(steps) == ["enter", "owned", "portal", "keys", "create-dialog", "closed"], list(steps)
+assert steps["keys"]["list_path"] == "/maas-consumer-portal/api/v1/api-keys" and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
+assert steps["create-dialog"]["subscription_on_screen"] is True and steps["create-dialog"]["submit_selector"] and steps["create-dialog"]["name_selector"], steps["create-dialog"]
+assert "sk-oai-" not in json.dumps(s)
+'
+out="$(maas m-pass 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "maas: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "maas: its key is revoked (one more key, no more live key)" grep -q 'left: {"keys":2,"live":1,"checks":0}' <<<"$out"
+expect "maas: the log says the key was revoked and proved refused" grep -q 'revoked (delete HTTP 204); the gateway now answers 403 with it' <<<"$out"
+expect "maas: markers.json follows the contract" markers m-pass '
+assert names == ["login", "portal", "keys", "create-form", "created", "calls", "answer", "end"], names
+assert m["persona"] == "ai-dev-01" and m["status"] == "pass" and len(m["created"]) == 1 and m["created"][0]["kind"] == "api-key" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+'
+expect "maas: the key the server made is in no file of the take and in no line of its output; the page drew the mask" python3 - "$work/m-pass" "$out" <<'PY'
+import pathlib, re, sys
+d = pathlib.Path(sys.argv[1])
+key = re.compile(rb"sk-oai-[A-Za-z0-9_-]{8,}")
+for f in d.rglob("*"):
+    if f.is_file() and f.suffix in (".json", ".txt", ".log"): assert not key.search(f.read_bytes()), f
+assert not key.search(sys.argv[2].encode()), "a key in the recorder's output"
+assert "the portal received a masked value" in sys.argv[2]
+PY
+out="$(maas m-refused FAKE_REFUSE_REVOKE=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "maas: a key that still answers after its revoke fails the take and names it, never its value" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the key k-[0-9a-f]* named zuno-demo-gif-[0-9]* was NOT revoked: its delete answered HTTP 403 and the gateway still answers 200 with it; revoke it by hand' <<<\"\$0\" && ! grep -q 'sk-oai-[A-Za-z0-9_-]\{8,\}' <<<\"\$0\"" "$out"
+out="$(maas m-noid FAKE_NO_ID=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "maas: a create answer without an id: the key is found by this take's own name and revoked" bash -c "test $rc -eq 0 && grep -q 'left: {\"keys\":2,\"live\":1,' <<<\"\$0\"" "$out"
+out="$(maas m-reread FAKE_REREAD=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "maas: a portal that sends the shown key back to its server stops the take, and the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/api/v1/check)' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":1}' <<<\"\$0\"" "$out"
+fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
+expect "no key created during a take is in any text file of any take" bash -c "! grep -r -l -I -E 'sk-oai-[A-Za-z0-9_-]{8,}' '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 exit $failed

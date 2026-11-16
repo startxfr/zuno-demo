@@ -1,0 +1,27 @@
+---
+# maas-portal-api-keys: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written BEFORE
+# the first take: tune it with `make demo gif maas-portal-api-keys` once a take exists.
+# `make demo record maas-portal-api-keys` takes the 5-minute version as ai-dev-01
+# (evaluations/browser/walkthroughs/maas-portal-api-keys.mjs).
+# Markers, in order: login, portal, keys, create-form, created, calls, answer, end.
+# The key is never on a picture: the recorder replaces it by a masked value before the portal receives it. The
+# moments `calls` and `answer` are a plain page of the calls MADE BY THE RECORDER with that key: their captions say
+# so. Row 4:15 is words: the close is a caption on the last screen.
+record_notice: >-
+  a recorded browser session as ai-dev-01 on the Red Hat AI portal: it creates ONE API key on the subscription
+  gpt-oss-20b-ocp-ai-dev and revokes it by its id at the end, pass or fail, then proves the revoke (the gateway must
+  refuse the key; the take fails and names the key otherwise); the portal's shown-once dialog displays a masked
+  value because the recorder replaced the key before the page received it: the key is in no picture, file or log;
+  the calls of rows 2:15 and 3:00 are made by the recorder with that key (two reads and one chat completion on
+  ai-dev-01's subscription) and their real results are drawn on a plain page, not a terminal; a revoked key may
+  stay listed as revoked; traces and metrics of the calls remain, as for any use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
+  - {still: portal, hold: 4, step: "0:00", caption: "0:00  The Red Hat AI portal"}
+  - {from: keys, to: created, fit: 8, hold: 6, step: "1:00", caption: "1:00  A key on my subscription: no ticket, no wait (masked here)"}
+  - {still: calls, hold: 8, step: "2:15", caption: "2:15  Calls made by the recorder: 401 without the key, 200 with it"}
+  - {still: answer, hold: 9, step: "3:00", caption: "3:00  Made by the recorder: any OpenAI-compatible tool works"}
+  - {still: end, hold: 5, step: "4:15", caption: "The platform keeps the models, the budget and the right to revoke"}

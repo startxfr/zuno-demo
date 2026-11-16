@@ -103,6 +103,9 @@ export function shapeProblems(walk) {
   if (walk.secrets !== undefined && (!Array.isArray(walk.secrets) || walk.secrets.some((n) => typeof n !== "string" || !/^[A-Z][A-Z0-9_]{2,}$/.test(n) || n === "PERSONA_PASSWORD"))) {
     problems.push("`secrets` must list the names of the environment variables that hold the other credentials the take types (e.g. DIFY_ADMIN_PASSWORD)");
   }
+  if (walk.creates !== undefined && (!Array.isArray(walk.creates) || walk.creates.some((n) => typeof n !== "string" || !/^[A-Z][A-Z0-9_]{2,}$/.test(n) || (walk.secrets || []).includes(n)))) {
+    problems.push("`creates` must list the names of the secrets the take creates and the recorder holds (e.g. MAAS_API_KEY)");
+  }
   return problems;
 }
 
@@ -266,6 +269,44 @@ async function typeSecret(page, target, name) {
   if ((await field.getAttribute("type")) !== "password") throw new Error(`${name} is typed only into a password field`);
   await field.fill(secrets.get(name));
 }
+// A secret CREATED during the take (an API key shown once): the walkthrough names it in `creates`. The recorder takes
+// it out of the creating call's RESPONSE before the page receives it: the page is given the same body with every
+// match of `pattern` replaced by `mask`, so the value is never in the page, hence in no frame, picture or video,
+// whatever the page does with it. The value joins the recorder's secrets (struck out of every line and file) and
+// the walkthrough never receives it: it gets {status, found, body} with the masked body. Install it BEFORE the click
+// that creates; it resolves when the call has answered.
+function interceptSecret(page, name, { url, method = "POST", pattern, mask }) {
+  if (!(walk.creates || []).includes(name)) throw new Error(`the walkthrough does not declare the created secret ${name} (\`creates\`)`);
+  if (!(url instanceof RegExp) || !(pattern instanceof RegExp) || typeof mask !== "string" || !mask) throw new Error("interceptSecret needs {url: RegExp, pattern: RegExp, mask: string}");
+  const every = new RegExp(pattern.source, "g");
+  if (every.test(mask)) throw new Error("the mask must not itself look like the secret");
+  let answered;
+  const result = new Promise((resolve) => { answered = resolve; });
+  const handler = async (route) => {
+    if (route.request().method() !== method) return route.continue();
+    const response = await route.fetch();
+    const text = await response.text();
+    const found = [...new Set(text.match(every) || [])];
+    found.forEach((value, i) => secrets.set(i ? `${name}#${i + 1}` : name, value));
+    const masked = text.replace(every, mask);
+    await route.fulfill({ response, body: masked });
+    let body = null;
+    try { body = JSON.parse(masked); } catch { /* not JSON */ }
+    answered({ status: response.status(), found: found.length, body });
+    return undefined;
+  };
+  page.route(url, handler);
+  return result;
+}
+// A call made BY THE RECORDER with a held secret (never by the page, never by the walkthrough): "{secret}" in a
+// header's value is replaced by it. Returns {status, text}: the answer's text, the secret struck out, 20,000
+// characters at most.
+async function fetchWithSecret(page, name, { url, method = "GET", headers = {}, body }) {
+  if (!secrets.get(name)) throw new Error(`no ${name} is held: nothing was created, or it is not declared`);
+  const filled = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, String(value).split("{secret}").join(secrets.get(name))]));
+  const response = await page.request.fetch(url, { method, headers: filled, data: body, timeout: 120000, failOnStatusCode: false });
+  return { status: response.status(), text: scrub(await response.text().catch(() => "")).slice(0, 20000) };
+}
 fs.mkdirSync(out, { recursive: true });
 
 async function keycloak(page, username) {
@@ -328,7 +369,8 @@ async function scoutOne(take, out) {
     return entry;
   };
   const ctx = { page, domain, log, step, take, persona: take.persona, state: { scout: true }, mark: async () => {},
-                keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name), base: process.env.RECORD_BASE_URL || walk.url(domain) };
+                keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name),
+                interceptSecret: (name, how) => interceptSecret(page, name, how), fetchWithSecret: (name, call) => fetchWithSecret(page, name, call), base: process.env.RECORD_BASE_URL || walk.url(domain) };
   try {
     // The same first two phases as a take: the sign-in, then what the persona owns (its count is all a scout keeps).
     const entered = await step("enter", async () => { await walk.enter(ctx); return {}; });
@@ -383,6 +425,7 @@ async function takeOne(take, out) {
   const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
   let ownedBefore = null;
   const ctx = { page, domain, mark, log, state, take, persona: take.persona, keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name),
+                interceptSecret: (name, how) => interceptSecret(page, name, how), fetchWithSecret: (name, call) => fetchWithSecret(page, name, call),
                 base: process.env.RECORD_BASE_URL || walk.url(domain) };
   const failures = [];
   try {
