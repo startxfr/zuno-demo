@@ -222,7 +222,10 @@ expect "identity: one scout.json per take, each as the page says, and takes.json
 import json, pathlib, sys
 d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
 assert t["status"] == "done" and [(x["name"], x["persona"], x["dir"], x["status"]) for x in t["takes"]] == [("consultant-02", "consultant-02", "consultant-02", "done"), ("sale-01", "sale-01", "sale-01", "done")], t
-assert not (d / "scout.json").exists()
+run = json.loads((d / "scout.json").read_text())   # the run's own scout.json, shaped like a single scout's
+assert run["status"] == "done" and run["takes"] == ["consultant-02", "sale-01"] and len(run["walkthrough_sha256"]) == 64 and run["changes"] == [], run
+assert [x["step"] for x in run["steps"]][:2] == ["consultant-02/enter", "consultant-02/owned"] and all(x["ok"] for x in run["steps"]), run["steps"]
+assert sum(1 for x in run["steps"] if x["step"].startswith("sale-01/")) == 7 and all((d / x["png"]).stat().st_size > 0 for x in run["steps"])
 for name, teams in (("consultant-02", ["agent-arkos", "agent-tekos", "consultant"]), ("sale-01", ["agent-comage", "sales"])):
     s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
     assert s["take"] == name and s["persona"] == name and s["status"] == "done" and s["refused_requests"] == [], s

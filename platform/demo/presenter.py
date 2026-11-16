@@ -664,7 +664,12 @@ def walkthrough_persona(demo_id: str, root: pathlib.Path) -> str:
     except OSError:
         text = ""
     found = re.search(r"""export\s+const\s+persona\s*=\s*["']([^"']+)["']""", text)
-    return found.group(1) if found else "the walkthrough's persona"
+    if found:
+        return found.group(1)
+    # Several takes, one per persona (`export const takes = [{ name, persona }, ...]`): all of them, in order.
+    takes = re.search(r"export\s+const\s+takes\s*=\s*\[(.*?)\];", text, re.S)
+    personas = re.findall(r"""persona:\s*["']([^"']+)["']""", takes.group(1)) if takes else []
+    return " then as ".join(personas) if personas else "the walkthrough's persona"
 
 
 def cmd_scout(args: List[str]) -> int:

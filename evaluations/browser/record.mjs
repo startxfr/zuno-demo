@@ -410,6 +410,23 @@ const bad = results.filter((r) => r.status === "fail");
 if (takes.length > 1 || takes[0].name) {
   fs.writeFileSync(path.join(out, "takes.json"), JSON.stringify({ demo: id, takes: results, status: bad.length ? "fail" : results[0].status }, null, 2) + "\n");
 }
+// A scout of several takes also leaves ONE scout.json at the top of OUT, shaped like a single scout's: the run's
+// status, the walkthrough's hash and `changes`, and every take's steps as `<take>/<step>` (ok, error, selector, png).
+// What reads "the newest scout of this demo" (make demo record) then needs nothing more.
+if (scouting && (takes.length > 1 || takes[0].name)) {
+  const parts = results.map((r) => {
+    try { return { name: r.name, ...JSON.parse(fs.readFileSync(path.join(out, r.name, "scout.json"), "utf8")) }; } catch { return { name: r.name, steps: [] }; }
+  });
+  fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify({
+    demo: id, takes: results.map((r) => r.name), persona: results.map((r) => r.persona).join(", "), viewport: walk.viewport,
+    started: (parts[0] || {}).started || "", when: new Date().toISOString(), walkthrough_sha256: walkthroughHash(id), changes: walk.changes,
+    steps: parts.flatMap((part) => (part.steps || []).map((s) => ({ step: `${part.name}/${s.step}`, ok: s.ok === true, ...(s.error ? { error: s.error } : {}),
+                                                                   ...(s.selector ? { selector: s.selector } : {}), png: s.png ? `${part.name}/${s.png}` : null }))),
+    refused_requests: parts.flatMap((part) => part.refused_requests || []),
+    status: bad.length ? "fail" : "done",
+    detail: bad.length ? `failed: ${bad.map((r) => r.name).join(", ")}` : `${results.length} takes`,
+  }, null, 2) + "\n");
+}
 const word = scouting ? "SCOUT:" : "RESULT:";
 if (takes.length === 1 && !takes[0].name) console.log(`${word} ${results[0].detail}`);
 else if (bad.length) console.log(`${word} ${scouting ? "failed" : "FAIL"} ${bad.map((r) => `${r.name}: ${r.detail.replace(/^(FAIL|failed) /, "")}`).join("; ")}`);

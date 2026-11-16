@@ -50,6 +50,35 @@ def cut(*moments, **changes) -> dict:
     return data
 
 
+def takes(**changes) -> dict:
+    """A recording of two takes shaped like identity-personas' (ADR-0618): name -> its markers.json."""
+    at = {"login": 1.0, "unifai": 5.0, "workspaces": 8.0, "webui": 12.0, "q-sent": 15.0, "q-done": 24.0, "end": 25.0}
+    made = {}
+    for name in ("consultant-02", "sale-01"):
+        made[name] = markers(at=dict(at), demo="identity-personas", persona=name, take=name, motion_from="unifai",
+                             created=[{"kind": "chat", "id": f"c-{name}"}], **changes.get(name, {}))
+        made[name]["markers"] = sorted((m for m in made[name]["markers"] if m["name"] in at), key=lambda m: m["t"])
+    return made
+
+
+def write_takes(directory: pathlib.Path, recording: dict) -> None:
+    """The files a recorder run of several takes leaves: takes.json and one sub-directory per take."""
+    (directory / "takes.json").write_text(json.dumps({"demo": "identity-personas", "status": "pass", "takes": [
+        {"name": name, "persona": m["persona"], "dir": name, "status": "pass", "detail": "PASS"} for name, m in recording.items()]}))
+    for name, m in recording.items():
+        (directory / name).mkdir()
+        (directory / name / "markers.json").write_text(json.dumps(m))
+        (directory / name / "recording.webm").write_bytes(b"webm")
+        for marker in m["markers"]:
+            (directory / name / marker["png"]).write_bytes(b"png")
+
+
+TWO = [{"take": "consultant-02", "still": "workspaces", "hold": 4, "caption": "consultant-02: three workspaces"},
+       {"take": "sale-01", "still": "workspaces", "hold": 4, "caption": "sale-01: two workspaces"},
+       {"take": "consultant-02", "from": "q-sent", "to": "q-done", "fit": 6, "hold": 3, "caption": "Six tools"},
+       {"take": "sale-01", "from": "q-sent", "to": "q-done", "fit": 6, "hold": 3, "caption": "Three tools"}]
+
+
 def refused(test: unittest.TestCase, cut_list: dict, take: dict, needle: str, times=TIMES) -> None:
     with test.assertRaises(gif.CutError) as ctx:
         gif.plan("open-webui", cut_list, take, times)
@@ -474,6 +503,93 @@ class Verbs(unittest.TestCase):
         rc, _, err = self.run_main("scout", "vault-pki")
         self.assertEqual(rc, 2)
         self.assertIn("is a terminal demo", err)
+
+
+class SeveralTakes(unittest.TestCase):
+    """A recording of several takes, one per persona (identity-personas): a moment names its take."""
+
+    def plan(self, moments=None, recording=None):
+        recording = recording or takes()
+        return gif.plan("identity-personas", cut(*(moments or TWO)), next(iter(recording.values())), None, takes=recording)
+
+    def refused(self, needle, moments=None, recording=None):
+        with self.assertRaises(gif.CutError) as ctx:
+            self.plan(moments, recording)
+        self.assertTrue(any(needle in r for r in ctx.exception.reasons), ctx.exception.reasons)
+
+    def test_each_moment_is_cut_from_its_own_take(self):
+        p = self.plan()
+        self.assertEqual([m.take for m in p.moments], ["consultant-02", "sale-01", "consultant-02", "sale-01"])
+        self.assertEqual(p.moments[2].label(), "consultant-02: 15.0-24.0 s x1.5")
+        argv = gif.ffmpeg_argv(p, {}, "identity-personas.gif", takes())
+        inputs = [argv[i + 1] for i, a in enumerate(argv) if a == "-i"]
+        self.assertEqual(inputs, ["/rec/consultant-02/workspaces.png", "/rec/sale-01/workspaces.png",
+                                  "/rec/consultant-02/recording.webm", "/rec/sale-01/recording.webm"])
+        self.assertEqual(argv[-1], "/rec/identity-personas.gif")
+
+    def test_a_moment_must_name_one_of_the_takes(self):
+        self.refused("moment 1: `take` must name one of the recording's takes (consultant-02, sale-01)",
+                     [dict(TWO[0], take="ai-ops-01")] + TWO[1:])
+        self.refused("moment 2: `take` must name one of the recording's takes", [TWO[0], {k: v for k, v in TWO[1].items() if k != "take"}])
+
+    def test_a_single_take_refuses_the_key(self):
+        refused(self, cut({"take": "sale-01", "still": "home", "hold": 3, "caption": "x"}), markers(),
+                "`take` is for a recording of several takes")
+
+    def test_each_take_is_checked_on_its_own(self):
+        self.refused("take sale-01: the recording did not pass", recording=takes(**{"sale-01": {"status": "fail", "detail": "x"}}))
+        self.refused("take sale-01: the take did not clean what it created (chat c-sale-01)",
+                     recording=takes(**{"sale-01": {"cleaned": False}}))
+        self.refused("take consultant-02: what the persona owns changed during the take",
+                     recording=takes(**{"consultant-02": {"owned": {"before": 1, "after": 2, "same": False}}}))
+        # No motion before the take's own `motion_from`.
+        self.refused("moment 1: a motion segment cannot start before `unifai`",
+                     [{"take": "sale-01", "from": "login", "to": "unifai", "fit": 3, "caption": "x"}])
+
+    def test_the_takes_share_one_viewport(self):
+        self.refused("the takes do not share one viewport (consultant-02 1280x800, sale-01 1024x768)",
+                     recording=takes(**{"sale-01": {"viewport": {"width": 1024, "height": 768}}}))
+
+    def test_built_from_the_sub_directories_and_recorded_with_its_takes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = pathlib.Path(tmp) / "identity-personas-20261116-010000"
+            directory.mkdir()
+            write_takes(directory, takes())
+            self.assertEqual(list(gif.load_takes(directory)), ["consultant-02", "sale-01"])
+            self.assertEqual(gif.latest_recording("identity-personas", pathlib.Path(tmp)), directory)
+
+            def ffmpeg(argv, **kwargs):
+                (directory / "identity-personas.gif").write_bytes(b"x" * 1024)
+                return subprocess.CompletedProcess(argv, 0, stdout="")
+            with mock.patch.object(gif.shutil, "which", return_value="/usr/bin/podman"), \
+                    mock.patch.object(gif, "_duration", return_value=26.0):
+                gif.build("identity-personas", directory, cut(*TWO), runner=ffmpeg)
+            record = json.loads((directory / "identity-personas.gif.json").read_text())
+            self.assertEqual([t["name"] for t in record["takes"]], ["consultant-02", "sale-01"])
+            self.assertEqual(record["takes"][1]["created"], [{"kind": "chat", "id": "c-sale-01"}])
+            self.assertEqual([m["take"] for m in record["moments"]], ["consultant-02", "sale-01", "consultant-02", "sale-01"])
+            self.assertEqual(record["take"], directory.name)
+            # A file of one take missing: refused before ffmpeg, named with its take.
+            (directory / "sale-01" / "recording.webm").unlink()
+            with mock.patch.object(gif.shutil, "which", return_value="/usr/bin/podman"), self.assertRaises(gif.CutError) as ctx:
+                gif.build("identity-personas", directory, cut(*TWO), runner=ffmpeg)
+            self.assertIn("missing sale-01/recording.webm", ctx.exception.reasons[0])
+
+    def test_the_guard_notice_names_every_persona_of_a_walkthrough_with_takes(self):
+        self.assertEqual(presenter.walkthrough_persona("identity-personas", ROOT), "consultant-02 then as sale-01")
+        self.assertEqual(presenter.walkthrough_persona("open-webui", ROOT), "sale-01")
+
+    def test_the_identity_personas_cut_list_fits_its_page_and_two_takes(self):
+        cut_list = gif.load_cut_list(gif.cut_list_path("identity-personas"))
+        recording = takes()
+        p = gif.plan("identity-personas", cut_list, next(iter(recording.values())), gif.page_times("identity-personas"), takes=recording)
+        self.assertEqual(len(p.moments), 6)
+        self.assertTrue(40 <= p.seconds <= 60, p.seconds)
+        self.assertEqual({m.take for m in p.moments}, {"consultant-02", "sale-01"})
+
+    def test_a_single_take_recording_has_no_takes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(gif.load_takes(pathlib.Path(tmp)))
 
 
 if __name__ == "__main__":
