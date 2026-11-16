@@ -105,7 +105,7 @@ Page: the "(untested command)" mark on row 1:00 is lifted, because the take ran 
 - `main` still carries Playwright 1.55.1 while `devel` is pinned to 1.48.0 (see the incident above).
 - The AAP user `consultant-03`: demo333 is to confirm whether AAP created it.
 - Node names are visible in the published `model-serving-llmd-mig` GIF, accepted by the owner for this demo only.
-- **Dify, Zuno Agent's edited date (cause measured, content never compared).** The date moved three times on 2026-11-16 (18:42, 20:02 and 20:51 UTC), once per `dify` take at its Agent turn in Debug & Preview; opening the page moves nothing. The third take ran under the default-deny guard and no configuration write left the browser for the Agent: Dify's server moves the date when the Agent answers, or when its conversation is deleted (not separated). The comparison of the Agent's configuration with a reference is no longer needed for this cause; keep it only as "content never compared". Detail below.
+- **Dify, Zuno Agent's edited date (cause measured, content never compared; `dify` is published with the effect declared).** The date moved three times on 2026-11-16 (18:42, 20:02 and 20:51 UTC), once per `dify` take at its Agent turn in Debug & Preview; opening the page moves nothing. The third take ran under the default-deny guard and no configuration write left the browser for the Agent: Dify's server moves the date when the Agent answers, or when its conversation is deleted (not separated). The comparison of the Agent's configuration with a reference is no longer needed for this cause; keep it only as "content never compared". Detail below.
 
 ## Scouts of the remaining demos (as relayed)
 
@@ -301,7 +301,7 @@ The sizes and moments quoted in the two take sections above are those of the fir
 
 One `dify` take under the default-deny guard (the coder's `f974ada4`, in test). Its log lists every write sent and every write refused. The aim is to learn what moves the Zuno Agent's edited date. Cost: one Agent turn, and the date may move once more. The take needs the owner's go in demo333. The coder read upstream Dify's source: by that code a debug turn writes a conversation and a message, not the app (not our exact build). The cause is **not settled**.
 
-## Take: dify "to know" (measured, not published)
+## Take: dify "to know" (measured, published at 23:19 CET)
 
 Owner's go in demo333 ("Take dify to know"), as relayed. All times UTC.
 
@@ -322,5 +322,15 @@ The writer opened `studio.png` (the Studio frame at the take's start): the Zuno 
 
 **Owner's decision**, answered just before 21:55:25 CET in `zuno-demo-reorg`'s session (as relayed): **"Yes, declared effect"** for `dify` and `guardrails`. The moved date is declared as an effect of those takes.
 
-**Not published.** Sent to the owner; the publication waits for their go.
+**Published.** See the next section.
+
+## Published at 23:19 CET: dify
+
+On the owner's "go de publication de dify" (coordinator's log 23:18:57 CET; commit `00a57123` at 23:19:46, as relayed). The writer compared the file in the commit with the GIF the take directory holds now.
+
+| Demo | Commit | Take | File | SHA-256 |
+|---|---|---|---|---|
+| `dify` | `00a57123` | `dify-20261116-215039` | 2 379 935 bytes, 49.0 s as relayed | `27114b527b11...`, equal |
+
+The commit also adds the GIF to `dify.md`; the page declares the edited-date effect and the run log that stays. The caption says the page titles in the answers are real pages of the company's Confluence, as the owner allowed. The writer opened only `studio.png` of this take, not the frames of the GIF. No "(untested ...)" mark was left on `dify.md`, so none was lifted. The catalogue has 23 GIF files of 30 demos. WP-289 has 16 of 18; `guardrails` and `observability-trace` remain.
 
