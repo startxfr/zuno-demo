@@ -16,7 +16,7 @@
 // the dashboard's address, and for each panel whether it shows "No data" and the text it shows, so that the review
 // can say no real person's name is in a picture (the RAGAS panel lists the evaluation's questions).
 import { describe, wordsOnScreen } from "./_helpers.mjs";
-import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
+import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaSignIn, grafanaViewPanel, grafanaWrites } from "./_grafana.mjs";
 
 export const persona = "ai-ops-01";
 export const page = "docs/demo/scenarios/rhoai/evaluation-trustyai-evalhub.md";
@@ -33,11 +33,15 @@ export const url = grafana.url;
 export const sends = grafana.writes;
 
 const DASHBOARD = { uid: "zuno-trustyai", title: "TrustyAI evaluation & guardrails", from: "now-7d" };   // gitops/charts/grafana
+// Each panel is filmed alone over the page (its id in gitops/charts/grafana/templates/dashboard-trustyai.yaml): in the
+// dashboard's grid the tables are half a page wide and their last column, the one that matters, is cut off (the take
+// of 2026-11-16). `shows`: the column headers that must be drawn inside the window.
 const PANELS = [
-  { marker: "jobs", row: "0:45", title: "Garak / RAGAS job outcomes" },
-  { marker: "ragas", row: "1:30", title: "RAGAS scores (real UnifAI retrievals)" },
-  { marker: "garak", row: "2:30", title: "Garak attack success rate (jailbreak probes)" },
+  { marker: "jobs", row: "0:45", id: 4, title: "Garak / RAGAS job outcomes", shows: ["job", "succeeded", "failed"] },
+  { marker: "ragas", row: "1:30", id: 6, title: "RAGAS scores (real UnifAI retrievals)", shows: ["metric", "question", "score"] },
+  { marker: "garak", row: "2:30", id: 7, title: "Garak attack success rate (jailbreak probes)", shows: ["model", "probe", "attack success rate"] },
 ];
+const viewPanel = (page, base, panel) => grafanaViewPanel(page, base, DASHBOARD.uid, panel.id, panel.title, { from: DASHBOARD.from, shows: panel.shows });
 
 export async function enter(ctx) {
   ctx.state.writes = grafanaWrites(ctx.page);
@@ -54,9 +58,10 @@ export async function run({ page, base, mark, log, state }) {
   await page.getByText(DASHBOARD.title).first().waitFor({ timeout: 30000 });
   await mark("dashboard");
   for (const panel of PANELS) {
-    const shown = await grafanaPanel(page, panel.title);
+    const shown = await viewPanel(page, base, panel);
     if (shown.no_data) throw new Error(`the panel "${panel.title}" (row ${panel.row}) shows "No data": nothing to film; the scores are kept 30 days after a run`);
-    log(`panel "${panel.title}": ${shown.lines.length} lines of text, selector ${shown.selector}`);
+    if (shown.not_in_window.length) throw new Error(`the panel "${panel.title}" (row ${panel.row}) does not show ${shown.not_in_window.join(", ")} inside the window: the picture would not hold the row's proof`);
+    log(`panel "${panel.title}": ${shown.lines.length} lines of text, alone over the page (${shown.view})`);
     await page.waitForTimeout(800);
     await mark(panel.marker);
   }
@@ -79,7 +84,7 @@ export async function scout({ page, base, step, state }) {
              controls: (await describe(page, "body", 40)).filter((el) => el.attrs["aria-label"] || el.text).slice(0, 40) };
   });
   for (const panel of PANELS) {
-    await step(`panel-${panel.marker}`, async () => ({ row: panel.row, title: panel.title, ...(await grafanaPanel(page, panel.title)) }));
+    await step(`panel-${panel.marker}`, async () => ({ row: panel.row, title: panel.title, ...(await viewPanel(page, base, panel)) }));
   }
   await step("closed", async () => {
     const wrote = state.writes();

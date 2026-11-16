@@ -19,7 +19,7 @@
 // Open WebUI's selectors were seen live on 2026-11-15 (the picker's are the open-webui walkthrough's); Grafana's
 // chain and panel selectors are guesses (_grafana.mjs). scout() reports both, sends nothing and creates nothing.
 import { click, firstVisible, newText, onScreen, owui, owuiAnswered, owuiAsk, owuiChats, owuiDeleteChat, owuiHome, wordsOnScreen } from "./_helpers.mjs";
-import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
+import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaSignIn, grafanaViewPanel, grafanaWrites } from "./_grafana.mjs";
 
 export const takes = [
   { name: "chat", persona: "sale-01", markers: ["login", "home", "picker", "code-picked", "q-sent", "q-done", "end"], motion_from: "home" },
@@ -44,6 +44,10 @@ const PICKER = ["#model-selector-model-button", "button[aria-label^='Selected mo
 const MODELS = ["Zuno", "Zuno Code"];
 const DASHBOARD = { uid: "zuno-three-experiences", title: "Five experiences", from: "now-1h", client: "open-webui" };   // gitops/charts/grafana
 const PANEL = "Which provider served each experience (over range)";
+const PANEL_ID = 5;   // gitops/charts/grafana/templates/dashboard-three-experiences.yaml
+// The panel alone over the page: in the dashboard's grid its `provider` column, the proof, is cut off (2026-11-16).
+const viewPanel = (page, domain) => grafanaViewPanel(page, dash(domain), DASHBOARD.uid, PANEL_ID, PANEL,
+  { from: DASHBOARD.from, vars: { client: DASHBOARD.client }, shows: ["client", "provider", PROOF] });
 const PROOF = "mistral-codestral";        // the page: the code question went to Codestral
 const LOCAL = /local-[a-z0-9-]+/;         // the page: a local model for the warm-up question, if one was asked
 const WAIT_FOR_PROOF_MS = 240000;
@@ -116,16 +120,16 @@ async function runDashboard({ page, domain, mark, log, state }) {
   await mark("dashboard");
   // The first take's call reaches the dashboard about a minute after it was made: look, wait, load again.
   const deadline = Date.now() + WAIT_FOR_PROOF_MS;
-  let shown = await grafanaPanel(page, PANEL);
+  let shown = await viewPanel(page, domain);
   while (!shown.lines.some((line) => line.includes(PROOF)) && Date.now() < deadline) {
     log(`the panel does not name ${PROOF} yet: waiting`);
     await page.waitForTimeout(20000);
-    await openDashboard(page, domain);
-    shown = await grafanaPanel(page, PANEL);
+    shown = await viewPanel(page, domain);
   }
   if (shown.no_data || !shown.lines.some((line) => line.includes(PROOF))) {
     throw new Error(`the panel "${PANEL}" does not name ${PROOF} for ${DASHBOARD.client} within ${WAIT_FOR_PROOF_MS / 60000} minutes of the code question: the row's proof is not on screen`);
   }
+  if (shown.not_in_window.length) throw new Error(`the panel "${PANEL}" does not show ${shown.not_in_window.join(", ")} inside the window: the picture would not hold the row's proof`);
   const local = shown.lines.map((line) => (line.match(LOCAL) || [])[0]).find(Boolean);
   log(`the panel names ${PROOF}; a local model for ${DASHBOARD.client} in the hour: ${local || "NONE (nobody asked Zuno in Open WebUI in the last hour)"}`);
   await page.waitForTimeout(800);
@@ -153,7 +157,7 @@ export async function scout({ page, domain, step, state, take }) {
                words: await wordsOnScreen(page, [/Last 1 hour/, /open-webui/, /Same models, same routing/]) };
     });
     await step("panel-providers", async () => {
-      const shown = await grafanaPanel(page, PANEL);
+      const shown = await viewPanel(page, domain);   // not_in_window names mistral-codestral here: no question was asked yet
       return { title: PANEL, ...shown, names_codestral: shown.lines.some((l) => l.includes(PROOF)), names_a_local_model: shown.lines.some((l) => LOCAL.test(l)) };
     });
     await step("closed", async () => {

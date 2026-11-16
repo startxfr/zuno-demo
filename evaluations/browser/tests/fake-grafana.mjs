@@ -41,18 +41,29 @@ const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account
 ${process.env.FAKE_AUTHORIZE === "more" ? '<label><input type="checkbox" name="scope" value="user:full" checked> user:full</label><br>' : ""}
 <input type="submit" name="approve" value="Allow selected permissions"> <input type="submit" name="deny" value="Deny"></form>`);
 
+// A table panel: its header cells and its rows, each cell an element of its own (a take checks that a header is drawn
+// inside the window). In the dashboard's grid a panel is 420 px wide and its last column is cut off, as in Grafana on
+// 2026-11-16; alone over the page (viewPanel) it has the page's width. FAKE_NARROW=1: the last header is cut off (an ellipsis) even alone.
+const cell = (text) => `<span style="display:inline-block;width:150px;white-space:nowrap">${text}</span> `;
+const cut = (text) => `<span style="display:inline-block;width:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${text}</span> `;
+const table = (headers, rows) => `<div style="white-space:nowrap">${headers.map((h, i) => (process.env.FAKE_NARROW === "1" && i === headers.length - 1 ? cut(h) : cell(h))).join("")}</div>${rows.map((row) => `<div style="white-space:nowrap">${row.map(cell).join("")}</div>`).join("")}`;
+const section = (title, i, body, alone) => `<section data-testid="data-testid Panel header ${title}" data-i="${i}" style="border:1px solid #888;padding:8px;min-height:160px;overflow:hidden;width:${alone ? 1100 : 420}px"><header><h2>${title}</h2></header><div class="content">${body}</div></section>`;
+// viewPanel in the address: `panel-<id>`, as Grafana names it now (FAKE_VIEW=old: only the bare `<id>` is understood).
+const viewed = (u) => { const v = u.searchParams.get("viewPanel") || ""; const m = v.match(process.env.FAKE_VIEW === "old" ? /^(\d+)$/ : /^panel-(\d+)$/); return m ? Number(m[1]) : 0; };
+
+const GARAK = process.env.FAKE_NO_DATA === "1" ? null : [["mitigation.MitigationBypass", "qwen3.5-9b-wesh", "dan.DAN", "1.00"]];
 const PANELS = [
-  ["Exchanges evaluated, by outcome", ["clean 412", "detected 3"]],
-  ["Garak / RAGAS job outcomes", ["garak-security succeeded 1", "garak-smoke succeeded 1", "ragas-eval succeeded 1"]],
-  ["RAGAS scores (real UnifAI retrievals)", ["Comment configurer un cluster OpenShift ? faithfulness 0.91", "Comment configurer un cluster OpenShift ? llm_context_precision 0.83"]],
-  ["Garak attack success rate (jailbreak probes)", ["__GARAK__"]],
+  [1, "Exchanges evaluated, by outcome", ["outcome", "count"], [["clean", "412"], ["detected", "3"]]],
+  [4, "Garak / RAGAS job outcomes", ["job", "succeeded", "failed"], [["garak-security", "1", "0"], ["garak-smoke", "1", "0"], ["ragas-eval", "1", "0"]]],
+  [6, "RAGAS scores (real UnifAI retrievals)", ["metric", "question", "score"], [["faithfulness", "Comment configurer ?", "0.91"], ["llm_context_precision", "Comment configurer ?", "0.83"]]],
+  [7, "Garak attack success rate (jailbreak probes)", ["detector", "model", "probe", "attack success rate"], GARAK],
 ];
-const DASHBOARD = page("TrustyAI evaluation & guardrails - Grafana", `<header><h1>Zuno Platform / TrustyAI evaluation & guardrails</h1><span>Last 7 days</span> <span>ai-ops-01</span></header>
-<main><div class="react-grid-layout">${PANELS.map(([title], i) => `<div style="height:${i ? 520 : 300}px"></div>
-<section data-testid="data-testid Panel header ${title}" data-i="${i}" style="border:1px solid #888;padding:8px;min-height:160px"><header><h2>${title}</h2></header><div class="content"></div></section>`).join("")}
+const BODIES = PANELS.map(([, , headers, rows]) => (rows ? table(headers, rows) : "No data"));
+const dashboard = (only) => page("TrustyAI evaluation & guardrails - Grafana", `<header><h1>Zuno Platform / TrustyAI evaluation & guardrails</h1><span>Last 7 days</span> <span>ai-ops-01</span></header>
+<main><div class="react-grid-layout">${PANELS.map(([id, title], i) => (only && only !== id ? "" : `<div style="height:${only ? 20 : i ? 520 : 300}px"></div>${section(title, i, "", Boolean(only))}`)).join("")}
 <div style="height:600px"></div></div></main>
 <script>
-const rows = ${JSON.stringify(PANELS.map(([, lines]) => lines))};
+const bodies = ${JSON.stringify(BODIES)};
 if (${process.env.FAKE_STAR === "1"}) fetch("/api/user/stars/dashboard/uid/zuno-trustyai", { method: "POST" });
 // A panel queries and draws only once it is near the screen, like Grafana.
 const seen = new IntersectionObserver((entries) => {
@@ -61,14 +72,11 @@ const seen = new IntersectionObserver((entries) => {
     e.target.dataset.asked = "1";
     const content = e.target.querySelector(".content");
     content.innerHTML = '<div aria-label="Panel loading bar">loading</div>';
-    fetch("/api/ds/query", { method: "POST", body: "{}" }).then(() => setTimeout(() => {
-      content.innerHTML = "";
-      for (const line of rows[Number(e.target.dataset.i)]) { const p = document.createElement("div"); p.textContent = line; content.appendChild(p); }
-    }, 900));
+    fetch("/api/ds/query", { method: "POST", body: "{}" }).then(() => setTimeout(() => { content.innerHTML = bodies[Number(e.target.dataset.i)]; }, 900));
   }
 });
 document.querySelectorAll("section").forEach((s) => seen.observe(s));
-</script>`).replace("__GARAK__", process.env.FAKE_NO_DATA === "1" ? "No data" : "mitigation.MitigationBypass qwen3.5-9b-wesh 1.00");
+</script>`);
 
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
@@ -87,16 +95,17 @@ http.createServer((req, res) => {
   if (u.pathname === "/api/ds/query") return json(200, { results: {} });
   if (u.pathname.startsWith("/api/") && req.method !== "GET") { writes += 1; return json(200, {}); }
   if (u.pathname === "/") return html(page("Home - Grafana", `<main><h1>Welcome to Grafana</h1><span>ai-ops-01</span></main>`));
-  if (u.pathname.startsWith("/d/zuno-trustyai")) return html(DASHBOARD);
+  if (u.pathname.startsWith("/d/zuno-trustyai")) return html(dashboard(viewed(u)));
   if (u.pathname.startsWith("/d/zuno-three-experiences")) {
     // ai-gateway-routing: the Codestral row reaches the panel late, as a real call does: from the second load of the
-    // dashboard on (FAKE_NO_PROOF=1: never).
-    loads += 1;
-    const rows = ["open-webui local-gpt-oss-maas success 1"].concat(loads >= 2 && process.env.FAKE_NO_PROOF !== "1" ? ["open-webui mistral-codestral success 2"] : []);
+    // panel alone on (FAKE_NO_PROOF=1: never).
+    const only = viewed(u);
+    if (only) loads += 1;
+    const rows = [["open-webui", "success", "local-gpt-oss-maas"]].concat(loads >= 2 && process.env.FAKE_NO_PROOF !== "1" ? [["open-webui", "success", "mistral-codestral"]] : []);
+    const title = "Which provider served each experience (over range)";
     return html(page("Five experiences - Grafana", `<header><h1>Zuno Platform / Five experiences</h1><span>Last 1 hour</span> <span>client ${u.searchParams.get("var-client") || "All"}</span></header>
-<main><div class="react-grid-layout"><div style="height:700px"><h3>Same models, same routing</h3></div>
-<section data-testid="data-testid Panel header Which provider served each experience (over range)" style="border:1px solid #888;padding:8px"><header><h2>Which provider served each experience (over range)</h2></header>
-${rows.map((row) => `<div>${row}</div>`).join("")}</section><div style="height:600px"></div></div></main>`));
+<main><div class="react-grid-layout">${only && only !== 5 ? "" : `<div style="height:${only ? 20 : 700}px"><h3>Same models, same routing</h3></div>
+${section(title, 0, table(["client", "outcome", "provider"], rows), Boolean(only))}`}<div style="height:600px"></div></div></main>`));
   }
   return json(404, {});
 }).listen(port, "127.0.0.1");

@@ -347,9 +347,10 @@ chain = steps["chain"]["chain"]
 assert [c["step"] for c in chain] == ["proxy", "chooser", "keycloak", "grafana"] and steps["chain"]["authorize_shown"] is False, chain
 assert chain[0]["matched"].startswith("button:has-text") and chain[1]["matched"] == "a[title=\x27Log in with openshift\x27]", chain
 assert steps["owned"]["count"] == 0 and "from=now-7d" in steps["dashboard"]["url"] and steps["dashboard"]["title_on_screen"] is True, steps["dashboard"]
-for name, word in (("panel-jobs", "ragas-eval succeeded 1"), ("panel-ragas", "faithfulness"), ("panel-garak", "MitigationBypass")):
+for name, word, view in (("panel-jobs", "ragas-eval", "viewPanel=panel-4"), ("panel-ragas", "faithfulness", "viewPanel=panel-6"), ("panel-garak", "MitigationBypass", "viewPanel=panel-7")):
     p = steps[name]
     assert p["no_data"] is False and p["whole_panel"] is True and any(word in line for line in p["lines"]), p
+    assert p["view"] == view and p["not_in_window"] == [] and view in p["url"], p
     assert not any("loading" in line for line in p["lines"]), p["lines"]   # read after its query settled
 assert steps["closed"]["writes"] == 0
 '
@@ -382,6 +383,17 @@ expect "grafana: an Authorize Access page that asks for one more permission stop
 out="$(evalhub g-authorize-other FAKE_AUTHORIZE=other)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: an Authorize Access page of another client stops the take, nothing approved" bash -c "test $rc -eq 1 && grep -q 'the take stops there: the page is not the one the owner approved (not on it: grafana-oauth-proxy)' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-oldview FAKE_VIEW=old)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a Grafana that names a panel by its bare id is filmed all the same" bash -c "test $rc -eq 0 && grep -q 'alone over the page (viewPanel=4)' <<<\"\$0\"" "$out"
+out="$(evalhub g-narrow FAKE_NARROW=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a key column header that is cut off, even with the panel alone, fails the take before its marker" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the panel \"Garak / RAGAS job outcomes\" (row 0:45) does not show failed inside the window' <<<\"\$0\"" "$out"
+expect "grafana: that take stopped at the dashboard marker" markers g-narrow '
+assert names == ["login", "dashboard"], names'
+out="$(routing r-narrow FAKE_NARROW=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "routing: a provider column that is cut off fails the dashboard take" bash -c "test $rc -eq 1 && grep -q 'dashboard: .*does not show provider inside the window' <<<\"\$0\"" "$out"
 out="$(evalhub g-news FAKE_NEWS=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: the product announcement is closed and the take passes, nothing written" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
@@ -429,6 +441,7 @@ assert list(chat) == ["enter", "owned", "picker", "closed"] and chat["picker"]["
 assert list(dash) == ["enter", "owned", "chain", "dashboard", "panel-providers", "closed"], list(dash)
 assert "var-client=open-webui" in dash["dashboard"]["url"] and "from=now-1h" in dash["dashboard"]["url"], dash["dashboard"]
 assert dash["panel-providers"]["names_a_local_model"] is True and dash["panel-providers"]["names_codestral"] is False, dash["panel-providers"]
+assert dash["panel-providers"]["view"] == "viewPanel=panel-5" and dash["panel-providers"]["not_in_window"] == ["mistral-codestral"], dash["panel-providers"]
 assert json.loads((d / "scout.json").read_text())["status"] == "done"
 PY
 out="$(routing r-pass)"; rc=$?

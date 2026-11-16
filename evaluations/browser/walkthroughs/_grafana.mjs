@@ -225,11 +225,69 @@ export async function grafanaPanel(page, title, { timeoutMs = 60000 } = {}) {
            lines: lines.slice(0, 40).map((l) => l.slice(0, 120)) };
 }
 
+// Is this text drawn INSIDE the window, whole? Some element holding exactly it must have its box in the window, not be
+// cut by its own cell (an ellipsis) and be the thing on top at its centre. A panel's text is on the page long before
+// it is in the picture: the takes of 2026-11-16 passed with their key column cut off on the right.
+export async function grafanaInWindow(page, text) {
+  const hits = page.getByText(text, { exact: true });
+  const view = page.viewportSize();
+  const count = Math.min(await hits.count(), 30);
+  for (let i = 0; i < count; i += 1) {
+    const hit = hits.nth(i);
+    const box = await hit.boundingBox().catch(() => null);
+    if (!box || box.width < 1 || box.height < 1 || box.x < 0 || box.y < 0 || box.x + box.width > view.width || box.y + box.height > view.height) continue;
+    const whole = await read(hit, (el) => {
+      if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== "visible") return false;
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return Boolean(top) && (top === el || el.contains(top) || top.contains(el));
+    }).catch(() => false);
+    if (whole) return true;
+  }
+  return false;
+}
+
+// Open ONE panel of a dashboard over the whole page (Grafana's "view panel" mode, by the address only: nothing is
+// saved), so a table has the page's width, and read it as grafanaPanel() does. `shows`: the texts that must be drawn
+// inside the window (column headers, the proof); the panel is refused when one is not, or when "No data" shows.
+// Grafana names the panel `panel-<id>` in the address since its "scenes" dashboards and `<id>` before: both are
+// tried, and the mode is proved by the page itself (one panel header on screen, at least 60% of the window wide).
+export async function grafanaViewPanel(page, base, uid, id, title, { from = "now-6h", to = "now", vars = {}, shows = [] } = {}) {
+  const chosen = Object.entries(vars).map(([name, value]) => `&var-${encodeURIComponent(name)}=${encodeURIComponent(value)}`).join("");
+  const tried = [];
+  for (const name of [`panel-${id}`, `${id}`]) {
+    await page.goto(`${base}/d/${uid}/?orgId=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${chosen}&viewPanel=${name}`);
+    await waitUntil(page, { what: `the panel ${name} of ${uid}`, timeoutMs: 60000, done: async () => (await firstVisible(page, grafana.READY.slice(0, 3))) || undefined });
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    await grafanaNews(page, { watchMs: 1500 });
+    await page.mouse.move(150, 700);   // away from the panel: no tooltip over it
+    const headers = page.locator("[data-testid*='Panel header']");
+    const deadline = Date.now() + 8000;
+    let alone = false;
+    while (Date.now() < deadline && !alone) {
+      const visible = [];
+      for (let i = 0; i < Math.min(await headers.count(), 40); i += 1) if (await headers.nth(i).isVisible().catch(() => false)) visible.push(headers.nth(i));
+      const box = visible.length === 1 ? await visible[0].boundingBox().catch(() => null) : null;
+      alone = Boolean(box) && box.width >= 0.6 * page.viewportSize().width && (await visible[0].innerText().catch(() => "")).includes(title);
+      if (!alone) await page.waitForTimeout(400);
+    }
+    tried.push(`viewPanel=${name}: ${alone ? "one wide panel" : "not alone or not wide"}`);
+    if (!alone) continue;
+    const shown = await grafanaPanel(page, title);
+    await page.mouse.move(150, 700);
+    await page.waitForTimeout(500);
+    const absent = [];
+    for (const text of shows) if (!(await grafanaInWindow(page, text))) absent.push(text);
+    return { ...shown, view: `viewPanel=${name}`, not_in_window: absent, url: page.url().replace(/[#].*/, "") };
+  }
+  throw new Error(`the panel "${title}" (id ${id}) did not open alone over the page (${tried.join("; ")})`);
+}
+
 // Watch for a request that would change something in Grafana: returns a function giving the list so far.
 export function grafanaWrites(page) {
   const seen = [];
   page.on("request", (r) => {
     if (!["GET", "HEAD", "OPTIONS"].includes(r.method()) && grafana.writes.test(new URL(r.url()).pathname)) seen.push(`${r.method()} ${new URL(r.url()).pathname}`);
   });
-  return () => [...seen];
+  return () => [...new Set(seen)];   // each request once: a dashboard is loaded several times
 }
