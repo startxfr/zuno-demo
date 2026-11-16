@@ -37,8 +37,9 @@ const APPS = shell(`<main><h1>Studio</h1>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${DOCS}/workflow'"><div>Zuno Technical Documentation</div><small>CHATFLOW</small></div>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${FLOW}/workflow'"><div>Zuno Confluence Search</div><small>WORKFLOW</small></div></main>`);
 const csrf = `(document.cookie.split("; ").map((c) => c.split("=")).find(([n]) => n === "csrf_token") || [])[1] || ""`;
-const AGENT_PAGE = shell(`<main><h1>Zuno Agent</h1><button>Publish</button><section><h2>Debug & Preview</h2><div id="thread"></div>
+const AGENT_PAGE = shell(`<main><h1>Zuno Agent</h1><div id="spin" role="status">loading</div><section id="editor" hidden><button>Publish</button><h2>Debug & Preview</h2><div id="thread"></div>
 <textarea placeholder="Talk to Bot" id="in" style="width:500px"></textarea></section></main>
+<script>setTimeout(() => { document.getElementById("spin").remove(); document.getElementById("editor").hidden = false; }, 4000);   // the editor draws after its shell, as on 2026-11-16</script>
 <script>
 document.getElementById("in").addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
@@ -52,7 +53,7 @@ document.getElementById("in").addEventListener("keydown", async (e) => {
 </script>`);
 const FLOW_PAGE = shell(`<main><h1>Zuno Confluence Search</h1><button id="run">Test Run</button><button>Publish</button>
 <div>Start</div><div>confluence.page.search</div><div>Summarise</div><div>End</div>
-<aside id="panel" hidden><label>topic <input type="text" id="topic"></label><button id="start">Start Run</button><div id="result"></div></aside></main>
+<aside id="panel" hidden><label>Topic <input id="topic" placeholder="Topic"></label><button id="start">Start Run</button><div id="result"></div></aside></main>
 <script>
 // The editor saves the draft by itself, as Dify's does.
 fetch("/console/api/apps/${FLOW}/workflows/draft", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});

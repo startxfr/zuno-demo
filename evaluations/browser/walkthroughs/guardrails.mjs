@@ -74,7 +74,7 @@ export async function owned({ page, state, take }) {
 }
 
 async function runAgent({ page, domain, mark, log, state }) {
-  await difyOpen(page, door(domain), APP, { changes });
+  await difyOpen(page, door(domain), APP, { changes, ready: dify.CHAT_INPUT });
   if (!(await firstVisible(page, dify.CHAT_INPUT))) throw new Error(`${APP}'s page has no chat input (${dify.CHAT_INPUT.join(" | ")})`);
   await mark("agent");
   const before = await page.locator("body").innerText();
@@ -143,7 +143,7 @@ export async function scout({ page, domain, step, state, take }) {
   const before = state.before.length;
   await step("sign-in", async () => ({ ...state.dify, profile_status: (await difyApi(page, "GET", "/console/api/account/profile").catch(() => ({ status: 0 }))).status }));
   await step("agent", async () => {
-    const address = await difyOpen(page, door(domain), APP, { changes });
+    const address = await difyOpen(page, door(domain), APP, { changes, ready: [...dify.CHAT_INPUT, "[contenteditable='true']"] });
     const input = await firstVisible(page, dify.CHAT_INPUT);
     return { url: address.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>"), selector: input ? input.matched : null };
   });

@@ -30,8 +30,9 @@ export const dify = {
   STUDIO: ["a[href='/apps']", "a:text-is('Studio')", "nav a:has-text('Studio')", "a:has-text('Studio')"],
   HOME: /Welcome back/,
   CHAT_INPUT: ["textarea[placeholder*='Talk' i]", "textarea[placeholder*='message' i]", "textarea"],     // guess
-  RUN: ["button:has-text('Test Run')", "button:has-text('Run')"],                                        // guess: the workflow's run button
-  START_RUN: ["button:has-text('Start Run')", "button:has-text('Start run')", "form button[type='submit']"],   // guess
+  RUN: ["button:has-text('Test Run')", "button:has-text('Run')"],                                        // 'Test Run' seen live, 2026-11-16
+  START_RUN: ["button:has-text('Start Run')", "button:has-text('Start run')", "form button[type='submit']"],   // 'Start Run' seen live, 2026-11-16
+  TOPIC: ["[placeholder='Topic' i]", "input[type='text']", "textarea"],   // the run form's one field: placeholder "Topic", seen live
   // The application's own definition: never written by a take or a scout (the editor's autosave included).
   definition: /\/console\/api\/apps\/[^/]+(\/(model-config|workflows\/draft|workflows\/publish|site|api-enable|site-enable|name|icon|copy|export|convert-to-workflow))?\/?$/,
   // What a scout refuses besides: a chat message, a workflow run, a conversation deleted.
@@ -138,7 +139,7 @@ export async function difyRuns(page, appId) {
 }
 
 // Open an application from Studio by its card: the address reached, without its query.
-export async function difyOpen(page, base, name, { changes = [] } = {}) {
+export async function difyOpen(page, base, name, { changes = [], ready = [] } = {}) {
   if (!/\/apps(\/|\?|$)/.test(page.url())) await page.goto(`${base}/apps`);
   // Dify's left menu lists the published web apps by the same names (scout of 2026-11-16): the card is the match in
   // the page's body, right of that menu, not the menu's entry (which opens the web app, not its editor).
@@ -155,6 +156,9 @@ export async function difyOpen(page, base, name, { changes = [] } = {}) {
   await click(card, { changes });
   await page.waitForURL(/\/app\/[0-9a-f-]{8,}\//, { timeout: 30000 });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  // The editor draws after its shell (scout of 2026-11-16: a spinner under the breadcrumb when the page was read):
+  // when the caller says what it needs (`ready`), it is waited for, 90 s, and the caller checks it afterwards.
+  if (ready.length) await waitUntil(page, { what: `the page of ${name}`, timeoutMs: 90000, done: async () => (await firstVisible(page, ready)) || undefined }).catch(() => {});
   await page.waitForTimeout(1000);
   return page.url().replace(/[?#].*/, "");
 }

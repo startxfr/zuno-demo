@@ -591,7 +591,7 @@ assert list(steps) == ["enter", "owned", "sign-in", "studio", "api", "agent", "w
 assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["landed"] == "home" and steps["sign-in"]["studio"].endswith("/apps") and steps["sign-in"]["apps"] == {"Zuno Agent": "agent-chat", "Zuno Technical Documentation": "advanced-chat", "Zuno Confluence Search": "workflow"}, steps["sign-in"]
 assert steps["api"] == {**steps["api"], "conversations": 1, "workflow_runs": 1, "profile_status": 200}, steps["api"]
 assert steps["agent"]["selector"] == "textarea[placeholder*=\x27Talk\x27 i]" and steps["agent"]["url"].endswith("/app/<id>/configuration"), steps["agent"]
-assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["fields"] == 1, steps["run-form"]
+assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["topic_selector"] == "[placeholder=\x27Topic\x27 i]", steps["run-form"]
 assert steps["closed"]["saves_refused"] == ["POST /console/api/apps/<id>/workflows/draft"], steps["closed"]
 '
 out="$(dify d-pass)"; rc=$?

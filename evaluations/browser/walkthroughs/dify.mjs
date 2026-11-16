@@ -61,7 +61,7 @@ export async function run({ page, base, mark, log, state }) {
   if (hidden.length) throw new Error(`Studio does not show ${hidden.join(", ")} on screen`);
   await mark("studio");
 
-  await difyOpen(page, base, APPS.agent, { changes });
+  await difyOpen(page, base, APPS.agent, { changes, ready: dify.CHAT_INPUT });
   if (!(await firstVisible(page, dify.CHAT_INPUT))) throw new Error(`Zuno Agent's page has no chat input (${dify.CHAT_INPUT.join(" | ")})`);
   await mark("agent");
 
@@ -74,14 +74,13 @@ export async function run({ page, base, mark, log, state }) {
   await mark("q-done");
 
   await page.goto(`${base}/apps`);
-  await difyOpen(page, base, APPS.workflow, { changes });
+  await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });
   const runs = await difyRuns(page, state.apps[APPS.workflow].id);
   await mark("workflow");
   const open = await firstVisible(page, dify.RUN);
   if (!open) throw new Error(`the workflow's Run button was not found (${dify.RUN.join(" | ")})`);
   await click(open, { changes });
-  const topic = page.locator("input[type='text'], textarea").last();   // guess: the run form's one field
-  await topic.waitFor({ timeout: 15000 });
+  const topic = await waitUntil(page, { what: "the run form's Topic field", timeoutMs: 20000, done: async () => (await firstVisible(page, dify.TOPIC)) || undefined });
   await topic.click();
   await page.keyboard.type(prompts["2:30"], { delay: 40 });
   await page.waitForTimeout(600);
@@ -122,15 +121,15 @@ export async function scout({ page, base, step, state }) {
     return { conversations: before, workflow_runs: runs ? runs.length : null, profile_status: who.status };
   });
   await step("agent", async () => {
-    const address = await difyOpen(page, base, APPS.agent, { changes });
+    const address = await difyOpen(page, base, APPS.agent, { changes, ready: [...dify.CHAT_INPUT, "[contenteditable='true']"] });
     const input = await firstVisible(page, dify.CHAT_INPUT);
-    return { url: address.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>"), selector: input ? input.matched : null,
+    return { editable_boxes: await page.locator("[contenteditable='true']").count(), spinner_gone: !(await page.locator("[role='status'], .spin-animation, .animate-spin").first().isVisible().catch(() => false)), url: address.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>"), selector: input ? input.matched : null,
              words: await wordsOnScreen(page, [/confluence\.page\.search/, /Debug|Preview/, /Publish/]),
              controls: (await describe(page, "main, body", 60)).filter((el) => el.attrs.placeholder || el.attrs["aria-label"]).slice(0, 30) };
   });
   await step("workflow", async () => {
     await page.goto(`${base}/apps`);
-    const address = await difyOpen(page, base, APPS.workflow, { changes });
+    const address = await difyOpen(page, base, APPS.workflow, { changes, ready: dify.RUN });
     const open = await firstVisible(page, dify.RUN);
     return { url: address.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>"), run_selector: open ? open.matched : null,
              words: await wordsOnScreen(page, [/confluence\.page\.search/, /Summarise/, /Start/, /End/, /Test Run/, /Publish/]) };
@@ -143,7 +142,7 @@ export async function scout({ page, base, step, state }) {
     await page.waitForTimeout(1500);
     const start = await firstVisible(page, dify.START_RUN);
     return { text: (await newText(page, text)).slice(0, 15).map((l) => l.slice(0, 60)), start_selector: start ? start.matched : null,
-             fields: await page.locator("input[type='text'], textarea").count() };
+             topic_selector: ((await firstVisible(page, dify.TOPIC)) || {}).matched || "", fields: await page.locator("input, textarea").count() };
   });
   await step("closed", async () => {
     await page.keyboard.press("Escape");
