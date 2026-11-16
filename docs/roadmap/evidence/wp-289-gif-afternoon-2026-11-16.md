@@ -213,3 +213,9 @@ A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the pro
 
 **Not published.** Sent to the owner.
 
+### observability-trace: rescout of 19:33 (as relayed by the coder)
+
+- Row 1:45 as written found the wrong trace: the newest `model_call` of `consultant-02` was a failed call of its OpenClaw assistant (`zuno.agent=openclaw`, `error=true`, a context-length error). The persona is shared by Dify, OpenClaw and UnifAI. The walkthrough now searches with `zuno.persona=consultant-02 zuno.agent=tekos` and refuses a span whose tags say error. The page says the same.
+- The span detail showed 11 of the 12 tags listed in row 3:00; `zuno.run_id` was missing, on that OpenClaw span. To confirm on a Tekos span from the first take's log. Row 5:00 copies `zuno.run_id` from the span and stays "not rehearsed".
+- The Tempo search page shows a yellow banner, "Jaeger UI is deprecated". The results do not show the tag filter as text.
+
