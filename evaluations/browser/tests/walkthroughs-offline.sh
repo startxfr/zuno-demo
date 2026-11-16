@@ -36,6 +36,7 @@ routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 
 # dify types a second credential: the recorder's (DIFY_ADMIN_PASSWORD) and the stand-in's own copy of it.
 dify() { local name="$1"; shift; take dify fake-dify.mjs 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret "$@"; }
 guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafana.mjs" 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret RECORD_BASE_URL_DIFY=http://127.0.0.1:8094 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095 "$@"; }
+agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -711,6 +712,45 @@ expect "lora: a page that writes to MLflow fails the take; MLflow's searches (PO
 out="$(lora l-dialog FAKE_DIALOG=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a dialog over the dashboard fails the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL a dialog covers the dashboard' <<<\"\$0\"" "$out"
+fi
+if wanted unifai-agents; then
+echo "== unifai-agents (two personas, a team workspace)"
+out="$(agents a-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "agents: a scout of both personas exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "agents: a scout creates no session, opens no team setting" grep -q 'left: {"sessions":2,"touched":0}' <<<"$out"
+expect "agents: each persona's scout.json reports its selector, the hub and the dialog" python3 - "$work/a-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+for name, teams in (("consultant-02", ["agent-arkos", "agent-tekos", "consultant"]), ("ai-ops-01", ["agent-tekos", "ops"])):
+    s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+    assert list(steps) == ["enter", "owned", "selector", "hub", "workflows", "closed"] and all(x["ok"] for x in s["steps"]), s
+    assert steps["selector"]["listed"] == {t: True for t in teams}, steps["selector"]
+    assert steps["hub"]["team_id_read"] is True and steps["hub"]["sessions"] == 1 and steps["hub"]["session_open"] is False and steps["hub"]["add_selector"], steps["hub"]
+    assert steps["workflows"] == {**steps["workflows"], "workflow_exact_matches": 1, "start_button": 1, "switches": 0}, steps["workflows"]
+    assert "Earlier" not in json.dumps(s) and s["changes"] == [], s["changes"]
+PY
+out="$(agents a-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "agents: a good run of both personas exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "agents: both sessions are gone, the other member's is kept, no team setting opened" grep -q 'left: {"sessions":2,"touched":0}' <<<"$out"
+expect "agents: the log carries the answers and what each persona's screen names" bash -c "grep -q 'answer 2 (.*): Common causes' <<<\"\$0\" && grep -q 'answer 1 (.*): k8s.events.read: the pod a2a-gateway' <<<\"\$0\" && grep -q 'a k8s read tool IS named' <<<\"\$0\" && grep -q 'a k8s read tool is NOT named' <<<\"\$0\"" "$out"
+expect "agents: each persona has its own markers, its own session, cleaned" python3 - "$work/a-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+c = json.loads((d / "consultant-02" / "markers.json").read_text()); o = json.loads((d / "ai-ops-01" / "markers.json").read_text())
+assert [x["name"] for x in c["markers"]] == ["login", "workspaces", "hub", "q1-sent", "q1-done", "q2-sent", "q2-done", "end"] and c["motion_from"] == "workspaces", c
+assert [x["name"] for x in o["markers"]] == ["login", "hub", "q-sent", "q-done", "end"] and o["motion_from"] == "hub", o
+for m in (c, o):
+    assert m["status"] == "pass" and len(m["created"]) == 1 and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+assert c["created"][0]["id"] != o["created"][0]["id"]
+PY
+out="$(agents a-refused FAKE_REFUSE_DELETE=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -4
+expect "agents: a refused delete fails the take and names the session" bash -c "test $rc -eq 1 && grep -q 'was NOT deleted' <<<\"\$0\"" "$out"
+out="$(agents a-addresses FAKE_ADDRESSES=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -4
+expect "agents: a cluster answer that names a node fails ai-ops-01's take, its session deleted all the same" bash -c "test $rc -eq 1 && grep -q 'ai-ops-01: .*the page showed node names or private IP addresses' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"

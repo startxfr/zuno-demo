@@ -1,0 +1,27 @@
+---
+# unifai-agents: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE the
+# first take: tune it with `make demo gif unifai-agents` once a take exists.
+# `make demo record unifai-agents` films TWO takes in one run (evaluations/browser/walkthroughs/unifai-agents.mjs):
+# `consultant-02`, then `ai-ops-01`, each in its own browser. Every moment names its take.
+# Markers of `consultant-02`: login, workspaces, hub, q1-sent, q1-done, q2-sent, q2-done, end. Of `ai-ops-01`: login,
+# hub, q-sent, q-done, end. The answers chain model and tool calls: their motion uses `fit`.
+# Row 4:15 is words: the close is a caption on the second answer.
+record_notice: >-
+  two recorded browser sessions on UnifAI, in the team workspace agent-tekos: consultant-02 asks Tekos two questions,
+  then ai-ops-01 asks the second one again; three Tekos answers (model and tool calls) on the two personas' budgets;
+  each persona creates one session and deletes it at the end, and a take fails if the workspace's sessions differ
+  before and after; the titles of earlier sessions of the workspace's members show in the list; ai-ops-01's answer
+  names real pods and events of zuno-ai-run (a node name or a private address fails the take); while a session is
+  open UnifAI signals presence to the workspace's other members; traces and metrics of the answers remain, as for
+  any use
+target_seconds: [45, 60]
+width: 960
+fps: 10
+moments:
+  - {take: consultant-02, still: login, hold: 3, caption: "Sign in with the company account"}
+  - {take: consultant-02, still: workspaces, hold: 5, step: "0:00", caption: "0:00  My workspaces come from my Keycloak groups"}
+  - {take: consultant-02, from: q1-sent, to: q1-done, fit: 6, hold: 3, step: "0:45", caption: "0:45  Tekos, an agent from a signed release"}
+  - {take: consultant-02, from: q2-sent, to: q2-done, fit: 8, hold: 6, step: "1:45", caption: "1:45  A consultant asks about the cluster: a generic answer"}
+  - {take: ai-ops-01, still: hub, hold: 3, caption: "Another person: ai-ops-01 operates the AI platform"}
+  - {take: ai-ops-01, from: q-sent, to: q-done, fit: 8, hold: 8, step: "3:00", caption: "3:00  Same agent, same question: real pods and events"}
+  - {take: ai-ops-01, still: end, hold: 5, step: "4:15", caption: "What an agent may do follows who asks"}
