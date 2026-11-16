@@ -50,7 +50,7 @@ demos of this brief, **13**: `gitops-day0-3`, `image-signing-admission`, `extern
 - `lora-pipeline-mlflow-kueue`: the pages name pipeline versions `v0-4-0-*` that the cluster does not list on 2026-11-16
   (deferred entry i); stills only, after the cause is known.
 
-**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to k: platform, agents or UnifAI
+**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to o: platform, agents or UnifAI
 changes that the sprint rule forbade); the Grafana user-storage entry and the OAuth authorization of `ai-ops-01` that now stay
 on the cluster; the stored effect of kagent's **Skip wizard**; the sprint's lesson that marker images are not enough for a chat
 answer (scan the frames of each answer span).
