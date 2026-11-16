@@ -9,6 +9,8 @@
 //   markers.json     {demo, kind "browser"|"terminal", persona, viewport, started, motion_from, markers: [{name, t,
 //                    png, private_addresses}], private_addresses: {flagged, count, at}, created, cleaned, owned, notes?, status, detail}
 //                    notes: what the walkthrough put in ctx.state.notes (short scalars only), when it put any
+//                    writes: {sent, refused, tolerated, through}, when the walkthrough declares `allows` (the write guard):
+//                    method, path and status of every write, never a body
 //                    private_addresses: node names and RFC 1918 addresses COUNTED in the page's text at each marker (never
 //                    kept); a take that showed one fails, after its clean-up
 //                    motion_from: the first marker a motion segment of the cut may start at
@@ -103,6 +105,12 @@ export function shapeProblems(walk) {
   if (walk.secrets !== undefined && (!Array.isArray(walk.secrets) || walk.secrets.some((n) => typeof n !== "string" || !/^[A-Z][A-Z0-9_]{2,}$/.test(n) || n === "PERSONA_PASSWORD"))) {
     problems.push("`secrets` must list the names of the environment variables that hold the other credentials the take types (e.g. DIFY_ADMIN_PASSWORD)");
   }
+  const rule = (x) => x && typeof x === "object" && /^(POST|PUT|PATCH|DELETE)$/.test(x.method || "") && x.path instanceof RegExp && typeof x.what === "string" && x.what.length > 0;
+  for (const list of ["allows", "tolerates"]) {
+    if (walk[list] !== undefined && (!Array.isArray(walk[list]) || !walk[list].every(rule))) problems.push(`\`${list}\` must be a list of {method, path: RegExp, what: "a word saying what it is"}`);
+  }
+  if (walk.tolerates !== undefined && walk.allows === undefined) problems.push("`tolerates` needs `allows`: the write guard is on only for a walkthrough that declares what it sends");
+  if (walk.guards !== undefined && typeof walk.guards !== "function") problems.push("`guards(domain)` must return the addresses of the applications the write guard covers");
   if (walk.creates !== undefined && (!Array.isArray(walk.creates) || walk.creates.some((n) => typeof n !== "string" || !/^[A-Z][A-Z0-9_]{2,}$/.test(n) || (walk.secrets || []).includes(n)))) {
     problems.push("`creates` must list the names of the secrets the take creates and the recorder holds (e.g. MAAS_API_KEY)");
   }
@@ -359,11 +367,59 @@ function within(work, ms, what) {
   return Promise.race([work, late]).finally(() => clearTimeout(timer));
 }
 
+// THE WRITE GUARD (default deny, 2026-11-16). A walkthrough that exports `allows` gets it, in a take AND in a scout:
+// every request to its application(s) that is not a read (GET, HEAD, OPTIONS) is refused before it leaves the
+// browser unless the walkthrough declares it: `allows: [{method, path, what}]`, `path` a RegExp on the address's
+// path, `what` a word saying what it is ("chat send", "search (a read)", "delete own chat"). A write it does not
+// declare is aborted and listed, and FAILS a take, unless it is in `tolerates` (same shape: a write the application
+// tries by itself and the take means to refuse, an editor's autosave): then it is aborted, listed, and that is all.
+// A write that is not declared and was answered all the same fails a take and a scout. The applications are
+// `guards(domain)` (addresses; by default the walkthrough's own): the sign-in pages (Keycloak, OpenShift) are other
+// origins and are not covered. Before this guard only a scout was protected, by `sends`; a take sent whatever the
+// page sent (the Dify finding of 2026-11-16). Only method, path and status are ever kept: never a body.
+const READS = ["GET", "HEAD", "OPTIONS"];
+const anonymous = (pathname) => pathname.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{22}|[0-9a-f]{16,}|\d{4,}/gi, "<id>");
+async function guardWrites(context) {
+  if (!walk.allows) return null;
+  const origins = (walk.guards ? walk.guards(domain) : [process.env.RECORD_BASE_URL || walk.url(domain)]).map((address) => new URL(address).origin);
+  const found = (list, request) => (list || []).find((x) => x.method === request.method() && x.path.test(new URL(request.url()).pathname));
+  const seen = { sent: [], refused: [], tolerated: [], through: [] };
+  await context.route((address) => origins.includes(address.origin), (route) => {
+    const request = route.request();
+    if (READS.includes(request.method())) return route.fallback();
+    const line = `${request.method()} ${anonymous(new URL(request.url()).pathname)}`;
+    const allowed = found(walk.allows, request);
+    if (allowed) return route.fallback();   // a scout's own filter (`sends`) still has its say
+    (found(walk.tolerates, request) ? seen.tolerated : seen.refused).push(line);
+    return route.abort();
+  });
+  context.on("response", (response) => {
+    const request = response.request();
+    if (READS.includes(request.method()) || !origins.includes(new URL(request.url()).origin)) return;
+    const line = `${request.method()} ${anonymous(new URL(request.url()).pathname)}`;
+    const allowed = found(walk.allows, request);
+    if (allowed) seen.sent.push(`${line} -> ${response.status()} (${allowed.what})`);
+    else seen.through.push(`${line} -> ${response.status()}`);
+  });
+  return seen;
+}
+// What markers.json and scout.json keep of it, and what it makes fail: [problems].
+function writesReport(seen, record, { scout }) {
+  if (!seen) return [];
+  const once = (list) => [...new Set(list)];
+  record.writes = { sent: seen.sent, refused: once(seen.refused), tolerated: once(seen.tolerated), through: once(seen.through) };
+  const problems = [];
+  if (seen.through.length) problems.push(`a write the walkthrough does not declare was answered all the same: ${once(seen.through).join(", ")}`);
+  if (seen.refused.length && !scout) problems.push(`the page was about to send ${once(seen.refused).length} write(s) the walkthrough does not declare (aborted): ${once(seen.refused).join(", ")}`);
+  return problems;
+}
+
 async function scoutOne(take, out) {
   const report = { demo: id, ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
                    walkthrough_sha256: walkthroughHash(id), changes: walk.changes, when: "", steps: [], status: "fail", detail: "" };
   const browser = await chromium.launch();
   const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport });
+  const guarded = await guardWrites(context);
   const page = await context.newPage();
   const t0 = Date.now();
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
@@ -411,6 +467,10 @@ async function scoutOne(take, out) {
   const bad = report.steps.filter((s) => !s.ok).map((s) => s.step);
   if (refused.length) bad.push(`a request a scout refuses was about to be sent (${refused.join(", ")})`);
   report.refused_requests = refused;
+  // The write guard: in a scout the undeclared writes it aborted are REPORTED (that is how an allow-list is learned);
+  // only one that got through fails it.
+  bad.push(...writesReport(guarded, report, { scout: true }));
+  if (guarded && guarded.refused.length) log(`write guard: aborted, not declared: ${[...new Set(guarded.refused)].join(", ")}`);
   // Reported, not a failure: a scout asks nothing, so what it sees is what the page shows before any answer.
   report.private_addresses = addressSummary(report.steps.filter((s) => typeof s.private_addresses === "number").map((s) => [s.step, s.private_addresses]));
   report.when = new Date().toISOString();
@@ -431,6 +491,7 @@ async function takeOne(take, out) {
     ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport,
     recordVideo: { dir: out, size: walk.viewport },
   });
+  const guarded = await guardWrites(context);
   const page = await context.newPage();
   const t0 = Date.now();
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
@@ -495,6 +556,12 @@ async function takeOne(take, out) {
       record.owned.same = false;
       failures.push(`what ${take.persona} owns could not be read after the take: ${String(e.message || e).split("\n")[0].slice(0, 200)}`);
     }
+  }
+  // The write guard's account, once the clean-up has sent its own writes too.
+  if (guarded) {
+    await page.waitForTimeout(500);
+    failures.push(...writesReport(guarded, record, { scout: false }));
+    log(`write guard: sent ${guarded.sent.join("; ") || "nothing"}${guarded.tolerated.length ? `; aborted as declared: ${[...new Set(guarded.tolerated)].join(", ")}` : ""}`);
   }
   // After the clean-up, which it never stops: a take that showed a node name or a private address is not publishable.
   if (record.private_addresses.flagged) {

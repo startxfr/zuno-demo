@@ -45,8 +45,11 @@ const AGENT_PAGE = shell(`<main><h1>Zuno Agent</h1><div id="spin" role="status">
 // The Agent's editor writes to its application by itself, by paths nobody guessed: on load, after a message, and
 // when the page is left (a beacon). All must be refused; \`saved\` counts the ones that reached the server.
 fetch("/console/api/apps/${AGENT}/model-config", { method: "POST", headers: { "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});
-fetch("/console/api/apps/${AGENT}/some-unguessed-autosave", { method: "PUT", headers: { "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});
-addEventListener("pagehide", () => { navigator.sendBeacon("/console/api/apps/${AGENT}/touch-on-leave", "{}"); });
+// FAKE_UNDECLARED=1: two writes nobody declared, one of them sent while the page is left.
+if (${process.env.FAKE_UNDECLARED === "1"}) {
+  fetch("/console/api/apps/${AGENT}/some-unguessed-autosave", { method: "PUT", headers: { "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});
+  addEventListener("pagehide", () => { navigator.sendBeacon("/console/api/apps/${AGENT}/touch-on-leave", "{}"); });
+}
 </script>
 <script>
 document.getElementById("in").addEventListener("keydown", async (e) => {

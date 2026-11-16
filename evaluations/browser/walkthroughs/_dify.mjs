@@ -15,7 +15,7 @@
 // its id at the end when Dify's API lists it), one run of the workflow (its run log CANNOT be deleted: said in the
 // record notice). What it must never write: the applications themselves. Dify's editor saves by itself; every
 // request to its console API that is not a read and not on a short list is refused before it leaves the browser, in
-// a take as in a scout (`difyGuard`, default deny).
+// a take as in a scout (the recorder's write guard, default deny: `dify.allows`, `dify.tolerates`).
 import { click, firstVisible, read, waitUntil } from "./_helpers.mjs";
 
 export const dify = {
@@ -37,57 +37,27 @@ export const dify = {
   RUN: ["button:has-text('Test Run')", "button:has-text('Run')"],                                        // 'Test Run' seen live, 2026-11-16
   START_RUN: ["button:has-text('Start Run')", "button:has-text('Start run')", "form button[type='submit']"],   // 'Start Run' seen live, 2026-11-16
   TOPIC: ["[placeholder='Topic' i]", "input[type='text']", "textarea"],   // the run form's one field: placeholder "Topic", seen live
-  // The ONLY requests to Dify's console API that are not reads and may leave the browser (difyGuard): the two
-  // sign-in calls, one read that Dify makes by POST, the Agent's chat message, the workflow's run, and the delete of
-  // the take's own conversation. Anything else is refused: an application is never written.
-  allowed: [
-    ["POST", /^\/console\/api\/(login|refresh-token)\/?$/],
-    ["POST", /^\/console\/api\/workspaces\/current\/?$/],                                   // a read made by POST (guess)
-    ["POST", /^\/console\/api\/apps\/[^/]+\/chat-messages\/?$/],
-    ["POST", /^\/console\/api\/apps\/[^/]+\/workflows\/draft\/run\/?$/],
-    ["DELETE", /^\/console\/api\/apps\/[^/]+\/chat-conversations\/[^/]+\/?$/],
+  // DEFAULT DENY (2026-11-16), by the recorder's write guard: a walkthrough of Dify exports these as its `allows`
+  // and `tolerates`. `allows`: the ONLY requests to Dify that are not reads and may leave the browser. `tolerates`:
+  // what Dify's editor tries by itself and is refused without failing the take. Anything else is refused AND fails
+  // the take: after the first takes the card of Zuno Agent read "Edited at" the minute of the turn, and a list of
+  // guessed saves could not say what had been sent.
+  allows: [
+    { method: "POST", path: /^\/console\/api\/login\/?$/, what: "Dify's sign-in" },
+    { method: "POST", path: /^\/console\/api\/refresh-token\/?$/, what: "session refresh" },
+    { method: "POST", path: /^\/console\/api\/workspaces\/current\/?$/, what: "the current workspace (a read)" },   // guess
+    { method: "POST", path: /^\/console\/api\/apps\/[^/]+\/chat-messages\/?$/, what: "the Agent's chat message" },
+    { method: "POST", path: /^\/console\/api\/apps\/[^/]+\/workflows\/draft\/run\/?$/, what: "the workflow's run" },
+    { method: "DELETE", path: /^\/console\/api\/apps\/[^/]+\/chat-conversations\/[^/]+\/?$/, what: "delete own conversation" },
+  ],
+  tolerates: [
+    { method: "POST", path: /^\/console\/api\/apps\/[^/]+\/workflows\/draft\/?$/, what: "the editor's own save of the workflow's draft" },   // seen live, refused
+    { method: "POST", path: /^\/console\/api\/apps\/[^/]+\/model-config\/?$/, what: "the editor's own save of the Agent's configuration" },
   ],
   // What a scout refuses besides: a chat message, a workflow run, a conversation deleted.
   sends: /\/console\/api\/apps\/[^/]+\/(chat-messages|completion-messages|workflows\/draft\/run|advanced-chat\/workflows\/draft\/run|chat-conversations\/[^/]+)\/?$/,
   ANSWER_TIMEOUT_MS: 240000,   // the Agent turn took 82 s on 2026-11-06
 };
-
-// DEFAULT DENY (2026-11-16). After the first take the card of Zuno Agent read "Edited at" the minute of that take:
-// something had written to the application although the saves this file had guessed were refused. So nothing is
-// guessed any more: every request to Dify's console API that is not a read (GET, HEAD, OPTIONS) is refused before it
-// leaves the browser, in a take as in a scout, unless it is one of the few a take must send (`dify.allowed`). The
-// refused ones are listed by method and path; and any write that is NOT on the list and was answered all the same
-// (it escaped the filter: a request sent while a page unloads can) is listed apart, and a take that has one fails.
-// Returns a function giving the refused list; its `.through()` gives the writes that got through, its `.sent()` every
-// allowed write the take made and how it was answered (method, path, status: never a body).
-const READ = ["GET", "HEAD", "OPTIONS"];
-const anonymous = (path) => path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "<id>");
-const isAllowed = (method, path) => dify.allowed.some(([m, p]) => m === method && p.test(path));
-export async function difyGuard(page) {
-  const refused = [];
-  const through = [];
-  const answered = [];
-  const allowed = [];   // every request that is not a read and was let through, in order: what the take really sent
-  await page.context().route((url) => url.pathname.startsWith("/console/api/"), (route) => {
-    const r = route.request();
-    const path = new URL(r.url()).pathname;
-    if (READ.includes(r.method())) return route.fallback();
-    if (isAllowed(r.method(), path)) { allowed.push(`${r.method()} ${anonymous(path)}`); return route.fallback(); }   // a scout's own filter still applies
-    refused.push(`${r.method()} ${anonymous(path)}`);
-    return route.abort();
-  });
-  page.context().on("response", (response) => {
-    const r = response.request();
-    const path = new URL(r.url()).pathname;
-    if (!path.startsWith("/console/api/") || READ.includes(r.method())) return;
-    if (isAllowed(r.method(), path)) { answered.push(`${r.method()} ${anonymous(path)} -> ${response.status()}`); return; }
-    through.push(`${r.method()} ${anonymous(path)} (HTTP ${response.status()})`);
-  });
-  const list = () => [...new Set(refused)];
-  list.through = () => [...new Set(through)];
-  list.sent = () => ({ sent: [...allowed], answered: [...answered] });   // not de-duplicated: the order and the count matter
-  return list;
-}
 
 // Sign in: the front door (Keycloak, the `login` marker on its EMPTY form), then Dify's own form as its single
 // administrator. Nothing is marked, described or logged between the two forms and Studio.

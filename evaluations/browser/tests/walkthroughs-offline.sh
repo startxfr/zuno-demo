@@ -593,16 +593,17 @@ assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["landed"] ==
 assert steps["api"] == {**steps["api"], "conversations": 1, "workflow_runs": 1, "profile_status": 200}, steps["api"]
 assert steps["agent"]["selector"] == "textarea[placeholder*=\x27Talk\x27 i]" and steps["agent"]["url"].endswith("/app/<id>/configuration"), steps["agent"]
 assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["topic_selector"] == "[placeholder=\x27Topic\x27 i]", steps["run-form"]
-# default deny: the saves nobody guessed, and the one sent while the page is left, are refused too
-assert sorted(steps["closed"]["saves_refused"]) == ["POST /console/api/apps/<id>/model-config", "POST /console/api/apps/<id>/touch-on-leave", "POST /console/api/apps/<id>/workflows/draft", "PUT /console/api/apps/<id>/some-unguessed-autosave"] and steps["closed"]["writes_through"] == [], steps["closed"]
+# the write guard: the saves the editor tries by itself are aborted as tolerated, nothing else was tried, nothing got through
+assert s["writes"]["tolerated"] == ["POST /console/api/apps/<id>/model-config", "POST /console/api/apps/<id>/workflows/draft"] and s["writes"]["refused"] == [] and s["writes"]["through"] == [], s["writes"]
+assert s["writes"]["sent"] == ["POST /console/api/login -> 200 (Dify\x27s sign-in)"], s["writes"]["sent"]
 '
 out="$(dify d-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "dify: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
 expect "dify: its conversation is gone, its run stays, no save of an application reached Dify" grep -q 'left: {"conversations":1,"runs":2,"saved":0}' <<<"$out"
-expect "dify: the log says the run cannot be deleted and which saves were refused" bash -c "grep -q 'succeeded; it stays in the application.s run log' <<<\"\$0\" && grep -q 'saves of the applications refused in the browser: .*PUT /console/api/apps/<id>/some-unguessed-autosave.*POST /console/api/apps/<id>/workflows/draft' <<<\"\$0\"" "$out"
-expect "dify: the log lists every write the take sent, in order, with its status" grep -q 'writes the take sent to Dify, in order: POST /console/api/login -> 200; POST /console/api/apps/<id>/chat-messages -> 200; POST /console/api/apps/<id>/workflows/draft/run -> 200' <<<"$out"
+expect "dify: the log says the run cannot be deleted, and the write guard's account" bash -c "grep -q 'succeeded; it stays in the application.s run log' <<<\"\$0\" && grep -q 'write guard: sent POST /console/api/login -> 200 (Dify.s sign-in); POST /console/api/apps/<id>/chat-messages -> 200 (the Agent.s chat message); POST /console/api/apps/<id>/workflows/draft/run -> 200 (the workflow.s run); DELETE /console/api/apps/<id>/chat-conversations/<id> -> 204 (delete own conversation); aborted as declared: POST /console/api/apps/<id>/model-config, POST /console/api/apps/<id>/workflows/draft' <<<\"\$0\"" "$out"
 expect "dify: markers.json follows the contract" markers d-pass '
+assert m["writes"]["refused"] == [] and m["writes"]["through"] == [] and len(m["writes"]["sent"]) == 4 and len(m["writes"]["tolerated"]) == 2, m["writes"]
 assert names == ["login", "studio", "agent", "q-sent", "q-done", "workflow", "run-form", "run-done", "end"], names
 assert m["persona"] == "consultant-02" and m["motion_from"] == "studio" and m["status"] == "pass", m
 assert len(m["created"]) == 1 and m["created"][0]["kind"] == "conversation" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
@@ -619,6 +620,16 @@ expect "dify: a failed workflow run fails the take, the conversation is deleted 
 out="$(dify d-addresses FAKE_ADDRESSES=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "dify: an answer with a node name fails the take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
+out="$(dify d-undeclared FAKE_UNDECLARED=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "dify: writes nobody declared, one sent while the page is left, are aborted, fail the take, and none reaches Dify" bash -c "test $rc -eq 1 && grep -q 'the page was about to send 2 write(s) the walkthrough does not declare (aborted): PUT /console/api/apps/<id>/some-unguessed-autosave, POST /console/api/apps/<id>/touch-on-leave' <<<\"\$0\" && grep -q 'left: {\"conversations\":1,\"runs\":2,\"saved\":0}' <<<\"\$0\"" "$out"
+out="$(dify d-undeclared-scout FAKE_UNDECLARED=1 RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "dify: in a scout the same writes are aborted and REPORTED, which is how an allow-list is learned" python3 - "$work/d-undeclared-scout" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
+assert s["status"] == "done" and "PUT /console/api/apps/<id>/some-unguessed-autosave" in s["writes"]["refused"] and s["writes"]["through"] == [], s["writes"]
+PY
 out="$(dify d-wrong DIFY_ADMIN_PASSWORD=offline-wrong-secret)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "dify: a wrong administrator password stops at Dify's form, nothing created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL Dify refused its administrator.s sign-in' <<<\"\$0\" && grep -q 'left: {\"conversations\":1,\"runs\":1,\"saved\":0}' <<<\"\$0\"" "$out"

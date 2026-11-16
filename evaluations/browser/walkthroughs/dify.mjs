@@ -20,7 +20,7 @@
 // (2026-11-16). NOTHING was seen live when this was written: every selector is a guess; scout() reports what is there,
 // sends nothing and creates nothing.
 import { click, describe, firstVisible, newText, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { dify, difyApi, difyApps, difyAsk, difyConversations, difyGuard, difyOpen, difyRuns, difySignIn } from "./_dify.mjs";
+import { dify, difyApi, difyApps, difyAsk, difyConversations, difyOpen, difyRuns, difySignIn } from "./_dify.mjs";
 
 export const persona = "consultant-02";
 export const secrets = ["DIFY_ADMIN_PASSWORD"];
@@ -32,6 +32,9 @@ export const motion_from = "studio";   // the two sign-in forms are never shown 
 export const changes = [dify.TURN_CHANGE];
 export const prompts = { "0:45": "Find our onboarding pages in Confluence", "2:30": "onboarding" };
 export const url = dify.url;
+// The write guard (record.mjs): what a take of Dify may send, and what Dify's editor tries by itself (_dify.mjs).
+export const allows = dify.allows;
+export const tolerates = dify.tolerates;
 export const sends = dify.sends;
 
 const APPS = { agent: "Zuno Agent", docs: "Zuno Technical Documentation", workflow: "Zuno Confluence Search" };
@@ -39,7 +42,6 @@ const TOOL = "confluence.page.search";   // the page: the tool both applications
 const RUN_TIMEOUT_MS = 120000;           // the page: about 3 s; D1 is a stall of the first run
 
 export async function enter(ctx) {
-  ctx.state.refused = await difyGuard(ctx.page);
   await difySignIn(ctx, persona);
   const apps = await difyApps(ctx.page);
   if (!apps) throw new Error("Dify's application list could not be read (GET /console/api/apps): the take could not tell what it creates");
@@ -114,11 +116,6 @@ export async function run({ page, base, mark, log, state }) {
 
   await page.waitForTimeout(800);
   await mark("end");
-  const refused = state.refused();
-  if (refused.length) log(`saves of the applications refused in the browser: ${refused.join(", ")}`);
-  log(`writes the take sent to Dify, in order: ${state.refused.sent().answered.join("; ") || state.refused.sent().sent.join("; ") || "none"}`);
-  const through = state.refused.through();
-  if (through.length) throw new Error(`a write to Dify that the take does not allow got through: ${through.join(", ")}: an application may have been changed, check it`);
 }
 
 // What a take will meet, for the price of the two sign-ins: Studio, each of the two applications' pages with their
@@ -163,8 +160,7 @@ export async function scout({ page, base, step, state }) {
     await page.keyboard.press("Escape");
     const after = await difyConversations(page, agent);
     if (!after || after.length !== before) throw new Error(`Zuno Agent holds ${after ? after.length : "?"} conversations after the scout, ${before} before it`);
-    if (state.refused.through().length) throw new Error(`a write to Dify that the scout does not allow got through: ${state.refused.through().join(", ")}`);
-    return { conversations: after.length, saves_refused: state.refused(), writes_through: state.refused.through() };
+    return { conversations: after.length };
   });
 }
 
