@@ -75,7 +75,7 @@ Facts relayed by the coordinator; the writer saw no scout files.
 - `aap-audited-operations-20261116-153130-scout` at `devel` `3d48acfe`: 14 of 14 steps pass.
 - The session-refresh POST was counted 5 times (2 bytes each). Refused requests: none. Private addresses: 0. No new AAP user effect.
 - `zuno-day3-test` is not in the templates this reader sees. The status word is "Success". The instance group is below the window.
-- Page: row 0:45 no longer states the counts 17 and 8 or names `zuno-day3-test` as the last template. The assist is to check the true list.
+- Page: row 0:45 no longer states the counts 17 and 8. The take shows the pager "1 - 10 of 25", so `zuno-day3-test` is on a later page.
 
 ## Incident of 15:07 CET: Playwright version (as relayed)
 
@@ -126,3 +126,52 @@ The WP-290 brief now says the same under `genai-playground`.
 Scout at `a6f7635b`, 2026-11-16 at 16:11. In **Settings**, **Model** the portal shows `ai-ops-01` the subscription `gpt-oss-20b-agents`; the page named `gpt-oss-20b-ocp-ai-ops`. The model matches. Not seen: whether the dropdown offers `gpt-oss-20b-ocp-ai-ops`. The take never chooses a subscription and no caption names one. The MCP row shows `zuno-mcp-gateway` with "0 active" in a fresh browser; the GIF caption says "listed, no token in this browser".
 
 Page: row 0:00 and the checklist now say the subscription shown may differ (option A of the assist). Possible platform finding, **not verified**: if `gpt-oss-20b-agents` is the agents' subscription and is offered to a person, a person draws on the agents' budget. The assist has not read the `MaaSSubscription` objects. Whether it goes on the deferred list is the coordinator's call.
+
+## Takes of the late afternoon (not published)
+
+### aap-audited-operations
+
+| Item | Value |
+|---|---|
+| Take | `aap-audited-operations-20261116-165220`: `consultant-03`, `pass`, 7 markers, cut at `a67ae533` (as relayed) |
+| Owner's go | Given in `zuno-demo-reorg-demo333`'s session (as relayed) |
+| Created and cleaned | `created` empty, `cleaned` null; owned 0 before and 0 after; `private_addresses` count 0 |
+| GIF | 3 232 151 bytes (read from the take), SHA-256 `d3c837e41a9d...`, 49.0 s, 960x656, 7 moments |
+| Notes in `markers.json` | job 1454; `zuno-mcp` jobs visible 14; session refreshes 5, 2 bytes, no keys |
+
+**Review.** The recording session: N = 18 (6 marker images and 12 frames), as relayed; the writer opened 2 images (`templates.png`,
+`job.png`) and no frames. `templates.png`: the Automation Templates list as `consultant-03`, 10 of 25 on the first page, launch
+buttons greyed, no person's name; the account name `consultant-03` is in the header. `job.png`: the Details tab of job 1454, status
+Success, launched by `zuno-mcp`, inventory `zuno`, credential `zuno-cluster-reader` (a name; no value). The Details frame ends
+before the instance group. Reported by the recording session, accepted: the AAP account name `admin` on the project page. The writer
+did not open that image. No node name was seen on the two images the writer opened.
+
+**Not published.** Sent to the owner.
+
+### quotas
+
+| Item | Value |
+|---|---|
+| Take | `quotas-20261116-172034`: `ai-ops-01`, `pass`, 6 markers in 99.4 s, cut at `e8f96b8d` (as relayed) |
+| Created and cleaned | `created` empty; owned 0 before and 0 after; `private_addresses` count 0 |
+| GIF | 5 016 713 bytes (read from the take), SHA-256 `76d62e17e770...`, 45.0 s, 960x656, 5 moments |
+
+The GIF is over the 5 MB aim (5.0 MB, under the 8 MB limit).
+
+**Review.** The recording session lists 5 opened images and 1 contact sheet of 12 frames, as relayed; its report says 6 images, so
+the writer counts what it can verify: the take holds 6 marker images and no frame files. The writer opened 2 images (`panel.png`,
+`evidence.png`) and no frames. `panel.png`: the Grafana panel "One group across the experiences: tokens (over range)", last 24
+hours, columns client and group, token counts per group, no person's name. Group names are role and source names
+(`consultant/confluence-...`, some cut by the column); the writer judges them not private, the owner is to confirm. An avatar sits at the top right.
+`evidence.png`: the repository page `quotas.md` on GitHub, with the WP-190 evidence paragraph (no secret). The recording session reports
+one transitional "Loading…" frame. `make demo start quotas` was **not** run: the panel held spend from earlier the same day.
+
+**Not published.** Sent to the owner.
+
+## Scouts, later (as relayed)
+
+- Tempo authorization: the click for `ai-ops-01` was made and is stored as declared (`tempo-tempo` in `zuno-monitoring`, scopes `user:info` and `user:check-access`), after the owner's decision in demo333's session.
+- `genai-playground` rescout: 11 of 11 steps.
+- `lora-pipeline-mlflow-kueue`: the Experiments page shows "No experiments" for the project Zuno MLOps. Page row 2:45 is at risk; to settle with the assist.
+- `dify`: the sign-in lands on a new Home page and shows four apps. The Vault read of the Dify admin password was done by demo333 with the owner's agreement: 3 helper runs, each creating and deleting for a few seconds an `ansible-seeder-login-token` in `zuno-vault`. The value was never printed.
+- On `devel`, unscouted: `maas-portal-api-keys`, `openclaw` (scout only), `a2a-delegation-approval`.
