@@ -50,3 +50,15 @@ It also shows the Atlassian host and page ids in the URLs; these are not secrets
 
 **What stays on the server.** The chats were deleted. The Confluence search of `consultant-02` and the failed Drive call of `sale-01`
 stay in the platform's tool-call records (ADR-0618 clause 12).
+
+## Scout: aap-audited-operations (as relayed)
+
+Facts relayed by the coordinator; the writer saw no scout files.
+
+- Scout at `d69bdb89`, with the owner's go in demo333's session. The go included the creation of the AAP user `consultant-03`.
+- The Keycloak sign-in to AAP works on demo333.
+- `consultant-03` sees 20 `zuno-day0-check` runs, 14 launched by `zuno-mcp`. A reader does see jobs it did not launch.
+- The scout then failed on the read-only guard: AAP's page sends `POST /api/gateway/v1/session/`. Five requests were refused and
+  nothing was written. Decision of the coordinator: that exact POST is let through and counted.
+- Open: the AAP user `consultant-03` stays on the cluster if AAP created it. Demo333 is to confirm.
+- Page: the "not rehearsed" notes on rows 0:00 and 2:00 are replaced by these facts, dated 2026-11-16.
