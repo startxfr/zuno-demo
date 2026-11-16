@@ -68,7 +68,7 @@ Facts relayed by the coordinator; the writer saw no scout files.
 - Take `model-serving-llmd-mig-20261116-152658`, cut at `devel` `830c999d`. The recording session reports: gate 29 lines; each model has 1 under exactly one MIG column; the NODE column is filled; the quota is as before.
 - GIF 46.1 s, about 1.0 MB. The recording session's review: N = 10 (2 marker images and 8 frames). The writer saw none of them.
 - The frames show node names. The owner accepted that for this demo only, as relayed. **No node name is copied here.**
-- Sent to the owner as a replacement of the published `21bca7e2`. **Not published.** The SHA-256 is to be checked at publication.
+- Sent to the owner as a replacement of the published `21bca7e2`.
 
 ## Re-scout: aap-audited-operations (as relayed)
 
@@ -90,3 +90,18 @@ Facts relayed by the coordinator; the writer saw no scout files.
 ## On `devel`, not yet scouted
 
 `observability-trace`, `genai-playground` (scout first) and the notes hook.
+
+### Published: model-serving-llmd-mig replaced (2026-11-16, 16:04 CET)
+
+`5dda6298` replaces `docs/assets/img/demo/model-serving-llmd-mig.gif` with the take above (937 892 to 1 022 964 bytes). The writer checked the
+file in the commit against the take's GIF: 1 022 964 bytes, SHA-256 `eadf8c53c353...`, equal. The owner's go ("ok, go pour le
+remplacement de model-serving-llmd-mig par la reprise") was at 16:04:41 CET, before the commit at 16:04:51, as read by the coordinator
+from its log. The alt text now says the recording shows the server each model runs on. The writer read the take's `transcript.txt`:
+the four models, each with 1 under one MIG column, and the NODE column filled (node names not copied). The catalogue still has 17 GIF files.
+Page: the "(untested command)" mark on row 1:00 is lifted, because the take ran that command.
+
+## Open items for the owner
+
+- `main` still carries Playwright 1.55.1 while `devel` is pinned to 1.48.0 (see the incident above).
+- The AAP user `consultant-03`: demo333 is to confirm whether AAP created it.
+- Node names are visible in the published `model-serving-llmd-mig` GIF, accepted by the owner for this demo only.
