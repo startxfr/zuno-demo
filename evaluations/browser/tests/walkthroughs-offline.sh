@@ -36,7 +36,7 @@ rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
 aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
 quotas() { take quotas fake-quotas.mjs 8089 "$@" RECORD_BASE_URL_GITHUB=http://127.0.0.1:8088; }
-lora() { take lora-pipeline-mlflow-kueue fake-rhoai-lora.mjs 8087 "$@"; }
+lora() { take lora-pipeline-mlflow-kueue fake-rhoai-lora.mjs 8087 "$@" RECORD_WAIT_CAP_MS=8000; }
 genai() { take genai-playground fake-genai.mjs 8086 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
@@ -710,7 +710,7 @@ assert links.get("Jobs") == "/develop-train/training-jobs" and links.get("Experi
 assert steps["pipeline"]["versions_shown"] == ["v0-3-0-tekos"] and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
 assert steps["trainjob"]["how"] == ["menu nav a[href=\x27/develop-train/training-jobs\x27]", "address /develop-train/training-jobs/zuno-mlops"], steps["trainjob"]
 assert steps["mlflow"]["workspace"] == "none chosen" and steps["mlflow"]["embedded"] is False and steps["mlflow"]["dashboard_list"] == "No experiments", steps["mlflow"]
-assert steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]", "Launch MLflow: /mlflow/"], steps["mlflow"]
+assert steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]", "Launch MLflow: /mlflow/", "nav a:has-text(\x27Experiments\x27)"], steps["mlflow"]
 assert steps["pipeline"]["how"][0] == "menu nav a[href=\x27/projects\x27]" and any(f.startswith("/mlflow/") for f in steps["mlflow-shapes"]["frames"]), (steps["pipeline"], steps["mlflow-shapes"]["frames"])
 '
 out="$(lora l-pass)"; rc=$?
@@ -721,21 +721,24 @@ assert names == ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"] 
 assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
 assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
 '
-out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1)"; rc=$?
+out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1 FAKE_VERSION=v0-4-0)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: MLflow listing the experiment only in its workspace: the workspace zuno-mlops is chosen, the take passes" bash -c "test $rc -eq 0 && grep -q 'mlflow: {.*\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\"" "$out"
+expect "lora: MLflow on another workspace: zuno-mlops is chosen; a v0-4-0-tekos graph passes too" bash -c "test $rc -eq 0 && grep -q 'mlflow: {.*\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\" && grep -q '\"versions_shown\":\[\"v0-4-0-tekos\"\]' <<<\"\$0\"" "$out"
 out="$(lora l-notrain FAKE_NO_TRAINING=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: no Jobs page fails the take and names the terminal row" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the Jobs page (/develop-train/training-jobs) does not show lora-comage-4c28m' <<<\"\$0\"" "$out"
-out="$(lora l-v4 FAKE_VERSION=v0-4-0)"; rc=$?
+out="$(lora l-v4 FAKE_VERSION=comage)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: a graph of another version than v0-3-0-tekos fails the take: the page's row names it" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is of v0-4-0-tekos, not v0-3-0-tekos' <<<\"\$0\"" "$out"
+expect "lora: a graph of another pipeline's version (comage) fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is of v0-3-0-comage, not a tekos version' <<<\"\$0\"" "$out"
 out="$(lora l-frame FAKE_DASHBOARD_FRAME=1 FAKE_NO_VERSION_NAME=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: MLflow embedded in the dashboard's page and a graph that names no version: the take passes and says so" bash -c "test $rc -eq 0 && grep -q '\"versions_shown\":\[\]' <<<\"\$0\" && grep -q '\"embedded\":true' <<<\"\$0\"" "$out"
 out="$(lora l-empty FAKE_MLFLOW_EMPTY=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: no experiment mlops-comage in the dashboard or in MLflow's own UI fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*mlops-comage' <<<\"\$0\"" "$out"
+out="$(lora l-training FAKE_MLFLOW_TRAINING_ONLY=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: an experiment listed only in MLflow's training view fails the take: switching that radio is the owner's decision" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*Model training.*a declared change, the owner.s decision' <<<\"\$0\"" "$out"
 out="$(lora l-write FAKE_WRITE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a page that writes to MLflow fails the take; MLflow's searches (POSTs) do not" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /mlflow/ajax-api/2.0/mlflow/runs/set-tag' <<<\"\$0\"" "$out"

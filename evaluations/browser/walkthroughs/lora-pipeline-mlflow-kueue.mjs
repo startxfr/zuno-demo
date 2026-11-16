@@ -30,7 +30,11 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"];
 // The provider chooser and the sign-in (up to dashboard) are never shown as motion.
 export const motion_from = "dashboard";
-export const changes = [];
+// MLflow's view toggle "Model training" is a radio, which the shared click() refuses unless it is declared here; whether
+// a take may switch it is the owner's decision (TRAINING_VIEW_DECLARED below, off).
+const TRAINING_VIEW_DECLARED = false;
+const TRAINING_CHANGE = "switches MLflow's own UI from its GenAI view to its Model training view (a view of the page, nothing saved on the server)";
+export const changes = TRAINING_VIEW_DECLARED ? [TRAINING_CHANGE] : [];
 export const url = (domain) => `https://rh-ai.${domain}`;
 // The requests that would start or change something: a pipeline run, an experiment or a version created in the
 // pipeline server (its API is /apis/v2beta1); a run, an experiment, a tag or a model changed in MLflow (its searches
@@ -46,7 +50,9 @@ const DWELL_MS = 2000;   // a presenter's pause on each screen, so that every mo
 
 const PROJECT = "Zuno MLOps";                                         // the display name of zuno-mlops (the page)
 const PIPELINE = "MLOps: dataset-to-model LoRA/PEFT pipeline (tekos)";   // gitops/charts/mlops: displayName + " (tekos)"
-const VERSION = "v0-3-0-tekos";                                       // the version demo333 listed on 2026-11-16
+// Any tekos version: v0-3-0 and v0-4-0 have the same steps (git: 9fd84fbe, decc2c0e). demo333 listed only v0-3-0 at
+// 01:25 on 2026-11-16; the rescout of 18:50 opened v0-4-0-tekos by default. The version shown is reported.
+const VERSION = /^v\d+-\d+-\d+-tekos$/;
 const STEPS = [/prepare-dataset/, /train-lora/, /\bevaluate\b/, /push-registry/];
 const TRAINJOB = "lora-comage-4c28m";
 const EXPERIMENT = "mlops-comage";
@@ -61,12 +67,23 @@ const PIPELINES_TAB = ["main [role='tab']:has-text('Pipelines')", "main button:t
 const PIPELINE_LINK = [`main a:text-is('${PIPELINE}')`, `main a:has-text('${PIPELINE}')`, `main button:has-text('${PIPELINE}')`];   // guess
 const PROJECT_PICKER = ["main button:has-text('Project')", "[data-testid*='project-selector' i]", "main [aria-label*='project' i]"];   // guess
 const WORKSPACE_PICKER = ["button:has-text('Workspace')", "[aria-label*='workspace' i]", "[data-testid*='workspace' i]"];       // guess (MLflow)
-const SLOW_MS = 90000;   // the menu took 48 s to show under load (scout of 2026-11-16)
+// Every wait of this walkthrough, capped by RECORD_WAIT_CAP_MS when it is set: the offline test only (its stand-in
+// answers at once, and its failing cases would otherwise sit through every long wait). record.sh never sets it.
+const WAIT_CAP_MS = Number(process.env.RECORD_WAIT_CAP_MS) || 0;
+function wait(ms) {
+  return WAIT_CAP_MS ? Math.min(ms, WAIT_CAP_MS) : ms;
+}
+const SLOW_MS = wait(90000);   // the menu took 48 s to show under load (scout of 2026-11-16)
 // A page still loading: the rescout of 2026-11-16 (dfdf7322) checked the graph page while it showed "Loading" and a spinner.
 const LOADING = "main [role='progressbar'], main .pf-v6-c-spinner, main .pf-v5-c-spinner";
 const VERSIONS = /\bv\d+-\d+-\d+-[a-z0-9-]+\b/g;   // version names as the chart makes them (v0-3-0-tekos)
 const NO_EXPERIMENTS = /No experiments/i;                                                                                  // seen, 2026-11-16 rescout
 const LAUNCH_MLFLOW = ["main a:has-text('Launch MLflow')", "a:has-text('Launch MLflow')"];                                // seen, 2026-11-16 rescout
+// MLflow 3.15's own UI (the rescout of 18:50): a toggle GenAI | Model training, GenAI selected, whose Home said "Create
+// your first experiment"; a left menu Home, Experiments, Prompts. Looked for in MLflow's own frames only (the page,
+// once Launch MLflow is followed, or a frame the dashboard embeds), never in the dashboard's menu.
+const TRAINING_VIEW = ["[role='radio']:has-text('Model training')", "button:has-text('Model training')", "label:has-text('Model training')"];   // guess
+const EXPERIMENTS_LINK = ["nav a:has-text('Experiments')", "a[href*='experiments']:has-text('Experiments')", "a:text-is('Experiments')"];   // guess
 
 // The requests sent so far that `sends` names and that are not a GET: a take fails if there is one.
 function writesSeen(page) {
@@ -83,15 +100,15 @@ async function noDialog(page, where) {
 
 async function visibleText(page, text, what, timeoutMs = SLOW_MS) {
   await waitUntil(page, { what, timeoutMs, done: async () => (await page.getByText(text).first().isVisible().catch(() => false)) || undefined });
-  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: wait(30000) }).catch(() => {});
 }
 
 // Click the first of these on screen, waiting for one up to `timeoutMs`; says which matched.
-async function clickOne(page, selectors, what, timeoutMs = 60000) {
+async function clickOne(page, selectors, what, timeoutMs = wait(60000)) {
   const found = await waitUntil(page, { what, timeoutMs, done: async () => (await firstVisible(page, selectors)) || undefined })
     .catch(() => { throw new Error(`${what} was not found (${selectors.join(" | ")})`); });
   await click(found, { changes });
-  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: wait(30000) }).catch(() => {});
   return found.matched;
 }
 
@@ -108,7 +125,7 @@ async function menuLinks(page) {
 }
 
 async function settle(page) {
-  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: wait(60000) }).catch(() => {});
   await page.waitForTimeout(800);
 }
 
@@ -137,9 +154,11 @@ async function frameWith(page, text, exact = false) {
 async function waitFrameWith(page, text, what, timeoutMs = SLOW_MS, exact = false) {
   return waitUntil(page, { what, timeoutMs, done: async () => (await frameWith(page, text, exact)) || undefined });
 }
-// The first of these selectors on screen in any frame: the locator, with the selector that matched.
-async function anyFrame(page, selectors) {
-  for (const frame of page.frames()) {
+// The first of these selectors on screen in any frame (or in MLflow's own frames only, `mlflowOnly`): the locator, with
+// the selector that matched.
+const isMlflow = (frame) => { try { return /^\/mlflow(\/|$)/.test(new URL(frame.url()).pathname); } catch { return false; } };
+async function anyFrame(page, selectors, mlflowOnly = false) {
+  for (const frame of page.frames().filter((f) => !mlflowOnly || isMlflow(f))) {
     for (const selector of selectors) {
       const found = frame.locator(selector).first();
       if (await found.isVisible().catch(() => false)) return Object.assign(found, { matched: selector });
@@ -152,10 +171,10 @@ async function anyFrame(page, selectors) {
 const SCREENS = [
   { name: "pipeline", show: async ({ page, base }) => {
     const how = [await goMenu(page, base, HREF.projects)];
-    const project = await waitUntil(page, { what: `the project ${PROJECT}`, timeoutMs: 60000, done: async () => (await firstVisible(page, PROJECT_LINK)) || undefined }).catch(() => null);
+    const project = await waitUntil(page, { what: `the project ${PROJECT}`, timeoutMs: wait(60000), done: async () => (await firstVisible(page, PROJECT_LINK)) || undefined }).catch(() => null);
     if (project) { await click(project, { changes }); how.push(project.matched); } else { await page.goto(`${base}${PROJECT_PAGE}`); how.push(`address ${PROJECT_PAGE}`); }
     await settle(page);
-    const tab = await waitUntil(page, { what: "the project's Pipelines tab", timeoutMs: 60000, done: async () => (await firstVisible(page, PIPELINES_TAB)) || undefined }).catch(() => null);
+    const tab = await waitUntil(page, { what: "the project's Pipelines tab", timeoutMs: wait(60000), done: async () => (await firstVisible(page, PIPELINES_TAB)) || undefined }).catch(() => null);
     if (!tab) { await page.goto(`${base}${PROJECT_PAGE}?section=pipelines-projects`); how.push("address ?section=pipelines-projects"); await settle(page); }
     else if ((await tab.getAttribute("aria-selected").catch(() => null)) !== "true") { await click(tab, { changes }); how.push(tab.matched); await settle(page); }
     how.push(await clickOne(page, PIPELINE_LINK, `the pipeline ${PIPELINE}`, SLOW_MS));
@@ -170,29 +189,29 @@ const SCREENS = [
     await noDialog(page, "pipeline's graph");
     // The version names drawn on the page: another version than the page's fails the take; none drawn is reported.
     const shownVersions = await read(page, (source) => [...new Set((document.querySelector("main") || document.body).innerText.match(new RegExp(source, "g")) || [])], VERSIONS.source).catch(() => []);
-    if (shownVersions.length && !shownVersions.includes(VERSION)) {
-      throw new Error(`the graph on screen is of ${shownVersions.join(", ")}, not ${VERSION}: the page's 0:45 row names it`);
+    if (shownVersions.length && !shownVersions.some((v) => VERSION.test(v))) {
+      throw new Error(`the graph on screen is of ${shownVersions.join(", ")}, not a tekos version: the page's 0:45 row names the tekos pipeline`);
     }
     return { how, url: new URL(page.url()).pathname, versions_shown: shownVersions,
              merge_export_on_screen: await page.getByText(/merge-export/).first().isVisible().catch(() => false) };
   } },
   { name: "trainjob", show: async ({ page, base }) => {
     const how = [await goMenu(page, base, HREF.jobs)];
-    let shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, 30000).catch(() => null);
+    let shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, wait(30000)).catch(() => null);
     if (!shown && !new URL(page.url()).pathname.includes("zuno-mlops")) {
       // The dashboard's project pages carry the namespace last (guess): the Jobs page of zuno-mlops.
       await page.goto(`${base}${HREF.jobs}/zuno-mlops`);
       await settle(page);
       how.push(`address ${HREF.jobs}/zuno-mlops`);
-      shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, 30000).catch(() => null);
+      shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, wait(30000)).catch(() => null);
     }
     if (!shown) {
       const picker = await firstVisible(page, PROJECT_PICKER);
       if (picker) {
         await click(picker, { changes });
         how.push(picker.matched);
-        await clickOne(page, [`[role='menu'] :text-is('${PROJECT}')`, `[role='listbox'] :text-is('${PROJECT}')`, `[role='option']:has-text('${PROJECT}')`], `the project ${PROJECT} in the selector`, 15000);
-        shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, 30000).catch(() => null);
+        await clickOne(page, [`[role='menu'] :text-is('${PROJECT}')`, `[role='listbox'] :text-is('${PROJECT}')`, `[role='option']:has-text('${PROJECT}')`], `the project ${PROJECT} in the selector`, wait(15000));
+        shown = await waitFrameWith(page, TRAINJOB, `the TrainJob ${TRAINJOB}`, wait(30000)).catch(() => null);
       }
     }
     if (!shown) {
@@ -204,7 +223,7 @@ const SCREENS = [
   { name: "mlflow", show: async ({ page, base }) => {
     const how = [await goMenu(page, base, HREF.mlflow)];
     let workspace = "";
-    let frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT}`, 60000, true).catch(() => null);
+    let frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT}`, wait(60000), true).catch(() => null);
     let dashboardList = "";
     if (!frame && await frameWith(page, NO_EXPERIMENTS)) {
       // The rescout of 2026-11-16: the dashboard's Experiments page for Zuno MLOps said "No experiments". MLflow's own UI,
@@ -217,24 +236,38 @@ const SCREENS = [
       await page.goto(target.href);
       await settle(page);
       how.push(`Launch MLflow: ${target.host === new URL(base).host ? "" : target.host}${target.pathname}`);
-      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's own UI`, 60000, true).catch(() => null);
-    }
-    if (!frame && dashboardList) {
-      const listed = await read(page, () => [...document.querySelectorAll("td a, [role='gridcell'] a, [role='row'] a")].map((a) => (a.innerText || "").trim()).filter(Boolean).slice(0, 12)).catch(() => []);
-      if (!(await anyFrame(page, WORKSPACE_PICKER))) {
-        throw new Error(`no experiment ${EXPERIMENT}: the dashboard says "No experiments" for ${PROJECT}, and MLflow's own UI (${new URL(page.url()).host}${new URL(page.url()).pathname}) lists ${listed.length ? listed.join(", ") : "none"} `
-          + "with no workspace picker: row 2:45 has nothing to show on this cluster (its fallback: the WP-116 record)");
-      }
+      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's own UI`, wait(60000), true).catch(() => null);
     }
     if (!frame) {
-      const picker = await anyFrame(page, WORKSPACE_PICKER);
-      if (!picker) throw new Error(`MLflow shows neither the experiment ${EXPERIMENT} nor a workspace picker (${WORKSPACE_PICKER.join(" | ")})`);
+      // MLflow's own UI: its Experiments page ("Create experiment" is never pressed).
+      const list = await anyFrame(page, EXPERIMENTS_LINK, true);
+      if (list) { await click(list, { changes }); how.push(list.matched); await settle(page); }
+      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's Experiments`, wait(30000), true).catch(() => null);
+    }
+    if (!frame && TRAINING_VIEW_DECLARED) {
+      const toggle = await anyFrame(page, TRAINING_VIEW, true);
+      if (toggle) { await click(toggle, { change: TRAINING_CHANGE, changes }); how.push(toggle.matched); await settle(page); }
+      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's training view`, wait(30000), true).catch(() => null);
+    }
+    if (!frame) {
+      const picker = await anyFrame(page, WORKSPACE_PICKER, true);
+      const onIt = picker ? new RegExp(WORKSPACE).test(await picker.innerText().catch(() => "")) : false;
+      if (!picker || onIt) {
+        const where = page.frames().find(isMlflow) || page.mainFrame();
+        const listed = await where.evaluate(() => [...document.querySelectorAll("td a, [role='gridcell'] a, [role='row'] a")].map((a) => (a.innerText || "").trim()).filter(Boolean).slice(0, 12)).catch(() => []);
+        const toggle = !TRAINING_VIEW_DECLARED && await anyFrame(page, TRAINING_VIEW, true);
+        const seen = `MLflow's own UI ${onIt ? `in the workspace ${WORKSPACE} ` : ""}lists ${listed.length ? listed.join(", ") : "none"}`
+          + `${dashboardList ? `, the dashboard says "No experiments" for ${PROJECT}` : ""} (${how.join(" > ")})`;
+        throw new Error(toggle
+          ? `no experiment ${EXPERIMENT} outside MLflow's "Model training" view, a radio a take switches only as a declared change, the owner's decision: ${seen}`
+          : `no experiment ${EXPERIMENT}: ${seen}; row 2:45 may have nothing to show on this cluster (its fallback: the WP-116 record)`);
+      }
       await click(picker, { changes });
       workspace = picker.matched;
-      const option = await waitUntil(page, { what: `the workspace ${WORKSPACE}`, timeoutMs: 15000,
+      const option = await waitUntil(page, { what: `the workspace ${WORKSPACE}`, timeoutMs: wait(15000),
         done: async () => (await anyFrame(page, [`[role='option']:has-text('${WORKSPACE}')`, `[role='menuitem']:has-text('${WORKSPACE}')`, `li:has-text('${WORKSPACE}')`])) || undefined });
       await click(option, { changes });
-      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in the workspace ${WORKSPACE}`, 30000, true);
+      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in the workspace ${WORKSPACE}`, wait(30000), true);
     }
     await click(frame.getByText(EXPERIMENT, { exact: true }).first(), { changes });
     const runs = await waitFrameWith(page, RUN_NAME, `a run of ${EXPERIMENT}`);
@@ -248,19 +281,19 @@ const SCREENS = [
 export async function enter({ page, base, mark, keycloak, state }) {
   state.writes = writesSeen(page);
   await page.goto(`${base}/`);
-  const provider = await waitUntil(page, { what: "the OpenShift sign-in page", timeoutMs: 60000,
+  const provider = await waitUntil(page, { what: "the OpenShift sign-in page", timeoutMs: wait(60000),
     done: async () => (await firstVisible(page, [...PROVIDER_LINK, "#username"])) || undefined });
   if (provider.matched !== "#username") await click(provider, { changes });
-  await page.waitForSelector("#username", { timeout: 30000 });
+  await page.waitForSelector("#username", { timeout: wait(30000) });
   await mark("login");   // the EMPTY Keycloak form: nothing is marked once the password is typed
   await keycloak(persona);
-  await waitUntil(page, { what: "the OpenShift AI dashboard", timeoutMs: 90000, done: async () => {
+  await waitUntil(page, { what: "the OpenShift AI dashboard", timeoutMs: wait(90000), done: async () => {
     if (APPROVE.test(page.url()) || APPROVE.test(await page.locator("body").innerText().catch(() => ""))) {
       throw new Error(`OpenShift asks ${persona} to authorize the dashboard's access: a take grants nothing; sign in once by hand, then take again`);
     }
     return (page.url().startsWith(base) && (await firstVisible(page, NAV))) || undefined;
   } });
-  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: wait(60000) }).catch(() => {});
   await page.waitForTimeout(1500);
 }
 
@@ -294,7 +327,7 @@ export async function scout(ctx) {
   await step("menu", async () => ({ url: page.url().replace(/[?#].*/, ""), dialog_on_screen: await page.locator(DIALOG).first().isVisible().catch(() => false),
                                     links: await menuLinks(page) }));
   await page.goto(`${base}/`);
-  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: wait(60000) }).catch(() => {});
   for (const screen of SCREENS) {
     await step(screen.name, async () => screen.show(ctx));
     await step(`${screen.name}-shapes`, async () => ({ url: page.url().replace(/[?#].*/, ""), main: await describe(page, "main, body", 60).catch(() => []),

@@ -44,7 +44,7 @@ ${dialog ? `<div class="modal" role="dialog" aria-modal="true"><div><h2>Welcome 
 }
 
 const PIPELINES = ["MLOps: dataset-to-model LoRA/PEFT pipeline", "MLOps: dataset-to-model LoRA/PEFT pipeline (comage)", "MLOps: dataset-to-model LoRA/PEFT pipeline (tekos)"];
-const VERSION = process.env.FAKE_VERSION === "v0-4-0" ? "v0-4-0-tekos" : "v0-3-0-tekos";
+const VERSION = { "v0-4-0": "v0-4-0-tekos", comage: "v0-3-0-comage" }[process.env.FAKE_VERSION] || "v0-3-0-tekos";
 
 function view(path, query) {
   if (path === "/") return `<h1>Welcome, ai-dev-01</h1><p>Your projects</p>`;
@@ -58,7 +58,8 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
   }
   if (path === "/pipelines/zuno-mlops/p2/view") {
     const graph = `<h1>${PIPELINES[2]}</h1>${knob("FAKE_NO_VERSION_NAME") ? "" : `<p>Version: <span>${VERSION}</span></p>`}<button>Create run</button>
-<svg width="900" height="160">${["prepare-dataset", "train-lora", "evaluate", "push-registry"].map((s, i) => `<rect x="${20 + i * 220}" y="40" width="180" height="40" fill="#ddd"/><text x="${30 + i * 220}" y="65">${s}</text>`).join("")}</svg>`;
+<p>LoRA/PEFT adapter pipeline for tekos - prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)</p>
+<svg width="900" height="160">${["component", "component-2", "component-3", "component-4"].map((s, i) => `<rect x="${20 + i * 220}" y="40" width="180" height="40" fill="#ddd"/><text x="${30 + i * 220}" y="65">${s}</text>`).join("")}</svg>`;
     // Drawn after a spinner, as the rescout of 2026-11-16 caught the page ("Loading").
     return `<div id="graph"><div role="progressbar">Loading</div></div><script>setTimeout(() => { document.getElementById("graph").innerHTML = ${JSON.stringify(graph)}; }, 2500);</script>`;
   }
@@ -72,12 +73,32 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
   return null;
 }
 
-const MLFLOW_HOME = `<!doctype html><title>MLflow</title><body style="font:16px sans-serif"><header>MLflow <button id="ws">Workspace: default</button>
-<div role="listbox" id="wslist" hidden><div role="option" onclick="document.getElementById('exps').hidden=false;document.getElementById('wslist').hidden=true">zuno-mlops</div></div></header>
-<main><h2>Experiments</h2><table><tr><td><a href="/mlflow/experiments/0">Default</a></td></tr></table>
-<div id="exps"${knob("FAKE_MLFLOW_WORKSPACE") ? " hidden" : ""}>${knob("FAKE_MLFLOW_EMPTY") ? "" : `<a href="/mlflow/experiments/7">mlops-comage</a>`}</div></main>
-<script>document.getElementById("ws").onclick = () => { document.getElementById("wslist").hidden = false; };
-fetch("/mlflow/ajax-api/2.0/mlflow/experiments/search", { method: "POST", body: "{}" });</script>`;
+// MLflow 3.15's own UI as the rescout of 2026-11-16 saw it: a workspace picker, a toggle GenAI | Model training on
+// GenAI, a left menu Home | Experiments; the GenAI Home says "Create your first experiment". The training view's
+// Experiments page lists the experiments of the workspace chosen (zuno-mlops, or "default" with FAKE_MLFLOW_WORKSPACE),
+// in either view; with FAKE_MLFLOW_TRAINING_ONLY=1 only in the training view (a radio a take does not switch).
+const MLFLOW_HOME = `<!doctype html><title>MLflow</title><body style="font:16px sans-serif"><header>MLflow
+<button id="ws">Workspace: ${knob("FAKE_MLFLOW_WORKSPACE") ? "default" : "zuno-mlops"}</button>
+<div role="listbox" id="wslist" hidden><div role="option" id="pick">zuno-mlops</div></div>
+<div role="radiogroup"><button role="radio" aria-checked="true" id="genai">GenAI</button><button role="radio" aria-checked="false" id="training">Model training</button></div></header>
+<nav><a href="#home" id="home">Home</a> <a href="#experiments" id="exp">Experiments</a> <a href="#prompts">Prompts</a></nav>
+<main id="view"><h2>Home</h2><p>Recent Experiments: Create your first experiment</p><button>Create experiment</button></main>
+<script>
+const $ = (id) => document.getElementById(id);
+let mode = "genai", ws = ${JSON.stringify(knob("FAKE_MLFLOW_WORKSPACE") ? "default" : "zuno-mlops")}, page = "home";
+function render() {
+  if (page !== "experiments") return;
+  const rows = (mode === "training" || !${knob("FAKE_MLFLOW_TRAINING_ONLY")}) && ws === "zuno-mlops"
+    ? '<tr><td><a href="/mlflow/experiments/0">Default</a></td></tr>' + (${knob("FAKE_MLFLOW_EMPTY")} ? "" : '<tr><td><a href="/mlflow/experiments/7">mlops-comage</a></td></tr>')
+    : "<tr><td>No experiments</td></tr>";
+  $("view").innerHTML = "<h2>Experiments</h2><table>" + rows + "</table>";
+}
+$("ws").onclick = () => { $("wslist").hidden = false; };
+$("pick").onclick = () => { ws = "zuno-mlops"; $("ws").textContent = "Workspace: zuno-mlops"; $("wslist").hidden = true; render(); };
+$("training").onclick = () => { mode = "training"; $("training").setAttribute("aria-checked", "true"); $("genai").setAttribute("aria-checked", "false"); render(); };
+$("exp").onclick = (e) => { e.preventDefault(); page = "experiments"; render(); };
+fetch("/mlflow/ajax-api/2.0/mlflow/experiments/search", { method: "POST", body: "{}" });
+</script>`;
 const MLFLOW_EXPERIMENT = `<!doctype html><title>mlops-comage - MLflow</title><body style="font:16px sans-serif"><main><h2>mlops-comage</h2>
 <table><tr><th>Run Name</th><th>base_model</th><th>lora_r</th><th>train_loss</th></tr><tr><td>wp126-20260908-195101</td><td>qwen35-9b</td><td>16</td><td>1.23</td></tr></table></main>
 <script>fetch("/mlflow/ajax-api/2.0/mlflow/runs/search", { method: "POST", body: "{}" });
