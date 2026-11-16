@@ -12,7 +12,8 @@
 record_notice: >-
   a recorded browser session in AAP as consultant-03 (aap_reader), read only: the templates, the jobs, the Details tab
   of one zuno-day0-check run launched by zuno-mcp (never its Output) and the project zuno-demo; every request to AAP
-  other than a read is refused in the browser, nothing is launched, synced or approved, no model call; AAP may create
+  other than a read is refused in the browser, except AAP's own session refresh (POST /api/gateway/v1/session/,
+  counted in the log); nothing is launched, synced or approved, no model call; AAP may create
   the user consultant-03 at its first Keycloak sign-in, as the page's 0:00 row does
 target_seconds: [40, 60]
 width: 960

@@ -13,17 +13,27 @@
 // name or a private address at a marker.)
 //
 // Read only. It launches, syncs, approves and edits nothing: every request to AAP other than GET, HEAD or OPTIONS is
-// refused before it leaves the browser (guard() below), and a take or a scout that met one fails and names it. owned()
+// refused before it leaves the browser (guard() below), and a take or a scout that met one fails and names it. One
+// exception, decided by zuno-demo-reorg on 2026-11-16 after the first scout: AAP's own page refreshes its session with
+// POST /api/gateway/v1/session/ (five times in that scout); that method on that exact path is let through, counted, and
+// reported with its body's size and the names of its JSON keys, never a value. It is the signed-in session refreshing
+// itself, as in any presenter's browser, not a declared change. owned()
 // lists the jobs consultant-03 launched (AAP's unified jobs it created): the same list before and after, nothing to
 // delete. No model, no budget. AAP itself may create the user consultant-03 at its first sign-in (the Keycloak
 // authenticator creates users), as the page's 0:00 row does.
 //
-// NOT seen live: AAP 2.7's screens on demo333. The Keycloak sign-in to AAP was proven once, on demo222 (WP-103,
+// The first scout (2026-11-16 13:57, demo333) passed every screen: the Keycloak link `a:has-text('Keycloak zuno')`,
+// /overview, the templates by their address (no menu link "Templates"), the filter #filter-input then Enter, a reader
+// who sees zuno-mcp's runs (14 of 20), the Details of a run, the project zuno-demo. On the job's Details the lower part
+// of the page (an execution node, an instance group, an address, an email) must stay out of the window: checked at
+// the `job` marker (OUT_OF_FRAME below). A scout or a take that has not ended after DEADLINE_MS stops and logs where.
+//
+// Before that scout: AAP 2.7's screens on demo333 were NOT seen live. The Keycloak sign-in to AAP was proven once, on demo222 (WP-103,
 // 2026-08-30), by a login round trip checked through the API, never with these screens. Every selector below is a
 // guess from AAP's platform UI. The scout plays the same screens and dumps the shapes of what it meets on each one
 // (tag, role, labels, the first classes), so the selectors can be written from them. Also untested: whether a reader
 // sees jobs it did not launch. The scout counts them; the page's fallback is consultant-02.
-import { click, describe, firstVisible, pageApi, waitUntil, wordsOnScreen } from "./_helpers.mjs";
+import { click, describe, firstVisible, pageApi, read, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "consultant-03";
 export const page = "docs/demo/scenarios/foundation/aap-audited-operations.md";
@@ -62,19 +72,90 @@ const APPLY = ["[aria-label='apply filter']", "main button[aria-label*='search' 
 const LAUNCH = "main button[aria-label*='Launch' i], main [data-cy*='launch' i]";                                            // guess; read for its state, never clicked
 const DIALOG = "[role='dialog'][aria-modal='true'], .pf-v5-c-backdrop, .pf-v6-c-backdrop";                                 // guess: a welcome or a tour
 const DWELL_MS = 2000;   // a presenter's pause on each screen, so that every motion moment has frames to cut
+// The one write let through (zuno-demo-reorg, 2026-11-16): AAP's session refresh, by its method and exact path.
+const SESSION = { method: "POST", path: "/api/gateway/v1/session/" };
+// What must not be inside the window on the job's Details (zuno-demo-reorg, 2026-11-16), looked for in AAP's main
+// area: the name of each kind found is reported, never the text.
+const OUT_OF_FRAME = [["an execution node", "Execution node"], ["an instance group", "Instance group"],
+                      ["an IPv4 address", "\\b\\d{1,3}(\\.\\d{1,3}){3}\\b"], ["an email address", "[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+"]];
+// A scout or a take that has not ended by then stops: the page is closed, and the log says the phase it was in. A
+// scout under load once hung 8 minutes with no output (2026-11-16); a normal one takes about a minute.
+const DEADLINE_MS = Number(process.env.RECORD_DEADLINE_MS) || 6 * 60 * 1000;   // RECORD_DEADLINE_MS: the offline test only
+
+// Where the scout or the take is, logged as it goes, for the deadline's message.
+function phase(ctx, name) {
+  ctx.state.phase = name;
+  ctx.log(`aap: ${name}`);
+}
+
+function arm(ctx) {
+  ctx.state.phase = "start";
+  const timer = setTimeout(() => {
+    ctx.state.stopped = ctx.state.phase;
+    ctx.log(`aap: STOPPED at "${ctx.state.phase}" after ${Math.round(DEADLINE_MS / 1000)} s (the overall deadline): the page is closed, the run ends`);
+    ctx.page.close().catch(() => {});
+  }, DEADLINE_MS);
+  if (timer.unref) timer.unref();
+  ctx.state.deadline = timer;
+}
+
+function disarm(state) {
+  if (state.deadline) clearTimeout(state.deadline);
+  state.deadline = null;
+}
 
 // Every request to AAP's own address that could change something is refused before it leaves the browser: only GET,
 // HEAD and OPTIONS pass (the Keycloak form is another address). Installed before the first page and kept for the
 // whole take; state.refused keeps what was refused (method and path).
 async function guard(page, base, state) {
   state.refused = [];
+  state.session = { count: 0, bytes: [], keys: [] };
   const origin = new URL(base).origin;
   await page.route((u) => u.origin === origin, (route) => {
     const r = route.request();
     if (["GET", "HEAD", "OPTIONS"].includes(r.method())) return route.fallback();
-    state.refused.push(`${r.method()} ${new URL(r.url()).pathname}`);
+    const path = new URL(r.url()).pathname;
+    if (r.method() === SESSION.method && path === SESSION.path) {
+      const body = r.postDataBuffer();
+      state.session.count += 1;
+      state.session.bytes.push(body ? body.length : 0);
+      if (body && body.length) {
+        let keys = ["(not JSON)"];
+        try {
+          const data = JSON.parse(body.toString("utf-8"));
+          keys = data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [`(${Array.isArray(data) ? "a list" : typeof data})`];
+        } catch { /* keys stay "(not JSON)" */ }
+        state.session.keys = [...new Set([...state.session.keys, ...keys])];
+      }
+      return route.fallback();
+    }
+    state.refused.push(`${r.method()} ${path}`);
     return route.abort();
   });
+}
+
+// What the session refreshes let through looked like: their count, the sizes of their bodies, their keys' names.
+const sessionSeen = (state) => `${state.session.count} (body bytes ${state.session.bytes.length ? [...new Set(state.session.bytes)].join("/") : "-"}, `
+  + `keys ${state.session.keys.length ? state.session.keys.join(", ") : "none"})`;
+
+// The kinds of OUT_OF_FRAME found in AAP's main area, inside the window (`inside`) or anywhere on the page (`page`).
+function framed([patterns, root]) {
+  const tests = patterns.map(([name, source]) => [name, new RegExp(source, "i")]);
+  const inside = new Set();
+  const anywhere = new Set();
+  const top = document.querySelector(root) || document.body;
+  const walker = document.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const found = tests.filter(([, re]) => re.test(node.textContent || ""));
+    if (!found.length) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const r = range.getBoundingClientRect();
+    const drawn = r.width >= 1 && r.height >= 1;
+    const within = drawn && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+    for (const [name] of found) { if (drawn) anywhere.add(name); if (within) inside.add(name); }
+  }
+  return { inside: [...inside], page: [...anywhere] };
 }
 
 function noWrites(state, where) {
@@ -125,9 +206,11 @@ async function go(page, base, which) {
 }
 
 // Sign in: AAP's sign-in page, its Keycloak link (or the address ui_auth gives), the Keycloak form, back to AAP.
-async function signIn({ page, base, mark, keycloak, state }) {
+async function signIn(ctx) {
+  const { page, base, mark, keycloak, state } = ctx;
   const chain = [];
   state.aap = { chain };
+  phase(ctx, "AAP's sign-in page");
   await page.goto(`${base}/`);
   let first = await waitUntil(page, { what: "AAP's sign-in page", timeoutMs: 60000,
                                       done: async () => (await firstVisible(page, [...SSO, KEYCLOAK_FORM, PASSWORD])) || undefined });
@@ -151,8 +234,10 @@ async function signIn({ page, base, mark, keycloak, state }) {
     await page.goto(new URL(sso.login_url, base).href);
     await page.waitForSelector(KEYCLOAK_FORM, { timeout: 30000 });
   }
+  phase(ctx, "the Keycloak form");
   await mark("login");   // the EMPTY Keycloak form: nothing is marked once the password is typed
   await keycloak(persona);
+  phase(ctx, "back to AAP after the Keycloak sign-in");
   let loginSince = 0;
   await waitUntil(page, { what: "AAP after the Keycloak sign-in", timeoutMs: 90000, done: async () => {
     if (!page.url().startsWith(base)) {
@@ -224,7 +309,19 @@ const SCREENS = [
     await shown(page, LAUNCHER, `the Details of job ${state.job}`);
     if (!/\/details\/?$/.test(new URL(page.url()).pathname)) throw new Error(`the job's Details are not at ${jobDetails(state.job)}: AAP went to ${new URL(page.url()).pathname}`);
     await noDialog(page, "the job's Details");
-    return { url: new URL(page.url()).pathname, words: await wordsOnScreen(page, [/Launched by/i, /Revision/i, /Successful|Failed|Running/, /Output/]) };
+    // The lower part of the Details stays out of the window: the page is shown from its top, and checked.
+    let frame = await read(page, framed, [OUT_OF_FRAME, MAIN]);
+    if (frame.inside.length) {
+      await read(page, () => { for (const el of [document.scrollingElement, ...document.querySelectorAll("main, [role='main'], main *")]) if (el && el.scrollTop) el.scrollTop = 0; });
+      await page.waitForTimeout(600);
+      frame = await read(page, framed, [OUT_OF_FRAME, MAIN]);
+    }
+    if (frame.inside.length) {
+      throw new Error(`the job's Details show ${frame.inside.join(", ")} inside the window, even from the top of the page: `
+        + "not for the GIF (zuno-demo-reorg, 2026-11-16); see the scout's job-shapes");
+    }
+    return { url: new URL(page.url()).pathname, below_the_window: frame.page,
+             words: await wordsOnScreen(page, [/Launched by/i, /Revision/i, /Successful|Failed|Running/, /Output/]) };
   } },
   { name: "project", show: async ({ page, base }) => {
     const how = await go(page, base, "projects");
@@ -244,6 +341,7 @@ const SCREENS = [
 ];
 
 export async function enter(ctx) {
+  arm(ctx);
   await guard(ctx.page, ctx.base, ctx.state);
   await signIn(ctx);
   noWrites(ctx.state, "the sign-in");
@@ -262,6 +360,7 @@ export async function run(ctx) {
   const { page, mark, log, state } = ctx;
   log(`sign-in: ${state.aap.chain.map((c) => `${c.step} ${c.matched}`).join(", ")}`);
   for (const screen of SCREENS) {
+    phase(ctx, screen.name);
     const found = await screen.show(ctx);
     noWrites(state, screen.name);
     log(`${screen.name}: ${JSON.stringify(found)}`);
@@ -271,6 +370,8 @@ export async function run(ctx) {
   }
   await page.waitForTimeout(1000);
   await mark("end");
+  disarm(state);
+  log(`AAP's session refreshes let through (POST ${SESSION.path}): ${sessionSeen(state)}`);
 }
 
 // The same screens as a take, without video. Each screen is a step, then a step `<screen>-shapes` that dumps what is
@@ -281,17 +382,21 @@ export async function scout(ctx) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   await step("sign-in", async () => ({ chain: state.aap.chain }));
   for (const screen of SCREENS) {
+    phase(ctx, screen.name);
     await step(screen.name, async () => screen.show(ctx));
     await step(`${screen.name}-shapes`, async () => ({ url: page.url().replace(/[?#].*/, ""), nav: await describe(page, "nav", 40).catch(() => []),
                                                        main: await describe(page, MAIN, 60).catch(() => []) }));
   }
+  disarm(state);
   await step("guard", async () => {
     noWrites(state, "the scout");
-    return { refused: state.refused };
+    if (state.stopped) throw new Error(`the scout stopped at "${state.stopped}" after ${Math.round(DEADLINE_MS / 1000)} s (the overall deadline)`);
+    return { refused: state.refused, session_refresh: { ...state.session, path: SESSION.path } };
   });
 }
 
 // Nothing was created: the take only reads.
-export async function cleanup() {
+export async function cleanup({ state }) {
+  disarm(state);
   return null;
 }

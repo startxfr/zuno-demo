@@ -510,7 +510,7 @@ if wanted aap-audited-operations; then
 echo "== aap-audited-operations"
 out="$(aap a-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "aap: a scout exits 0, SCOUT: done, nothing written, no Output opened" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0}' <<<\"\$0\"" "$out"
+expect "aap: a scout exits 0, SCOUT: done, nothing written but the session refreshes, no Output opened" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0,\"sessions\":[1-9]' <<<\"\$0\"" "$out"
 expect "aap: the scout plays every screen, dumps its shapes, finds job 102 (zuno-mcp's, not the latest) and no launch action" scouted a-scout '
 assert list(steps) == ["enter", "owned", "sign-in", "home", "home-shapes", "templates", "templates-shapes", "jobs", "jobs-shapes", "job", "job-shapes",
                        "project", "project-shapes", "guard"], list(steps)
@@ -520,10 +520,12 @@ assert steps["templates"]["launch_actions"] > 0 and steps["templates"]["launch_e
 assert steps["job"]["url"] == "/execution/jobs/playbook/102/details" and steps["project"]["words"]["\\bdevel\\b"] is True, (steps["job"], steps["project"])
 assert all(steps[n]["main"] and steps[n]["nav"] for n in ("templates-shapes", "jobs-shapes", "job-shapes", "project-shapes")), "shapes"
 assert steps["guard"]["refused"] == [] and s["private_addresses"]["flagged"] is False, s
+assert steps["guard"]["session_refresh"]["count"] >= 1 and steps["guard"]["session_refresh"]["path"] == "/api/gateway/v1/session/" and steps["guard"]["session_refresh"]["keys"] == [], steps["guard"]
+assert set(steps["job"]["below_the_window"]) == {"an execution node", "an instance group"}, steps["job"]
 '
 out="$(aap a-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "aap: a good take exits 0, RESULT: PASS, nothing written, no Output opened" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0}' <<<\"\$0\"" "$out"
+expect "aap: a good take exits 0, RESULT: PASS, nothing written but the session refreshes (logged), no Output opened" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0,\"sessions\":[1-9]' <<<\"\$0\" && grep -q 'session refreshes let through (POST /api/gateway/v1/session/): [1-9][0-9]* (body bytes 2, keys none)' <<<\"\$0\" && grep -q 'aap: back to AAP after the Keycloak sign-in' <<<\"\$0\"" "$out"
 expect "aap: the markers in order, nothing created, the jobs launched by consultant-03 the same, no node name at a marker" markers a-pass '
 assert names == ["login", "home", "templates", "jobs", "job", "project", "end"] and m["motion_from"] == "home" and m["status"] == "pass", m
 assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
@@ -545,6 +547,15 @@ expect "aap: a page that wants to write is refused in the browser and fails the 
 out="$(aap a-dialog FAKE_DIALOG=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "aap: a dialog over the first screen fails the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*a dialog covers AAP.s first screen' <<<\"\$0\"" "$out"
+out="$(aap a-body FAKE_SESSION_BODY=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a session refresh with a body is let through, its keys' names logged, never a value" bash -c "test $rc -eq 0 && grep -q 'keys theme, expires_in, padding)' <<<\"\$0\" && ! grep -q 'dark' <<<\"\$0\" && grep -q 'left: {\"writes\":0,' <<<\"\$0\"" "$out"
+out="$(aap a-low FAKE_DETAILS_LOW=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: the execution node or instance group inside the window on the Details fails the take, by kind" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*the job.s Details show an execution node, an instance group inside the window' <<<\"\$0\" && ! grep -q 'aap-controller-task' <<<\"\$0\"" "$out"
+out="$(aap a-hang FAKE_HANG=1 RECORD_DEADLINE_MS=25000)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a take that hangs stops at the overall deadline and logs the phase it was in" bash -c "test $rc -eq 1 && grep -q 'aap: STOPPED at \"templates\" after' <<<\"\$0\" && grep -q '^RESULT: FAIL' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"

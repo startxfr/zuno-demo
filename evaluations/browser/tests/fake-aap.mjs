@@ -9,10 +9,15 @@
 // project zuno-demo. The job links of the list open the Output, as AAP's may. The controller API answers the reads of
 // jobs, unified jobs and projects. Every request that is not a GET is counted and refused.
 // Jobs: 101 zuno-day1-check by admin, 102 zuno-day0-check by zuno-mcp, 103 zuno-day0-check by admin (the latest).
+// Every page of the signed-in UI refreshes its session as AAP's did in the scout of 2026-11-16: POST
+// /api/gateway/v1/session/ with `{}`. A job's Details keep "Execution node" and "Instance group" below the window.
 // Knobs: FAKE_SSO_HIDDEN=1 the sign-in page shows no Keycloak link; FAKE_LOGIN_LOOP=1 the sign-in comes back to AAP's
 // sign-in page; FAKE_NO_MCP_JOB=1 no job launched by zuno-mcp; FAKE_UI_WRITE=1 the first screen POSTs a preference;
-// FAKE_DIALOG=1 a dialog covers the first screen. /fake/count says {writes, outputs}: the non-GET requests that reached
-// the stand-in and the Output pages served. No cluster.
+// FAKE_DIALOG=1 a dialog covers the first screen; FAKE_SESSION_BODY=1 the session refresh carries a JSON body with two
+// keys; FAKE_DETAILS_LOW=1 the Details show the execution node and the instance group at the top; FAKE_HANG=1 the
+// templates page never shows its list. /fake/count says
+// {writes, outputs, sessions}: the other non-GET requests that reached the stand-in, the Output pages served and the
+// session refreshes received. No cluster.
 import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8092);
@@ -20,6 +25,8 @@ const SLUG = "ansible_base-authentication-authenticator_plugins-keycloak__keyclo
 const knob = (name) => process.env[name] === "1";
 let writes = 0;
 let outputs = 0;
+let sessions = 0;
+const SESSION_BODY = process.env.FAKE_SESSION_BODY === "1" ? JSON.stringify({ theme: "dark", expires_in: 1800, padding: "x".repeat(60) }) : "{}";
 
 const TEMPLATES = ["zuno-day0-check", "zuno-day1-build", "zuno-day1-check", "zuno-day1-check-workflow", "zuno-day1-install",
                    "zuno-day1-install-workflow", "zuno-day1-reconcile", "zuno-day2-check", "zuno-day3-test"];
@@ -41,7 +48,8 @@ function shell(path, user, main) {
   return page("Ansible Automation Platform", `<nav aria-label="Global"><a href="/overview">Overview</a>
 <button id="grp" aria-expanded="${open}" onclick="const g=document.getElementById('grp-items');g.hidden=!g.hidden">Automation Execution</button>
 <div id="grp-items"${open ? "" : " hidden"}><a href="/execution/jobs">Jobs</a><a href="/execution/templates">Templates</a><a href="/execution/projects">Projects</a></div></nav>
-<header style="position:fixed;right:16px;top:8px">${user}</header><main>${main}</main>`);
+<header style="position:fixed;right:16px;top:8px">${user}</header><main>${main}</main>
+<script>fetch("/api/gateway/v1/session/", { method: "POST", body: ${JSON.stringify(SESSION_BODY)} })</script>`);
 }
 
 const table = (rows) => `<table><tbody>${rows.join("")}</tbody></table>`;
@@ -53,6 +61,7 @@ function view(path, query, user) {
       + (knob("FAKE_UI_WRITE") ? `<script>fetch("/api/gateway/v1/user_preferences/", {method: "POST", body: "{}"})</script>` : "");
   }
   if (path === "/execution/templates") {
+    if (knob("FAKE_HANG")) return `<h1>Templates</h1><p>Loading...</p>`;
     return `<h1>Templates</h1>` + table(TEMPLATES.map((t) => `<tr><td><a href="/execution/templates/job-template/1/details">${t}</a></td>`
       + `<td><button aria-label="Launch template" disabled>Launch</button></td></tr>`));
   }
@@ -73,8 +82,10 @@ onclick="location.href='/execution/jobs?name='+encodeURIComponent(document.getEl
       outputs += 1;
       return `<h1>${found.id} - ${found.name}</h1>${tabs}<pre>TASK [day0 check] ok: [ip-10-1-2-3.ec2.internal]</pre>`;
     }
-    return `<h1>${found.id} - ${found.name}</h1>${tabs}<dl><dt>Status</dt><dd>Successful</dd><dt>Job template</dt><dd>${found.name}</dd>`
-      + `<dt>Launched by</dt><dd>${found.by}</dd><dt>Project</dt><dd>zuno-demo</dd><dt>Revision</dt><dd>0123abcd</dd></dl>`;
+    const low = `<dt>Execution node</dt><dd>aap-controller-task-0</dd><dt>Instance group</dt><dd>default</dd>`;
+    return `<h1>${found.id} - ${found.name}</h1>${tabs}<dl>${knob("FAKE_DETAILS_LOW") ? low : ""}<dt>Status</dt><dd>Successful</dd><dt>Job template</dt><dd>${found.name}</dd>`
+      + `<dt>Launched by</dt><dd>${found.by}</dd><dt>Project</dt><dd>zuno-demo</dd><dt>Revision</dt><dd>0123abcd</dd>`
+      + `${knob("FAKE_DETAILS_LOW") ? "" : `<div style="height:1400px"></div>${low}`}</dl>`;
   }
   if (path === "/execution/projects") return `<h1>Projects</h1>` + table([`<tr><td><a href="/execution/projects/7/details">zuno-demo</a></td><td>Successful</td></tr>`]);
   if (path === "/execution/projects/7/details") {
@@ -92,7 +103,8 @@ function json(res, status, body) {
 http.createServer((req, res) => {
   const url = new URL(req.url, "http://fake");
   const user = (/(?:^|; )sid=([a-z0-9-]+)/.exec(req.headers.cookie || "") || [])[1] || "";
-  if (url.pathname === "/fake/count") return json(res, 200, { writes, outputs });
+  if (url.pathname === "/fake/count") return json(res, 200, { writes, outputs, sessions });
+  if (req.method === "POST" && url.pathname === "/api/gateway/v1/session/") { sessions += 1; return json(res, 200, {}); }
   if (req.method !== "GET") { writes += 1; return json(res, 403, { detail: "the stand-in refuses every write" }); }
   if (url.pathname === "/api/gateway/v1/ui_auth/") return json(res, 200, { show_login_form: true, ssos: [{ name: "Keycloak zuno", login_url: `/api/gateway/social/login/${SLUG}/` }] });
   if (url.pathname === `/api/gateway/social/login/${SLUG}/`) { res.writeHead(302, { location: "/fake-keycloak/auth" }); return res.end(); }
