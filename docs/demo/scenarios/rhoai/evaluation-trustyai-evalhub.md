@@ -19,6 +19,8 @@ This scenario shows past results. Running an evaluation is a cluster change: reh
 **The message:** "Models and agents are measured before they change: a benchmark, the quality of the RAG answers,
 jailbreak resistance, and twenty scenarios per agent with a 75% bar. The results stay visible, failures included."
 
+![The 5-minute version of the evaluation demo, recorded live as ai-ops-01 on the Grafana TrustyAI dashboard: the evaluation jobs and their outcome, the RAGAS scores of three test questions, and the Garak attack success rates per probe and detector, including a detector at 100%.](../../../assets/img/demo/evaluation-trustyai-evalhub.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
