@@ -68,7 +68,7 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana, "lora-pipeline-mlflow-kueue": ["switches MLflow\x27s own UI from its GenAI view"]}.get(s["demo"], [])
+declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -703,25 +703,23 @@ echo "== lora-pipeline-mlflow-kueue"
 out="$(lora l-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a scout exits 0, SCOUT: done, nothing started or changed" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0}' <<<\"\$0\"" "$out"
-expect "lora: the scout dumps the menu's links with their addresses, then plays the three screens" scouted l-scout '
-assert list(steps) == ["enter", "owned", "menu", "pipeline", "pipeline-shapes", "trainjob", "trainjob-shapes", "mlflow", "mlflow-shapes", "closed"], list(steps)
+expect "lora: the scout dumps the menu's links with their addresses, then plays the two screens of the GIF (row 2:45 off)" scouted l-scout '
+assert list(steps) == ["enter", "owned", "menu", "pipeline", "pipeline-shapes", "trainjob", "trainjob-shapes", "closed"], list(steps)
 links = {l["text"]: l["href"] for l in steps["menu"]["links"]}
 assert links.get("Jobs") == "/develop-train/training-jobs" and links.get("Experiments") == "/develop-train/mlflow/experiments" and links.get("Projects") == "/projects", links
 assert steps["pipeline"]["versions_shown"] == ["v0-3-0-tekos"] and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
 assert steps["trainjob"]["how"] == ["menu nav a[href=\x27/develop-train/training-jobs\x27]", "address /develop-train/training-jobs/zuno-mlops"], steps["trainjob"]
-assert steps["mlflow"]["workspace"] == "none chosen" and steps["mlflow"]["embedded"] is False and steps["mlflow"]["dashboard_list"] == "No experiments", steps["mlflow"]
-assert steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]", "Launch MLflow: /mlflow/", "nav a:has-text(\x27Experiments\x27)"], steps["mlflow"]
-assert steps["pipeline"]["how"][0] == "menu nav a[href=\x27/projects\x27]" and any(f.startswith("/mlflow/") for f in steps["mlflow-shapes"]["frames"]), (steps["pipeline"], steps["mlflow-shapes"]["frames"])
+assert steps["pipeline"]["how"][0] == "menu nav a[href=\x27/projects\x27]", steps["pipeline"]
 '
 out="$(lora l-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a good take exits 0, RESULT: PASS, nothing started or changed" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0}' <<<\"\$0\"" "$out"
 expect "lora: the markers in order, nothing created or owned, no node name at a marker" markers l-pass '
-assert names == ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"] and m["motion_from"] == "dashboard" and m["status"] == "pass", m
+assert names == ["login", "dashboard", "pipeline", "trainjob", "end"] and m["motion_from"] == "dashboard" and m["status"] == "pass", m
 assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
 assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
 '
-out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1 FAKE_VERSION=v0-4-0)"; rc=$?
+out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1 FAKE_VERSION=v0-4-0 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: MLflow on another workspace: zuno-mlops is chosen; a v0-4-0-tekos graph passes too" bash -c "test $rc -eq 0 && grep -q 'mlflow: {.*\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\" && grep -q '\"versions_shown\":\[\"v0-4-0-tekos\"\]' <<<\"\$0\"" "$out"
 out="$(lora l-notrain FAKE_NO_TRAINING=1)"; rc=$?
@@ -730,19 +728,19 @@ expect "lora: no Jobs page fails the take and names the terminal row" bash -c "t
 out="$(lora l-v4 FAKE_VERSION=comage)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a graph of another pipeline's version (comage) fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is of v0-3-0-comage, not a tekos version' <<<\"\$0\"" "$out"
-out="$(lora l-frame FAKE_DASHBOARD_FRAME=1 FAKE_NO_VERSION_NAME=1)"; rc=$?
+out="$(lora l-frame FAKE_DASHBOARD_FRAME=1 FAKE_NO_VERSION_NAME=1 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: MLflow embedded in the dashboard's page and a graph that names no version: the take passes and says so" bash -c "test $rc -eq 0 && grep -q '\"versions_shown\":\[\]' <<<\"\$0\" && grep -q '\"embedded\":true' <<<\"\$0\"" "$out"
-out="$(lora l-empty FAKE_MLFLOW_EMPTY=1)"; rc=$?
+out="$(lora l-empty FAKE_MLFLOW_EMPTY=1 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: no experiment mlops-comage in the dashboard or in MLflow's own UI fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*mlops-comage' <<<\"\$0\"" "$out"
-out="$(lora l-training FAKE_MLFLOW_TRAINING_ONLY=1)"; rc=$?
+out="$(lora l-training FAKE_MLFLOW_TRAINING_ONLY=1 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: an experiment listed only in MLflow's training view: the declared switch sends no write, the take passes" bash -c "test $rc -eq 0 && grep -q '\"training_view\":{\"sent\":\[[^]]*\],\"refused\":\[\]}' <<<\"\$0\"" "$out"
-out="$(lora l-togglewrite FAKE_MLFLOW_TRAINING_ONLY=1 FAKE_TOGGLE_WRITE=1)"; rc=$?
+out="$(lora l-togglewrite FAKE_MLFLOW_TRAINING_ONLY=1 FAKE_TOGGLE_WRITE=1 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a view switch that would write is refused and fails the take (option B)" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL switching MLflow to its Model training view wanted to send POST /mlflow/ajax-api/2.0/mlflow/users/preferences' <<<\"\$0\"" "$out"
-out="$(lora l-write FAKE_WRITE=1)"; rc=$?
+out="$(lora l-write FAKE_WRITE=1 RECORD_MLFLOW_ROW=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a page that writes to MLflow fails the take; MLflow's searches (POSTs) do not" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /mlflow/ajax-api/2.0/mlflow/runs/set-tag' <<<\"\$0\"" "$out"
 out="$(lora l-dialog FAKE_DIALOG=1)"; rc=$?

@@ -3,9 +3,9 @@
 //
 // The rows of docs/demo/scenarios/rhoai/lora-pipeline-mlflow-kueue.md, as ai-dev-01: the Keycloak form (login), the
 // OpenShift AI dashboard (dashboard), the project Zuno MLOps and the graph of the pipeline "MLOps: dataset-to-model
-// LoRA/PEFT pipeline (tekos)", version v0-3-0-tekos (pipeline, row 0:45), the Training jobs page with the TrainJob
-// lora-comage-4c28m (trainjob, row 1:45), the MLflow experiment mlops-comage and its runs (mlflow, row 2:45), then end.
-// Rows 0:00 and 4:30 are words; row 3:45 is the evidence page of WP-133, not filmed.
+// LoRA/PEFT pipeline (tekos)", its latest tekos version (pipeline, row 0:45), the Jobs page with the TrainJob
+// lora-comage-4c28m (trainjob, row 1:45), then end. Row 2:45 (the MLflow experiment mlops-comage) is off on this cluster:
+// see MLFLOW_ROW below. Rows 0:00 and 4:30 are words; row 3:45 is the evidence page of WP-133, not filmed.
 //
 // It signs in through the OpenShift sign-in (the provider chooser `openshift`, then Keycloak), the flow the
 // model-catalog-registry take proved on 2026-11-16 (its code is copied here: a walkthrough's hash covers only the
@@ -27,7 +27,12 @@ import { click, describe, firstVisible, read, waitUntil, wordsOnScreen } from ".
 export const persona = "ai-dev-01";
 export const page = "docs/demo/scenarios/rhoai/lora-pipeline-mlflow-kueue.md";
 export const viewport = { width: 1280, height: 800 };
-export const markers = ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"];
+// Row 2:45 (MLflow) is off: demo333's rescouts of 2026-11-16 (19:54 and 20:41) found no experiment in MLflow's
+// workspace zuno-mlops, in its GenAI view or its Model training view, and the dashboard lists none for Zuno MLOps. The
+// GIF ends at the training job. The MLflow screen stays in this file, tested offline (RECORD_MLFLOW_ROW=1, which only the
+// offline test sets; record.sh never does), for when an experiment is logged on this cluster.
+const MLFLOW_ROW = process.env.RECORD_MLFLOW_ROW === "1";
+export const markers = MLFLOW_ROW ? ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"] : ["login", "dashboard", "pipeline", "trainjob", "end"];
 // The provider chooser and the sign-in (up to dashboard) are never shown as motion.
 export const motion_from = "dashboard";
 // MLflow's view toggle "Model training" is a radio, which the shared click() refuses unless it is declared here. Declared
@@ -36,7 +41,7 @@ export const motion_from = "dashboard";
 // before it leaves the browser and fails the take or the scout: then the decision is option B (no MLflow row).
 const TRAINING_VIEW_DECLARED = true;
 const TRAINING_CHANGE = "switches MLflow's own UI from its GenAI view to its Model training view (a view of the page, nothing saved on the server)";
-export const changes = TRAINING_VIEW_DECLARED ? [TRAINING_CHANGE] : [];
+export const changes = MLFLOW_ROW && TRAINING_VIEW_DECLARED ? [TRAINING_CHANGE] : [];
 export const url = (domain) => `https://rh-ai.${domain}`;
 // The requests that would start or change something: a pipeline run, an experiment or a version created in the
 // pipeline server (its API is /apis/v2beta1); a run, an experiment, a tag or a model changed in MLflow (its searches
@@ -314,7 +319,7 @@ const SCREENS = [
     return { how, dashboard_list: dashboardList || "listed", workspace: workspace || "none chosen", training_view: toggleSent || "not needed",
              embedded: runs !== page.mainFrame(), url: page.url().replace(/[?#].*/, ""), words };
   } },
-];
+].filter((screen) => MLFLOW_ROW || screen.name !== "mlflow");
 
 export async function enter({ page, base, mark, keycloak, state }) {
   state.writes = writesSeen(page);
