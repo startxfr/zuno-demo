@@ -219,3 +219,27 @@ A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the pro
 - The span detail showed 11 of the 12 tags listed in row 3:00; `zuno.run_id` was missing, on that OpenClaw span. To confirm on a Tekos span from the first take's log. Row 5:00 copies `zuno.run_id` from the span and stays "not rehearsed".
 - The Tempo search page shows a yellow banner, "Jaeger UI is deprecated". The results do not show the tag filter as text.
 
+### unifai-agents (take, not published)
+
+| Item | Value |
+|---|---|
+| Take | `unifai-agents-20261116-194517`: two personas, cut at `fb2b47f9` (as relayed) |
+| Owner's go | Given in demo333's session (as relayed) |
+| `consultant-02` | `pass`, 8 markers in 48.5 s; one session created and deleted; owned 21 before and 21 after; `private_addresses` count 0 |
+| `ai-ops-01` | `pass`, 5 markers in 37.7 s; one session created and deleted; owned 21 before and 21 after; `private_addresses` count 0 |
+| GIF | 6 083 220 bytes (read from the take), SHA-256 `384298501f55...`, 55.0 s, 960x656, 7 moments |
+
+The GIF is over the 5 MB aim (about 5.8 MiB) and under the 8 MB limit.
+
+**What the images show.** The recording session's own count is 6 of 13 marker images opened (partial; a full review is asked for), as relayed. The writer opened 2 images (`consultant-02/q1-done.png`, `ai-ops-01/q-done.png`) and no frames. `consultant-02/q1-done.png`: the Collaboration Hub, team `agent-tekos`, workflow `tekos`, answer "I can help you with precise, concise technical questions about OpenShift, Kubernetes, and the surrounding Red Hat ecosystem." The live-workflow panel lists `knowledge-tekos`; the model line reads `local-gpt-oss-maas · gpt-oss-20b`. `ai-ops-01/q-done.png`: the answer says no pod of `zuno-ai-run` is in a failed or pending state, all are `Running` or `Completed` with no restarts; the mark "1 tool used · 1 call" is on the step; the tool is not named. No node name and no address on either image. **Points for the owner:** the header shows the persona display names, and the session list shows earlier session titles (accepted by the owner, as for `unifai-live-rag`; none is copied here).
+
+As relayed: the `consultant-02` second answer is generic troubleshooting steps, not opened by the writer.
+
+**Page.** Row 3:00 now says what was seen: a short answer from the live cluster with the "1 tool used" mark, worded differently at each run. The caption of the cut list still says "real pods and events"; that is the coder's, to change.
+
+**Not published.** Sent to the owner; a re-cut follows.
+
+### dify (take failed, as relayed)
+
+The take failed after the Agent turn: the workflow step went to the web-app page. One `consultant-02` turn was spent. The conversation was deleted. No run-log entry was left.
+
