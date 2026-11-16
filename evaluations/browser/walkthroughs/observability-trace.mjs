@@ -25,9 +25,10 @@
 //    addresses on the page at each step; if it finds some at `tags`, a take would fail there. scout() opens the newest
 //    existing trace (read only) so that this is known for the price of a sign-in.
 import { click, firstVisible, read, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { ADD, newSession, openHub, openSelector, teamSessions, toBottom } from "./_unifai_team.mjs";
+import { ADD, newSession, openHub, openSelector, teamAllows, teamSessions, toBottom } from "./_unifai_team.mjs";
 import { grafanaInWindow, proxySignIn } from "./_grafana.mjs";
 
+const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
 export const takes = [
   { name: "chat", persona: "consultant-02", markers: ["login", "hub", "q-sent", "q-done", "end"], motion_from: "hub" },
   { name: "trace", persona: "ai-ops-01", markers: ["login", "search", "trace", "tags", "end"], motion_from: "search" },
@@ -46,6 +47,9 @@ export const changes = [TEMPO_AUTHORIZE.change];
 export const prompts = { "0:45": "In one short sentence, say what you can help me with." };
 export const url = unifai.url;
 export const sends = unifai.sends;
+// The write guard covers both applications: UnifAI gets a team take's writes; the Tempo search UI gets none at all.
+export const allows = teamAllows;
+export const guards = (domain) => [process.env.RECORD_BASE_URL || unifai.url(domain), tempo(domain)];
 
 const WORKSPACE = "agent-tekos";
 const WORKFLOW = "tekos";
@@ -68,7 +72,6 @@ const SPAN_NAME = [".span-row .span-name", ".span-name", "[data-testid='span-nam
 const DETAIL = [".detail-row", ".SpanDetail", "[data-testid='span-detail']"];                                              // guess
 const TAGS_HEADER = [".detail-row .AccordianKeyValues--header:has-text('Tags')", ".AccordianKeyValues--header:has-text('Tags')", "[role='switch']:has-text('Tags')"];   // guess
 
-const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
 // The 15 minutes are given as two instants too (microseconds, as the form's "Find Traces" writes them): with
 // `lookback` alone the search answered traces hours old (the take of 2026-11-16 opened one from 3 h 30 before).
 const searchAddress = (base) => `${base}/search?service=${SEARCH.service}&operation=${SEARCH.operation}`

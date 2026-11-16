@@ -41,6 +41,12 @@ export const url = (domain) => `https://rh-ai.${domain}/maas-consumer-portal`;
 // (The portal READS its key list by a POST, .../api-keys/search, scout of 2026-11-16: that one is a read and passes.)
 export const sends = /api-?keys(?!\/search(\/|\?|$))/i;
 
+// The write guard (record.mjs): the only writes the take may send to the portal. (Its revoke is sent by the
+// recorder's own client in cleanup(), like the calls with the key: neither goes through the page.)
+export const allows = [
+  { method: "POST", path: /api-?keys\/search\/?$/i, what: "the key list (a read)" },
+  { method: "POST", path: /api-?keys\/?$/i, what: "create the take's key" },
+];
 const SUBSCRIPTION = "gpt-oss-20b-ocp-ai-dev";   // the page's row 1:00
 const KEY = /sk-oai-[A-Za-z0-9_-]{8,}/;          // the page: a key starting with sk-oai-
 const MASK = "sk-oai-••••••••••••••••••••••••";

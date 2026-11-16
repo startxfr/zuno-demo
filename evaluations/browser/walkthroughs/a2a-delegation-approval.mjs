@@ -20,7 +20,7 @@
 // Team mode is _unifai_team.mjs's (seen by the scouts of 2026-11-16). The approval card was never seen by a scout
 // (a scout sends nothing): its selectors are guesses from the page's words, marked `guess`.
 import { click, firstVisible, pageApi, read, unifai, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { ADD, START, newSession, openHub, openSelector, teamSessions, toBottom } from "./_unifai_team.mjs";
+import { ADD, START, newSession, openHub, openSelector, teamAllows, teamSessions, toBottom } from "./_unifai_team.mjs";
 
 export const persona = "consultant-02";
 export const page = "docs/demo/scenarios/governance/a2a-delegation-approval.md";
@@ -33,6 +33,8 @@ export const prompts = {
 };
 export const url = unifai.url;
 export const sends = unifai.sends;
+// The write guard: a team take's writes, and the decision on an approval card (Approve, the declared change; Reject).
+export const allows = [...teamAllows, { method: "POST", path: /^\/api2\/sessions\/session\.approval\/?$/, what: "the decision on an approval card" }];
 
 const WORKSPACE = "agent-arkos";
 const WORKFLOW = "arkos";

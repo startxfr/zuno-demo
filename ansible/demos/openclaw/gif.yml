@@ -1,15 +1,18 @@
 ---
-# openclaw: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written BEFORE any take,
-# and before the walkthrough accepts one: evaluations/browser/walkthroughs/openclaw.mjs refuses a take until a scout
-# has shown how the Control UI deletes a session and the owner has decided what a take may leave in the assistant.
-# `make demo scout openclaw` is what runs today: consultant-02 at the front door, then the Control UI's own password
-# (a second credential, OPENCLAW_UI_PASSWORD, read at run time by the caller), nothing sent.
+# openclaw: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written BEFORE the first
+# take: tune it with `make demo gif openclaw` once a take exists.
+# `make demo record openclaw` takes the 5-minute version (evaluations/browser/walkthroughs/openclaw.mjs):
+# consultant-02 at the front door, then the Control UI's own password (a second credential, OPENCLAW_UI_PASSWORD,
+# read at run time by the caller and typed masked by the recorder).
 # Markers, in order: login, ui, session, q-sent, q-done, end. Rows 2:30 to 4:15 are words.
 record_notice: >-
-  NOT TAKEN YET: the walkthrough refuses a take. A take would be a recorded browser session as consultant-02 on its
-  own OpenClaw assistant (the front door, then the Control UI's password, a second credential typed masked by the
-  recorder and never shown): one new session and one Confluence question on consultant-02's budget; the session, and
-  whatever the assistant writes to its own memory, would stay in the assistant: nothing known deletes them
+  a recorded browser session as consultant-02 on its own OpenClaw assistant (the front door, then the Control UI's
+  password, a second credential typed masked by the recorder and never shown): one new session and one Confluence
+  question on consultant-02's budget; real Confluence page titles show in the answer, and the sidebar shows the
+  titles of the assistant's earlier sessions; the take deletes its session at the end through the Control UI's menu
+  (Delete…) and fails if it is still listed; what the assistant may have memorised from that one question stays in
+  its own memory (a 10Gi volume): no take can undo that; each take is a new device to the assistant's gateway;
+  traces and metrics of the answer remain, as for any use
 target_seconds: [35, 60]
 width: 960
 fps: 10

@@ -69,7 +69,7 @@ steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
 turn = "an Agent turn in Dify\x27s Debug & Preview moves the Zuno Agent\x27s edited date"
-declared = {"dify": [turn], "kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": [turn] + grafana, "quotas": grafana}.get(s["demo"], [])
+declared = {"openclaw": ["clicks Delete… in the menu of the session the take created", "the assistant may keep a memory of this one question"], "dify": [turn], "kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": [turn] + grafana, "quotas": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -931,28 +931,44 @@ echo "$out" | sed 's/^/    /' | tail -3
 expect "maas: a create answer without an id: the key is found by this take's own name and revoked" bash -c "test $rc -eq 0 && grep -q 'left: {\"keys\":2,\"live\":1,' <<<\"\$0\"" "$out"
 out="$(maas m-reread FAKE_REREAD=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "maas: a portal that sends the shown key back to its server stops the take, and the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/maas/api/v1/check)' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":1}' <<<\"\$0\"" "$out"
+expect "maas: a portal that sends the shown key back to its server stops the take; the write guard aborted that call; the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/maas/api/v1/check)' <<<\"\$0\" && grep -q 'the page was about to send 1 write(s) the walkthrough does not declare (aborted): PUT /maas-consumer-portal/maas/api/v1/check' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":0}' <<<\"\$0\"" "$out"
 fi
 if wanted openclaw; then
-echo "== openclaw (a second credential typed in a plain field; no take yet)"
+echo "== openclaw (a second credential typed in a plain field; the session deleted through the Control UI's menu)"
 out="$(claw c-scout RECORD_SCOUT=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "openclaw: a scout exits 0, SCOUT: done, and sends nothing" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+expect "openclaw: a scout exits 0, SCOUT: done, sends nothing, deletes nothing" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":1}' <<<\"\$0\"" "$out"
 expect "openclaw: scout.json describes the connected Control UI and keeps no session title" scouted c-scout '
-assert list(steps) == ["enter", "owned", "control-ui", "controls", "session-menu", "composer", "closed"], list(steps)
-assert steps["session-menu"] == {**steps["session-menu"], "menus": 1, "entries": ["Rename", "Delete"], "delete_like": ["Delete"], "closed": True}, steps["session-menu"]
+assert list(steps) == ["enter", "owned", "control-ui", "controls", "session-menu", "composer", "sessions", "closed"], list(steps)
+assert steps["session-menu"] == {**steps["session-menu"], "menus": 1, "entries": ["Rename…", "Delete…"], "delete_like": ["Delete…"], "closed": True}, steps["session-menu"]
 ui = steps["control-ui"]
 assert ui["on_its_own_address"] is True and ui["password_field_still_on_screen"] is False and ui["new_session_selector"] and ui["storage_added"] == ["local:openclaw.control.settings"], ui
 assert steps["composer"]["selector"] == "textarea" and any(c["label"] == "Open session menu" for c in steps["controls"]["controls"]), steps["controls"]
+assert steps["sessions"] == {**steps["sessions"], "rows": 1, "told_apart_by": ["link"], "distinct": 1} and s["writes"]["refused"] == [], (steps["sessions"], s["writes"])
 assert "FAKE-EARLIER-SESSION-TITLE" not in json.dumps(s)
 '
-expect "openclaw: the password typed in the plain field was masked in the scout's pictures' page (no file holds it)" bash -c "! grep -r -l offline-claw-secret '$work/c-scout' >/dev/null"
-out="$(claw c-take 2>&1)"; rc=$?
+out="$(claw c-pass 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -6
+expect "openclaw: a good take exits 0, RESULT: PASS; its session is deleted, the earlier one kept" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":1}' <<<\"\$0\"" "$out"
+expect "openclaw: markers.json: one session created and cleaned, the same sessions owned, no title anywhere" python3 - "$work/c-pass" "$out" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); raw = (d / "markers.json").read_text(); m = json.loads(raw)
+assert [x["name"] for x in m["markers"]] == ["login", "ui", "session", "q-sent", "q-done", "end"] and m["status"] == "pass", m
+assert len(m["created"]) == 1 and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True} and m["writes"]["refused"] == [], m
+assert "FAKE-" not in raw and "FAKE-" not in sys.argv[2]
+PY
+out="$(claw c-refused FAKE_REFUSE_DELETE=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "openclaw: a take is refused by the walkthrough itself, before anything is sent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL openclaw is not taken yet: a take would leave a session' <<<\"\$0\" && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+expect "openclaw: a session still listed after Delete… fails the take, without its title" bash -c "test $rc -eq 1 && grep -q 'is STILL listed after Delete' <<<\"\$0\" && ! grep -q 'FAKE-' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":2}' <<<\"\$0\"" "$out"
+out="$(claw c-stray FAKE_STRAY=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: two new sessions: nothing is deleted, the take fails" bash -c "test $rc -eq 1 && grep -q 'the sidebar lists 2 new sessions' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":3}' <<<\"\$0\"" "$out"
+out="$(claw c-notool FAKE_NO_TOOL=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: an answer without the Confluence tool line fails the take, its session deleted all the same" bash -c "test $rc -eq 1 && grep -q 'shows no Zuno Confluence-page-search tool line' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":1}' <<<\"\$0\"" "$out"
 out="$(claw c-unmask RECORD_SCOUT=1 FAKE_UNMASK=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "openclaw: a field that does not stay masked is emptied and stops the scout" bash -c "test $rc -eq 1 && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+expect "openclaw: a field that does not stay masked is emptied and stops the scout" bash -c "test $rc -eq 1 && grep -q 'left: {\"sent\":0,' <<<\"\$0\"" "$out"
 expect "openclaw: scout.json says the field did not stay masked" python3 - "$work/c-unmask" <<'PY'
 import json, pathlib, sys
 s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())

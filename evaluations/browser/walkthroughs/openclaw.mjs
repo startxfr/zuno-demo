@@ -11,18 +11,21 @@
 // placeholder "optional" and it may be a plain text field, so the recorder masks it before typing and refuses to
 // type if it cannot. Nothing is marked or described while it is being filled.
 //
-// NOT TAKEN YET, on purpose. The Control UI talks to its gateway over a WebSocket: there is no list or delete this
-// file can call as the persona, and the assistant keeps a memory of its own. So what a take would leave (one session
-// in consultant-02's assistant, and whatever the assistant memorises) cannot be removed by any means known today.
-// run() therefore refuses to start (`DELETE`: how a session is deleted, unknown) until a scout has shown the session
-// list's controls and the owner has decided. scout() does everything up to the connected Control UI and describes
-// it; it sends nothing, opens no session, and stores no session title.
+// What a take leaves, and the owner's decision of 2026-11-16 on it. It creates ONE session in consultant-02's
+// assistant and deletes it in cleanup() through the Control UI's own menu, "Delete…" (a declared click), and fails if
+// the session is still listed. The Control UI talks to its gateway over a WebSocket: there is no list or delete this
+// file can call, so the sessions are those of the sidebar, told apart by their link (or, failing that, their text,
+// kept in memory only and never written). What the assistant may memorise from the one question (its own 10Gi
+// volume) STAYS: no take can undo that; it is declared in `changes` and in the record notice.
 //
-// Seen by the scout of 2026-11-16: the Control UI at /chat, connected; "New session", a select "Filter sessions by
-// agent", and for each of the six earlier sessions "Pin session" and "Open session menu"; a textarea; "Collapse
-// sidebar" (the sidebar lists the earlier sessions' titles: a take hides it or the owner accepts them). Connect
-// writes one key to the browser's storage, openclaw-device-identity-v1: the browser of a take is new each time, so
-// each take is a new device to the gateway; whether the gateway keeps a record of it is not known from here.
+// Seen by the scouts of 2026-11-16: the Control UI at /chat, connected; "New session", a select "Filter sessions by
+// agent", and for each earlier session "Pin session" and "Open session menu" (shown on hover), whose entries are Pin
+// session, Mark as unread, Rename…, Fork, Move to group, Archive session, Delete…; a textarea; "Collapse sidebar".
+// The sidebar lists the earlier sessions' titles: they are on the pictures (collapsing it may be kept by the
+// assistant, so it is not clicked). Connect writes one key to the browser's storage, openclaw-device-identity-v1:
+// the browser of a take is new each time, so each take is a new device to the gateway. NOT seen: a question sent,
+// the tool line, what "Delete…" asks before it deletes: the first take is their scout.
+import crypto from "node:crypto";
 import { click, describe, firstVisible, newText, read, settled, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "consultant-02";
@@ -31,7 +34,13 @@ export const page = "docs/demo/scenarios/experiences/openclaw.md";
 export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "ui", "session", "q-sent", "q-done", "end"];
 export const motion_from = "ui";
-export const changes = [];
+export const changes = [
+  "clicks Delete… in the menu of the session the take created (and confirms it): that session is removed from the assistant",
+  "the assistant may keep a memory of this one question (its 10Gi volume); no take can undo that",
+];
+// The write guard: the Control UI works over its WebSocket; no HTTP write to the assistant is declared, so any is
+// aborted and fails the take (a scout reports it).
+export const allows = [];
 export const prompts = { "0:45": "Cherche dans Confluence les pages d'onboarding" };
 export const url = (domain) => `https://assistant-zuno-claw-${persona}.${domain}`;
 // The Control UI sends its messages over a WebSocket, which a request filter does not see: a scout sends nothing
@@ -39,8 +48,6 @@ export const url = (domain) => `https://assistant-zuno-claw-${persona}.${domain}
 // (guess: none is known).
 export const sends = /\/api\/[^?]*(sessions?|messages?|chat)\b/i;
 
-// How the take deletes the session it created: unknown until a scout (see the header). null: run() refuses.
-const DELETE = null;
 const UI_PASSWORD = ["input[placeholder='optional' i]"];                                  // seen by the browser check (run.mjs)
 const CONNECT = ["button:has-text('Connect')"];                                           // seen by the browser check
 const NEW_SESSION = ["button:has-text('New session')", "a:has-text('New session')", "button:has-text('Nouvelle session')"];   // the first seen live, 2026-11-16
@@ -73,16 +80,25 @@ export async function enter({ page, base, mark, keycloak, typeSecret, state }) {
   state.password_field_still_on_screen = Boolean(await firstVisible(page, UI_PASSWORD));
 }
 
-// Nothing this file can list as the persona (a WebSocket, see the header).
-export async function owned() {
-  return [];
+// The sessions of the sidebar: one per "Open session menu" button. Each is known by an id made here from its link's
+// address or, when it has none, from its text without its age ("3h", "10d"): a hash, so that no title is ever kept,
+// logged or written. [{id, index}].
+async function rows(page) {
+  const seen = await read(page, (selector) => [...document.querySelectorAll(selector)].map((button) => {
+    const row = button.closest("li, [role='listitem'], [role='option'], a") || button.parentElement;
+    const link = row.matches("a[href]") ? row : row.querySelector("a[href]");
+    return { link: link ? link.getAttribute("href") : "", text: (row.innerText || "").replace(/\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi, "").replace(/\s+/g, " ").trim() };
+  }), SESSION_MENU.join(", "));
+  return seen.map((row, index) => ({ index, by: row.link && row.link !== "#" ? "link" : "text", id: crypto.createHash("sha256").update(row.link && row.link !== "#" ? row.link : row.text).digest("hex").slice(0, 16) }));
+}
+
+// The sessions the persona's sidebar lists (a WebSocket behind it: see the header).
+export async function owned({ page }) {
+  return (await rows(page)).map((row) => ({ kind: "session", id: row.id }));
 }
 
 export async function run({ page, mark, log, state }) {
-  if (!DELETE) {
-    throw new Error("openclaw is not taken yet: a take would leave a session (and the assistant's memory of it) that nothing known can delete; "
-      + "scout it, then the owner decides (walkthrough header)");
-  }
+  state.before = (await rows(page)).map((row) => row.id);
   if (state.password_field_still_on_screen) throw new Error("the Control UI still shows its password field after Connect: it must not be in a picture");
   await mark("ui");
   const fresh = await firstVisible(page, NEW_SESSION);
@@ -155,11 +171,32 @@ export async function scout({ page, base, step, state }) {
     const input = await firstVisible(page, INPUT);
     return { selector: input ? input.matched : null, textareas: await page.locator("textarea").count() };
   });
+  await step("sessions", async () => { const list = await rows(page); return { rows: list.length, told_apart_by: [...new Set(list.map((row) => row.by))], distinct: new Set(list.map((row) => row.id)).size }; });
   await step("closed", async () => ({ nothing_typed: true, sessions_opened: 0 }));
 }
 
-// Nothing is created while run() refuses. When a take exists, this deletes its session by the means the scout found.
-export async function cleanup({ state }) {
+// Delete the session this take created, through the Control UI's own menu, and nothing else: the ONE session of the
+// sidebar that was not there before the take. None new: nothing to delete (said in the log). Several new: nothing is
+// deleted and the take fails (another device of the persona may have opened one). The session must be gone afterwards.
+export async function cleanup({ page, log, state }) {
   if (!state.sent) return null;
-  throw new Error("a question was sent and this walkthrough does not know how to delete its session: check consultant-02's assistant by hand");
+  const now = await rows(page);
+  const fresh = now.filter((row) => !state.before.includes(row.id));
+  if (!fresh.length) throw new Error("a question was sent but the sidebar lists no new session: the take's session could not be found, check consultant-02's assistant by hand");
+  if (fresh.length > 1) throw new Error(`the sidebar lists ${fresh.length} new sessions: the take's cannot be told from another's, nothing was deleted; check consultant-02's assistant by hand`);
+  state.created.push({ kind: "session", id: fresh[0].id });
+  const button = page.locator(SESSION_MENU.join(", ")).nth(fresh[0].index);
+  await button.locator("xpath=..").hover({ timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  if (await button.isVisible().catch(() => false)) await button.click({ timeout: 5000 }); else await button.dispatchEvent("click");
+  const entry = page.locator("[role='menuitem'], [role='menu'] button, [role='menu'] li").filter({ hasText: /^\s*Delete/ }).first();
+  await entry.waitFor({ timeout: 10000 });
+  await click(entry, { change: changes[0], changes });
+  // "Delete…" asks before it deletes: its own confirmation, if one shows, is confirmed (the same declared click).
+  const confirm = page.locator("[role='dialog'] button, [role='alertdialog'] button").filter({ hasText: /^\s*(Delete|Confirm|Yes)/ }).first();
+  if (await confirm.waitFor({ timeout: 5000 }).then(() => true).catch(() => false)) await click(confirm, { change: changes[0], changes });
+  const gone = await waitUntil(page, { what: "the session's removal", timeoutMs: 20000, done: async () => !(await rows(page)).some((row) => row.id === fresh[0].id) || undefined }).catch(() => false);
+  if (!gone) throw new Error(`the session the take created (${fresh[0].id}, the newest of the sidebar) is STILL listed after Delete…: delete it by hand in consultant-02's assistant`);
+  log(`session ${fresh[0].id} deleted through the Control UI's menu; what the assistant memorised of the question stays`);
+  return true;
 }

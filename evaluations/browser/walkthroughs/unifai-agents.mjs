@@ -26,7 +26,7 @@
 // returns to Personal, so the take never reloads), the hub's "+" is titled "New session from workflow" and its
 // dialog confirms with "Start Session". Selectors marked `guess` are from that reading.
 import { click, firstVisible, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { ADD, START, newSession, openHub, openSelector, teamSessions, toBottom } from "./_unifai_team.mjs";
+import { ADD, START, newSession, openHub, openSelector, teamAllows, teamSessions, toBottom } from "./_unifai_team.mjs";
 
 export const takes = [
   { name: "consultant-02", persona: "consultant-02", markers: ["login", "workspaces", "hub", "q1-sent", "q1-done", "q2-sent", "q2-done", "end"], motion_from: "workspaces" },
@@ -43,6 +43,7 @@ export const prompts = {
 };
 export const url = unifai.url;
 export const sends = unifai.sends;
+export const allows = teamAllows;   // the write guard: nothing else is sent to UnifAI
 
 const WORKSPACE = "agent-tekos";
 const WORKFLOW = "tekos";

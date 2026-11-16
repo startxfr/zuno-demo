@@ -9,40 +9,74 @@ import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8091);
 let sent = 0;
+const sessions = [{ id: "s1", title: "FAKE-EARLIER-SESSION-TITLE" }];   // the assistant's sessions, newest first
 const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/cb"><input id="username" name="u">
 <input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`;
 const UI = `<!doctype html><title>OpenClaw Control UI</title><body style="font:16px sans-serif;margin:24px">
 <div id="gate"><label>Password <input type="text" id="pw" placeholder="optional"></label><button id="connect">Connect</button><p id="error"></p></div>
-<div id="app" hidden><button id="new">New session</button><ul><li><a href="#s1" title="">FAKE-EARLIER-SESSION-TITLE</a><button aria-label="Pin session"></button><button aria-label="Open session menu" id="menu-open" style="visibility:hidden">m</button></li></ul>
-<style>li:hover #menu-open { visibility: visible !important; }</style>
-<div role="menu" id="menu" hidden><button role="menuitem">Rename</button><button role="menuitem" id="del">Delete</button></div>
-<textarea placeholder="Message"></textarea><span>zuno</span></div>
+<div id="app" hidden><button id="new">New session</button><ul id="sessions"></ul>
+<div role="menu" id="menu" hidden><button role="menuitem">Rename…</button><button role="menuitem" id="del">Delete…</button></div>
+<div role="dialog" id="confirm" hidden><p>Delete this session?</p><button id="yes">Delete</button><button id="no">Cancel</button></div>
+<div id="thread"></div><textarea placeholder="Message"></textarea><span>zuno</span></div>
+<style>li:hover .menu-open { visibility: visible !important; }</style>
 <script>
 const $ = (id) => document.getElementById(id);
 if (${process.env.FAKE_UNMASK === "1"}) $("pw").addEventListener("input", () => { $("pw").removeAttribute("style"); });
+// The sessions live in the gateway (here: the server), reached over what stands for the WebSocket: GETs with a verb
+// in the query, so that no HTTP write exists, as in the Control UI.
+let target = "";
+async function draw() {
+  const list = await (await fetch("/ws?do=list")).json();
+  $("sessions").innerHTML = "";
+  for (const s of list) {
+    const li = document.createElement("li");
+    li.innerHTML = '<a href="/chat?session=' + s.id + '">' + s.title + '</a> <small>3h</small><button aria-label="Pin session"></button><button aria-label="Open session menu" class="menu-open" style="visibility:hidden">m</button>';
+    li.querySelector(".menu-open").onclick = () => { target = s.id; $("menu").hidden = false; };
+    $("sessions").appendChild(li);
+  }
+}
 $("connect").onclick = async () => {
-  const r = await fetch("/connect", { method: "POST", body: $("pw").value });
-  if (r.status === 200) { $("gate").remove(); $("app").hidden = false; localStorage.setItem("openclaw.control.settings", "{}"); }
+  const r = await fetch("/ws?do=connect", { headers: { "X-Fake-Password": $("pw").value } });   // stands for the WebSocket: no HTTP write
+  if (r.status === 200) { $("gate").remove(); $("app").hidden = false; localStorage.setItem("openclaw.control.settings", "{}"); draw(); }
   else $("error").textContent = "Could not connect to the gateway";
 };
-$("menu-open").onclick = () => { $("menu").hidden = false; };
-$("del").onclick = () => fetch("/send", { method: "POST" });   // a delete chosen would count as something sent
+let current = "";
+$("new").onclick = () => { current = "new"; };
+$("del").onclick = () => { $("menu").hidden = true; $("confirm").hidden = false; };
+$("no").onclick = () => { $("confirm").hidden = true; };
+$("yes").onclick = async () => { $("confirm").hidden = true; await fetch("/ws?do=delete&id=" + target + "${process.env.FAKE_REFUSE_DELETE === "1" ? "&refuse=1" : ""}"); draw(); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("menu").hidden = true; });
-document.querySelector("textarea").addEventListener("keydown", (e) => { if (e.key === "Enter") fetch("/send", { method: "POST" }); });
+document.querySelector("textarea").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const text = e.target.value; e.target.value = "";
+  const add = (line) => { const p = document.createElement("p"); p.textContent = line; $("thread").appendChild(p); };
+  add(text);
+  const said = await (await fetch("/ws?do=send&text=" + encodeURIComponent(text))).json();
+  draw();
+  setTimeout(() => { for (const line of said.lines) add(line); }, 1200);
+});
 </script>`;
 
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   const signed = /(^|; )s=1/.test(req.headers.cookie || "");
   const json = (code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
-  if (u.pathname === "/fake/count") return json(200, { sent });
+  if (u.pathname === "/fake/count") return json(200, { sent, sessions: sessions.length });
   if (u.pathname === "/cb") { res.writeHead(302, { Location: "/", "Set-Cookie": "s=1; Path=/" }); return res.end(); }
   if (!signed) { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
-  if (u.pathname === "/send") { sent += 1; return json(200, {}); }
-  if (u.pathname === "/connect" && req.method === "POST") {
-    let raw = ""; req.on("data", (c) => { raw += c; });
-    return req.on("end", () => json(process.env.FAKE_UI_PASSWORD && raw === process.env.FAKE_UI_PASSWORD ? 200 : 401, {}));
+  if (u.pathname === "/ws") {
+    const act = u.searchParams.get("do");
+    if (act === "connect") return json(process.env.FAKE_UI_PASSWORD && req.headers["x-fake-password"] === process.env.FAKE_UI_PASSWORD ? 200 : 401, {});
+    if (act === "list") return json(200, sessions);
+    if (act === "send") {
+      sent += 1;
+      sessions.unshift({ id: "s" + (sessions.length + 1) + "-" + sent, title: "FAKE-NEW-SESSION-TITLE " + sent });
+      if (process.env.FAKE_STRAY === "1") sessions.unshift({ id: "stray-" + sent, title: "FAKE-STRAY-TITLE" });
+      return json(200, { lines: process.env.FAKE_NO_TOOL === "1" ? ["Voici ce que je sais."] : ["Zuno Confluence-page-search onboarding", "MNGD2-AP001 Onboarding Chef de projet (SXSI)"] });
+    }
+    if (act === "delete") { if (!u.searchParams.get("refuse")) { const i = sessions.findIndex((s) => s.id === u.searchParams.get("id")); if (i >= 0) sessions.splice(i, 1); } return json(200, {}); }
   }
-  res.writeHead(200, { "Content-Type": "text/html" });
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   return res.end(UI);
 }).listen(port, "127.0.0.1");

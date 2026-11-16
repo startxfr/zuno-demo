@@ -27,6 +27,18 @@ async function press(page, target, what, { changes = [], state = {} } = {}) {
   }
 }
 
+// The write guard (record.mjs): what a take in a team workspace may send to UnifAI, and nothing else. From the
+// fork's source (use-session-hub.ts, api/collaboration.ts, api/sessions.ts): its own session created, its questions,
+// its session cancelled and deleted, and what the hub sends by itself while a session is open (presence, the locks'
+// states). A scout shows what else UnifAI sends (scout.json `writes.refused`).
+export const teamAllows = [
+  { method: "POST", path: /^\/api2\/sessions\/user\.session\.create\/?$/, what: "create own session" },
+  { method: "POST", path: /^\/api2\/sessions\/user\.session\.submit\/?$/, what: "chat send" },
+  { method: "POST", path: /^\/api2\/sessions\/session\.cancel\/?$/, what: "cancel own session" },
+  { method: "DELETE", path: /^\/api2\/sessions\/session\.delete\/?$/, what: "delete own session" },
+  { method: "POST", path: /^\/api2\/collaboration\/session\.(join|leave|heartbeat|typing)\/?$/, what: "presence in the hub" },
+  { method: "POST", path: /^\/api2\/collaboration\/edit_lock\.statuses\/?$/, what: "the locks' states (a read)" },
+];
 export const TEAM = ["button:text-is('Team')"];                                                             // guess (Sidebar.tsx)
 export const SELECTOR = ["button:has(svg.lucide-chevron-down)", "button:has-text('Select team')"];          // guess (Sidebar.tsx)
 export const HUB = ["a[href='/agentic-chats']"];                                                            // the same route as Agentic Chats
