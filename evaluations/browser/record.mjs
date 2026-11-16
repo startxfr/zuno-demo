@@ -99,6 +99,9 @@ export function shapeProblems(walk) {
   if (typeof walk.scout !== "function") problems.push("`scout(ctx)` is missing: a walkthrough is scouted before its first take");
   if (walk.sends !== undefined && !(walk.sends instanceof RegExp)) problems.push("`sends` must be a regular expression");
   if (!Array.isArray(walk.changes) || walk.changes.some((c) => typeof c !== "string")) problems.push("`changes` must list the settings the take may change ([] for none)");
+  if (walk.secrets !== undefined && (!Array.isArray(walk.secrets) || walk.secrets.some((n) => typeof n !== "string" || !/^[A-Z][A-Z0-9_]{2,}$/.test(n) || n === "PERSONA_PASSWORD"))) {
+    problems.push("`secrets` must list the names of the environment variables that hold the other credentials the take types (e.g. DIFY_ADMIN_PASSWORD)");
+  }
   return problems;
 }
 
@@ -246,6 +249,22 @@ const domain = process.env.APPS_DOMAIN || "";
 const password = process.env.PERSONA_PASSWORD || "";
 if (!domain || !password) usage("APPS_DOMAIN and PERSONA_PASSWORD are required");
 const walk = await load(id);
+// A second credential (the owner's decision of 2026-11-16, for Dify's own administrator): a walkthrough names the
+// environment variables it needs in `secrets`; the same rules as the persona password hold. The value is read here
+// and nowhere else, a walkthrough never receives it (it asks `ctx.typeSecret(locator, name)` to type it into ONE
+// field), and it is struck out of every line printed and every file written, should a page ever echo it.
+const secrets = new Map((walk.secrets || []).map((name) => [name, process.env[name] || ""]));
+for (const [name, value] of secrets) if (!value) usage(`${name} is required by this walkthrough (its \`secrets\`) and is empty`);
+const scrub = (text) => [password, ...secrets.values()].filter((v) => v.length >= 4).reduce((t, v) => t.split(v).join("***"), String(text));
+const print = console.log.bind(console);
+console.log = (...args) => print(...args.map((a) => (typeof a === "string" ? scrub(a) : a)));
+const writeJson = (file, value) => fs.writeFileSync(file, scrub(JSON.stringify(value, null, 2)) + "\n");
+async function typeSecret(page, target, name) {
+  if (!secrets.has(name)) throw new Error(`the walkthrough does not declare the secret ${name}`);
+  const field = typeof target === "string" ? page.locator(target).first() : target;
+  if ((await field.getAttribute("type")) !== "password") throw new Error(`${name} is typed only into a password field`);
+  await field.fill(secrets.get(name));
+}
 fs.mkdirSync(out, { recursive: true });
 
 async function keycloak(page, username) {
@@ -308,7 +327,7 @@ async function scoutOne(take, out) {
     return entry;
   };
   const ctx = { page, domain, log, step, take, persona: take.persona, state: { scout: true }, mark: async () => {},
-                keycloak: (username) => keycloak(page, username), base: process.env.RECORD_BASE_URL || walk.url(domain) };
+                keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name), base: process.env.RECORD_BASE_URL || walk.url(domain) };
   try {
     // The same first two phases as a take: the sign-in, then what the persona owns (its count is all a scout keeps).
     const entered = await step("enter", async () => { await walk.enter(ctx); return {}; });
@@ -329,7 +348,7 @@ async function scoutOne(take, out) {
   report.when = new Date().toISOString();
   report.status = bad.length ? "fail" : "done";
   report.detail = bad.length ? `failed: ${bad.join(", ")}` : `${report.steps.length} steps`;
-  fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify(report, null, 2) + "\n");
+  writeJson(path.join(out, "scout.json"), report);
   return { code: bad.length ? 1 : 0, line: bad.length ? `failed ${bad.join(", ")}` : "done" };
 }
 
@@ -361,7 +380,7 @@ async function takeOne(take, out) {
   const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
   const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
   let ownedBefore = null;
-  const ctx = { page, domain, mark, log, state, take, persona: take.persona, keycloak: (username) => keycloak(page, username),
+  const ctx = { page, domain, mark, log, state, take, persona: take.persona, keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name),
                 base: process.env.RECORD_BASE_URL || walk.url(domain) };
   const failures = [];
   try {
@@ -421,7 +440,7 @@ async function takeOne(take, out) {
   record.status = failures.length ? "fail" : "pass";
   record.detail = failures.length ? failures.join("; ")
     : `${record.markers.length} markers in ${record.markers[record.markers.length - 1].t.toFixed(1)} s`;
-  fs.writeFileSync(path.join(out, "markers.json"), JSON.stringify(record, null, 2) + "\n");
+  writeJson(path.join(out, "markers.json"), record);
   return { code: failures.length ? 1 : 0, line: record.status === "pass" ? "PASS" : `FAIL ${record.detail}` };
 }
 
@@ -445,7 +464,7 @@ for (const take of takes) {
 }
 const bad = results.filter((r) => r.status === "fail");
 if (takes.length > 1 || takes[0].name) {
-  fs.writeFileSync(path.join(out, "takes.json"), JSON.stringify({ demo: id, takes: results, status: bad.length ? "fail" : results[0].status }, null, 2) + "\n");
+  writeJson(path.join(out, "takes.json"), { demo: id, takes: results, status: bad.length ? "fail" : results[0].status });
 }
 // A scout of several takes also leaves ONE scout.json at the top of OUT, shaped like a single scout's: the run's
 // status, the walkthrough's hash and `changes`, and every take's steps as `<take>/<step>` (ok, error, selector, png).
@@ -454,7 +473,7 @@ if (scouting && (takes.length > 1 || takes[0].name)) {
   const parts = results.map((r) => {
     try { return { name: r.name, ...JSON.parse(fs.readFileSync(path.join(out, r.name, "scout.json"), "utf8")) }; } catch { return { name: r.name, steps: [] }; }
   });
-  fs.writeFileSync(path.join(out, "scout.json"), JSON.stringify({
+  writeJson(path.join(out, "scout.json"), {
     demo: id, takes: results.map((r) => r.name), persona: results.map((r) => r.persona).join(", "), viewport: walk.viewport,
     started: (parts[0] || {}).started || "", when: new Date().toISOString(), walkthrough_sha256: walkthroughHash(id), changes: walk.changes,
     steps: parts.flatMap((part) => (part.steps || []).map((s) => ({ step: `${part.name}/${s.step}`, ok: s.ok === true, ...(s.error ? { error: s.error } : {}),
@@ -462,7 +481,7 @@ if (scouting && (takes.length > 1 || takes[0].name)) {
     refused_requests: parts.flatMap((part) => part.refused_requests || []),
     status: bad.length ? "fail" : "done",
     detail: bad.length ? `failed: ${bad.map((r) => r.name).join(", ")}` : `${results.length} takes`,
-  }, null, 2) + "\n");
+  });
 }
 const word = scouting ? "SCOUT:" : "RESULT:";
 if (takes.length === 1 && !takes[0].name) console.log(`${word} ${results[0].detail}`);

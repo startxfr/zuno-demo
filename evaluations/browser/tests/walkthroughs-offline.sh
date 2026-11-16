@@ -31,6 +31,8 @@ aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
+# dify types a second credential: the recorder's (DIFY_ADMIN_PASSWORD) and the stand-in's own copy of it.
+dify() { local name="$1"; shift; take dify fake-dify.mjs 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret "$@"; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -557,6 +559,53 @@ out="$(aap a-hang FAKE_HANG=1 RECORD_DEADLINE_MS=25000)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "aap: a take that hangs stops at the overall deadline and logs the phase it was in" bash -c "test $rc -eq 1 && grep -q 'aap: STOPPED at \"templates\" after' <<<\"\$0\" && grep -q '^RESULT: FAIL' <<<\"\$0\"" "$out"
 fi
+if wanted dify; then
+echo "== dify (a second credential)"
+out="$(dify d-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "dify: a scout creates no conversation, runs nothing, and no save of an application reached Dify" grep -q 'left: {"conversations":1,"runs":1,"saved":0}' <<<"$out"
+expect "dify: scout.json reports the sign-in, the applications and the run form" scouted d-scout '
+assert list(steps) == ["enter", "owned", "sign-in", "studio", "api", "agent", "workflow", "run-form", "closed"], list(steps)
+assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["apps"] == {"Zuno Agent": "agent-chat", "Zuno Technical Documentation": "advanced-chat", "Zuno Confluence Search": "workflow"}, steps["sign-in"]
+assert steps["api"] == {**steps["api"], "conversations": 1, "workflow_runs": 1, "profile_status": 200}, steps["api"]
+assert steps["agent"]["selector"] == "textarea[placeholder*=\x27Talk\x27 i]" and steps["agent"]["url"].endswith("/app/<id>/configuration"), steps["agent"]
+assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["fields"] == 1, steps["run-form"]
+assert steps["closed"]["saves_refused"] == ["POST /console/api/apps/<id>/workflows/draft"], steps["closed"]
+'
+out="$(dify d-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "dify: its conversation is gone, its run stays, no save of an application reached Dify" grep -q 'left: {"conversations":1,"runs":2,"saved":0}' <<<"$out"
+expect "dify: the log says the run cannot be deleted and which saves were refused" bash -c "grep -q 'succeeded; it stays in the application.s run log' <<<\"\$0\" && grep -q 'saves of the applications refused in the browser: POST /console/api/apps/<id>/workflows/draft' <<<\"\$0\"" "$out"
+expect "dify: markers.json follows the contract" markers d-pass '
+assert names == ["login", "studio", "agent", "q-sent", "q-done", "workflow", "run-form", "run-done", "end"], names
+assert m["persona"] == "consultant-02" and m["motion_from"] == "studio" and m["status"] == "pass", m
+assert len(m["created"]) == 1 and m["created"][0]["kind"] == "conversation" and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+'
+out="$(dify d-refused FAKE_REFUSE_DELETE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a refused delete fails the take and names the conversation" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the conversation .* of Zuno Agent was NOT deleted: DELETE answered HTTP 403' <<<\"\$0\"" "$out"
+out="$(dify d-none FAKE_NO_CONVERSATION=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a chat that leaves no conversation passes, and the log says nothing was there to delete" bash -c "test $rc -eq 0 && grep -q 'its debug chat left none to delete' <<<\"\$0\"" "$out"
+out="$(dify d-runfails FAKE_RUN_FAILS=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a failed workflow run fails the take, the conversation is deleted all the same" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the workflow.s run failed' <<<\"\$0\" && grep -q 'left: {\"conversations\":1,' <<<\"\$0\"" "$out"
+out="$(dify d-addresses FAKE_ADDRESSES=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: an answer with a node name fails the take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
+out="$(dify d-wrong DIFY_ADMIN_PASSWORD=offline-wrong-secret)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: a wrong administrator password stops at Dify's form, nothing created" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL Dify refused its administrator.s sign-in' <<<\"\$0\" && grep -q 'left: {\"conversations\":1,\"runs\":1,\"saved\":0}' <<<\"\$0\"" "$out"
+out="$(dify d-empty DIFY_ADMIN_PASSWORD= 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "dify: without its second credential the recorder does not start" bash -c "test $rc -eq 2 && grep -q 'DIFY_ADMIN_PASSWORD is required by this walkthrough' <<<\"\$0\"" "$out"
+expect "record.sh takes a declared secret from the environment by name, and refuses to start without it" bash -c "
+  cd '$here' && sed -n 's/^export const secrets = \[\(.*\)\];.*\$/\1/p' walkthroughs/dify.mjs | grep -q DIFY_ADMIN_PASSWORD \
+  && grep -q 'more+=(-e \"\$name\")' record.sh && ! grep -q 'DIFY_ADMIN_PASSWORD' record.sh"
+fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
+expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 exit $failed

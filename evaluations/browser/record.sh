@@ -79,7 +79,20 @@ if [[ -z "$PERSONA_PASSWORD" ]]; then
   exit 2
 fi
 export PERSONA_PASSWORD
-podman run --rm -e DEMO="$id" -e RECORD_SCOUT="$scout" -e APPS_DOMAIN="$domain" -e PERSONA_PASSWORD -e OUT=/out \
+# A walkthrough that types another credential names its environment variable in `secrets` (record.mjs). It is taken
+# from THIS process's environment, by name: never from a command line, never written anywhere, and the take does not
+# start without it. Where the caller reads it from is the caller's (Vault, for Dify's administrator).
+more=()
+while read -r name; do
+  [[ -z "$name" ]] && continue
+  if [[ -z "${!name:-}" ]]; then
+    echo "$id types a second credential: $name must be set in the environment (read it from where the platform keeps it; never on a command line)" >&2
+    exit 2
+  fi
+  export "$name"
+  more+=(-e "$name")
+done < <(sed -n 's/^export const secrets = \[\(.*\)\];.*$/\1/p' "$here/walkthroughs/$id.mjs" | tr ',' '\n' | tr -d ' "'"'"'')
+podman run --rm -e DEMO="$id" -e RECORD_SCOUT="$scout" -e APPS_DOMAIN="$domain" -e PERSONA_PASSWORD "${more[@]+"${more[@]}"}" -e OUT=/out \
   -v "$here:/work:Z" -v "$out:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
   sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node record.mjs'
 rc=$?
