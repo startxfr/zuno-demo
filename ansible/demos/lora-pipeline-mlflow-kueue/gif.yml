@@ -6,7 +6,9 @@
 # Markers written by the walkthrough, in order: login, dashboard, pipeline, trainjob, end. Every screen is held about
 # 2 s by the walkthrough itself, so each motion moment has frames to cut. The graph is of the latest tekos version the
 # dashboard opens (v0-4-0-tekos on 2026-11-16 at 18:50); its nodes are labelled component..component-4 and the step
-# names are in its description line, which the 0:45 caption follows. Row 2:45 (MLflow) is not in the GIF: the
+# names are in its description line ("prepare-dataset -> train-lora -> evaluate -> push-registry", legible at 960 px in
+# the take of 2026-11-16 21:15), which the 0:45 caption follows word for word. Every caption says only what its frame
+# shows: the Jobs frame has the job's name, Type TrainJob, Nodes 0 and Created, and no status column at 1280 px. Row 2:45 (MLflow) is not in the GIF: the
 # rescouts of 2026-11-16 found no experiment in MLflow's workspace zuno-mlops, in either of its views. Row 3:45 (the
 # WP-133 evidence) is not filmed: no caption speaks of MLflow, the registry or serving. Rows 0:00 and 4:30 are words.
 record_notice: >-
@@ -18,7 +20,7 @@ width: 960
 fps: 10
 moments:
   - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
-  - {still: dashboard, hold: 5, step: "0:00", caption: "0:00  One pipeline adapts a model to one agent"}
-  - {from: dashboard, to: pipeline, fit: 7, hold: 9, step: "0:45", caption: "0:45  Data, training, the agent's own tests, registry"}
-  - {from: pipeline, to: trainjob, fit: 6, hold: 8, step: "1:45", caption: "1:45  Training ran on a GPU node added for the run"}
+  - {still: dashboard, hold: 5, step: "0:00", caption: "0:00  OpenShift AI, as a developer, with its projects"}
+  - {from: dashboard, to: pipeline, fit: 7, hold: 9, step: "0:45", caption: "0:45  The tekos pipeline: prepare, train, evaluate, register"}
+  - {from: pipeline, to: trainjob, fit: 6, hold: 8, step: "1:45", caption: "1:45  The training job: a TrainJob, kept in Zuno MLOps"}
   - {still: end, hold: 6, step: "4:30", caption: "A fine-tuned model is a build artefact like any other"}
