@@ -14,7 +14,19 @@ let loads = 0;      // loads of the Five experiences dashboard
 let approved = 0;   // "Authorize Access" approved: a take or a scout must leave it at 0
 let writes = 0;     // writes received by Grafana's API: must stay 0 (FAKE_STAR=1 aside, refused in a scout)
 
-const page = (title, body) => `<!doctype html><title>${title}</title><body style="font:16px sans-serif;margin:24px">${body}`;
+// FAKE_NEWS=1: Grafana's announcement covers every signed-in page a moment after it loads, until it is closed (kept in
+// the browser); FAKE_NEWS=server: closing it also saves a preference on the server; FAKE_NEWS=other: another dialog.
+const NEWS = !process.env.FAKE_NEWS ? "" : `<div role="dialog" id="news" hidden style="position:fixed;top:80px;left:200px;width:800px;height:500px;background:#223;color:#fff;z-index:9">
+<button aria-label="Close" id="news-close">x</button><span>${process.env.FAKE_NEWS === "other" ? "Your session is about to expire" : "NEW</span><h2>Grafana Assistant is now available to OSS users</h2><span>1/4"}</span></div>
+<script>
+setTimeout(() => { if (!localStorage.getItem("grafana.whatsnew.dismissed")) document.getElementById("news").hidden = false; }, 700);
+document.getElementById("news-close").onclick = () => {
+  localStorage.setItem("grafana.whatsnew.dismissed", "1");
+  if (${process.env.FAKE_NEWS === "server"}) fetch("/api/user/preferences", { method: "PATCH", body: "{}" });
+  document.getElementById("news").hidden = true;
+};
+</script>`;
+const page = (title, body) => `<!doctype html><title>${title}</title><body style="font:16px sans-serif;margin:24px">${body}${/Grafana$/.test(title) ? NEWS : ""}`;
 const PROXY = page("Log In", `<form action="/oauth/start"><button>Log in with OpenShift</button></form>`);
 const CHOOSER = page("Log in", `<h1>Log in with...</h1><a class="idp" title="Log in with startx-htpasswd_auth" href="/htpasswd">startx-htpasswd_auth</a><br>
 <a class="idp" title="Log in with openshift" href="/kc">openshift</a>`);

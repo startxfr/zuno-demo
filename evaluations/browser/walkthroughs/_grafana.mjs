@@ -41,6 +41,60 @@ export const grafana = {
   writes: /\/api\/(dashboards\/(db|uid|import)|user\/(stars|preferences|password|using)|org\/preferences|preferences|annotations|snapshots|folders|playlists|short-urls|alert|ruler|v1\/provisioning)|\/apis\/[^?]*\/(dashboards|folders|preferences)/,
 };
 
+// Grafana's own announcement ("NEW  Grafana Assistant is now available to OSS users", 1/4, seen live on 2026-11-16
+// over the home page AND over the dashboard): a take would film it over the panels. It is closed by its own close
+// button (or Escape), and the close is MEASURED the way the other first-screen notices are: while it is closed, every
+// request to Grafana that is not a GET and not a query is refused before it leaves the browser and kept by its path,
+// and the browser-storage keys it adds are kept by name. A close that only writes to the browser is fine (nothing on
+// the server, nothing of the persona's settings). A close that wants to write to Grafana stops the take: nothing was
+// written, and whether a take may save that for the persona is the owner's decision. Any OTHER dialog stops the take.
+const seenNews = new WeakMap();   // page -> {shown, closed_by, refused: [], storage_added: []}
+export const grafanaNewsSeen = (page) => seenNews.get(page) || { shown: 0, closed_by: "", refused: [], storage_added: [] };
+const NEWS = { DIALOG: "[role='dialog']", IS: /Grafana Assistant|is now available to|What's new in Grafana/i, // seen live: "NEW", "Grafana Assistant is now available to OSS users"
+               CLOSE: ["[role='dialog'] button[aria-label='Close']", "[role='dialog'] button[aria-label*='close' i]", "[role='dialog'] button[data-testid*='close' i]"] };   // guess
+const QUIET = /\/api\/(ds\/query|frontend-metrics|live\/)|\/log-grafana-javascript-agent|\/api\/frontend\/assets/;   // reads and telemetry: let through, not state
+
+export async function grafanaNews(page, { watchMs = 3000 } = {}) {
+  const seen = grafanaNewsSeen(page);
+  seenNews.set(page, seen);
+  const origin = new URL(page.url()).origin;
+  const deadline = Date.now() + watchMs;   // the announcement comes a moment after the page
+  while (Date.now() < deadline) {
+    const dialog = page.locator(NEWS.DIALOG).first();
+    if (!(await dialog.isVisible().catch(() => false))) { await page.waitForTimeout(300); continue; }
+    const text = (await dialog.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
+    if (!NEWS.IS.test(text)) throw new Error(`a dialog covers Grafana and it is not its product announcement ("${text.slice(0, 80)}"): the take stops, it dismisses nothing it does not know`);
+    seen.shown += 1;
+    const refused = [];
+    const guard = (route) => {
+      const r = route.request();
+      if (r.method() === "GET" || QUIET.test(new URL(r.url()).pathname)) return route.continue();
+      refused.push(`${r.method()} ${new URL(r.url()).pathname}`);
+      return route.abort();
+    };
+    const keys = () => read(page, () => [...Object.keys(localStorage).map((k) => "local:" + k), ...Object.keys(sessionStorage).map((k) => "session:" + k)]);
+    const before = await keys();
+    await page.route(`${origin}/**`, guard);
+    try {
+      const close = await firstVisible(page, NEWS.CLOSE);
+      if (close) { await click(close); seen.closed_by = close.matched; } else { await page.keyboard.press("Escape"); seen.closed_by = "Escape"; }
+      await dialog.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1200);   // what the close sends, it sends now
+    } finally {
+      await page.unroute(`${origin}/**`, guard);
+    }
+    seen.storage_added = [...new Set([...seen.storage_added, ...(await keys()).filter((k) => !before.includes(k))])];
+    seen.refused.push(...refused);
+    if (refused.length) {
+      throw new Error(`closing Grafana's announcement wanted to send ${refused.join(", ")} to Grafana: refused before it left the browser, nothing was written; `
+        + "whether a take may save that for the persona is the owner's decision");
+    }
+    if (await dialog.isVisible().catch(() => false)) throw new Error(`Grafana's announcement is still on screen after ${seen.closed_by}`);
+    return seen;
+  }
+  return seen;
+}
+
 const provider = (name) => [`a[title='Log in with ${name}']`, `a.idp:text-is('${name}')`, `a:text-is('${name}')`];   // guess (OpenShift login page)
 
 // Sign in to Grafana through its proxy, OpenShift's chooser and Keycloak. The `login` marker is the EMPTY Keycloak
@@ -100,6 +154,7 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
     if (landed === "authorize") throw stop("the page came back after it was approved once");
   }
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  state.grafana.news = await grafanaNews(page);
   return chain;
 }
 
@@ -110,6 +165,7 @@ export async function grafanaDashboard(page, base, uid, { from = "now-6h", to = 
   await page.goto(`${base}/d/${uid}/?orgId=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${chosen}`);
   await waitUntil(page, { what: `the dashboard ${uid}`, timeoutMs: 60000, done: async () => (await firstVisible(page, grafana.READY.slice(0, 3))) || undefined });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await grafanaNews(page, { watchMs: 2500 });   // the announcement comes back on every page until it is closed
   await page.waitForTimeout(1000);
   return page.url().replace(/[#].*/, "");
 }
@@ -144,6 +200,8 @@ export async function grafanaPanel(page, title, { timeoutMs = 60000 } = {}) {
     if (now !== last || loading) { last = now; stableSince = Date.now(); return undefined; }
     return Date.now() - stableSince >= 2000 ? now : undefined;
   } });
+  // A panel behind a dialog is not a picture of the panel (the take of 2026-11-16 passed with the announcement over it).
+  if (await page.locator(NEWS.DIALOG).first().isVisible().catch(() => false)) throw new Error(`a dialog covers the dashboard while the panel "${title}" is read: nothing to film`);
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   return { selector: panel ? panel.matched : `text=${title}`, whole_panel: Boolean(panel), no_data: lines.some((l) => /^No data$/i.test(l)),
            lines: lines.slice(0, 40).map((l) => l.slice(0, 120)) };

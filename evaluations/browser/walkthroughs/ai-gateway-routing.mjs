@@ -19,7 +19,7 @@
 // Open WebUI's selectors were seen live on 2026-11-15 (the picker's are the open-webui walkthrough's); Grafana's
 // chain and panel selectors are guesses (_grafana.mjs). scout() reports both, sends nothing and creates nothing.
 import { click, firstVisible, newText, onScreen, owui, owuiAnswered, owuiAsk, owuiChats, owuiDeleteChat, owuiHome, wordsOnScreen } from "./_helpers.mjs";
-import { grafana, grafanaDashboard, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
+import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
 
 export const takes = [
   { name: "chat", persona: "sale-01", markers: ["login", "home", "picker", "code-picked", "q-sent", "q-done", "end"], motion_from: "home" },
@@ -148,7 +148,7 @@ export async function scout({ page, domain, step, state, take }) {
     await step("chain", async () => ({ ...state.grafana, url: page.url().replace(/[?#].*/, "") }));
     await step("dashboard", async () => {
       await openDashboard(page, domain);
-      return { url: page.url().replace(/[#].*/, ""), title_on_screen: await page.getByText(DASHBOARD.title).first().isVisible().catch(() => false),
+      return { url: page.url().replace(/[#].*/, ""), news: grafanaNewsSeen(page), dialog_on_screen: await page.locator("[role='dialog']").first().isVisible().catch(() => false), title_on_screen: await page.getByText(DASHBOARD.title).first().isVisible().catch(() => false),
                words: await wordsOnScreen(page, [/Last 1 hour/, /open-webui/, /Same models, same routing/]) };
     });
     await step("panel-providers", async () => {

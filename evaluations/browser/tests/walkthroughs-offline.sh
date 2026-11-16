@@ -381,6 +381,22 @@ expect "grafana: an Authorize Access page that asks for one more permission stop
 out="$(evalhub g-authorize-other FAKE_AUTHORIZE=other)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: an Authorize Access page of another client stops the take, nothing approved" bash -c "test $rc -eq 1 && grep -q 'the take stops there: the page is not the one the owner approved (not on it: grafana-oauth-proxy)' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-news FAKE_NEWS=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: the product announcement is closed and the take passes, nothing written" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-news-scout FAKE_NEWS=1 RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a scout reports the announcement, how it was closed and what the close stored" scouted g-news-scout '
+n = steps["dashboard"]["news"]
+assert n == {"shown": 1, "closed_by": "[role=\x27dialog\x27] button[aria-label=\x27Close\x27]", "refused": [], "storage_added": ["local:grafana.whatsnew.dismissed"]}, n
+assert steps["dashboard"]["dialog_on_screen"] is False
+'
+out="$(evalhub g-news-server FAKE_NEWS=server)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a close that wants to save a preference is refused in the browser and stops the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL closing Grafana.s announcement wanted to send PATCH /api/user/preferences to Grafana: refused before it left the browser' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-news-other FAKE_NEWS=other)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: another dialog stops the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL a dialog covers Grafana and it is not its product announcement (\"xYour session is about to expire\")' <<<\"\$0\"" "$out"
 out="$(evalhub g-star FAKE_STAR=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: a write to Grafana during the take fails it" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the take sent POST /api/user/stars/dashboard/uid/zuno-trustyai to Grafana' <<<\"\$0\"" "$out"

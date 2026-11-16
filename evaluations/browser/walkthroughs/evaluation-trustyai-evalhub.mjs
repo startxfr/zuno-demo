@@ -16,7 +16,7 @@
 // the dashboard's address, and for each panel whether it shows "No data" and the text it shows, so that the review
 // can say no real person's name is in a picture (the RAGAS panel lists the evaluation's questions).
 import { describe, wordsOnScreen } from "./_helpers.mjs";
-import { grafana, grafanaDashboard, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
+import { grafana, grafanaDashboard, grafanaNewsSeen, grafanaPanel, grafanaSignIn, grafanaWrites } from "./_grafana.mjs";
 
 export const persona = "ai-ops-01";
 export const page = "docs/demo/scenarios/rhoai/evaluation-trustyai-evalhub.md";
@@ -73,7 +73,7 @@ export async function scout({ page, base, step, state }) {
                                      words: await wordsOnScreen(page, [/ai-ops-01/, /Zuno Platform/, /Welcome to Grafana/]) }));
   await step("dashboard", async () => {
     const address = await grafanaDashboard(page, base, DASHBOARD.uid, { from: DASHBOARD.from });
-    return { url: address, title_on_screen: await page.getByText(DASHBOARD.title).first().isVisible().catch(() => false),
+    return { url: address, news: grafanaNewsSeen(page), dialog_on_screen: await page.locator("[role='dialog']").first().isVisible().catch(() => false), title_on_screen: await page.getByText(DASHBOARD.title).first().isVisible().catch(() => false),
              words: await wordsOnScreen(page, [/Last 7 days/, /Guardrails \(observe-only\)/, /Evaluation jobs/, /Scores \(latest run\)/]),
              controls: (await describe(page, "body", 40)).filter((el) => el.attrs["aria-label"] || el.text).slice(0, 40) };
   });
