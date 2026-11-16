@@ -20,7 +20,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
   podman run --rm -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")"; exit $rc'
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
@@ -33,6 +33,7 @@ evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
 # dify types a second credential: the recorder's (DIFY_ADMIN_PASSWORD) and the stand-in's own copy of it.
 dify() { local name="$1"; shift; take dify fake-dify.mjs 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret "$@"; }
+guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafana.mjs" 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret RECORD_BASE_URL_DIFY=http://127.0.0.1:8094 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095 "$@"; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -52,7 +53,7 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana}.get(s["demo"], [])
+declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -604,6 +605,41 @@ expect "dify: without its second credential the recorder does not start" bash -c
 expect "record.sh takes a declared secret from the environment by name, and refuses to start without it" bash -c "
   cd '$here' && sed -n 's/^export const secrets = \[\(.*\)\];.*\$/\1/p' walkthroughs/dify.mjs | grep -q DIFY_ADMIN_PASSWORD \
   && grep -q 'more+=(-e \"\$name\")' record.sh && ! grep -q 'DIFY_ADMIN_PASSWORD' record.sh"
+fi
+if wanted guardrails; then
+echo "== guardrails (Dify with its second credential, then Grafana)"
+out="$(guardrails gr-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "guardrails: a scout of both takes exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "guardrails: a scout sends nothing to Dify and writes nothing to Grafana" grep -q 'left: {"conversations":1,"runs":1,"saved":0}{"approved":0,"writes":0}' <<<"$out"
+expect "guardrails: each take's scout.json reports its own screens" python3 - "$work/gr-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+agent = {x["step"]: x for x in json.loads((d / "agent" / "scout.json").read_text())["steps"]}
+dash = {x["step"]: x for x in json.loads((d / "dashboard" / "scout.json").read_text())["steps"]}
+assert list(agent) == ["enter", "owned", "sign-in", "agent", "closed"] and agent["sign-in"]["second_form"] is True and agent["agent"]["selector"], agent
+assert list(dash) == ["enter", "owned", "chain", "dashboard", "panel-detections", "closed"], list(dash)
+p = dash["panel-detections"]
+assert p["view"] == "viewPanel=panel-4" and p["names_dify_detected"] is False and p["not_in_window"] == ["dify (detected)"], p
+assert json.loads((d / "scout.json").read_text())["status"] == "done"
+PY
+out="$(guardrails gr-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "guardrails: a good run of both takes exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "guardrails: the conversation is gone, nothing written to Grafana" grep -q 'left: {"conversations":1,"runs":1,"saved":0}{"approved":0,"writes":0}' <<<"$out"
+expect "guardrails: the dashboard take waited for the detection" bash -c "grep -q 'does not name dify (detected) yet: waiting' <<<\"\$0\" && grep -q 'the panel names dify (detected); its legend also names: open-webui (clean)' <<<\"\$0\"" "$out"
+expect "guardrails: each take has its own markers; the conversation is cleaned" python3 - "$work/gr-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+agent = json.loads((d / "agent" / "markers.json").read_text()); dash = json.loads((d / "dashboard" / "markers.json").read_text())
+assert [x["name"] for x in agent["markers"]] == ["login", "agent", "q-sent", "q-done", "end"] and agent["motion_from"] == "agent", agent
+assert [x["name"] for x in dash["markers"]] == ["login", "dashboard", "detections", "end"] and dash["motion_from"] == "dashboard", dash
+assert agent["persona"] == "consultant-02" and len(agent["created"]) == 1 and agent["cleaned"] is True and agent["owned"]["same"] is True, agent
+assert dash["persona"] == "ai-ops-01" and dash["created"] == [] and dash["cleaned"] is None, dash
+PY
+out="$(guardrails gr-noproof FAKE_NO_PROOF=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -5
+expect "guardrails: without the detection on the panel the dashboard take fails" bash -c "test $rc -eq 1 && grep -q 'dashboard: .*does not name dify (detected) within 4 minutes' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"

@@ -1,0 +1,28 @@
+---
+# guardrails: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE the first
+# take: tune it with `make demo gif guardrails` once a take exists.
+# `make demo record guardrails` films TWO takes in one run (evaluations/browser/walkthroughs/guardrails.mjs): `agent`,
+# consultant-02 at Dify's front door then Dify's single administrator (a second credential, DIFY_ADMIN_PASSWORD, read
+# at run time by the caller), then `dashboard`, ai-ops-01 on Grafana. Every moment names its take.
+# Markers of `agent`: login, agent, q-sent, q-done, end. Of `dashboard`: login, dashboard, detections, end. The
+# dashboard take waits until its panel names "dify (detected)", up to four minutes: none of that wait is in the cut
+# (stills only on that take).
+# Rows 0:00, 3:15 and 4:15 are words: the close is a caption on the panel.
+record_notice: >-
+  two recorded browser sessions: on Dify (consultant-02 at the front door, then Dify's single administrator, a second
+  credential typed by the recorder and never shown) one jailbreak sentence is sent to Zuno Agent, one Agent turn on
+  consultant-02's budget; it leaves ONE guardrails detection in the platform's metrics and the gateway's log, which
+  is the demo's proof and cannot be removed; the Agent's conversation is deleted at the end when Dify lists it; then
+  ai-ops-01 on Grafana, read only (sign-in through OpenShift and Keycloak; if OpenShift shows its Authorize Access
+  page for Grafana's proxy the take approves it, and Grafana's product announcement, if it shows, is closed by its
+  cross, which stores in Grafana's user storage of ai-ops-01 that the notice was seen)
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {take: agent, still: login, hold: 3, caption: "Sign in with the company account at the door"}
+  - {take: agent, still: agent, hold: 4, step: "0:00", caption: "0:00  One gateway, the same detectors for every experience"}
+  - {take: agent, from: q-sent, to: q-done, fit: 8, hold: 6, step: "0:45", caption: "0:45  A classic jailbreak: not blocked today, but seen"}
+  - {take: dashboard, still: dashboard, hold: 4, caption: "The platform operator's view, one minute later"}
+  - {take: dashboard, still: detections, hold: 10, step: "2:00", caption: "2:00  The gateway recorded a detection for Dify"}
+  - {take: dashboard, still: end, hold: 6, step: "4:15", caption: "Today they watch and record; blocking is one policy switch"}

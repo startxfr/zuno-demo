@@ -482,7 +482,7 @@ class Verbs(unittest.TestCase):
     def test_record_and_gif_take_a_scenario_with_a_cut_list(self):
         rc, _, err = self.run_main("record", "three-experiences")
         self.assertEqual((rc, "is a workshop" in err), (2, True))
-        rc, _, err = self.run_main("gif", "guardrails")
+        rc, _, err = self.run_main("gif", "world-model")
         self.assertEqual((rc, "has no cut list" in err), (2, True))
 
     def test_gif_without_a_recording(self):
@@ -501,7 +501,7 @@ class Verbs(unittest.TestCase):
         for verb in ("scout", "record", "gif"):
             rc, out, _ = self.run_main("--complete", verb)
             self.assertIn("open-webui", out.split(), verb)
-            self.assertNotIn("guardrails", out.split(), verb)             # no cut list
+            self.assertNotIn("world-model", out.split(), verb)            # no cut list
         rc, out, _ = self.run_main("--complete", "scout")
         self.assertNotIn("vault-pki", out.split())                         # a terminal demo is not scouted
         rc, _, err = self.run_main("scout", "vault-pki")

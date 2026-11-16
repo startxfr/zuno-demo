@@ -103,8 +103,12 @@ http.createServer((req, res) => {
     if (only) loads += 1;
     const rows = [["open-webui", "success", "local-gpt-oss-maas"]].concat(loads >= 2 && process.env.FAKE_NO_PROOF !== "1" ? [["open-webui", "success", "mistral-codestral"]] : []);
     const title = "Which provider served each experience (over range)";
+    // guardrails: the detection reaches the panel late too (from the second load of the panel alone; FAKE_NO_PROOF=1: never).
+    const legend = ["open-webui (clean)"].concat(loads >= 2 && process.env.FAKE_NO_PROOF !== "1" ? ["dify (detected)"] : []);
     return html(page("Five experiences - Grafana", `<header><h1>Zuno Platform / Five experiences</h1><span>Last 1 hour</span> <span>client ${u.searchParams.get("var-client") || "All"}</span></header>
-<main><div class="react-grid-layout">${only && only !== 5 ? "" : `<div style="height:${only ? 20 : 700}px"><h3>Same models, same routing</h3></div>
+<main><div class="react-grid-layout">${only && only !== 4 ? "" : `<div style="height:20px"><h3>Same backend, five experiences</h3></div>
+${section("Guardrails evaluations by experience (over range)", 1, `<canvas width="300" height="80"></canvas><div>${legend.map((l) => `<button style="margin:4px">${l}</button>`).join("")}</div>`, Boolean(only))}`}
+${only && only !== 5 ? "" : `<div style="height:${only ? 20 : 700}px"><h3>Same models, same routing</h3></div>
 ${section(title, 0, table(["client", "outcome", "provider"], rows), Boolean(only))}`}<div style="height:600px"></div></div></main>`));
   }
   return json(404, {});
