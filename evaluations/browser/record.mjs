@@ -7,7 +7,9 @@
 //
 //   recording.webm   the whole take, never published
 //   markers.json     {demo, kind "browser"|"terminal", persona, viewport, started, motion_from, markers: [{name, t,
-//                    png}], created, cleaned, owned, status, detail}
+//                    png, private_addresses}], private_addresses: {flagged, count, at}, created, cleaned, owned, status, detail}
+//                    private_addresses: node names and RFC 1918 addresses COUNTED in the page's text at each marker (never
+//                    kept); a take that showed one fails, after its clean-up
 //                    motion_from: the first marker a motion segment of the cut may start at
 //                    created: [{kind, id}] what the take created; cleaned: true (all deleted), false (something may
 //                    remain), null (nothing was created)
@@ -256,6 +258,23 @@ async function keycloak(page, username) {
 const { chromium } = await import("playwright");
 
 // One scout, of one take (the only one, or one persona of a walkthrough with `takes`), into `out`.
+// What a public picture must never show (the repository is public): a node's name (ip-10-18-..., *.compute.internal)
+// or a private IPv4 address (RFC 1918). A model's answer is not the same twice, so no walkthrough can promise it: the
+// text of the page, every frame of it, is read at each marker and once more after the last one, and the matches are
+// COUNTED. Never kept: neither markers.json, scout.json nor the log holds what matched.
+const PRIVATE = [/\bip-\d+-\d+-\d+-\d+\b/g, /compute\.internal/g,
+                 /(?<![\d.])(?:10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}(?![\d.]|\.\d)/g];
+async function privateAddresses(page) {
+  let count = 0;
+  for (const frame of page.frames()) {
+    const text = await frame.evaluate(() => (document.body ? document.body.innerText : "")).catch(() => "");
+    for (const pattern of PRIVATE) count += (text.match(pattern) || []).length;
+  }
+  return count;
+}
+// The summary kept in markers.json and scout.json: {flagged, count (the most seen at once), at: [marker or step]}.
+const addressSummary = (seen) => ({ flagged: seen.some(([, n]) => n > 0), count: Math.max(0, ...seen.map(([, n]) => n)), at: seen.filter(([, n]) => n > 0).map(([name]) => name) });
+
 async function scoutOne(take, out) {
   const report = { demo: id, ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
                    walkthrough_sha256: walkthroughHash(id), changes: walk.changes, when: "", steps: [], status: "fail", detail: "" };
@@ -283,6 +302,7 @@ async function scoutOne(take, out) {
       entry.error = String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300);
     }
     await page.screenshot({ path: path.join(out, entry.png) }).catch(() => { entry.png = null; });
+    entry.private_addresses = await privateAddresses(page).catch(() => 0);
     report.steps.push(entry);
     log(`scout ${name}: ${entry.ok ? "ok" : "FAILED " + entry.error}`);
     return entry;
@@ -304,6 +324,8 @@ async function scoutOne(take, out) {
   const bad = report.steps.filter((s) => !s.ok).map((s) => s.step);
   if (refused.length) bad.push(`a request a scout refuses was about to be sent (${refused.join(", ")})`);
   report.refused_requests = refused;
+  // Reported, not a failure: a scout asks nothing, so what it sees is what the page shows before any answer.
+  report.private_addresses = addressSummary(report.steps.filter((s) => typeof s.private_addresses === "number").map((s) => [s.step, s.private_addresses]));
   report.when = new Date().toISOString();
   report.status = bad.length ? "fail" : "done";
   report.detail = bad.length ? `failed: ${bad.join(", ")}` : `${report.steps.length} steps`;
@@ -331,8 +353,9 @@ async function takeOne(take, out) {
     if (name !== expected) throw new Error(`marker ${name} out of order: ${expected || "no marker"} was expected`);
     const t = Math.round((Date.now() - t0) / 10) / 100;
     await page.screenshot({ path: path.join(out, `${name}.png`) });
-    record.markers.push({ name, t, png: `${name}.png` });
-    log(`marker ${name}`);
+    const addresses = await privateAddresses(page).catch(() => 0);
+    record.markers.push({ name, t, png: `${name}.png`, private_addresses: addresses });
+    log(`marker ${name}${addresses ? ` (${addresses} node names or private addresses on the page)` : ""}`);
   }
 
   const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
@@ -352,6 +375,10 @@ async function takeOne(take, out) {
     failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
     await page.screenshot({ path: path.join(out, "failed.png") }).catch(() => {});
   }
+  // Before the clean-up changes the page: what it shows after the last marker.
+  const shown = record.markers.map((m) => [m.name, m.private_addresses]);
+  shown.push(["after the last marker", await privateAddresses(page).catch(() => 0)]);
+  record.private_addresses = addressSummary(shown);
   // Pass or fail, what the take created is removed: a failed take must not leave its chat behind either.
   try {
     const cleaned = await walk.cleanup(ctx);
@@ -377,6 +404,11 @@ async function takeOne(take, out) {
       record.owned.same = false;
       failures.push(`what ${take.persona} owns could not be read after the take: ${String(e.message || e).split("\n")[0].slice(0, 200)}`);
     }
+  }
+  // After the clean-up, which it never stops: a take that showed a node name or a private address is not publishable.
+  if (record.private_addresses.flagged) {
+    failures.push(`the page showed node names or private IP addresses (${record.private_addresses.count} at once, at ${record.private_addresses.at.join(", ")}): `
+      + "this take must not be published; record again, or ask a question whose answer cannot hold them");
   }
   const video = page.video();
   await context.close();

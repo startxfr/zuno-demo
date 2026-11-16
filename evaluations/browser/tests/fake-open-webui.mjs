@@ -97,7 +97,10 @@ http.createServer((req, res) => {
           answer.done = true;
           return;
         }
-        answer.content = model === "Zuno Code" ? "Here:\n```python\ndef is_email(s):\n    return '@' in s\n```" : "I can help you with questions.";
+        answer.content = model === "Zuno Code" ? "Here:\n```python\ndef is_email(s):\n    return '@' in s\n```"
+          // FAKE_ADDRESSES=1: an answer as Lightspeed gave on 2026-11-16, with a pod's address and its node's name.
+          : process.env.FAKE_ADDRESSES === "1" ? "I can help. ai-gateway-7d9 runs at 10.130.2.14 on ip-10-18-3-7.eu-west-3.compute.internal."
+          : "I can help you with questions.";
         answer.done = true;
       }, 1500);
       json(res, 200, { id: chatId });

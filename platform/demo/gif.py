@@ -240,6 +240,12 @@ def _take_facts(demo_id: str, markers: dict, reasons: List[str]) -> dict:
         elif owned.get("same") is not True:
             reasons.append(f"what the persona owns changed during the take ({owned.get('before')} before, "
                            f"{owned.get('after')} after): read the take's log, then record again")
+    # A take whose page showed a node name or a private address is never cut, whatever its status says (record.mjs
+    # counts them at each marker; the repository is public). No cut list can excuse it: record again.
+    shown = markers.get("private_addresses")
+    if isinstance(shown, dict) and shown.get("flagged"):
+        reasons.append(f"the take showed node names or private IP addresses (at {', '.join(map(str, shown.get('at') or [])) or 'see markers.json'}): "
+                       "it must not be published, record it again")
     if markers.get("demo") not in (None, demo_id):
         reasons.append(f"the recording is of {markers.get('demo')!r}, not {demo_id!r}")
     at: Dict[str, float] = {}

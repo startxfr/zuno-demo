@@ -171,6 +171,10 @@ class CutList(unittest.TestCase):
         refused(self, cut(still), markers(status="fail", detail="no answer"), "did not pass")
         refused(self, cut(still), markers(cleaned=False), "did not clean what it created (chat c-1)")
         refused(self, cut(still), markers(owned={"before": 3, "after": 4, "same": False}), "3 before, 4 after")
+        # A take that showed a node name or a private address is refused even if its status says pass.
+        refused(self, cut(still), markers(private_addresses={"flagged": True, "count": 2, "at": ["q-done"]}),
+                "showed node names or private IP addresses (at q-done)")
+        gif.plan("open-webui", cut(still), markers(private_addresses={"flagged": False, "count": 0, "at": []}), TIMES)
         refused(self, cut(still), markers(owned=None), "does not say what the persona owns")
         gif.plan("open-webui", cut(still), markers(created=[], cleaned=None), TIMES)    # nothing created
         refused(self, cut(still), markers(demo="dify"), "not 'open-webui'")

@@ -115,6 +115,30 @@ m = json.loads((pathlib.Path(sys.argv[1]) / "markers.json").read_text())
 assert m["status"] == "fail" and m["cleaned"] is True and m["owned"]["same"] is True, m
 assert m["markers"][-1]["name"] == "q1-sent" and m["markers"][-1]["t"] < 30, m["markers"]
 PY
+out="$(take addresses FAKE_ADDRESSES=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "an answer with a node name and a private address fails the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the page showed node names or private IP addresses (3 at once, at ' <<<\"\$0\"" "$out"
+expect "its chat is deleted all the same" grep -q 'chats left: {"chats":0,"toggled":0}' <<<"$out"
+expect "markers.json counts them per marker and keeps none; neither does the log" python3 - "$work/addresses" "$out" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); raw = (d / "markers.json").read_text(); m = json.loads(raw)
+seen = m["private_addresses"]
+assert seen["flagged"] is True and seen["count"] == 3 and seen["at"] and "login" not in seen["at"], seen
+assert all(isinstance(x["private_addresses"], int) for x in m["markers"]) and m["markers"][0]["private_addresses"] == 0, m["markers"]
+assert m["status"] == "fail" and m["cleaned"] is True and m["owned"]["same"] is True, m
+for text in (raw, sys.argv[2]):
+    assert "10.130" not in text and "compute.internal" not in text and "ip-10-18" not in text
+PY
+expect "a clean take says so" python3 - "$work/pass" <<'PY'
+import json, pathlib, sys
+m = json.loads((pathlib.Path(sys.argv[1]) / "markers.json").read_text())
+assert m["private_addresses"] == {"flagged": False, "count": 0, "at": []} and all(x["private_addresses"] == 0 for x in m["markers"]), m
+PY
+expect "a scout reports the count per step" python3 - "$work/scout" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
+assert s["private_addresses"] == {"flagged": False, "count": 0, "at": []} and all(x["private_addresses"] == 0 for x in s["steps"]), s
+PY
 out="$(take stray FAKE_STRAY_CHAT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "a chat the take did not create fails the take" test "$rc" -eq 1
