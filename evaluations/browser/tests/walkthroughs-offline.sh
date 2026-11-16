@@ -660,6 +660,7 @@ expect "quotas: the scout reads the class table and the evidence on GitHub in th
 assert list(steps) == ["enter", "owned", "chain", "classes", "classes-shapes", "dashboard", "panel", "evidence", "closed"], list(steps)
 for name in ("classes", "evidence"):
     assert steps[name]["lead_uncovered"] is True and steps[name]["absent"] == [] and steps[name]["url"].endswith("/blob/devel/docs/demo/scenarios/governance/quotas.md"), steps[name]
+    assert steps[name]["scrolled"]["steps"] > 0 and 60 <= steps[name]["lead_top"] <= 300, steps[name]
 assert steps["panel"]["view"] == "viewPanel=panel-7" and steps["panel"]["no_data"] is False and steps["panel"]["not_in_window"] == [], steps["panel"]
 assert steps["dashboard"]["title_on_screen"] is True and steps["closed"]["writes"] == 0, steps["dashboard"]
 '
@@ -680,6 +681,9 @@ expect "quotas: GitHub out of reach fails the take and names option B" bash -c "
 out="$(quotas q-banner FAKE_GITHUB_BANNER=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "quotas: a banner over the page on GitHub fails the take: the layout fights the scroll" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*not wholly inside the window on GitHub.*fall back to option B' <<<\"\$0\" && grep -q 'github_writes\":0' <<<\"\$0\"" "$out"
+out="$(quotas q-reset FAKE_GITHUB_RESET=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a GitHub page that scrolls itself back once is scrolled again, the take passes" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'classes: .*\"rounds\":[2-3]' <<<\"\$0\"" "$out"
 out="$(quotas q-star FAKE_STAR=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "quotas: a dashboard that writes to Grafana fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /api/user/stars/dashboard/uid/zuno-three-experiences to Grafana' <<<\"\$0\"" "$out"

@@ -4,10 +4,12 @@
 // the walkthrough, not like the real sites: it proves the walkthrough's own logic, not their selectors.
 // Grafana, on FAKE_PORT (8089): the proxy's "Log in with OpenShift", the chooser, the Keycloak form, then the dashboard
 // zuno-three-experiences, whose panel 7 is a table (group, client, Value) far down the page, or alone over the page
-// with `viewPanel=panel-7`. GitHub, on GITHUB_PORT (8088): the page at /startxfr/zuno-demo/blob/devel/..., a sticky
-// header of 60 px, then the rendered Markdown with the class table and the evidence list among long paragraphs.
+// with `viewPanel=panel-7`. GitHub, on GITHUB_PORT (8088): the page at /startxfr/zuno-demo/blob/devel/..., as the scout
+// of 2026-11-16 saw it: a 167 px header that scrolls away, a 320 px file tree, a sticky 56 px file toolbar, then the
+// rendered Markdown with the class table and the evidence list among long paragraphs.
 // Knobs: FAKE_NO_DATA=1 the panel shows "No data"; FAKE_STAR=1 the dashboard stars itself when opened (a write);
-// FAKE_GITHUB_DOWN=1 nothing listens on GITHUB_PORT; FAKE_GITHUB_BANNER=1 a fixed banner covers the top of the page.
+// FAKE_GITHUB_DOWN=1 nothing listens on GITHUB_PORT; FAKE_GITHUB_BANNER=1 a fixed banner covers the top of the page;
+// FAKE_GITHUB_RESET=1 the page scrolls itself back to its top once, half a second after the first scroll.
 // /fake/count on FAKE_PORT says {writes, github_writes}: the non-GET requests to Grafana's API (queries aside) and to
 // the GitHub stand-in. No cluster.
 import http from "node:http";
@@ -53,7 +55,10 @@ http.createServer((req, res) => {
 // The page on GitHub: long enough that both places must be scrolled to.
 const filler = (n) => Array.from({ length: n }, (_, i) => `<p>Paragraph ${i + 1} of the page, words that take a line or two on the screen, as a real page does.</p>`).join("\n");
 const GITHUB = `<!doctype html><title>quotas.md - startxfr/zuno-demo</title><body style="font:16px sans-serif;margin:0">
-<div style="position:sticky;top:0;height:60px;background:#eee;z-index:5">startxfr / zuno-demo / docs / demo / scenarios / governance / quotas.md</div>
+<div style="height:167px;background:#111;color:#fff">GitHub header, startxfr / zuno-demo, Code Issues Pull requests</div>
+<div style="display:flex"><div style="width:320px;flex:none;background:#f6f6f6">Files<br>docs/demo/scenarios/governance</div><div style="flex:1">
+<div style="position:sticky;top:0;height:56px;background:#eee;z-index:5">quotas.md  Preview Code Blame  361 lines</div>
+${process.env.FAKE_GITHUB_RESET === "1" ? `<script>addEventListener("scroll", function once() { removeEventListener("scroll", once); setTimeout(() => scrollTo(0, 0), 500); });</script>` : ""}
 ${process.env.FAKE_GITHUB_BANNER === "1" ? `<div style="position:fixed;top:0;left:0;right:0;height:300px;background:#fc0;z-index:9">Sign up to GitHub</div>` : ""}
 <article class="markdown-body" style="max-width:1000px;margin:0 auto;padding:16px">
 <h1>Scenario: quotas</h1>${filler(25)}
@@ -69,7 +74,7 @@ ${process.env.FAKE_GITHUB_BANNER === "1" ? `<div style="position:fixed;top:0;lef
 <li>01:12:40, Open WebUI as sale-01: 429 <code>{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user","budget_tokens":2000,"window":"5m"}</code>;</li>
 <li>01:12-01:14, UnifAI (team <code>agent-comage</code>): the card "Rate limit reached";</li>
 <li>01:14:00, OpenClaw, a short turn: 429, the same body, in 0.03 s.</li></ul>${filler(30)}
-</article>`;
+</article></div></div>`;
 if (process.env.FAKE_GITHUB_DOWN !== "1") {
   http.createServer((req, res) => {
     if (req.method !== "GET") { githubWrites += 1; return json(res, 403, {}); }

@@ -41,7 +41,10 @@ const PANEL = { id: 7, title: "One group across the experiences: tokens (over ra
 const PAGE_PATH = "/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/quotas.md";
 const github = () => `${process.env.RECORD_BASE_URL_GITHUB || "https://github.com"}${PAGE_PATH}`;
 const ARTICLE = ["article.markdown-body", ".markdown-body"];   // guess: GitHub's rendered Markdown
-const TOP = 140;                                               // guess: room under GitHub's sticky file header
+// Where the lead paragraph is brought: just under GitHub's sticky file toolbar once the page is scrolled (the scout of
+// 2026-11-16: header, repo bar and tabs take 0-167 px at the top of the page and scroll away; the article starts at
+// x 337, right of a 320 px file tree). Moved down by steps while the paragraph is covered.
+const TOP = 100;
 // What each GitHub screen must hold inside the window: the paragraph that leads it (scrolled under the header) and
 // the block itself, wholly visible.
 const SHOW = {
@@ -49,12 +52,29 @@ const SHOW = {
   evidence: { lead: "Evidence of the shared budget", block: "ul", has: "quota_exceeded", words: [] },
 };
 
-// The paragraph scrolled to TOP pixels from the top of its scrolling box (a scroll of the view: nothing is changed).
-function lift(el, top) {
-  el.scrollIntoView({ block: "start" });
-  let box = el.parentElement;
-  while (box && !(box.scrollHeight > box.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
-  (box || document.scrollingElement).scrollTop -= top;
+// Bring the lead paragraph to `top` pixels from the top of the window with the mouse wheel over the article, as a
+// reader scrolls (the first scout's programmatic scroll never moved GitHub's page: both stills showed its top). Each
+// round wheels until the paragraph is within 30 px of `top`, then waits and looks again: a page that scrolls itself
+// back after it renders gets another round. Returns the rounds and wheel steps used.
+async function scrollTo(page, lead, top) {
+  const box = await page.locator(ARTICLE[0]).first().boundingBox().catch(() => null);
+  await page.mouse.move(box ? Math.min(box.x + box.width / 2, page.viewportSize().width - 20) : 800, 500);
+  let steps = 0;
+  for (let round = 1; round <= 3; round += 1) {
+    for (let i = 0; i < 40; i += 1) {
+      const a = await lead.boundingBox().catch(() => null);
+      if (!a) break;
+      const delta = a.y - top;
+      if (Math.abs(delta) <= 30) break;
+      await page.mouse.wheel(0, Math.max(-700, Math.min(700, delta)));
+      steps += 1;
+      await page.waitForTimeout(200);
+    }
+    await page.waitForTimeout(900);
+    const a = await lead.boundingBox().catch(() => null);
+    if (a && Math.abs(a.y - top) <= 30) return { rounds: round, steps };
+  }
+  return { rounds: 3, steps };
 }
 
 // Is the element drawn on top at the middle of its first line (not under a sticky header or a banner)?
@@ -80,17 +100,19 @@ async function onGitHub(page, which) {
   const lead = body.locator("p", { hasText: want.lead }).first();
   const block = body.locator(want.block).filter({ hasText: want.has }).first();
   await lead.waitFor({ timeout: 30000 });
-  await read(lead, lift, TOP);
-  await page.waitForTimeout(800);
+  let scrolled = await scrollTo(page, lead, TOP);
+  // Still under a sticky bar at TOP: a little lower, at most four times.
+  for (let lower = 1; lower <= 4 && !(await read(lead, uncovered).catch(() => false)); lower += 1) scrolled = await scrollTo(page, lead, TOP + 40 * lower);
   const view = page.viewportSize();
   const a = await lead.boundingBox().catch(() => null);
   const b = await block.boundingBox().catch(() => null);
-  const shown = { article: article.matched, url: page.url().replace(/[?#].*/, ""), lead_top: a ? Math.round(a.y) : null,
+  const shown = { article: article.matched, url: page.url().replace(/[?#].*/, ""), scrolled, lead_top: a ? Math.round(a.y) : null,
                   block_bottom: b ? Math.round(b.y + b.height) : null, lead_uncovered: await read(lead, uncovered).catch(() => false), absent: [] };
   for (const word of want.words) if (!(await grafanaInWindow(page, word))) shown.absent.push(word);
   if (!a || !b || a.y < 0 || b.y + b.height > view.height || !shown.lead_uncovered || shown.absent.length) {
-    throw new Error(`the ${which} of the page is not wholly inside the window on GitHub: the layout fights the scroll, `
-      + `fall back to option B, Grafana only (${JSON.stringify(shown)})`);
+    throw new Error(`the ${which} of the page is not wholly inside the window on GitHub (lead at ${shown.lead_top}, block ends at `
+      + `${shown.block_bottom} of ${view.height}, lead uncovered ${shown.lead_uncovered}, not drawn: ${shown.absent.join(" ") || "-"}, `
+      + `${scrolled.rounds} rounds, ${scrolled.steps} wheel steps): the layout fights the scroll, fall back to option B, Grafana only`);
   }
   return shown;
 }
