@@ -44,6 +44,7 @@ from typing import Any, Dict  # noqa: E402
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
 from mcp.server.mcpserver import MCPServer  # noqa: E402
+from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
 from starlette.applications import Starlette  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
@@ -81,7 +82,7 @@ def _build_fake_downstream_app() -> Starlette:
     @mcp_server.tool()
     async def get_customer(customer_id: int) -> Dict[str, Any]:
         if customer_id == 999:
-            raise ValueError(f"no customer with id {customer_id}")
+            raise ToolError(f"no customer with id {customer_id}")
         return {"customer": {"id": customer_id, "name": "Acme Corp"}}
 
     class AuthorizationMiddleware(BaseHTTPMiddleware):

@@ -42,7 +42,7 @@ class _Launcher:
     async def __call__(self, progress=None):
         self.count += 1
         if self.fail:
-            raise ValueError("AAP Controller is unreachable")
+            raise server.ToolValueError("AAP Controller is unreachable")
         return {"launched": True, "job": {"id": self.count}}
 
 
@@ -129,7 +129,7 @@ async def test_a_failure_after_a_successful_post_still_counts(transport):
         if method == "POST":
             posts.append(path)
             return {"id": 40 + len(posts)}
-        raise ValueError("AAP Controller did not answer within 20s (GET job status)")
+        raise server.ToolValueError("AAP Controller did not answer within 20s (GET job status)")
 
     async def launch(headers):
         http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers)
@@ -152,7 +152,7 @@ async def test_a_failure_before_the_post_does_not_count_and_buckets_are_pruned(t
     _reset()
 
     async def fake_request(client, method, path, **kwargs):
-        raise ValueError("AAP Controller is unreachable")
+        raise server.ToolValueError("AAP Controller is unreachable")
 
     with mock.patch.object(server, "_client", lambda: _NoClient()), \
             mock.patch.object(server, "_request", fake_request), mock.patch.dict(os.environ, LIMIT):

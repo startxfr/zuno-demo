@@ -66,7 +66,21 @@ from typing import Any, Dict, List, Mapping, Optional
 import httpx
 from fastapi import FastAPI
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+
+
+class ToolValueError(ToolError, ValueError):
+    """A tool failure whose message is meant for the caller.
+
+    mcp 2.2 reduces any exception that is not a ToolError to "Error executing
+    tool <name>"; this keeps the message and stays a ValueError for callers
+    and tests that catch that.
+    """
+
+
+class ToolPermissionError(ToolError, PermissionError):
+    """A refusal whose message is meant for the caller (see ToolValueError)."""
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -151,14 +165,14 @@ async def _owner_scope(client: httpx.AsyncClient, ctx: Optional[Context], tool: 
         return None
     caller = _caller(ctx, tool)
     if caller is None:
-        raise PermissionError(f"{tool} is refused: owner scoping is on and the call carries no verified caller context")
+        raise ToolPermissionError(f"{tool} is refused: owner scoping is on and the call carries no verified caller context")
     if set(caller["groups"]) & set(_all_records_groups()):
         return None
     email = caller["email"]
     if not email:
-        raise PermissionError(f"{tool} is refused: owner scoping needs the caller's email, and the token carries none")
+        raise ToolPermissionError(f"{tool} is refused: owner scoping needs the caller's email, and the token carries none")
     if not caller.get("email_verified"):
-        raise PermissionError(
+        raise ToolPermissionError(
             f"{tool} is refused: owner scoping needs a verified email, and the token's email_verified is not true"
         )
     soql = f"SELECT Id FROM User WHERE Email = {_soql_quote(email)} AND IsActive = true LIMIT 2"
@@ -166,16 +180,16 @@ async def _owner_scope(client: httpx.AsyncClient, ctx: Optional[Context], tool: 
     resp.raise_for_status()
     records = resp.json().get("records", [])
     if len(records) != 1:
-        raise PermissionError(
+        raise ToolPermissionError(
             f"{tool} is refused: owner scoping found {len(records)} active Salesforce users for the caller's email"
         )
     user_id = str(records[0].get("Id") or "")
     if not _RECORD_ID_RE.fullmatch(user_id):
-        raise PermissionError(f"{tool} is refused: Salesforce returned an invalid user id")
+        raise ToolPermissionError(f"{tool} is refused: Salesforce returned an invalid user id")
     return user_id
 
 
-class SalesforceConfigError(RuntimeError):
+class SalesforceConfigError(ToolError, RuntimeError):
     pass
 
 
@@ -322,7 +336,7 @@ async def create_opportunity(
             request_body["OwnerId"] = owner_id
         resp = await client.post("/sobjects/Opportunity", json=request_body)
         if resp.status_code == 400:
-            raise ValueError(f"Salesforce rejected opportunity creation: {resp.text}")
+            raise ToolValueError(f"Salesforce rejected opportunity creation: {resp.text}")
         resp.raise_for_status()
         payload = resp.json()
 
@@ -347,11 +361,11 @@ async def update_opportunity(
     if close_date is not None:
         request_body["CloseDate"] = close_date
     if not request_body:
-        raise ValueError("update_opportunity requires at least one of stage/amount/close_date")
+        raise ToolValueError("update_opportunity requires at least one of stage/amount/close_date")
 
     # ADR-0603 M12: the id lands in a URL path; checked whether or not owner scoping is on.
     if not _RECORD_ID_RE.fullmatch(str(opportunity_id)):
-        raise ValueError("opportunity_id must be a Salesforce record id (15 or 18 letters and digits)")
+        raise ToolValueError("opportunity_id must be a Salesforce record id (15 or 18 letters and digits)")
     async with _client() as client:
         owner_id = await _owner_scope(client, ctx, "update_opportunity")
         if owner_id:
@@ -364,10 +378,10 @@ async def update_opportunity(
             owned = await client.get("/query", params={"q": check})
             owned.raise_for_status()
             if not owned.json().get("records"):
-                raise ValueError(f"no Salesforce opportunity with id {opportunity_id} owned by the caller")
+                raise ToolValueError(f"no Salesforce opportunity with id {opportunity_id} owned by the caller")
         resp = await client.patch(f"/sobjects/Opportunity/{opportunity_id}", json=request_body)
         if resp.status_code == 404:
-            raise ValueError(f"no Salesforce opportunity with id {opportunity_id}")
+            raise ToolValueError(f"no Salesforce opportunity with id {opportunity_id}")
         resp.raise_for_status()
 
         current_resp = await client.get(
@@ -424,7 +438,7 @@ _CALL_ASSERTION_KEYS: Dict[str, Any] = {}
 _CALL_ASSERTION_SEEN: Dict[str, float] = {}
 
 
-class CallAssertionError(ValueError):
+class CallAssertionError(ToolValueError):
     """The assertion is not acceptable; the message is safe to return."""
 
 

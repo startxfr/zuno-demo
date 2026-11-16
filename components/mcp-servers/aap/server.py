@@ -49,7 +49,17 @@ from typing import Any, Deque, Dict, List, Mapping, Optional
 import httpx
 from fastapi import FastAPI
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+
+
+class ToolValueError(ToolError, ValueError):
+    """A tool failure whose message is meant for the caller.
+
+    mcp 2.2 reduces any exception that is not a ToolError to "Error executing
+    tool <name>"; this keeps the message and stays a ValueError for callers
+    and tests that catch that.
+    """
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -151,7 +161,7 @@ def _rate_window_seconds() -> float:
         return 900.0
 
 
-class RateLimited(PermissionError):
+class RateLimited(ToolError, PermissionError):
     pass
 
 
@@ -194,7 +204,7 @@ def _release_launch(caller_key: str, stamp: Optional[float]) -> None:
         del _launches[caller_key]
 
 
-class AapConfigError(RuntimeError):
+class AapConfigError(ToolError, RuntimeError):
     """A required credential/configuration value is missing on this pod."""
 
 
@@ -236,28 +246,28 @@ async def _request(client: httpx.AsyncClient, method: str, path: str, **kwargs: 
     try:
         response = await client.request(method, path, **kwargs)
     except httpx.TimeoutException as exc:
-        raise ValueError(
+        raise ToolValueError(
             f"AAP Controller did not answer within {HTTP_TIMEOUT_SECONDS}s "
             f"({method} {path}) - the platform may be degraded: {exc}"
         ) from exc
     except httpx.RequestError as exc:
-        raise ValueError(
+        raise ToolValueError(
             f"AAP Controller is unreachable at {AAP_BASE_URL} "
             f"({method} {path}) - check the zuno-aap NetworkPolicy and that "
             f"the aap component is running: {exc}"
         ) from exc
 
     if response.status_code in (401, 403):
-        raise ValueError(
+        raise ToolValueError(
             f"AAP rejected this server's token ({response.status_code} on "
             f"{method} {path}) - it has expired, been revoked, or lacks the "
             f"required grant. Re-run `make d1 install aap-config` to re-mint "
             f"secret/zuno/aap/mcp-token."
         )
     if response.status_code == 404:
-        raise ValueError(f"no such AAP resource: {method} {path}")
+        raise ToolValueError(f"no such AAP resource: {method} {path}")
     if response.status_code >= 400:
-        raise ValueError(
+        raise ToolValueError(
             f"AAP returned {response.status_code} on {method} {path}: "
             f"{response.text[:500]}"
         )
@@ -267,7 +277,7 @@ async def _request(client: httpx.AsyncClient, method: str, path: str, **kwargs: 
     try:
         return response.json()
     except ValueError as exc:
-        raise ValueError(
+        raise ToolValueError(
             f"AAP returned a non-JSON body on {method} {path} "
             f"(is AAP_BASE_URL pointing at the Gateway?): {response.text[:200]}"
         ) from exc
@@ -281,7 +291,7 @@ async def _lookup_by_name(client: httpx.AsyncClient, collection: str, name: str)
     )
     results = payload.get("results") or []
     if not results:
-        raise ValueError(
+        raise ToolValueError(
             f"no {collection[:-1]} named '{name}' in AAP - is aap-config "
             f"installed and its Project synced?"
         )
@@ -392,7 +402,7 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
         recent_jobs: how many recent Job Template runs to include (1-25).
     """
     if not isinstance(recent_jobs, int) or not 1 <= recent_jobs <= 25:
-        raise ValueError("recent_jobs must be an integer between 1 and 25")
+        raise ToolValueError("recent_jobs must be an integer between 1 and 25")
 
     async with _client() as client:
         ping = await _request(client, "GET", "/api/controller/v2/ping/")
@@ -491,7 +501,7 @@ async def _launch_cluster_audit(progress: Optional[Dict[str, bool]] = None) -> D
         progress["posted"] = True
         job_id = launched.get("id") or launched.get("job")
         if not job_id:
-            raise ValueError(
+            raise ToolValueError(
                 f"AAP accepted the launch of '{JOB_TEMPLATE_NAME}' but returned "
                 f"no job id: {launched}"
             )
@@ -564,7 +574,7 @@ _CALL_ASSERTION_KEYS: Dict[str, Any] = {}
 _CALL_ASSERTION_SEEN: Dict[str, float] = {}
 
 
-class CallAssertionError(ValueError):
+class CallAssertionError(ToolValueError):
     """The assertion is not acceptable; the message is safe to return."""
 
 

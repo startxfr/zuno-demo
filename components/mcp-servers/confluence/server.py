@@ -59,7 +59,21 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 import httpx
 from fastapi import FastAPI
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+
+
+class ToolValueError(ToolError, ValueError):
+    """A tool failure whose message is meant for the caller.
+
+    mcp 2.2 reduces any exception that is not a ToolError to "Error executing
+    tool <name>"; this keeps the message and stays a ValueError for callers
+    and tests that catch that.
+    """
+
+
+class ToolPermissionError(ToolError, PermissionError):
+    """A refusal whose message is meant for the caller (see ToolValueError)."""
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -165,7 +179,7 @@ def _space_policy(ctx: Optional[Context], tool: str, *, write: bool) -> Optional
         return None
     caller = _caller(ctx, tool)
     if caller is None:
-        raise PermissionError(
+        raise ToolPermissionError(
             f"{tool} is refused: a space allowlist is configured and the call carries no verified caller context"
         )
     return caller, allowlist
@@ -176,7 +190,7 @@ def _check_space(space_key: str, policy: Optional[Tuple[Dict[str, Any], Dict[str
         return
     caller, allowlist = policy
     if not _allowed(space_key or "", caller, allowlist):
-        raise PermissionError(
+        raise ToolPermissionError(
             f"space {space_key!r} is outside the space allowlist of the caller's groups (ADR-0603 M12)"
         )
 
@@ -187,7 +201,7 @@ def _check_page_space(page_id: str, space_key: str, policy: Optional[Tuple[Dict[
     try:
         _check_space(space_key, policy)
     except PermissionError:
-        raise ValueError(f"no Confluence page with id {page_id}") from None
+        raise ToolValueError(f"no Confluence page with id {page_id}") from None
 
 
 def _literal_spaces(policy: Tuple[Dict[str, Any], Dict[str, List[str]]]) -> Optional[List[str]]:
@@ -203,7 +217,7 @@ def _literal_spaces(policy: Tuple[Dict[str, Any], Dict[str, List[str]]]) -> Opti
     return sorted(set(keys))
 
 
-class ConfluenceConfigError(RuntimeError):
+class ConfluenceConfigError(ToolError, RuntimeError):
     pass
 
 
@@ -299,7 +313,7 @@ _MAX_SEARCH_LIMIT = 50
 def _check_page_id(page_id: str) -> None:
     """ADR-0603 / WP-222: page_id is model-chosen and lands in a URL path."""
     if not _PAGE_ID_RE.fullmatch(str(page_id)):
-        raise ValueError("page_id must be a numeric Confluence content id")
+        raise ToolValueError("page_id must be a numeric Confluence content id")
 
 
 def _cql_escape(text: str) -> str:
@@ -376,7 +390,7 @@ async def search_pages(
     # ADR-0602 / WP-222: both values are model-chosen and land inside a CQL
     # string literal, so a quote in either would widen the query.
     if space and not _SPACE_KEY_RE.fullmatch(space):
-        raise ValueError("space must be a Confluence space key (letters, digits, _ . : @ -, optional leading ~)")
+        raise ToolValueError("space must be a Confluence space key (letters, digits, _ . : @ -, optional leading ~)")
     policy = _space_policy(ctx, "search_pages", write=False)
     if space:
         _check_space(space, policy)
@@ -391,7 +405,7 @@ async def search_pages(
         literal = _literal_spaces(policy)
         if literal is not None:
             if not literal:
-                raise PermissionError("no Confluence space is allowed to the caller's groups (ADR-0603 M12)")
+                raise ToolPermissionError("no Confluence space is allowed to the caller's groups (ADR-0603 M12)")
             spaces = ",".join(f'"{key}"' for key in literal)
             cql = f"space in ({spaces}) and {cql}"
     async with _client() as client:
@@ -424,7 +438,7 @@ async def read_page(page_id: str, ctx: Optional[Context] = None) -> Dict[str, An
             params={"expand": "space,version,body.storage"},
         )
         if resp.status_code == 404:
-            raise ValueError(f"no Confluence page with id {page_id}")
+            raise ToolValueError(f"no Confluence page with id {page_id}")
         resp.raise_for_status()
         payload = resp.json()
 
@@ -448,12 +462,12 @@ async def create_page(
         async with _client() as client:
             parent_resp = await client.get(f"/content/{parent_id}", params={"expand": "space"})
             if parent_resp.status_code == 404:
-                raise ValueError(f"no Confluence page with id {parent_id}")
+                raise ToolValueError(f"no Confluence page with id {parent_id}")
             parent_resp.raise_for_status()
             parent_space = ((parent_resp.json().get("space") or {}).get("key")) or ""
         _check_page_space(parent_id, parent_space, policy)
         if parent_space.lower() != space_key.lower():
-            raise ValueError(f"no Confluence page with id {parent_id} in space {space_key!r}")
+            raise ToolValueError(f"no Confluence page with id {parent_id} in space {space_key!r}")
     request_body: Dict[str, Any] = {
         "type": "page",
         "title": title,
@@ -466,7 +480,7 @@ async def create_page(
     async with _client() as client:
         resp = await client.post("/content", json=request_body)
         if resp.status_code == 400:
-            raise ValueError(f"Confluence rejected page creation: {resp.text}")
+            raise ToolValueError(f"Confluence rejected page creation: {resp.text}")
         resp.raise_for_status()
         payload = resp.json()
 
@@ -483,7 +497,7 @@ async def update_page(
     async with _client() as client:
         current_resp = await client.get(f"/content/{page_id}", params={"expand": "version,space"})
         if current_resp.status_code == 404:
-            raise ValueError(f"no Confluence page with id {page_id}")
+            raise ToolValueError(f"no Confluence page with id {page_id}")
         current_resp.raise_for_status()
         current = current_resp.json()
         # ADR-0603 M12: the page's own space, read before any write.
@@ -501,7 +515,7 @@ async def update_page(
         }
         resp = await client.put(f"/content/{page_id}", json=request_body)
         if resp.status_code == 409:
-            raise ValueError(
+            raise ToolValueError(
                 f"Confluence page {page_id} was modified concurrently (version conflict) - retry"
             )
         resp.raise_for_status()
@@ -564,7 +578,7 @@ _CALL_ASSERTION_KEYS: Dict[str, Any] = {}
 _CALL_ASSERTION_SEEN: Dict[str, float] = {}
 
 
-class CallAssertionError(ValueError):
+class CallAssertionError(ToolValueError):
     """The assertion is not acceptable; the message is safe to return."""
 
 
