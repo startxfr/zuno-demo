@@ -20,7 +20,7 @@ S3, never from Hugging Face at start. How the objects, the route and the quota f
 **The message:** "Five models run on two GPUs we own. Each is declared in Git, sized to a GPU slice and capped by a
 quota."
 
-![The 5-minute version of the model serving demo, recorded live in a terminal: the models served by llm-d and the embeddings model, the GPU slice each model holds, and the quota that caps those slices. The Grafana throughput panel of row 3:00 and the node names are not in the recording.](../../../assets/img/demo/model-serving-llmd-mig.gif)
+![The 5-minute version of the model serving demo, recorded live in a terminal: the models served by llm-d and the embeddings model, the GPU slice each model holds and the server it runs on, and the quota that caps those slices. The Grafana throughput panel of row 3:00 is not in the recording.](../../../assets/img/demo/model-serving-llmd-mig.gif)
 
 ## Personas
 
