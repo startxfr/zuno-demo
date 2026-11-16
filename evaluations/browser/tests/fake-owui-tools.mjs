@@ -2,13 +2,15 @@
 // (tests/walkthroughs-offline.sh). Its own file, so the stand-in of the other Open WebUI walkthroughs stays as it is.
 // It serves what the shared owui* helpers look for (seen live on 0.12.5): the sign-in form, a chat page whose sidebar
 // keeps an earlier chat off screen, a sign-in toast for 2.5 s, "Zuno picks the model", and a chat's read and delete.
-// The persona is the name typed in the sign-in form (a cookie). The answers depend on the persona and the prompt:
-// the tools question lists three tools for sale-01, six for consultant-02 (the Confluence tool names among them); the
-// Confluence question shows consultant-02 a tool call ("Executing search_confluence") 1 s after the send, then its
-// result and the answer, naming a page "FAKE-CONFLUENCE-TITLE", 2.5 s later; sale-01 gets a refusal and no tool call.
-// Knobs: FAKE_NO_TOOL_CALL=1 consultant-02's answer comes with no tool call; FAKE_ANSWER_WITH_CHIP=1 the answer's text
-// shows at the same time as the tool call. /fake/count says how many chats remain and how many Confluence searches
-// ran. No cluster, no model.
+// The messages sit in a box of their own that scrolls, and that does not follow a long answer.
+// The persona is the name typed in the sign-in form (a cookie). The answers depend on the persona and the prompt, with
+// the tool names the take of 2026-11-16 saw: the tools question lists three tools for sale-01, six for consultant-02
+// (the Confluence tools among them); the Confluence question shows consultant-02 the tool call "View Result from
+// zuno-mcp_confluence.page.search" 1 s after the send, then the answer, naming a page "FAKE-CONFLUENCE-TITLE", 2.5 s
+// later; sale-01 gets a refusal and no tool call.
+// Knobs: FAKE_NO_TOOL_CALL=1 consultant-02's answer comes with no tool call; FAKE_OTHER_TOOL=1 its tool call is a Drive
+// search, not a Confluence one; FAKE_LONG_ANSWER=1 its answer is longer than the message box. /fake/count says how
+// many chats remain and how many Confluence searches ran. No cluster, no model.
 import http from "node:http";
 import crypto from "node:crypto";
 
@@ -21,7 +23,7 @@ const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/
 <input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`;
 
 const CHAT = `<!doctype html><title>Open WebUI (fake)</title>
-<style>body{font:16px sans-serif;margin:24px} #chat-input{border:1px solid #888;min-height:40px;padding:8px} .chip{border:1px solid #888;border-radius:8px;padding:4px 8px;display:inline-block}</style>
+<style>body{font:16px sans-serif;margin:24px} #chat-input{border:1px solid #888;min-height:40px;padding:8px} .chip{border:1px solid #888;border-radius:8px;padding:4px 8px;display:inline-block} #messages{height:420px;overflow-y:auto} #messages p{white-space:pre-line}</style>
 <div id="sidebar" style="position:fixed;top:0;left:-400px;width:300px"><a href="/c/${EARLIER}">An earlier chat</a></div>
 <button id="sidebar-toggle-button" onclick="document.getElementById('sidebar').style.left='0px'">toggle</button>
 <div id="toast">You're now logged in.</div>
@@ -60,8 +62,9 @@ $("chat-input").addEventListener("keydown", async (e) => {
 </script>`;
 
 const TOOLS = {
-  "sale-01": "I can use: search_drive, read_gmail, generate_diagram.",
-  "consultant-02": "I can use: search_drive, read_gmail, generate_diagram, search_confluence, read_confluence_page, search_technical_docs.",
+  "sale-01": "Here are the tools I can use for you: zuno-mcp_drive.document.search, zuno-mcp_gmail.message.read, zuno-mcp_diagram.generation.create.",
+  "consultant-02": "Here are the tools I can use for you: zuno-mcp_drive.document.search, zuno-mcp_gmail.message.read, "
+    + "zuno-mcp_diagram.generation.create, zuno-mcp_confluence.page.search, zuno-mcp_confluence.page.read, zuno-mcp_knowledge.tech.search.",
 };
 
 function json(res, status, body) {
@@ -81,13 +84,15 @@ function answer(persona, text, message) {
   if (persona !== "consultant-02" || process.env.FAKE_NO_TOOL_CALL === "1") {
     return later(1500, () => { message.content = persona === "consultant-02" ? "Here are some pages: FAKE-CONFLUENCE-TITLE." : "I cannot search Confluence for you."; message.done = true; });
   }
-  const content = "Here are the onboarding pages: FAKE-CONFLUENCE-TITLE, a guide for new consultants, with its link.";
-  later(1000, () => {
-    searches += 1;
-    message.chip = "Executing search_confluence";
-    if (process.env.FAKE_ANSWER_WITH_CHIP === "1") message.content = content;
-  });
-  later(3500, () => { message.chip = "View Result from search_confluence"; message.content = content; message.done = true; });
+  if (process.env.FAKE_OTHER_TOOL === "1") {
+    later(1000, () => { message.chip = "View Result from zuno-mcp_drive.document.search"; });
+    return later(3500, () => { message.content = "I could not find onboarding pages in your Drive."; message.done = true; });
+  }
+  const pages = process.env.FAKE_LONG_ANSWER === "1" ? 40 : 3;
+  const content = "Here are the onboarding pages:\n"
+    + Array.from({ length: pages }, (_, n) => `${n + 1}. FAKE-CONFLUENCE-TITLE ${n + 1}, a guide for new consultants`).join("\n");
+  later(1000, () => { searches += 1; message.chip = "View Result from zuno-mcp_confluence.page.search"; });
+  later(3500, () => { message.content = content; message.done = true; });
 }
 
 http.createServer((req, res) => {

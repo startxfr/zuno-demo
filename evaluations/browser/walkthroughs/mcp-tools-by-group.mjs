@@ -7,25 +7,25 @@
 // list of tools names the Confluence tool, which would read as a tool call. The prompts are the page's, verbatim
 // (`node record.mjs --check mcp-tools-by-group`); the 1:30 suggestion card is not clicked, its prompt is typed.
 //
-// Row 1:30 is a search of the REAL company Confluence, as consultant-02: its answer names real pages. They never go
-// into a public GIF without the owner's choice (the rule of 2026-11-16, as for dify). consultant-02's take marks `chip`
-// the moment a tool call shows on screen, before the tool's result can come back, and `end` right after it; nothing
-// is marked once the answer renders, and the log keeps only the answer's length, never its text. Text already on
-// screen beside the chip comes from the model before any result; the log counts those lines, and chip.png is
-// checked before a cut. The cut list stops consultant-02 at that still. The full row is the owner's later choice.
+// Row 1:30 is a search of the REAL company Confluence, as consultant-02: its answer names real pages. The owner
+// accepted on 2026-11-16 that the GIF shows them, the list and the answer (the first take, 2026-11-16 11:20, stopped at
+// the tool call). consultant-02's take marks `chip` the moment the Confluence tool call shows, before the answer
+// streams under it, then `q2-done` once the answer has finished and its end is inside the window. The log never copies
+// that answer, only its length: the titles are on the pictures, where the owner looks at them, and nowhere else.
 //
-// sale-01's 2:45: the page expects no Confluence tool call and an answer saying so. The take does not fail on the
-// wording; it logs the answer's first 400 characters (sale-01 cannot read Confluence) and whether a Confluence tool
-// name is on screen. The tools answers (0:00, 0:45) are logged the same way, so the page's "You should see" cells can
-// be set from what was seen (the owner's decision: the contrast is shown by a question, not by the tools button).
+// sale-01's 2:45: the page expects no Confluence tool call and an answer saying so. Seen on 2026-11-16: a red cross on
+// a Drive search the model tried instead, then a refusal in its own words. The take does not fail on the wording; it
+// logs the answer's first 400 characters (sale-01 cannot read Confluence) and whether a Confluence tool name is on
+// screen. The tools answers (0:00, 0:45) are logged the same way, so the page's "You should see" cells can be set from
+// what was seen (the owner's decision: the contrast is shown by a question, not by the tools button).
 //
 // Each take costs two answers on its persona's budget (consultant-02's second one runs one Confluence search with its
 // own identity) and creates TWO Open WebUI chats, each deleted by its id in cleanup(). No setting is changed: the
 // tools switch is never touched.
 //
-// Open WebUI's selectors are the shared owui* helpers, seen live on 2026-11-15. NOT seen live: the tool-call chip
-// (CHIP below, guesses from Open WebUI's tool-call display), which no scout can show without sending a prompt. A take
-// that never sees it fails, and logs only the shapes of the new elements, never their text.
+// Open WebUI's selectors are the shared owui* helpers, seen live on 2026-11-15. The tool call (CHIP below) was seen
+// live once, by the take of 2026-11-16. A take that never sees it fails, and logs only the shapes of the new elements,
+// never their text.
 import { describe, firstVisible, onScreen, owui, owuiAnswered, owuiAsk, owuiChats, owuiDeleteChat, owuiHome, pageApi, read, waitUntil,
          wordsOnScreen } from "./_helpers.mjs";
 
@@ -35,11 +35,11 @@ const CONFLUENCE_PROMPT = "Find our onboarding pages in Confluence.";
 export const takes = [
   { name: "sale-01", persona: "sale-01" },
   { name: "consultant-02", persona: "consultant-02", motion_from: "home",
-    markers: ["login", "home", "q1-sent", "q1-done", "home-2", "q2-sent", "chip", "end"] },
+    markers: ["login", "home", "q1-sent", "q1-done", "home-2", "q2-sent", "chip", "q2-done", "end"] },
 ];
 export const page = "docs/demo/scenarios/governance/mcp-tools-by-group.md";
 export const viewport = { width: 1280, height: 800 };
-// sale-01's markers; consultant-02's take has its own (above): it stops at the chip.
+// sale-01's markers; consultant-02's take has its own (above): one more, `chip`, before its answer.
 export const markers = ["login", "home", "q1-sent", "q1-done", "home-2", "q2-sent", "q2-done", "end"];
 // The sign-in (login to home) is never shown as motion.
 export const motion_from = "home";
@@ -53,19 +53,20 @@ export const prompts = {
 export const url = owui.url;
 export const sends = /\/api\/(chat\/completions|chat\/completed|v1\/chats\/new|v1\/chats\/[^/]+$|v1\/tasks\/)/;
 
-// The rows each persona plays, and whether its Confluence question stops at the chip.
+// The rows each persona plays, and whether its Confluence question shows a Confluence tool call.
 const ROWS = {
   "sale-01": { tools: "0:00", confluence: "2:45", chip: false },
   "consultant-02": { tools: "0:45", confluence: "1:30", chip: true },
 };
-// A tool call on screen (guess: Open WebUI's tool-call display, "Executing ..." then "View Result from <tool>", and
-// the Confluence tool's own names). Looked for only in the new chat of the Confluence question.
-const CHIP = ["text=/search_confluence|read_confluence/i", "text=/View Result from/i", "text=/Executing\\b/i",
-              "details[type='tool_calls']", "[data-type='tool_calls']"];
-const CONFLUENCE_TOOL = /search_confluence|read_confluence/i;
+// The Confluence tool call on screen. Seen live on 2026-11-16 (Open WebUI 0.12.5): "View Result from
+// zuno-mcp_confluence.page.search" with a green check, 2.4 s after the send; the "Executing" wording before the result
+// is a guess. The tool must be a Confluence one: a Drive search, the model's other choice (seen for sale-01), is not.
+const CHIP = ["text=/View Result from\\s+\\S*confluence/i", "text=/Executing\\s+\\S*confluence/i"];
+const CONFLUENCE_TOOL = /confluence\.page\.(search|read)|search_confluence|read_confluence/i;
 
 // While waiting for the chip: has the answer of the chat in the address bar already finished? Asked once a second, a
-// read of the chat by its id; "" while it runs. An answer that finished with no chip fails the take at once.
+// read of the chat by its id; "" while it runs. An answer that finished with no Confluence tool call on screen fails
+// the take at once.
 function answerFinished(page) {
   let last = 0;
   return async () => {
@@ -76,7 +77,7 @@ function answerFinished(page) {
     const got = await pageApi(page, "GET", `/api/v1/chats/${id}`).catch(() => null);
     const messages = got && got.status === 200 && got.body && got.body.chat && got.body.chat.history && got.body.chat.history.messages;
     const done = messages && Object.values(messages).some((m) => m && m.role === "assistant" && m.done === true);
-    return done ? "the answer finished with no tool call on screen" : "";
+    return done ? "the answer finished with no Confluence tool call on screen" : "";
   };
 }
 
@@ -100,12 +101,34 @@ async function shapes(page) {
   return (await describe(page, "body", 120)).map((el) => `${el.tag}${el.role ? `[role=${el.role}]` : ""}${el.classes.length ? "." + el.classes.join(".") : ""}`);
 }
 
-// The lines on screen, now, that were not there before the send: the prompt and the chip's own words left out.
-async function otherLines(page, before) {
-  const seen = new Set(before.split("\n").map((l) => l.trim()));
-  const now = await read(page, () => document.body.innerText);
-  return [...new Set(now.split("\n").map((l) => l.trim()))]
-    .filter((l) => l && !seen.has(l) && l !== CONFLUENCE_PROMPT && !CONFLUENCE_TOOL.test(l) && !/View Result from|Executing\b/i.test(l));
+// Every scrolling box around the element brought to its end, in the page (a scroll of the view: nothing is changed);
+// returns how many moved.
+function toEnd(el) {
+  let moved = 0;
+  const boxes = [];
+  for (let box = el.parentElement; box && box !== document.body; box = box.parentElement) boxes.push(box);
+  if (document.scrollingElement) boxes.push(document.scrollingElement);
+  for (const box of boxes) {
+    const scrolls = box === document.scrollingElement || /auto|scroll/.test(getComputedStyle(box).overflowY);
+    if (scrolls && box.scrollHeight > box.clientHeight + 4 && box.scrollTop + box.clientHeight < box.scrollHeight - 4) {
+      box.scrollTop = box.scrollHeight;
+      moved += 1;
+    }
+  }
+  return moved;
+}
+
+// The end of consultant-02's answer inside the window. Open WebUI follows a streaming answer, but a long list may end
+// under the fold: the boxes around the tool call are brought to their end until a look finds nothing left to move.
+// Says how many scrolls it took and whether the tool call is still inside the window (a long list pushes it above;
+// the `chip` still shows it anyway).
+async function answerEnd(page, chip) {
+  let moved = 0;
+  await waitUntil(page, { what: "the end of the answer inside the window", timeoutMs: 15000, everyMs: 700,
+                          done: async () => { const n = await read(chip, toEnd); moved += n; return n === 0 ? true : undefined; } });
+  const box = await chip.boundingBox().catch(() => null);
+  const view = page.viewportSize();
+  return { moved, chipInside: Boolean(box && box.height > 0 && box.y >= 0 && box.y + box.height <= view.height) };
 }
 
 // Sign in and reach the home page of a new chat, sidebar closed, sign-in toast gone.
@@ -143,39 +166,38 @@ export async function run({ page, base, mark, log, state, persona }) {
   await page.goto(`${base}/`);
   await owuiHome(page, base, { changes });
   await mark("home-2");
-  const before = await read(page, () => document.body.innerText);
   const second = await askInNewChat(page, CONFLUENCE_PROMPT, state, log);
   await mark("q2-sent");
 
+  let chip = null;
   if (rows.chip) {
-    // consultant-02: the still is taken the moment a tool call shows, then nothing more is marked.
-    let chip;
+    // consultant-02: a still the moment the Confluence tool call shows, before the answer streams under it.
     try {
-      chip = await waitUntil(page, { what: "a tool call on screen", timeoutMs: 120000, everyMs: 150, failed: answerFinished(page),
+      chip = await waitUntil(page, { what: "a Confluence tool call on screen", timeoutMs: 120000, everyMs: 150, failed: answerFinished(page),
                                      done: async () => (await firstVisible(page, CHIP)) || undefined });
     } catch (e) {
-      log(`no tool call seen; the elements on screen (shapes only): ${(await shapes(page).catch(() => [])).join(" ")}`);
+      log(`no Confluence tool call seen; the elements on screen (shapes only): ${(await shapes(page).catch(() => [])).join(" ")}`);
       await second().catch(() => {});   // the chat's id, for cleanup(), when the address bar shows it
       throw new Error(`no Confluence tool call on screen for ${persona} (${CHIP.join(" | ")}): ${e.message}`);
     }
     await mark("chip");
-    const beside = await otherLines(page, before).catch(() => null);
-    log(`tool call on screen (${chip.matched}); other new lines at the chip: ${beside === null ? "not read" : beside.length}`
-        + `${beside && beside.length ? ` (lengths ${beside.map((l) => l.length).join(", ")}): check chip.png before the cut` : ""}`);
-    await mark("end");
-    const secondId = await second();
-    const answer = await owuiAnswered(page, secondId, 1);
-    log(`answer of ${persona} to the ${rows.confluence} question: ${answer.length} chars, not logged (real Confluence pages)`);
-    return;
+    log(`Confluence tool call on screen (${chip.matched})`);
   }
 
-  // sale-01: the whole answer may be filmed: sale-01 cannot read Confluence.
   const secondId = await second();
   const answer = await owuiAnswered(page, secondId, 1);
   await page.waitForTimeout(1500);
-  const named = await page.getByText(CONFLUENCE_TOOL).first().isVisible().catch(() => false);
-  log(`answer of ${persona} to the ${rows.confluence} question (${answer.length} chars): ${answer.replace(/\s+/g, " ").slice(0, 400)}`);
-  log(`a Confluence tool name on screen after ${persona}'s answer: ${named ? "YES, check the take" : "no"}`);
+  if (chip) {
+    // The real Confluence pages are on screen from here: the log keeps the answer's length only.
+    const shown = await answerEnd(page, chip);
+    log(`answer of ${persona} to the ${rows.confluence} question: ${answer.length} chars, not logged (real Confluence pages); `
+        + `its end inside the window after ${shown.moved} scroll(s), the tool call ${shown.chipInside ? "inside it too" : "above it"}`);
+  } else {
+    // sale-01: the whole answer may be logged: sale-01 cannot read Confluence.
+    const named = await page.getByText(CONFLUENCE_TOOL).first().isVisible().catch(() => false);
+    log(`answer of ${persona} to the ${rows.confluence} question (${answer.length} chars): ${answer.replace(/\s+/g, " ").slice(0, 400)}`);
+    log(`a Confluence tool name on screen after ${persona}'s answer: ${named ? "YES, check the take" : "no"}`);
+  }
   await mark("q2-done");
   await page.waitForTimeout(800);
   await mark("end");

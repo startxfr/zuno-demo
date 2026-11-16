@@ -1,29 +1,29 @@
 ---
-# mcp-tools-by-group: the first cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Written BEFORE
-# the first take: tune it with `make demo gif mcp-tools-by-group` once a take exists.
+# mcp-tools-by-group: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Tune it with
+# `make demo gif mcp-tools-by-group` once a take exists.
 # `make demo record mcp-tools-by-group` films TWO takes in one run, sale-01 then consultant-02, each in its own
 # browser and its own video (evaluations/browser/walkthroughs/mcp-tools-by-group.mjs): every moment names its take.
 # Markers of sale-01: login, home, q1-sent, q1-done, home-2, q2-sent, q2-done, end. Markers of consultant-02: login,
-# home, q1-sent, q1-done, home-2, q2-sent, chip, end.
-# Row 1:30 searches the REAL company Confluence: its answer names real pages, and they do not go into a public GIF
-# without the owner's choice (2026-11-16). consultant-02's last moment is the still `chip`, taken when the tool call
-# shows and before its result can come back; no moment of that take reaches past q2-sent as motion. Look at
-# consultant-02/chip.png before building the GIF (the take's log counts any other new line on screen at that moment).
-# The answers are live model answers to prompts the page marks untested: no caption quotes or counts the tools; set
-# the captions after the first take, from what the q1-done and q2-done pictures show. Row 3:45 is words.
+# home, q1-sent, q1-done, home-2, q2-sent, chip, q2-done, end.
+# Row 1:30 searches the REAL company Confluence and its answer names real pages: the owner accepted on 2026-11-16
+# that the GIF shows them, the list and the answer. The still `chip` is the tool call, taken before the answer streams
+# under it; `chip` to `q2-done` is the answer, its end inside the window. The take's log never copies that answer.
+# The first take (2026-11-16 11:20) stopped at the chip; its moments were 14/14/4/5/13/4 s.
+# Row 3:45 is words.
 record_notice: >-
   two recorded browser sessions in Open WebUI, as sale-01 then as consultant-02, each asking two questions in two new
   chats: 4 real model answers on the two personas' budgets, and one real Confluence search as consultant-02, with its
   own identity, read only; the 4 chats are deleted at the end, and a take fails if its persona's chats differ before
-  and after; the GIF stops at consultant-02's tool call, before the pages found are on screen; traces and model-call
-  metrics of the answers remain, as for any use
+  and after; the GIF shows consultant-02's Confluence answer, real company page titles (the owner's choice of
+  2026-11-16); traces and model-call metrics of the answers remain, as for any use
 target_seconds: [40, 60]
 width: 960
 fps: 10
 moments:
-  - {take: sale-01, from: home, to: q1-done, fit: 9, hold: 5, step: "0:00", caption: "0:00  sale-01, a salesperson: which tools can you use?"}
-  - {take: consultant-02, from: home, to: q1-done, fit: 9, hold: 5, step: "0:45", caption: "0:45  The same question, as a consultant"}
+  - {take: sale-01, from: home, to: q1-done, fit: 6, hold: 5, step: "0:00", caption: "0:00  sale-01, a salesperson: which tools can you use?"}
+  - {take: consultant-02, from: home, to: q1-done, fit: 6, hold: 5, step: "0:45", caption: "0:45  The same question, as a consultant"}
   - {take: consultant-02, from: home-2, to: q2-sent, fit: 3, hold: 1, step: "1:30", caption: "1:30  consultant-02 asks for pages in Confluence"}
-  - {take: consultant-02, still: chip, hold: 5, step: "1:30", caption: "1:30  The model calls the Confluence tool"}
-  - {take: sale-01, from: home-2, to: q2-done, fit: 8, hold: 5, step: "2:45", caption: "2:45  The same request, as sale-01"}
-  - {take: sale-01, still: end, hold: 4, step: "4:30", caption: "Same question, different person, different tools"}
+  - {take: consultant-02, still: chip, hold: 3, step: "1:30", caption: "1:30  The model calls the Confluence tool"}
+  - {take: consultant-02, from: chip, to: q2-done, fit: 4, hold: 6, step: "1:30", caption: "1:30  The onboarding pages it found in Confluence"}
+  - {take: sale-01, from: home-2, to: q2-done, fit: 6, hold: 5, step: "2:45", caption: "2:45  The same request, as sale-01"}
+  - {take: sale-01, still: end, hold: 3, step: "4:30", caption: "Same question, different person, different tools"}
