@@ -300,7 +300,7 @@ async function scoutOne(take, out) {
   await context.close();
   await browser.close();
   const bad = report.steps.filter((s) => !s.ok).map((s) => s.step);
-  if (refused.length) bad.push(`a chat message was about to be sent (${refused.join(", ")})`);
+  if (refused.length) bad.push(`a request a scout refuses was about to be sent (${refused.join(", ")})`);
   report.refused_requests = refused;
   report.when = new Date().toISOString();
   report.status = bad.length ? "fail" : "done";

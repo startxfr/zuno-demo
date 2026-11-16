@@ -27,6 +27,7 @@ unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
+evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -305,6 +306,47 @@ expect "model-catalog-registry: a source filter that is a checkbox is not clicke
 out="$(rhoai r-approve FAKE_APPROVE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "model-catalog-registry: an OAuth grant page stops the take, nothing granted" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL OpenShift asks ai-dev-01 to authorize' <<<\"\$0\"" "$out"
+fi
+if wanted evaluation-trustyai-evalhub; then
+echo "== evaluation-trustyai-evalhub (Grafana)"
+out="$(evalhub g-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "grafana: a scout approves nothing and writes nothing" grep -q 'left: {"approved":0,"writes":0}' <<<"$out"
+expect "grafana: scout.json reports the sign-in chain and what each panel shows" scouted g-scout '
+assert list(steps) == ["enter", "owned", "chain", "dashboard", "panel-jobs", "panel-ragas", "panel-garak", "closed"], list(steps)
+chain = steps["chain"]["chain"]
+assert [c["step"] for c in chain] == ["proxy", "chooser", "keycloak", "grafana"] and steps["chain"]["authorize_shown"] is False, chain
+assert chain[0]["matched"].startswith("button:has-text") and chain[1]["matched"] == "a[title=\x27Log in with openshift\x27]", chain
+assert steps["owned"]["count"] == 0 and "from=now-7d" in steps["dashboard"]["url"] and steps["dashboard"]["title_on_screen"] is True, steps["dashboard"]
+for name, word in (("panel-jobs", "ragas-eval succeeded 1"), ("panel-ragas", "faithfulness"), ("panel-garak", "MitigationBypass")):
+    p = steps[name]
+    assert p["no_data"] is False and p["whole_panel"] is True and any(word in line for line in p["lines"]), p
+    assert not any("loading" in line for line in p["lines"]), p["lines"]   # read after its query settled
+assert steps["closed"]["writes"] == 0
+'
+out="$(evalhub g-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "grafana: nothing approved, nothing written" grep -q 'left: {"approved":0,"writes":0}' <<<"$out"
+expect "grafana: markers.json: nothing created, nothing owned, one marker per panel" markers g-pass '
+assert names == ["login", "dashboard", "jobs", "ragas", "garak", "end"], names
+assert m["persona"] == "ai-ops-01" and m["motion_from"] == "dashboard" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True}, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(evalhub g-nodata FAKE_NO_DATA=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a panel that shows No data fails the take and names its row" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the panel \"Garak attack success rate (jailbreak probes)\" (row 2:30) shows \"No data\"' <<<\"\$0\"" "$out"
+out="$(evalhub g-authorize FAKE_AUTHORIZE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: OpenShift's Authorize Access page stops the take, and nothing is approved" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL OpenShift asks ai-ops-01 to authorize Grafana.s proxy' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-star FAKE_STAR=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a write to Grafana during the take fails it" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the take sent POST /api/user/stars/dashboard/uid/zuno-trustyai to Grafana' <<<\"\$0\"" "$out"
+out="$(evalhub g-star-scout FAKE_STAR=1 RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: in a scout that write is refused before it leaves the browser, and fails the scout" bash -c "test $rc -eq 1 && grep -q '^SCOUT: failed' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
