@@ -62,3 +62,31 @@ Facts relayed by the coordinator; the writer saw no scout files.
   nothing was written. Decision of the coordinator: that exact POST is let through and counted.
 - Open: the AAP user `consultant-03` stays on the cluster if AAP created it. Demo333 is to confirm.
 - Page: the "not rehearsed" notes on rows 0:00 and 2:00 are replaced by these facts, dated 2026-11-16.
+
+## Re-take: model-serving-llmd-mig, NODE column (as relayed)
+
+- Take `model-serving-llmd-mig-20261116-152658`, cut at `devel` `830c999d`. The recording session reports: gate 29 lines; each model has 1 under exactly one MIG column; the NODE column is filled; the quota is as before.
+- GIF 46.1 s, about 1.0 MB. The recording session's review: N = 10 (2 marker images and 8 frames). The writer saw none of them.
+- The frames show node names. The owner accepted that for this demo only, as relayed. **No node name is copied here.**
+- Sent to the owner as a replacement of the published `21bca7e2`. **Not published.** The SHA-256 is to be checked at publication.
+
+## Re-scout: aap-audited-operations (as relayed)
+
+- `aap-audited-operations-20261116-153130-scout` at `devel` `3d48acfe`: 14 of 14 steps pass.
+- The session-refresh POST was counted 5 times (2 bytes each). Refused requests: none. Private addresses: 0. No new AAP user effect.
+- `zuno-day3-test` is not in the templates this reader sees. The status word is "Success". The instance group is below the window.
+- Page: row 0:45 no longer states the counts 17 and 8 or names `zuno-day3-test` as the last template. The assist is to check the true list.
+
+## Incident of 15:07 CET: Playwright version (as relayed)
+
+- A merge of `origin/main` into `devel` (`e5626745`, not by the zuno-demo sessions) brought Dependabot's `08533cac`: Playwright 1.48.0 to 1.55.1 in `evaluations/browser/package.json`. Every script runs the v1.48.0 image, so every fresh browser run failed at launch.
+- Found within minutes by the coder, the assist and demo333. Fixed by the coordinator in `3d48acfe`: the pin goes back to 1.48.0. The zuno-demo session checked the 164 open alerts: none on Playwright or npm, so it was not a security update.
+- Open for the owner: `main` still carries 1.55.1. Either an ignore rule, or one planned move of the package and the image together.
+
+## Disclosure by demo333
+
+`make demo check` typed without an id defaulted to `guardrails` and ran its golden-path probe twice. Two `consultant-02` prompts were spent. Nothing else changed.
+
+## On `devel`, not yet scouted
+
+`observability-trace`, `genai-playground` (scout first) and the notes hook.
