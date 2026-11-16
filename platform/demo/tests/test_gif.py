@@ -569,6 +569,14 @@ class SeveralTakes(unittest.TestCase):
             self.assertEqual(record["takes"][1]["created"], [{"kind": "chat", "id": "c-sale-01"}])
             self.assertEqual([m["take"] for m in record["moments"]], ["consultant-02", "sale-01", "consultant-02", "sale-01"])
             self.assertEqual(record["take"], directory.name)
+            # The publication record reads `created` and `cleaned`: the whole recording's, not the first take's.
+            self.assertEqual(record["created"], [{"kind": "chat", "id": "c-consultant-02"}, {"kind": "chat", "id": "c-sale-01"}])
+            self.assertIs(record["cleaned"], True)
+            # A newer scout of several takes (it holds a takes.json too) is not "the newest recording".
+            scout = pathlib.Path(tmp) / "identity-personas-20261116-020000-scout"
+            scout.mkdir()
+            (scout / "takes.json").write_text("{}")
+            self.assertEqual(gif.latest_recording("identity-personas", pathlib.Path(tmp)), directory)
             # A file of one take missing: refused before ffmpeg, named with its take.
             (directory / "sale-01" / "recording.webm").unlink()
             with mock.patch.object(gif.shutil, "which", return_value="/usr/bin/podman"), self.assertRaises(gif.CutError) as ctx:

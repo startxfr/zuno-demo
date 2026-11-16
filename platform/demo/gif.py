@@ -62,6 +62,7 @@ SPEED_RANGE = (0.5, 16.0)
 BAND = 56                   # pixels of the caption band under the picture
 FPS_RANGE = (5, 15)
 WIDTH_RANGE = (480, 1280)
+STAMP = re.compile(r"^\d{8}-\d{6}$")   # <YYYYmmdd-HHMMSS>, the suffix of a recording directory
 TAKE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 CAPTION_MAX = 60           # about 780 px at 26 px Liberation Sans: inside 960 with a margin
 FFMPEG_TIMEOUT = 900
@@ -189,9 +190,11 @@ def latest_recording(demo_id: str, base: Optional[pathlib.Path] = None) -> Optio
     base = base or recordings_dir()
     if not base.is_dir():
         return None
+    # The whole suffix is the stamp: a scout's `<id>-<stamp>-scout/` is not a recording (a scout of several takes
+    # holds a takes.json too).
     found = [p for p in base.glob(f"{demo_id}-*") if p.is_dir()
              and ((p / "markers.json").is_file() or (p / "takes.json").is_file())
-             and p.name[len(demo_id) + 1:][:8].isdigit()]
+             and STAMP.match(p.name[len(demo_id) + 1:])]
     return sorted(found)[-1] if found else None
 
 
@@ -540,12 +543,17 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
         tail = "\n".join((done.stdout or "").strip().split("\n")[-15:])
         raise CutError([f"ffmpeg failed (exit {done.returncode}): {tail}"])
     built = Built(path, _duration(directory, output), path.stat().st_size, p)
+    created, cleaned = markers.get("created"), markers.get("cleaned")
+    if takes:
+        created = [c for m in takes.values() for c in m.get("created") or []]
+        states = [m.get("cleaned") for m in takes.values() if m.get("cleaned") is not None]
+        cleaned = (all(state is True for state in states) if states else None)
     (directory / f"{demo_id}.gif.json").write_text(json.dumps({
         "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
-        "take": directory.name, "started": markers.get("started"), "created": markers.get("created"),
-        "cleaned": markers.get("cleaned"),
-        # A recording of several takes: each with its persona, its start and what it created; `started`, `created`
-        # and `cleaned` above are then the first take's.
+        "take": directory.name, "started": markers.get("started"), "created": created, "cleaned": cleaned,
+        # A recording of several takes: each with its persona, its start and what it created. `created` and
+        # `cleaned` above are then the whole recording's (everything the takes created; cleaned only if every take
+        # that created something cleaned it), and `started` is the first take's.
         "takes": [{"name": name, "persona": m.get("persona"), "started": m.get("started"), "created": m.get("created"),
                    "cleaned": m.get("cleaned")} for name, m in (takes or {}).items()],
         "cut_list": f"ansible/demos/{demo_id}/gif.yml", "cut_list_blob": git_blob(cut_path) if cut_path else None,
