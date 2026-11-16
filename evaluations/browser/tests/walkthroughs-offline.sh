@@ -40,6 +40,7 @@ guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafa
 agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
 trace() { take observability-trace "fake-unifai.mjs fake-jaeger.mjs" 8097 "$@" FAKE_TEAM_MODE=1 RECORD_BASE_URL_TEMPO=http://127.0.0.1:8093; }
 maas() { take maas-portal-api-keys fake-maas-portal.mjs 8092 "$@" RECORD_BASE_URL=http://127.0.0.1:8092/maas-consumer-portal RECORD_BASE_URL_MAAS=http://127.0.0.1:8092/zuno-ai-run/gpt-oss-20b; }
+claw() { local name="$1"; shift; take openclaw fake-openclaw.mjs 8091 "$name" OPENCLAW_UI_PASSWORD=offline-claw-secret FAKE_UI_PASSWORD=offline-claw-secret "$@"; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -896,8 +897,40 @@ out="$(maas m-reread FAKE_REREAD=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "maas: a portal that sends the shown key back to its server stops the take, and the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/api/v1/check)' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":1}' <<<\"\$0\"" "$out"
 fi
+if wanted openclaw; then
+echo "== openclaw (a second credential typed in a plain field; no take yet)"
+out="$(claw c-scout RECORD_SCOUT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "openclaw: a scout exits 0, SCOUT: done, and sends nothing" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+expect "openclaw: scout.json describes the connected Control UI and keeps no session title" scouted c-scout '
+assert list(steps) == ["enter", "owned", "control-ui", "controls", "composer", "closed"], list(steps)
+ui = steps["control-ui"]
+assert ui["on_its_own_address"] is True and ui["password_field_still_on_screen"] is False and ui["new_session_selector"] and ui["storage_added"] == ["local:openclaw.control.settings"], ui
+assert steps["composer"]["selector"] == "textarea" and any(c["label"] == "Session menu" for c in steps["controls"]["controls"]), steps["controls"]
+assert "FAKE-EARLIER-SESSION-TITLE" not in json.dumps(s)
+'
+expect "openclaw: the password typed in the plain field was masked in the scout's pictures' page (no file holds it)" bash -c "! grep -r -l offline-claw-secret '$work/c-scout' >/dev/null"
+out="$(claw c-take 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: a take is refused by the walkthrough itself, before anything is sent" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL openclaw is not taken yet: a take would leave a session' <<<\"\$0\" && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+out="$(claw c-unmask RECORD_SCOUT=1 FAKE_UNMASK=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: a field that does not stay masked is emptied and stops the scout" bash -c "test $rc -eq 1 && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
+expect "openclaw: scout.json says the field did not stay masked" python3 - "$work/c-unmask" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
+assert "did not stay masked" in s["steps"][0]["error"], s["steps"][0]
+PY
+out="$(claw c-wrong RECORD_SCOUT=1 OPENCLAW_UI_PASSWORD=offline-claw-wrong 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: a wrong Control UI password stops at the gate" python3 - "$work/c-wrong" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
+assert "could not connect to its gateway" in s["steps"][0]["error"], s["steps"][0]
+PY
+fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
-expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
+expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret -e offline-claw-secret -e offline-claw-wrong '$work' >/dev/null"
 expect "no key created during a take is in any text file of any take" bash -c "! grep -r -l -I -E 'sk-oai-[A-Za-z0-9_-]{8,}' '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
 exit $failed

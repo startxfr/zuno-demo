@@ -1,0 +1,20 @@
+---
+# openclaw: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written BEFORE any take,
+# and before the walkthrough accepts one: evaluations/browser/walkthroughs/openclaw.mjs refuses a take until a scout
+# has shown how the Control UI deletes a session and the owner has decided what a take may leave in the assistant.
+# `make demo scout openclaw` is what runs today: consultant-02 at the front door, then the Control UI's own password
+# (a second credential, OPENCLAW_UI_PASSWORD, read at run time by the caller), nothing sent.
+# Markers, in order: login, ui, session, q-sent, q-done, end. Rows 2:30 to 4:15 are words.
+record_notice: >-
+  NOT TAKEN YET: the walkthrough refuses a take. A take would be a recorded browser session as consultant-02 on its
+  own OpenClaw assistant (the front door, then the Control UI's password, a second credential typed masked by the
+  recorder and never shown): one new session and one Confluence question on consultant-02's budget; the session, and
+  whatever the assistant writes to its own memory, would stay in the assistant: nothing known deletes them
+target_seconds: [35, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account at the door"}
+  - {still: ui, hold: 5, step: "0:00", caption: "0:00  My own assistant, in its own namespace"}
+  - {from: session, to: q-done, fit: 10, hold: 8, step: "0:45", caption: "0:45  It searches Confluence with my rights, and holds no key"}
+  - {still: end, hold: 6, step: "4:15", caption: "No key, no internet: the platform decides models and tools"}

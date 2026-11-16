@@ -266,8 +266,19 @@ const writeJson = (file, value) => fs.writeFileSync(file, scrub(JSON.stringify(v
 async function typeSecret(page, target, name) {
   if (!secrets.has(name)) throw new Error(`the walkthrough does not declare the secret ${name}`);
   const field = typeof target === "string" ? page.locator(target).first() : target;
-  if ((await field.getAttribute("type")) !== "password") throw new Error(`${name} is typed only into a password field`);
+  // Typed only where it is not drawn. A password field hides it. Any other field (OpenClaw's Control UI asks its
+  // password in a plain one) is masked first, by the browser's own text masking, and checked before and after.
+  const hidden = async () => (await field.getAttribute("type")) === "password"
+    || await field.evaluate((el) => getComputedStyle(el).webkitTextSecurity === "disc").catch(() => false);
+  if (!(await hidden())) {
+    await field.evaluate((el) => el.style.setProperty("-webkit-text-security", "disc", "important"));
+    if (!(await hidden())) throw new Error(`${name} is typed only into a field that hides it: this one is not a password field and could not be masked`);
+  }
   await field.fill(secrets.get(name));
+  if (!(await hidden())) {
+    await field.fill("").catch(() => {});
+    throw new Error(`the field ${name} was typed into did not stay masked: it was emptied, the take stops`);
+  }
 }
 // A secret CREATED during the take (an API key shown once): the walkthrough names it in `creates`. The recorder takes
 // it out of the creating call's RESPONSE before the page receives it: the page is given the same body with every
