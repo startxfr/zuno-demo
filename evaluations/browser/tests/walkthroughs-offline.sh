@@ -784,6 +784,7 @@ assert [x["name"] for x in chat["markers"]] == ["login", "hub", "q-sent", "q-don
 assert [x["name"] for x in tr["markers"]] == ["login", "search", "trace", "tags", "end"] and tr["motion_from"] == "search", tr
 assert chat["persona"] == "consultant-02" and len(chat["created"]) == 1 and chat["cleaned"] is True and chat["owned"]["same"] is True, chat
 assert tr["persona"] == "ai-ops-01" and tr["created"] == [] and tr["cleaned"] is None, tr
+assert tr["notes"] == {"traces_listed": 1} and "notes" not in chat, (tr.get("notes"), chat.get("notes"))   # a walkthrough's own notes
 PY
 out="$(trace t-authorize FAKE_AUTHORIZE=1 RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3

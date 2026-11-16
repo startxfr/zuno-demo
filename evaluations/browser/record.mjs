@@ -7,7 +7,8 @@
 //
 //   recording.webm   the whole take, never published
 //   markers.json     {demo, kind "browser"|"terminal", persona, viewport, started, motion_from, markers: [{name, t,
-//                    png, private_addresses}], private_addresses: {flagged, count, at}, created, cleaned, owned, status, detail}
+//                    png, private_addresses}], private_addresses: {flagged, count, at}, created, cleaned, owned, notes?, status, detail}
+//                    notes: what the walkthrough put in ctx.state.notes (short scalars only), when it put any
 //                    private_addresses: node names and RFC 1918 addresses COUNTED in the page's text at each marker (never
 //                    kept); a take that showed one fails, after its clean-up
 //                    motion_from: the first marker a motion segment of the cut may start at
@@ -378,6 +379,7 @@ async function takeOne(take, out) {
   }
 
   const state = { created: record.created };   // the walkthrough pushes {kind, id} as soon as it knows an id
+  state.notes = {};   // facts of its own a walkthrough wants kept in markers.json (`notes`): short scalars only
   const ownedIds = async () => (await walk.owned(ctx)).map((o) => `${o.kind}:${o.id}`).sort();
   let ownedBefore = null;
   const ctx = { page, domain, mark, log, state, take, persona: take.persona, keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name),
@@ -437,6 +439,11 @@ async function takeOne(take, out) {
   } catch (e) {
     failures.push(`no recording.webm: ${String(e.message || e).slice(0, 200)}`);
   }
+  // A walkthrough's own notes: at most 20 of them, numbers, booleans or strings of 200 characters; anything else is
+  // dropped, so a title, an answer or an object never lands in markers.json by this door.
+  const notes = Object.entries(state.notes && typeof state.notes === "object" ? state.notes : {})
+    .filter(([key, value]) => /^[a-z][a-z0-9_]{0,39}$/.test(key) && (["number", "boolean"].includes(typeof value) || (typeof value === "string" && value.length <= 200))).slice(0, 20);
+  if (notes.length) record.notes = Object.fromEntries(notes);
   record.status = failures.length ? "fail" : "pass";
   record.detail = failures.length ? failures.join("; ")
     : `${record.markers.length} markers in ${record.markers[record.markers.length - 1].t.toFixed(1)} s`;

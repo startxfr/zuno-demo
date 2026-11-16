@@ -145,6 +145,7 @@ async function runTrace({ page, domain, mark, log, state }) {
   }
   if (!found.count) throw new Error(`the Tempo search finds no ${SPAN} trace of ${SEARCH.tags["zuno.persona"]} in the last ${SEARCH.lookback} within ${WAIT_FOR_TRACE_MS / 60000} minutes of the question`);
   log(`the search lists ${found.count} trace(s)`);
+  state.notes.traces_listed = found.count;
   await mark("search");
   await openTrace(page, found);
   await mark("trace");
