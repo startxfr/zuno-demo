@@ -16,8 +16,8 @@ steps: {}
 # 129 columns wrapped three tables (the default serving tables, 150 and 181 columns, and the quota, 233), so row 0:00
 # now prints three columns (name, ready, URL: about 97) and row 2:15 uses `oc describe` (Resource, Used, Hard: about
 # 45); the margin above 97 leaves room for a model name three characters longer. The typed commands of 0:00 and 1:00
-# wrap; the tallest screen is about 12 lines (2:15). Row 1:00 shows no node name: the NODE column was dropped from
-# the page on 2026-11-16 (internal addresses and the cloud region are not published).
+# wrap; the tallest screen is about 12 lines (2:15). Row 1:00 shows the node names again (the owner's order of
+# 2026-11-16 afternoon): MODEL, two slice columns and NODE, about 92 columns, inside the 104.
 record:
   kind: terminal
   allow: []
