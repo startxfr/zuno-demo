@@ -21,6 +21,8 @@ mesh's own Prometheus. How the parts connect is in [Appendix B](#appendix-b---ll
 **The message:** "Inside Zuno, the services that hold data, identities and models accept only mutual TLS, and each
 proves who it is with a one-hour certificate from our own PKI."
 
+![The 5-minute version of the service mesh demo, recorded live in a terminal: one Istio control plane and its certificate agent, the namespaces that refuse plaintext and their named exceptions, and the one-hour certificates Vault signs for each service account. The Kiali console of row 3:15 is not in the recording.](../../../assets/img/demo/service-mesh-kiali.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
