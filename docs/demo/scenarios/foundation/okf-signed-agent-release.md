@@ -13,6 +13,8 @@ platform: see [Appendix A](#appendix-a---hld). The chain from the tag to a runni
 **The message:** "Agents run only from a signed release, owned by the business, chosen by digest and reviewed like code.
 If the signature does not verify, the component does not start."
 
+![The 5-minute version of the signed agent release demo, recorded live in a terminal: the one agents release the platform pins by digest, and the tool gateway's log line that verified its signature, read from the platform's own registry. The Arkos sheet of row 0:00, in the agents repository, is not in the recording.](../../../assets/img/demo/okf-signed-agent-release.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
