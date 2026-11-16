@@ -347,6 +347,18 @@ async function privateAddresses(page) {
 // The summary kept in markers.json and scout.json: {flagged, count (the most seen at once), at: [marker or step]}.
 const addressSummary = (seen) => ({ flagged: seen.some(([, n]) => n > 0), count: Math.max(0, ...seen.map(([, n]) => n)), at: seen.filter(([, n]) => n > 0).map(([name]) => name) });
 
+// A take or a scout that never ends, ends: its phases are given a deadline (RECORD_DEADLINE_S, or the walkthrough's
+// `deadline_s`; 20 minutes for a take, 10 for a scout), then the clean-up three minutes. On the workstation of
+// 2026-11-16 seven recorders of timed-out offline suites ran for hours. The phase left behind is abandoned: closing
+// the browser ends whatever it was waiting for.
+const deadlineMs = (fallbackS) => 1000 * (Number(process.env.RECORD_DEADLINE_S) || Number(walk.deadline_s) || fallbackS);
+function within(work, ms, what) {
+  let timer;
+  const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} did not end within ${Math.round(ms / 1000)} s: stopped by the recorder's deadline`)), ms); });
+  work.catch(() => {});   // if the deadline wins, what the phase throws later is nobody's
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}
+
 async function scoutOne(take, out) {
   const report = { demo: id, ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
                    walkthrough_sha256: walkthroughHash(id), changes: walk.changes, when: "", steps: [], status: "fail", detail: "" };
@@ -383,12 +395,14 @@ async function scoutOne(take, out) {
                 keycloak: (username) => keycloak(page, username), typeSecret: (target, name) => typeSecret(page, target, name),
                 interceptSecret: (name, how) => interceptSecret(page, name, how), fetchWithSecret: (name, call) => fetchWithSecret(page, name, call), base: process.env.RECORD_BASE_URL || walk.url(domain) };
   try {
+    await within((async () => {
     // The same first two phases as a take: the sign-in, then what the persona owns (its count is all a scout keeps).
     const entered = await step("enter", async () => { await walk.enter(ctx); return {}; });
     if (entered.ok) {
       await step("owned", async () => ({ count: (await walk.owned(ctx)).length }));
       await walk.scout(ctx);
     }
+    })(), deadlineMs(600), "the scout");
   } catch (e) {
     report.steps.push({ step: "scout", ok: false, png: null, error: String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300) });
   }
@@ -440,10 +454,12 @@ async function takeOne(take, out) {
                 base: process.env.RECORD_BASE_URL || walk.url(domain) };
   const failures = [];
   try {
-    await walk.enter(ctx);
-    ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
-    record.owned.before = ownedBefore.length;
-    await walk.run(ctx);
+    await within((async () => {
+      await walk.enter(ctx);
+      ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
+      record.owned.before = ownedBefore.length;
+      await walk.run(ctx);
+    })(), deadlineMs(1200), "the take");
     const missing = wanted.slice(record.markers.length);
     if (missing.length) throw new Error(`markers not reached: ${missing.join(", ")}`);
   } catch (e) {
@@ -456,7 +472,7 @@ async function takeOne(take, out) {
   record.private_addresses = addressSummary(shown);
   // Pass or fail, what the take created is removed: a failed take must not leave its chat behind either.
   try {
-    const cleaned = await walk.cleanup(ctx);
+    const cleaned = await within(Promise.resolve().then(() => walk.cleanup(ctx)), 180000, "the clean-up");
     record.cleaned = record.created.length || cleaned === true ? cleaned === true : null;
   } catch (e) {
     record.cleaned = false;
@@ -465,7 +481,7 @@ async function takeOne(take, out) {
   // The persona must own after the take exactly what it owned before it: ids only, never a title, and only in the log.
   if (ownedBefore) {
     try {
-      const ownedAfter = await ownedIds();
+      const ownedAfter = await within(ownedIds(), 120000, "the read of what the persona owns");
       record.owned.after = ownedAfter.length;
       const added = ownedAfter.filter((o) => !ownedBefore.includes(o));
       const removed = ownedBefore.filter((o) => !ownedAfter.includes(o));

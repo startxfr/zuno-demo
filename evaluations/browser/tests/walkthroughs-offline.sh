@@ -10,17 +10,24 @@
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# Every container this run starts carries its label and is stopped when the script ends, however it ends; and inside
+# the container the recorder is itself given a time limit (OFFLINE_TIMEOUT_S, 900 s), because a script killed by
+# `timeout` does not get to run this trap while it waits for a container (seven such containers ran for hours on
+# 2026-11-16).
+label="zuno-offline=$$"
+stop_containers() { podman ps -q --filter "label=$label" 2>/dev/null | xargs -r podman stop -t 2 >/dev/null 2>&1; }
+trap 'stop_containers; rm -rf "$work"' EXIT
+trap 'exit 143' TERM INT
 failed=0
 take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; prints its output, returns its exit code
   local demo="$1" fake="$2" port="$3" name="$4"
   mkdir -p "$work/$name"
   local knobs=()
   for knob in "${@:5}"; do knobs+=(-e "$knob"); done
-  podman run --rm -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
+  podman run --rm --label "$label" -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc'
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }

@@ -9,16 +9,23 @@
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# Every container this run starts carries its label and is stopped when the script ends, however it ends; and inside
+# the container the recorder is itself given a time limit (OFFLINE_TIMEOUT_S, 900 s), because a script killed by
+# `timeout` does not get to run this trap while it waits for a container (seven such containers ran for hours on
+# 2026-11-16).
+label="zuno-offline=$$"
+stop_containers() { podman ps -q --filter "label=$label" 2>/dev/null | xargs -r podman stop -t 2 >/dev/null 2>&1; }
+trap 'stop_containers; rm -rf "$work"' EXIT
+trap 'exit 143' TERM INT
 failed=0
 take() {   # take <name> [VAR=1 ...]: one recorder run with these knobs set; prints its output, returns its exit code
   mkdir -p "$work/$1"
   local knobs=()
   for knob in "${@:2}"; do knobs+=(-e "$knob"); done
-  podman run --rm -e DEMO=open-webui -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
+  podman run --rm --label "$label" -e DEMO=open-webui -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL=http://127.0.0.1:8099 "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$1:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node tests/fake-open-webui.mjs >/dev/null & sleep 1; node record.mjs; rc=$?; echo "chats left: $(curl -s http://127.0.0.1:8099/fake/count)"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; node tests/fake-open-webui.mjs >/dev/null & sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "chats left: $(curl -s http://127.0.0.1:8099/fake/count)"; exit $rc'
 }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -139,6 +146,9 @@ import json, pathlib, sys
 s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
 assert s["private_addresses"] == {"flagged": False, "count": 0, "at": []} and all(x["private_addresses"] == 0 for x in s["steps"]), s
 PY
+out="$(take deadline RECORD_DEADLINE_S=3)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -2
+expect "a take that does not end is stopped by the recorder's deadline, cleaned and failed" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the take did not end within 3 s: stopped by the recorder.s deadline' <<<\"\$0\" && grep -q 'chats left: {\"chats\":0,' <<<\"\$0\"" "$out"
 out="$(take stray FAKE_STRAY_CHAT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "a chat the take did not create fails the take" test "$rc" -eq 1
