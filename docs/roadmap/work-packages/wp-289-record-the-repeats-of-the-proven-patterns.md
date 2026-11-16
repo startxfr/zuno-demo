@@ -41,9 +41,8 @@ demos of this brief, **11**: `gitops-day0-3`, `image-signing-admission`, `extern
 
 **Seven demos of this brief are not published.**
 
-- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decides whether the take may
-  show them (deferred entry d). The run log it leaves cannot be deleted by the user.
-- `guardrails`: rows 0:45 and 2:00 need Dify's own admin password, a second credential (deferred entry c). The Grafana half
+- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decided on 2026-11-16, 13:2x CET, that the take may show them (deferred entry d, order below). The run log it leaves cannot be deleted by the user.
+- `guardrails`: rows 0:45 and 2:00 need Dify's own admin password, a second credential (deferred entry c; the owner allowed it on 2026-11-16, 13:2x CET, never in git). The Grafana half
   is no longer blocked: the Grafana sign-in now authorizes once and closes the announcement as declared changes.
 - `unifai-agents`: two personas; not scouted.
 - `observability-trace`: the Tempo half is wholly unscouted and the page says "not rehearsed"; the possible simplification is
@@ -61,3 +60,14 @@ answer (scan the frames of each answer span).
 
 Rows that carried "(untested command)" or "(untested prompt)" and were run by a published take have the mark lifted. The marks
 that remain belong to rows no take has run.
+
+## Owner's order of 2026-11-16, 13:2x CET
+
+As given in `zuno-demo-reorg`'s session and relayed by it. The owner asked to continue, with the team of agents, on `dify`,
+`guardrails`, `quotas`, `observability-trace`, `aap-audited-operations`, `lora-pipeline-mlflow-kueue` and the demos planned next, and
+said they are OK with the information shown by `dify`, `guardrails` (as long as the password is not shown in git),
+`mcp-tools-by-group` and `model-serving-llmd-mig`. So: `dify` may show real Confluence page titles; `guardrails` may use Dify's own
+admin password as a second credential, never in git; `mcp-tools-by-group` row 1:30 may be shown in full and its re-take replaces the
+published GIF; `model-serving-llmd-mig` may show the `NODE` column and its re-take replaces the published GIF. The decisions
+that the hand-over above calls "the owner's" for `dify` and `guardrails` are therefore given. Each GIF still needs the owner's go
+before it is published. Details and the split of the work: [the sprint evidence](../evidence/wp-289-gif-sprint-2026-11-16.md).
