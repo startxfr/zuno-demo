@@ -220,7 +220,7 @@ A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the pro
 - The span detail showed 11 of the 12 tags listed in row 3:00; `zuno.run_id` was missing, on that OpenClaw span. To confirm on a Tekos span from the first take's log. Row 5:00 copies `zuno.run_id` from the span and stays "not rehearsed".
 - The Tempo search page shows a yellow banner, "Jaeger UI is deprecated". The results do not show the tag filter as text.
 
-### unifai-agents (take, not published)
+### unifai-agents (published)
 
 | Item | Value |
 |---|---|
@@ -273,7 +273,7 @@ In a take, only `aap-audited-operations` and `genai-playground` refuse writes by
 
 A lora rescout at `889fe3c9` passed 8 of 8 (as relayed); its take is with the owner.
 
-## Take: lora-pipeline-mlflow-kueue (not yet a publication candidate)
+## Take: lora-pipeline-mlflow-kueue (published, stills only)
 
 | Item | Value |
 |---|---|
@@ -285,4 +285,19 @@ A lora rescout at `889fe3c9` passed 8 of 8 (as relayed); its take is with the ow
 **Review.** demo333 opened the 5 marker images (as relayed). The writer opened 2 (`pipeline.png`, `trainjob.png`) and no frames. `pipeline.png`: the pipeline version `v0-4-0-tekos`, a version dropdown, tabs Graph, Summary and Pipeline spec, a graph of four nodes `component` to `component-4`, and the step names in the description line; the account `ai-dev-01` in the header; no node name, no address. `trainjob.png`: the **Jobs** page of Zuno MLOps with one row, `lora-comage-4c28m`, type TrainJob, nodes 0, cluster queue "-", created "2 months ago"; no status column at 1280 px.
 
 **Not yet a publication candidate.** Two captions overstate; the assist fixes `gif.yml` and the GIF is re-cut from the same take (as relayed). Page: row 1:45 now matches the Jobs frame: the job, its type and its age. Its `Complete` state and its date 2026-09-08 come from `oc get trainjob`, not from the page. Sent to the owner.
+
+## Published at 21:31 CET: unifai-agents and lora-pipeline-mlflow-kueue
+
+On the owner's go "go de publication pour unifai-agents et lora-pipeline-mlflow-kueue" (coordinator's log 21:30:55 CET; commits at 21:31:13). The writer compared each file in the commit with the GIF the take directory holds now.
+
+| Demo | Commit | Take | File | SHA-256 |
+|---|---|---|---|---|
+| `unifai-agents` | `84f41734` | `unifai-agents-20261116-194517`, re-cut at `2b9f3dfb` | 5 639 585 bytes, 45.0 s as relayed | `5121d0a6f8b2...`, equal |
+| `lora-pipeline-mlflow-kueue` | `a4285b25` | `lora-pipeline-mlflow-kueue-20261116-211512`, stills-only cut `e839d037` | 323 266 bytes, 42.0 s as relayed | `4cf2301253f2...`, equal |
+
+The sizes and moments quoted in the two take sections above are those of the first cuts; the published files are the re-cuts. For `lora`: two re-cuts, the captions corrected by the assist (`aa80972f`), then stills only (`1d4a1118`), because the motion spans were mostly loading pages. The writer did not open the frames of the final cuts. The catalogue has 22 GIF files of 30 demos. No "(untested ...)" mark needed lifting on rows these takes ran (`unifai-agents` has none; the marks left on the `lora` page are on the MLflow tab, which the GIF does not show).
+
+## Owner's decision on Dify: "one take to know" (answered 21:30:11 CET, as relayed)
+
+One `dify` take under the default-deny guard (the coder's `f974ada4`, in test). Its log lists every write sent and every write refused. The aim is to learn what moves the Zuno Agent's edited date. Cost: one Agent turn, and the date may move once more. The take needs the owner's go in demo333. The coder read upstream Dify's source: by that code a debug turn writes a conversation and a message, not the app (not our exact build). The cause is **not settled**.
 

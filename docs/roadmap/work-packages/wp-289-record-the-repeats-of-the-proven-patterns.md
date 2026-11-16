@@ -1,6 +1,6 @@
 # WP-289: Record the repeats of the proven patterns
 
-- **State:** Repo work merged (2026-11-16: 13 of 18 demos published; the other five wait for the owner's decisions and go)
+- **State:** Repo work merged (2026-11-16: 15 of 18 demos published; the other three wait for the owner's decisions and go)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-288](wp-288-record-the-first-batch-of-browser-demos.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -34,21 +34,17 @@ Rows that the page claims and the screen cannot show are settled before the take
 
 The night sprint of 2026-11-16 and the morning that followed are in the
 [sprint evidence](../evidence/wp-289-gif-sprint-2026-11-16.md). Published on `devel`, each with a stated review: of the 18
-demos of this brief, **13**: `gitops-day0-3`, `image-signing-admission`, `external-models`, `ai-gateway-sovereignty`,
+demos of this brief, **15**: `gitops-day0-3`, `image-signing-admission`, `external-models`, `ai-gateway-sovereignty`,
 `okf-signed-agent-release`, `service-mesh-kiali`, `lightspeed`, `model-catalog-registry`, `mcp-tools-by-group`,
-`ai-gateway-routing`, `evaluation-trustyai-evalhub`, `aap-audited-operations` and `quotas` (the last two on the owner's go of 18:36 CET, as relayed by the coordinator). With `open-webui`, `vault-pki` and the four of
-[WP-288](wp-288-record-the-first-batch-of-browser-demos.md), the catalogue has **19 GIFs of 30 demos**.
+`ai-gateway-routing`, `evaluation-trustyai-evalhub`, `aap-audited-operations`, `quotas` (the two on the owner's go of 18:36 CET), `unifai-agents` and `lora-pipeline-mlflow-kueue` (the two on the owner's go of 21:30 CET; the coordinator's log, as relayed). With `open-webui`, `vault-pki` and the four of
+[WP-288](wp-288-record-the-first-batch-of-browser-demos.md), the catalogue has **22 GIFs of 30 demos**.
 
-**Five demos of this brief are not published.**
+**Three demos of this brief are not published.**
 
-- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decided on 2026-11-16, 13:12 CET, that the take may show them (deferred entry d, order below). The run log it leaves cannot be deleted by the user.
+- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decided on 2026-11-16, 13:12 CET, that the take may show them (deferred entry d, order below). The run log it leaves cannot be deleted by the user. One take passed (`dify-20261116-210141`) but is not proposed: each of the two takes moved the Zuno Agent's edited date (finding in the afternoon evidence; content unverified). Owner's decision, answered at 21:30:11 CET (as relayed): **"one take to know"**: one take under the new default-deny guard, whose log lists every write sent and refused, to learn what moves the date. It costs one Agent turn, the date may move once more, and the take needs the owner's go in demo333. The coder read upstream Dify's source: a debug turn writes a conversation and a message, not the app (not our exact build). The cause is **not settled**.
 - `guardrails`: rows 0:45 and 2:00 need Dify's own admin password, a second credential (deferred entry c; the owner allowed it on 2026-11-16, 13:12 CET, never in git). The Grafana half
   is no longer blocked: the Grafana sign-in now authorizes once and closes the announcement as declared changes.
-- `unifai-agents`: two personas; not scouted.
-- `observability-trace`: the Tempo half is wholly unscouted and the page says "not rehearsed"; the possible simplification is
-  Grafana Explore on a Tempo data source (not checked).
-- `lora-pipeline-mlflow-kueue`: the pages name pipeline versions `v0-4-0-*` that the cluster does not list on 2026-11-16
-  (deferred entry i); stills only, after the cause is known.
+- `observability-trace`: the chat take passed, but both trace takes failed (the search opened the OpenClaw error trace, then Jaeger's Compare page: a selector bug). The page says "not rehearsed" for the Tempo half.
 
 **Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to o: platform, agents or UnifAI
 changes that the sprint rule forbade); the Grafana user-storage entry and the OAuth authorization of `ai-ops-01` that now stay
