@@ -88,8 +88,8 @@ Profile 1, **consultant-02**.
 |---|---|---|---|
 | 0:00 | Open the Lightspeed panel | "This is the assistant built into the OpenShift console, a Red Hat product. Here it runs on our own model." | The Lightspeed panel and its prompt box. |
 | 0:45 | Ask: `In one sentence, what is a Pod in OpenShift?` | "The answer comes from gpt-oss-20b on our GPUs, through the same MaaS gateway as our developers' keys, and from the official documentation of this OpenShift version." | A one-sentence answer, usually within a minute (219 and 242 characters in the probe runs of 2026-11-12). |
-| 2:00 | Ask: `List only the names of the pods in the zuno-ai-run namespace. No IP addresses, no node names, no table.` *(untested prompt)* | "Now it reads the live cluster with my own rights. As a consultant I may read the Zuno namespaces." | The names of the pods of `zuno-ai-run` (the gateways, the model pods), and nothing else: no address, no node name. |
-| 3:15 | Ask: `List the pods in the openshift-etcd namespace.` *(untested prompt)* | "Outside what I may see, it gets nothing: it uses my rights, not its own." | An answer saying the user has no permission to list pods there. |
+| 2:00 | Ask: `List only the names of the pods in the zuno-ai-run namespace. No IP addresses, no node names, no table.` | "Now it reads the live cluster with my own rights. As a consultant I may read the Zuno namespaces." | The names of the pods of `zuno-ai-run`, one per line, with their generated suffixes, for example `a2a-gateway-...`, `aap-mcp-...`, `ai-gateway-...`; no address, no node name (seen in the take of 2026-11-16; the answer is long and scrolls). |
+| 3:15 | Ask: `List the pods in the openshift-etcd namespace.` | "Outside what I may see, it gets nothing: it uses my rights, not its own." | An answer saying it has no permission to list pods in `openshift-etcd`, then a suggestion to run a command with a user that has the right permissions (seen in the take of 2026-11-16). |
 | 4:15 | Close | "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what the person asking may see." | |
 
 ## 15-minute version
