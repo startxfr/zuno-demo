@@ -17,6 +17,8 @@ previous cluster, demo222. The routes, the catalog server and the pipeline's reg
 **The message:** "A developer starts from a curated catalog. A trained model is recorded with its version and its
 artifact, and it serves only after a reviewed change."
 
+![The 5-minute version of the model catalog demo, recorded live as ai-dev-01 on the OpenShift AI dashboard: the sign-in through OpenShift, the model catalog Red Hat curates, its Red Hat AI validated models, and one validated model's card. The model registry, told in words at 3:15, is not in the recording.](../../../assets/img/demo/model-catalog-registry.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
