@@ -285,9 +285,32 @@ As relayed: the DAN sentence was sent once; the model answered "I'm sorry, but I
 
 **Review.** The writer opened 3 of the 9 marker images, and no frames of a GIF: `agent/q-done.png` (the Zuno Agent's Orchestrate page; the DAN sentence; the answer above; the account name in the corner is a single letter; no node name or address), `dashboard/detections.png` (the panel "Guardrails evaluations by experience (over range)", last hour; legend entries `dify (clean)`, `dify (detected)` and the other clients; no node name or address), and `agent/login.png` (the Keycloak sign-in, empty fields). As relayed, demo333 counted 4 of 9 reviewed and a full review was asked.
 
-**No GIF yet.** The first cut was 38.0 s (the answer came in 4.4 s) and `gif.py` refused it. The coordinator's `16eb4a9a` makes it 42.0 s on the take; the re-cut is pending (as relayed). Not published.
+**No GIF at first.** The first cut was 38.0 s (the answer came in 4.4 s) and `gif.py` refused it. The coordinator's `16eb4a9a` makes it 42.0 s on the take; the re-cut is pending (as relayed). Not published.
 
 **Page.** `guardrails.md` row 0:45 says what was seen on 2026-11-16; row 2:00 says the detection is recorded, not blocked, and that Check has already sent the prompt once, so the count is the probes' plus the live step's.
+
+## After midnight, 2026-11-17 (this file continues here)
+
+The takes of the night of 2026-11-16 to 2026-11-17 go on in this file, so that the guardrails facts stay in one place.
+
+### guardrails: candidate re-cut (not published)
+
+The writer read the take directory `guardrails-20261116-233501` and `guardrails.gif.json`.
+
+| Item | Value |
+|---|---|
+| GIF | `guardrails.gif`, 691 243 bytes (0.7 MB), 43.0 s, 7 moments, written 23:47 CET |
+| Cuts, as relayed | `16eb4a9a` (42.0 s), then `0fb526ee`: a still of `agent/q-done` so the model's reply is in the GIF, caption "0:45  The model itself declines; the gateway blocked nothing" (43.0 s) |
+| Review, as relayed | Complete by demo333: the 9 marker images and 12 frames, then 9 frames of the final cut. The writer opened no frame of the GIF; the 3 marker images it opened are in the section above |
+| Status | Sent to the owner. **Not published.** |
+
+### Scouts under the write guard (as relayed)
+
+Scouts at `6df63b54` and `6f836c28`. The only write refused anywhere was `POST /api2/blueprints/blueprint.validate`, on every UnifAI hub page. Refusing it made the hub say "Workflow Unavailable" and disabled the composer. The coder's `6f836c28` allows it as a read. After that fix `writes.refused` is empty for `unifai-agents`, `a2a-delegation-approval`, `observability-trace` (chat), `maas-portal-api-keys` and `openclaw`. The writer read none of these scout files. The offline scripts retry "pasta failed" once (`6f836c28`).
+
+### Slow first loads (deferred entry p, as relayed)
+
+Between about 00:20 and 00:35 CET the first load of UnifAI and of the Tempo search UI took more than 30 s in 4 of 7 attempts, at a workstation load of 2 to 3. All UnifAI pods were Running. Cause unknown. The coder raises the walkthroughs' first-load waits to 90 s. Entry p of the [sprint evidence](wp-289-gif-sprint-2026-11-16.md).
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 

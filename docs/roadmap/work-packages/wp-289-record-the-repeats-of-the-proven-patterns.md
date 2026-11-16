@@ -46,7 +46,7 @@ demos of this brief, **16**: `gitops-day0-3`, `image-signing-admission`, `extern
   is no longer blocked: the Grafana sign-in now authorizes once and closes the announcement as declared changes.
 - `observability-trace`: the chat take passed, but both trace takes failed (the search opened the OpenClaw error trace, then Jaeger's Compare page: a selector bug). The page says "not rehearsed" for the Tempo half.
 
-**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to o: platform, agents or UnifAI
+**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to p: platform, agents or UnifAI
 changes that the sprint rule forbade); the Grafana user-storage entry and the OAuth authorization of `ai-ops-01` that now stay
 on the cluster; the stored effect of kagent's **Skip wizard**; the sprint's lesson that marker images are not enough for a chat
 answer (scan the frames of each answer span).
