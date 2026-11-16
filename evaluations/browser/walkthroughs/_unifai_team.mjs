@@ -58,10 +58,13 @@ export async function openHub(page, state, workspace, { changes = [] } = {}) {
   await page.waitForTimeout(800);
   const hub = await firstVisible(page, HUB);
   if (!hub) throw new Error(`the Collaboration Hub link was not found (${HUB.join(" | ")})`);
-  const asked = page.waitForRequest((r) => /\/api2\/sessions\/session\.user\.list/.test(r.url()) && Boolean(new URL(r.url()).searchParams.get("teamId")), { timeout: 30000 });
+  const asked = page.waitForRequest((r) => /\/api2\/sessions\/session\.user\.list/.test(r.url()) && Boolean(new URL(r.url()).searchParams.get("teamId")), { timeout: 120000 });
   await press(page, hub, "the Collaboration Hub link", { changes, state });
   state.teamId = new URL((await asked).url()).searchParams.get("teamId");
-  await waitUntil(page, { what: "the Collaboration Hub", timeoutMs: 30000, done: async () => (await firstVisible(page, ADD)) || undefined });
+  // The hub shows "Loading sessions..." until its list has answered: more than 30 s under load (scout of 2026-11-16,
+  // 21 sessions, load 16), so it is given two minutes.
+  await waitUntil(page, { what: "the Collaboration Hub and its sessions", timeoutMs: 120000,
+    done: async () => (!(await page.getByText("Loading sessions").first().isVisible().catch(() => false)) && (await firstVisible(page, ADD))) || undefined });
   await page.waitForTimeout(1000);
 }
 

@@ -24,7 +24,7 @@
 //  - an opened span shows a "Process" line (the pod's address, its host): the recorder counts node names and private
 //    addresses on the page at each step; if it finds some at `tags`, a take would fail there. scout() opens the newest
 //    existing trace (read only) so that this is known for the price of a sign-in.
-import { click, firstVisible, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
+import { click, firstVisible, read, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 import { ADD, newSession, openHub, openSelector, teamSessions, toBottom } from "./_unifai_team.mjs";
 import { grafanaInWindow, proxySignIn } from "./_grafana.mjs";
 
@@ -57,10 +57,10 @@ const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.cl
               "zuno.latency_ms", "zuno.estimated_cost_usd", "zuno.outcome", "zuno.run_id"];
 const WAIT_FOR_TRACE_MS = 180000;
 const READY = [".SearchForm", ".SearchTracePage", "[data-testid='SearchForm']", "#jaeger-ui-root", "main"];       // guess (Jaeger UI)
-const RESULT = [".ResultItem a.ResultItemTitle--item", ".ResultItem a", "a[href*='/trace/']"];                             // guess
+const RESULT = [".ResultItem a.ResultItemTitle--item", ".ResultItem a", "a[href*='/trace/']"];                             // ".ResultItem a" seen live, 2026-11-16
 const SPAN_NAME = [".span-row .span-name", ".span-name", "[data-testid='span-name']"];                                      // guess
 const DETAIL = [".detail-row", ".SpanDetail", "[data-testid='span-detail']"];                                              // guess
-const TAGS_HEADER = [".AccordianKeyValues--header:has-text('Tags')", "a:has-text('Tags')", "[role='switch']:has-text('Tags')"];   // guess
+const TAGS_HEADER = [".detail-row .AccordianKeyValues--header:has-text('Tags')", ".AccordianKeyValues--header:has-text('Tags')", "[role='switch']:has-text('Tags')"];   // guess
 
 const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
 const searchAddress = (base) => `${base}/search?service=${SEARCH.service}&operation=${SEARCH.operation}`
@@ -126,14 +126,29 @@ async function openTrace(page, found) {
   await page.waitForTimeout(1000);
 }
 
+// The ONE exception to the click guard, by name. The Jaeger UI gives its span rows and its accordions the role
+// "switch" (scout of 2026-11-16: the guard refused them). They are folds of the trace page, kept nowhere: not a
+// setting of the persona. fold() clicks such an element directly, and ONLY such an element: a span's name inside a
+// span row, or the header of the accordion "Tags" inside a span's detail. Anything else is refused here too, so the
+// guard is not weakened for a real switch.
+const FOLDS = {
+  span: (el) => Boolean(el.closest(".span-row, [data-testid='span-view']")) && !el.closest(".detail-row"),
+  tags: (el) => /^\s*Tags\b/.test(el.innerText || "") && Boolean(el.closest(".AccordianKeyValues, .detail-row, [data-testid='span-detail']")) && !el.matches("input, [type='checkbox']"),
+};
+async function fold(target, kind) {
+  const allowed = await read(target, FOLDS[kind]);
+  if (!allowed) throw new Error(`refused to click: not the ${kind === "span" ? "name of a span in its row" : "Tags accordion of a span's detail"} of the Jaeger UI`);
+  await target.click({ timeout: 15000 });
+}
+
 async function openSpan(page) {
   const name = await firstVisible(page, SPAN_NAME);
   const spans = page.locator(name.matched).filter({ hasText: SPAN });
   if (!(await spans.count())) throw new Error(`the trace holds no ${SPAN} span on screen (${name.matched})`);
-  await click(spans.first(), { changes });
+  await fold(spans.first(), "span");
   const detail = await waitUntil(page, { what: "the span's detail", timeoutMs: 15000, done: async () => (await firstVisible(page, DETAIL)) || undefined });
   const header = await firstVisible(page, TAGS_HEADER);
-  if (header) { await click(header, { changes }); await page.waitForTimeout(800); }   // an accordion of the page: nothing is saved
+  if (header) { await fold(page.locator(header.matched).first(), "tags"); await page.waitForTimeout(800); }
   await page.mouse.move(640, 790);
   const text = await page.locator(detail.matched).first().innerText().catch(() => "");
   return { detail: detail.matched, tags_header: header ? header.matched : "", tags: TAGS.filter((tag) => text.includes(tag)) };

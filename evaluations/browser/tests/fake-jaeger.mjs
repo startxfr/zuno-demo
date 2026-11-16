@@ -53,12 +53,12 @@ http.createServer((req, res) => {
   if (u.pathname === `/trace/${TRACE}`) {
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><h1 class="TracePageHeader">unifai: workflow.run</h1>
 <div class="span-row"><a class="span-name">unifai workflow.run</a></div>
-<div class="span-row"><a class="span-name" id="mc">ai-gateway model_call</a></div><div id="detail"></div>
+<div class="span-row"><a class="span-name" id="mc" role="switch" aria-checked="false">ai-gateway model_call</a></div><div id="detail"></div>
 <div class="span-row"><a class="span-name">ai-gateway model_call</a></div></div>
 <script>
 const tags = ${JSON.stringify(TAGS)};
 document.getElementById("mc").onclick = () => {
-  document.getElementById("detail").innerHTML = '<div class="detail-row"><a class="AccordianKeyValues--header" id="th">Tags: ' + tags.slice(0, 2).map((t) => t.join("=")).join(" ") + '</a><table id="tt" hidden></table>'
+  document.getElementById("detail").innerHTML = '<div class="detail-row"><div class="AccordianKeyValues"><a class="AccordianKeyValues--header" id="th" role="switch" aria-checked="false">Tags: ' + tags.slice(0, 2).map((t) => t.join("=")).join(" ") + '</a><table id="tt" hidden></table></div>'
     + '<a class="AccordianKeyValues--header">${PROCESS}</a></div>';
   document.getElementById("th").onclick = () => {
     const t = document.getElementById("tt"); t.hidden = false;
