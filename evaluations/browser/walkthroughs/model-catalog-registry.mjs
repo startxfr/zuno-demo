@@ -12,9 +12,10 @@
 // setting: when a dialog covers the dashboard (a welcome or a tour), or OpenShift asks to authorize access, the take
 // stops and says so; when the source filter is a checkbox, click() refuses it (declare it in `changes` after a scout).
 //
-// NOT yet scouted, and the navigation of the 3.6.0-ea.2 dashboard was never checked (the page says so): EVERY selector
-// below is a guess, marked `guess`. scout() reports each one and dumps the controls it finds; no take before a scout
-// that passes.
+// Scouted once on demo333 (2026-11-16, 3.6.0-ea.2): the sign-in, the dashboard with no dialog, and the left menu, whose
+// group "AI hub" is collapsed and holds ONE link, "Models" (no "Catalog"). Not reached yet: the page behind "Models",
+// the catalog, its source filter and a card. Every selector marked `guess` is still one. scout() reports each and dumps
+// the controls it finds; no take before a scout that passes.
 import { buttons, click, describe, firstVisible, newText, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "ai-dev-01";
@@ -32,13 +33,17 @@ const PROVIDER = "openshift";   // the page: the OpenShift sign-in, Keycloak beh
 const PROVIDER_LINK = [`a[title='Log in with ${PROVIDER}']`, `a.idp:text-is('${PROVIDER}')`, `a:text-is('${PROVIDER}')`];   // seen live in the console, 2026-11-16
 const APPROVE = /\/oauth\/authorize\/approve|Authorize Access|Allow selected permissions/i;                               // guess: an OAuth grant page
 const NAV = ["#page-sidebar", "nav[aria-label*='Global' i]", "nav"];                                                       // guess
-const NAV_GROUP = ["nav button:has-text('AI hub')", "nav button:has-text('Models')"];                                       // guess: a collapsed menu group
-const NAV_CATALOG = ["nav a:text-is('Catalog')", "nav a:text-is('Model catalog')", "nav a[href*='catalog' i]"];             // guess
+const NAV_GROUP = ["nav button:has-text('AI hub')"];                                                                      // seen collapsed, 2026-11-16
+// "Models" is the only link of AI hub (scout of 2026-11-16); the others are kept in case a later version names it.
+const NAV_CATALOG = ["nav a:text-is('Catalog')", "nav a:text-is('Model catalog')", "nav a[href*='catalog' i]", "nav a:text-is('Models')"];
+const CATALOG_TAB = ["main [role='tab']:has-text('Catalog')", "main a:text-is('Catalog')", "main button:text-is('Catalog')"];   // guess: a tab of the Models page
 const SOURCES = /Red Hat AI validated|Other models/;                                                                       // the page's "You should see"
 const VALIDATED = ["button:has-text('Red Hat AI validated')", "[role='tab']:has-text('Red Hat AI validated')",
                    "[role='option']:has-text('Red Hat AI validated')", "a:has-text('Red Hat AI validated')",
                    "label:has-text('Red Hat AI validated')"];                                                              // guess
-const CARD = ["[data-testid*='catalog-card' i] a", "[data-testid*='model-card' i] a", ".pf-v6-c-card a", ".pf-v5-c-card a", "article a"];   // guess
+// guess. The home page's project cards are `.pf-v6-c-card` too (scout of 2026-11-16): a card is looked for only once
+// the catalog's sources are on screen.
+const CARD = ["main [data-testid*='catalog-card' i] a", "main [data-testid*='model-card' i] a", "main .pf-v6-c-card a", "main .pf-v5-c-card a", "main article a"];
 const DETAIL = ["[data-testid='app-page-title']", "main h1", "h1"];                                                         // guess
 const DIALOG = "[role='dialog'][aria-modal='true'], .pf-v5-c-backdrop, .pf-v6-c-backdrop";                                  // guess: a welcome or a tour
 const DWELL_MS = 2000;   // a presenter's pause on each screen, so that every motion moment has frames to cut
@@ -49,8 +54,9 @@ async function noDialog(page, where) {
   }
 }
 
-// The catalog page, from the left menu: the group opened first when the link is inside a collapsed one. {group, link}
-async function openCatalog(page) {
+// The left menu's way to the catalog: the group opened first when the link is inside a collapsed one, then the link,
+// then the page's Catalog tab when it has one and another tab is selected. Navigation only. {group, link, tab}
+async function openMenu(page) {
   let link = await firstVisible(page, NAV_CATALOG);
   let group = "";
   if (!link) {
@@ -61,10 +67,22 @@ async function openCatalog(page) {
     link = await waitUntil(page, { what: "the catalog link in the left menu", timeoutMs: 15000, done: async () => (await firstVisible(page, NAV_CATALOG)) || undefined });
   }
   await click(link, { changes });
+  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  let tab = "";
+  const toTab = await firstVisible(page, CATALOG_TAB);
+  if (toTab && (await toTab.getAttribute("aria-selected").catch(() => null)) !== "true") {
+    tab = toTab.matched;
+    await click(toTab, { changes });
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  }
+  return { group, link: link.matched, tab };
+}
+
+// The catalog is on screen: its sources named and at least one card.
+async function catalogShown(page) {
   await waitUntil(page, { what: "the model catalog and its sources", timeoutMs: 60000,
     done: async () => (SOURCES.test(await page.locator("body").innerText()) && (await firstVisible(page, CARD))) || undefined });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  return { group, link: link.matched };
 }
 
 export async function enter({ page, base, mark, keycloak }) {
@@ -95,8 +113,9 @@ export async function run({ page, mark, log }) {
   await mark("dashboard");
   await page.waitForTimeout(DWELL_MS);
 
-  const opened = await openCatalog(page);
-  log(`catalog opened from the left menu (${opened.group ? `group ${opened.group}, ` : ""}link ${opened.link})`);
+  const opened = await openMenu(page);
+  await catalogShown(page);
+  log(`catalog opened from the left menu (${opened.group ? `group ${opened.group}, ` : ""}link ${opened.link}${opened.tab ? `, tab ${opened.tab}` : ""})`);
   await page.waitForTimeout(DWELL_MS);
   await mark("catalog");
 
@@ -122,9 +141,10 @@ export async function run({ page, mark, log }) {
   await mark("end");
 }
 
-// What a take will meet, for the price of a sign-in: the dashboard (a dialog over it?), the left menu, the catalog and
-// its sources, the source filter (a button or a checkbox?), and one card. Nothing is deployed or registered: the
-// recorder refuses `sends` in a scout, and no Deploy or Register button is clicked.
+// What a take will meet, for the price of a sign-in: the dashboard (a dialog over it?), the left menu and the page it
+// opens (dumped even when the catalog is not there), the catalog and its sources, the source filter (a button or a
+// checkbox?), and one card, opened only when the catalog was seen. Nothing is deployed or registered: the recorder
+// refuses `sends` in a scout, and no Deploy or Register button is clicked.
 export async function scout({ page, step, state }) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   await step("dashboard", async () => ({ url: page.url().replace(/[?#].*/, ""), dialog_on_screen: await page.locator(DIALOG).first().isVisible().catch(() => false),
@@ -133,18 +153,27 @@ export async function scout({ page, step, state }) {
                                          group: ((await firstVisible(page, NAV_GROUP)) || {}).matched || "",
                                          words: await wordsOnScreen(page, [/ai-dev-01/, /OpenShift AI/, /AI hub/, /Catalog/]),
                                          menu: await describe(page, ((await firstVisible(page, NAV)) || {}).matched || "body", 60) }));
-  await step("catalog", async () => {
-    const text = await page.locator("body").innerText();
-    const opened = await openCatalog(page);
+  const text = await page.locator("body").innerText();
+  await step("menu", async () => {
+    const opened = await openMenu(page);
+    await page.waitForTimeout(DWELL_MS);
+    const heading = await firstVisible(page, DETAIL);
+    return { url: page.url().replace(/[?#].*/, ""), ...opened, title: heading ? ((await heading.innerText().catch(() => "")) || "").slice(0, 80) : "",
+             tabs: await describe(page, "main [role='tablist']", 20), words: await wordsOnScreen(page, [/Catalog/, /Red Hat AI validated/, /Other models/, /Registry/, /Deployments/]),
+             text: (await newText(page, text)).slice(0, 30), controls: await describe(page, "main", 80) };
+  });
+  const catalog = await step("catalog", async () => {
+    await catalogShown(page);
     const filter = await firstVisible(page, VALIDATED);
-    return { url: page.url().replace(/[?#].*/, ""), group: opened.group, link: opened.link, card_selector: ((await firstVisible(page, CARD)) || {}).matched || "",
+    return { url: page.url().replace(/[?#].*/, ""), card_selector: ((await firstVisible(page, CARD)) || {}).matched || "",
              cards: await page.locator(CARD.join(", ")).count(), filter_selector: filter ? filter.matched : "",
              filter_is: filter ? await filter.evaluate((e) => `${e.tagName.toLowerCase()} role=${e.getAttribute("role") || ""} type=${e.getAttribute("type") || ""}`
                + ` checkbox_inside=${!!e.querySelector("input[type=checkbox], input[type=radio], [role=switch]")}`) : "",
              words: await wordsOnScreen(page, [/Red Hat AI validated/, /Red Hat AI\b/, /Other models/]),
-             text: (await newText(page, text)).slice(0, 30), buttons: await buttons(page, "main"), controls: await describe(page, "main", 80) };
+             buttons: await buttons(page, "main"), controls: await describe(page, "main", 80) };
   });
   await step("card", async () => {
+    if (!catalog.ok) throw new Error("the catalog was not seen: no card is opened (the home page's project cards look the same)");
     const card = await firstVisible(page, CARD);
     if (!card) throw new Error(`no card on screen (${CARD.join(" | ")})`);
     const before = await page.locator("body").innerText();

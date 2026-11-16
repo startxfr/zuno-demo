@@ -277,15 +277,28 @@ out="$(rhoai r-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "model-catalog-registry: a scout exits 0, SCOUT: done, nothing deployed" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"deploys\":0}' <<<\"\$0\"" "$out"
 expect "model-catalog-registry: scout.json reports every guess" scouted r-scout '
-assert list(steps) == ["enter", "owned", "dashboard", "catalog", "card", "closed"], list(steps)
+assert list(steps) == ["enter", "owned", "dashboard", "menu", "catalog", "card", "closed"], list(steps)
 d = steps["dashboard"]
 assert d["dialog_on_screen"] is False and d["nav_selector"] == "#page-sidebar" and d["catalog_link"] == "" and d["group"].endswith("AI hub\x27)"), d
+n = steps["menu"]
+assert n["link"] == "nav a:text-is(\x27Models\x27)" and n["tab"] == "main [role=\x27tab\x27]:has-text(\x27Catalog\x27)" and n["url"].endswith("/ai-hub/models/catalog"), n
+assert n["title"] == "Models" and n["words"]["Catalog"] and n["controls"], n
 c = steps["catalog"]
-assert c["link"] == "nav a:text-is(\x27Catalog\x27)" and c["cards"] == 4 and c["filter_selector"] == "button:has-text(\x27Red Hat AI validated\x27)", c
+assert c["cards"] == 4 and c["filter_selector"] == "button:has-text(\x27Red Hat AI validated\x27)", c
 assert c["filter_is"].startswith("button") and "checkbox_inside=false" in c["filter_is"] and all(c["words"].values()), c
 k = steps["card"]
-assert k["url"].endswith("/ai-hub/catalog/granite-3.1-8b-instruct") and k["title_selector"] == "[data-testid=\x27app-page-title\x27]" and k["words"]["Deploy"], k
+assert k["url"].endswith("/ai-hub/models/catalog/granite-3.1-8b-instruct") and k["title_selector"] == "[data-testid=\x27app-page-title\x27]" and k["words"]["Deploy"], k
 '
+out="$(rhoai r-nocat RECORD_SCOUT=1 FAKE_NO_CATALOG=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: no catalog on screen, the scout still dumps the Models page and opens no card" bash -c "test $rc -eq 1 && grep -q '^SCOUT: failed catalog, card' <<<"\$0"" "$out"
+expect "model-catalog-registry: scout.json keeps the menu step, the card step names why" python3 -c '
+import json, sys
+s = json.load(open(sys.argv[1])); steps = {x["step"]: x for x in s["steps"]}
+assert steps["menu"]["ok"] and steps["menu"]["url"].endswith("/ai-hub/models/catalog") and steps["menu"]["controls"], steps["menu"]
+assert not steps["card"]["ok"] and "the catalog was not seen" in steps["card"]["error"], steps["card"]
+assert steps["closed"]["url"].endswith("/ai-hub/models/catalog"), steps["closed"]   # no project card was opened
+' "$work/r-nocat/scout.json"
 out="$(rhoai r-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "model-catalog-registry: a good take exits 0, RESULT: PASS, nothing deployed" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"deploys\":0}' <<<\"\$0\"" "$out"

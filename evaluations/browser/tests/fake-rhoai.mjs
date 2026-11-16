@@ -1,10 +1,12 @@
 // WP-289: a stand-in for the OpenShift sign-in and the OpenShift AI dashboard's model catalog, for the offline test
-// of walkthroughs/model-catalog-registry.mjs (tests/walkthroughs-offline.sh). It serves what the walkthrough GUESSES
-// the dashboard shows (no scout has run yet): the provider chooser and Keycloak, the dashboard with a collapsed "AI hub"
-// menu group holding "Catalog", the catalog with its three sources and their cards, the "Red Hat AI validated" source
-// as a button, and a card's page with a Deploy button. It proves the walkthrough's own logic, not the real selectors.
+// of walkthroughs/model-catalog-registry.mjs (tests/walkthroughs-offline.sh). As the scout of 2026-11-16 saw it: the
+// provider chooser and Keycloak, a home page with project cards, a collapsed "AI hub" menu group holding one link,
+// "Models". Still GUESSED (not reached by the scout): the Models page with tabs, opening on another tab than "Catalog",
+// the catalog with its three sources and their cards, the "Red Hat AI validated" source as a button, and a card's page
+// with a Deploy button. It proves the walkthrough's own logic, not the real selectors.
 // Knobs: FAKE_DIALOG=1 a welcome dialog covers the dashboard; FAKE_CHECKBOX=1 the source filter is a checkbox;
-// FAKE_APPROVE=1 OpenShift asks to authorize access after the sign-in. /fake/count says how many deployments were
+// FAKE_APPROVE=1 OpenShift asks to authorize access after the sign-in; FAKE_NO_CATALOG=1 the Catalog tab shows no
+// source and no card. /fake/count says how many deployments were
 // started (a take and a scout must leave it at 0). No cluster, no model.
 import http from "node:http";
 
@@ -34,22 +36,28 @@ main{padding:24px;flex:1} .pf-v6-c-card{border:1px solid #888;margin:8px;padding
 function shell(body, { dialog = false } = {}) {
   return `<!doctype html><title>Red Hat OpenShift AI (fake)</title>${STYLE}
 <nav id="page-sidebar" aria-label="Global"><p>ai-dev-01</p><a href="/">Home</a>
+<a href="/projects">Projects</a>
 <button id="group" aria-expanded="false" onclick="this.setAttribute('aria-expanded','true');document.getElementById('cat').hidden=false">AI hub</button>
-<a id="cat" href="/ai-hub/catalog" hidden>Catalog</a><a href="/projects">Projects</a></nav>
+<a id="cat" href="/ai-hub/models" hidden>Models</a></nav>
 <main>${body}</main>
 ${dialog ? `<div class="modal" role="dialog" aria-modal="true"><div><h2>Welcome to Red Hat OpenShift AI</h2><button onclick="this.closest('.modal').remove()">Close</button></div></div>` : ""}`;
+}
+
+function tabs(selected) {
+  return `<div role="tablist">${[["Catalog", "/ai-hub/models/catalog"], ["Deployments", "/ai-hub/models"]].map(([name, href]) =>
+    `<a role="tab" aria-selected="${name === selected}" href="${href}">${name}</a>`).join(" ")}</div>`;
 }
 
 function catalog() {
   const filter = process.env.FAKE_CHECKBOX === "1"
     ? `<label><input type="checkbox" id="only"> Red Hat AI validated</label>`
     : ["Red Hat AI", "Red Hat AI validated", "Other models"].map((s) => `<button class="source">${s}</button>`).join(" ");
-  return shell(`<h1 data-testid="app-page-title">Catalog</h1><div id="filters">${filter}</div><div id="cards"></div>
+  return shell(`<h1 data-testid="app-page-title">Models</h1>${tabs("Catalog")}<div id="filters">${filter}</div><div id="cards"></div>
 <script>
 const MODELS = ${JSON.stringify(MODELS)};
 function show(source) {
   document.getElementById("cards").innerHTML = MODELS.filter((m) => !source || m.source === source).map((m) =>
-    '<div class="pf-v6-c-card" data-testid="model-catalog-card"><a href="/ai-hub/catalog/' + m.name + '">' + m.name + '</a><p>' + m.source + '</p></div>').join("");
+    '<div class="pf-v6-c-card" data-testid="model-catalog-card"><a href="/ai-hub/models/catalog/' + m.name + '">' + m.name + '</a><p>' + m.source + '</p></div>').join("");
 }
 show("");
 document.querySelectorAll("button.source").forEach((b) => { b.onclick = () => show(b.textContent); });
@@ -61,7 +69,7 @@ if (only) only.onchange = () => show(only.checked ? "Red Hat AI validated" : "")
 function card(name) {
   const m = MODELS.find((x) => x.name === name);
   if (!m) return null;
-  return shell(`<p><a href="/ai-hub/catalog">Catalog</a> / ${m.name}</p><h1 data-testid="app-page-title">${m.name}</h1><p>${m.source}</p>
+  return shell(`<p><a href="/ai-hub/models/catalog">Catalog</a> / ${m.name}</p><h1 data-testid="app-page-title">${m.name}</h1><p>${m.source}</p>
 <h2>Performance</h2><p>Validated on 1 x H100: 1,200 tokens per second.</p>
 <button onclick="fetch('/api/k8s/apis/serving.kserve.io/v1beta1/namespaces/x/inferenceservices',{method:'POST'})">Deploy</button>`);
 }
@@ -80,8 +88,12 @@ http.createServer((req, res) => {
   if (u.pathname === "/oauth/authorize/approve") return html(APPROVE);
   if (!signed) return u.pathname.startsWith("/api") ? json(401, {}) : html(CHOOSER);
   if (/\/inferenceservices$/.test(u.pathname) && req.method === "POST") { deploys += 1; return json(201, {}); }
-  if (u.pathname === "/ai-hub/catalog") return html(catalog());
-  const one = u.pathname.match(/^\/ai-hub\/catalog\/([^/]+)$/);
+  if (u.pathname === "/ai-hub/models") return html(shell(`<h1 data-testid="app-page-title">Models</h1>${tabs("Deployments")}<p>No deployments.</p>`));
+  if (u.pathname === "/ai-hub/models/catalog") {
+    return html(process.env.FAKE_NO_CATALOG === "1" ? shell(`<h1 data-testid="app-page-title">Models</h1>${tabs("Catalog")}<p>Loading...</p>`) : catalog());
+  }
+  const one = u.pathname.match(/^\/ai-hub\/models\/catalog\/([^/]+)$/);
   if (one) return html(card(decodeURIComponent(one[1])) || "not found", card(decodeURIComponent(one[1])) ? 200 : 404);
-  return html(shell(`<h1 data-testid="app-page-title">Welcome</h1><p>Red Hat OpenShift AI</p>`, { dialog: process.env.FAKE_DIALOG === "1" }));
+  return html(shell(`<h1>Projects</h1><div class="pf-v6-c-card"><a href="/projects/zuno-ai-build">Zuno AI Build</a></div>
+<p>Red Hat OpenShift AI</p>`, { dialog: process.env.FAKE_DIALOG === "1" }));
 }).listen(port, "127.0.0.1");
