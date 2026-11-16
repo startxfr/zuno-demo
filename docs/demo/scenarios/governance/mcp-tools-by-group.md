@@ -24,6 +24,8 @@ marker. How the gateway runs these steps: see [Appendix B](#appendix-b---lld).
 **The message:** "Same question, different person, different tools. Who you are decides which tools you get, in every
 experience, and every call is recorded in one place."
 
+![The 5-minute version of the tools by group demo, recorded live in Open WebUI as sale-01 then consultant-02: the salesperson's three tools and the refusal of a Confluence question, then the consultant's six tools and a Confluence search tool call. The recording stops at the tool call: the pages it lists are not shown.](../../../assets/img/demo/mcp-tools-by-group.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
