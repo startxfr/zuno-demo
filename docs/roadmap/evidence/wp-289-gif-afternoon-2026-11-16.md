@@ -105,6 +105,7 @@ Page: the "(untested command)" mark on row 1:00 is lifted, because the take ran 
 - `main` still carries Playwright 1.55.1 while `devel` is pinned to 1.48.0 (see the incident above).
 - The AAP user `consultant-03`: demo333 is to confirm whether AAP created it.
 - Node names are visible in the published `model-serving-llmd-mig` GIF, accepted by the owner for this demo only.
+- **Dify, Zuno Agent's configuration.** On the Studio frame of the `dify` take, the card **Zuno Agent** reads "Edited at 11/16/2026 18:42"; the other applications read 11/05 or 11/06. The first `dify` take of the evening (failed at the workflow step) ran at 18:42 UTC, as relayed. A take or scout probably let an autosave of the Agent's configuration through, because the Dify guard refused only a guessed list of paths. Instructions and tools look unchanged on screen; this is **not proven either way**. To do: compare the Agent's configuration with its reference.
 
 ## Scouts of the remaining demos (as relayed)
 
@@ -251,4 +252,22 @@ The take failed after the Agent turn: the workflow step went to the web-app page
 ## Scouts at `d80f25ef` and the re-cut (as relayed)
 
 `openclaw` 7 of 7; `maas-portal-api-keys` 6 of 6 (empty key list, Create dialog seen and cancelled, nothing created); `dify` 9 of 9; `guardrails` both paths fine; `observability-trace`: the search finds one recent Tekos trace of `consultant-02`, but the click opened Jaeger's Compare page (selector bug). The `unifai-agents` re-cut was refused once by `gif.py` because a caption was 64 characters, and redone at `2b9f3dfb`. The owner's decision on the `openclaw` session cleanup is in the WP-290 brief.
+
+## Take: dify, not proposed for publication
+
+| Item | Value |
+|---|---|
+| Take | `dify-20261116-210141`: `consultant-02`, `pass`, 9 markers in 48.0 s, cut at `d80f25ef` (as relayed) |
+| Created and cleaned | One conversation created and deleted; owned 0 before and 0 after; `private_addresses` count 0 |
+| GIF | 3 694 923 bytes (read from the take), SHA-256 `379a9da29cbb...`, 49.0 s as relayed, 7 moments |
+| Run log | The workflow run (id as relayed) succeeded and **stays** in Dify's run log. The user cannot delete it. |
+| Blocked | The editor's `workflows/draft` autosave was refused in the browser (as relayed) |
+
+**Review.** demo333 opened 9 marker images (as relayed). The writer opened 2 images (`studio.png`, `run-done.png`) and no frames. `studio.png`: Studio with four cards; **Zuno Agent** reads "Edited at 11/16/2026 18:42", **Zuno Technical Documentation** 11/06 17:27, **Zuno Confluence Search** 11/06 16:30, **Strategic Consulting Expert** 11/05 12:18; the account name is "x". `run-done.png`: the workflow editor with the Test Run result, a list of real Confluence page titles with their codes; no person's name seen; the editor header says "Auto-Saved 09:55:47". The owner accepted real titles at 13:12 CET; none is copied here. A company acronym is part of the titles on that frame: note it for the owner's review.
+
+**Not proposed for publication yet**, because of the Zuno Agent finding above. All Dify takes are on hold; the coder is making the guard default-deny (as relayed).
+
+## Limit of every GIF published so far: write guards (assist's survey, as relayed)
+
+In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
 
