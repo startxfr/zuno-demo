@@ -18,6 +18,8 @@ This scenario shows past runs. Starting a run is a cluster change: rehearse only
 **The message:** "A fine-tuned model is a build artefact like any other. A pipeline trains it, MLflow records it, the
 agent's own tests gate it, and it is served only after a human approves the change in Git."
 
+![The 5-minute version of the LoRA pipeline demo, recorded live as ai-dev-01 on the OpenShift AI dashboard, in stills: the projects, the tekos pipeline graph with its four steps, and the training job kept in the Zuno MLOps project. The MLflow experiment of row 2:45 is not in the recording: none was listed on the cluster that day.](../../../assets/img/demo/lora-pipeline-mlflow-kueue.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
