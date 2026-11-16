@@ -12,10 +12,11 @@
 // setting: when a dialog covers the dashboard (a welcome or a tour), or OpenShift asks to authorize access, the take
 // stops and says so; when the source filter is a checkbox, click() refuses it (declare it in `changes` after a scout).
 //
-// Scouted once on demo333 (2026-11-16, 3.6.0-ea.2): the sign-in, the dashboard with no dialog, and the left menu, whose
-// group "AI hub" is collapsed and holds ONE link, "Models" (no "Catalog"). Not reached yet: the page behind "Models",
-// the catalog, its source filter and a card. Every selector marked `guess` is still one. scout() reports each and dumps
-// the controls it finds; no take before a scout that passes.
+// Scouted on demo333 (2026-11-16, 3.6.0-ea.2): the sign-in, the dashboard with no dialog, the left menu (group "AI hub",
+// collapsed, holding ONE link "Models"), the Models page opening on its Catalog tab, the catalog cards, the source
+// buttons (a toggle group "Source label selection": All models | Red Hat AI - validated models | Red Hat AI models |
+// Other models) and a card's page, which loads behind a spinner. The first take (100433) failed on the source label,
+// "Red Hat AI - validated models", which the first guess did not match. Selectors marked `guess` are still guesses.
 import { buttons, click, describe, firstVisible, newText, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "ai-dev-01";
@@ -37,16 +38,26 @@ const NAV_GROUP = ["nav button:has-text('AI hub')"];                            
 // "Models" is the only link of AI hub (scout of 2026-11-16); the others are kept in case a later version names it.
 const NAV_CATALOG = ["nav a:text-is('Catalog')", "nav a:text-is('Model catalog')", "nav a[href*='catalog' i]", "nav a:text-is('Models')"];
 const CATALOG_TAB = ["main [role='tab']:has-text('Catalog')", "main a:text-is('Catalog')", "main button:text-is('Catalog')"];   // guess: a tab of the Models page
-const SOURCES = /Red Hat AI validated|Other models/;                                                                       // the page's "You should see"
-const VALIDATED = ["button:has-text('Red Hat AI validated')", "[role='tab']:has-text('Red Hat AI validated')",
-                   "[role='option']:has-text('Red Hat AI validated')", "a:has-text('Red Hat AI validated')",
-                   "label:has-text('Red Hat AI validated')"];                                                              // guess
+const SOURCES = /Red Hat AI\s*-\s*validated|Other models/;                                                              // seen, 2026-11-16
+// The source button, inside its toggle group: the banner's "Explore Red Hat AI - validated models" and the link "Show
+// all Red Hat AI - validated models" carry the same words and are not the filter (seen, 2026-11-16).
+const VALIDATED = ["[aria-label='Source label selection'] button:has-text('validated')", "button[id='label-Red Hat AI validated']"];
 // guess. The home page's project cards are `.pf-v6-c-card` too (scout of 2026-11-16): a card is looked for only once
 // the catalog's sources are on screen.
 const CARD = ["main [data-testid*='catalog-card' i] a", "main [data-testid*='model-card' i] a", "main .pf-v6-c-card a", "main .pf-v5-c-card a", "main article a"];
-const DETAIL = ["[data-testid='app-page-title']", "main h1", "h1"];                                                         // guess
+const DETAIL = ["[data-testid='app-page-title']", "main h1", "h1"];                                                         // "main h1" matched, 2026-11-16
+// A card's page draws a spinner first ("Loading...", seen in the scout of 2026-11-16): the card is marked once it is gone.
+const LOADING = "main [role='progressbar']";
 const DIALOG = "[role='dialog'][aria-modal='true'], .pf-v5-c-backdrop, .pf-v6-c-backdrop";                                  // guess: a welcome or a tour
 const DWELL_MS = 2000;   // a presenter's pause on each screen, so that every motion moment has frames to cut
+
+// A card's page, once loaded: its title on screen and no spinner left in it.
+async function cardShown(page, before) {
+  await waitUntil(page, { what: "the model's card", timeoutMs: 60000,
+    done: async () => ((await page.locator("body").innerText()) !== before && (await firstVisible(page, DETAIL))
+                       && !(await page.locator(LOADING).first().isVisible().catch(() => false))) || undefined });
+  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+}
 
 async function noDialog(page, where) {
   if (await page.locator(DIALOG).first().isVisible().catch(() => false)) {
@@ -122,7 +133,8 @@ export async function run({ page, mark, log }) {
   const filter = await firstVisible(page, VALIDATED);
   if (!filter) throw new Error(`the Red Hat AI validated source was not found (${VALIDATED.join(" | ")})`);
   await click(filter, { changes });
-  await waitUntil(page, { what: "the validated models", timeoutMs: 30000, done: async () => (await firstVisible(page, CARD)) || undefined });
+  await waitUntil(page, { what: "the validated models", timeoutMs: 30000,
+    done: async () => ((await filter.getAttribute("aria-pressed").catch(() => null)) !== "false" && (await firstVisible(page, CARD))) || undefined });
   await page.waitForTimeout(DWELL_MS);
   await mark("validated");
 
@@ -130,9 +142,7 @@ export async function run({ page, mark, log }) {
   const name = ((await card.innerText().catch(() => "")) || "").split("\n")[0].trim().slice(0, 80);
   const before = await page.locator("body").innerText();
   await click(card, { changes });
-  await waitUntil(page, { what: "the model's card", timeoutMs: 30000,
-    done: async () => ((await page.locator("body").innerText()) !== before && (await firstVisible(page, DETAIL))) || undefined });
-  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await cardShown(page, before);
   await page.waitForTimeout(DWELL_MS);
   log(`card opened: ${name || "(no title read)"}`);
   await mark("card");
@@ -159,7 +169,7 @@ export async function scout({ page, step, state }) {
     await page.waitForTimeout(DWELL_MS);
     const heading = await firstVisible(page, DETAIL);
     return { url: page.url().replace(/[?#].*/, ""), ...opened, title: heading ? ((await heading.innerText().catch(() => "")) || "").slice(0, 80) : "",
-             tabs: await describe(page, "main [role='tablist']", 20), words: await wordsOnScreen(page, [/Catalog/, /Red Hat AI validated/, /Other models/, /Registry/, /Deployments/]),
+             tabs: await describe(page, "main [role='tablist']", 20), words: await wordsOnScreen(page, [/Catalog/, /Red Hat AI\s*-\s*validated/, /Other models/, /Registry/, /Deployments/]),
              text: (await newText(page, text)).slice(0, 30), controls: await describe(page, "main", 80) };
   });
   const catalog = await step("catalog", async () => {
@@ -169,7 +179,7 @@ export async function scout({ page, step, state }) {
              cards: await page.locator(CARD.join(", ")).count(), filter_selector: filter ? filter.matched : "",
              filter_is: filter ? await filter.evaluate((e) => `${e.tagName.toLowerCase()} role=${e.getAttribute("role") || ""} type=${e.getAttribute("type") || ""}`
                + ` checkbox_inside=${!!e.querySelector("input[type=checkbox], input[type=radio], [role=switch]")}`) : "",
-             words: await wordsOnScreen(page, [/Red Hat AI validated/, /Red Hat AI\b/, /Other models/]),
+             words: await wordsOnScreen(page, [/Red Hat AI\s*-\s*validated/, /Red Hat AI\b/, /Other models/]),
              buttons: await buttons(page, "main"), controls: await describe(page, "main", 80) };
   });
   await step("card", async () => {
@@ -178,8 +188,7 @@ export async function scout({ page, step, state }) {
     if (!card) throw new Error(`no card on screen (${CARD.join(" | ")})`);
     const before = await page.locator("body").innerText();
     await click(card, { changes });
-    await waitUntil(page, { what: "the model's card", timeoutMs: 30000,
-      done: async () => ((await page.locator("body").innerText()) !== before && (await firstVisible(page, DETAIL))) || undefined });
+    await cardShown(page, before);
     return { url: page.url().replace(/[?#].*/, ""), title_selector: ((await firstVisible(page, DETAIL)) || {}).matched || "",
              words: await wordsOnScreen(page, [/Performance/i, /validated/i, /Deploy/, /Register/]), controls: await describe(page, "main", 60) };
   });

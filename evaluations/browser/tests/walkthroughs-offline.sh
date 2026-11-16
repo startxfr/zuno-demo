@@ -295,7 +295,7 @@ n = steps["menu"]
 assert n["link"] == "nav a:text-is(\x27Models\x27)" and n["tab"] == "main [role=\x27tab\x27]:has-text(\x27Catalog\x27)" and n["url"].endswith("/ai-hub/models/catalog"), n
 assert n["title"] == "Models" and n["words"]["Catalog"] and n["controls"], n
 c = steps["catalog"]
-assert c["cards"] == 4 and c["filter_selector"] == "button:has-text(\x27Red Hat AI validated\x27)", c
+assert c["cards"] == 4 and c["filter_selector"] == "[aria-label=\x27Source label selection\x27] button:has-text(\x27validated\x27)", c
 assert c["filter_is"].startswith("button") and "checkbox_inside=false" in c["filter_is"] and all(c["words"].values()), c
 k = steps["card"]
 assert k["url"].endswith("/ai-hub/models/catalog/granite-3.1-8b-instruct") and k["title_selector"] == "[data-testid=\x27app-page-title\x27]" and k["words"]["Deploy"], k

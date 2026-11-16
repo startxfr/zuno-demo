@@ -1,9 +1,11 @@
 // WP-289: a stand-in for the OpenShift sign-in and the OpenShift AI dashboard's model catalog, for the offline test
 // of walkthroughs/model-catalog-registry.mjs (tests/walkthroughs-offline.sh). As the scout of 2026-11-16 saw it: the
 // provider chooser and Keycloak, a home page with project cards, a collapsed "AI hub" menu group holding one link,
-// "Models". Still GUESSED (not reached by the scout): the Models page with tabs, opening on another tab than "Catalog",
-// the catalog with its three sources and their cards, the "Red Hat AI validated" source as a button, and a card's page
-// with a Deploy button. It proves the walkthrough's own logic, not the real selectors.
+// "Models", the Models page with its tabs, the catalog's source buttons in a toggle group "Source label selection"
+// ("Red Hat AI - validated models" among them, after a banner button and a link that carry the same words) and a card's
+// page that shows a spinner before its content. Still GUESSED: the Models page opening on another tab than "Catalog"
+// (live, it opens on Catalog), the cards' markup and the Deploy button. It proves the walkthrough's own logic, not the
+// real selectors.
 // Knobs: FAKE_DIALOG=1 a welcome dialog covers the dashboard; FAKE_CHECKBOX=1 the source filter is a checkbox;
 // FAKE_APPROVE=1 OpenShift asks to authorize access after the sign-in; FAKE_NO_CATALOG=1 the Catalog tab shows no
 // source and no card. /fake/count says how many deployments were
@@ -48,11 +50,18 @@ function tabs(selected) {
     `<a role="tab" aria-selected="${name === selected}" href="${href}">${name}</a>`).join(" ")}</div>`;
 }
 
+// The source buttons as seen live: label -> the source of the models it shows.
+const SOURCE_BUTTONS = [["all", "All models", ""], ["label-Red Hat AI validated", "Red Hat AI - validated models", "Red Hat AI validated"],
+                        ["label-Red Hat AI", "Red Hat AI models", "Red Hat AI"], ["no-labels", "Other models", "Other models"]];
+
 function catalog() {
-  const filter = process.env.FAKE_CHECKBOX === "1"
-    ? `<label><input type="checkbox" id="only"> Red Hat AI validated</label>`
-    : ["Red Hat AI", "Red Hat AI validated", "Other models"].map((s) => `<button class="source">${s}</button>`).join(" ");
-  return shell(`<h1 data-testid="app-page-title">Models</h1>${tabs("Catalog")}<div id="filters">${filter}</div><div id="cards"></div>
+  const filter = SOURCE_BUTTONS.map(([id, label, source]) => process.env.FAKE_CHECKBOX === "1" && source === "Red Hat AI validated"
+    ? `<button id="${id}" aria-pressed="false"><input type="checkbox" id="only"> ${label}</button>`
+    : `<button class="source" id="${id}" data-source="${source}" aria-pressed="${id === "all"}">${label}</button>`).join(" ");
+  return shell(`<h1 data-testid="app-page-title">Models</h1>${tabs("Catalog")}
+<button onclick="location.href='/ai-hub/models/catalog?banner=1'">Explore Red Hat AI - validated models</button>
+<a href="/ai-hub/models/catalog?all=validated">Show all Red Hat AI - validated models</a>
+<div role="group" aria-label="Source label selection" id="filters">${filter}</div><div id="cards"></div>
 <script>
 const MODELS = ${JSON.stringify(MODELS)};
 function show(source) {
@@ -60,7 +69,10 @@ function show(source) {
     '<div class="pf-v6-c-card" data-testid="model-catalog-card"><a href="/ai-hub/models/catalog/' + m.name + '">' + m.name + '</a><p>' + m.source + '</p></div>').join("");
 }
 show("");
-document.querySelectorAll("button.source").forEach((b) => { b.onclick = () => show(b.textContent); });
+document.querySelectorAll("button.source").forEach((b) => { b.onclick = () => {
+  document.querySelectorAll("button.source").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  show(b.dataset.source);
+}; });
 const only = document.getElementById("only");
 if (only) only.onchange = () => show(only.checked ? "Red Hat AI validated" : "");
 </script>`);
@@ -69,9 +81,11 @@ if (only) only.onchange = () => show(only.checked ? "Red Hat AI validated" : "")
 function card(name) {
   const m = MODELS.find((x) => x.name === name);
   if (!m) return null;
-  return shell(`<p><a href="/ai-hub/models/catalog">Catalog</a> / ${m.name}</p><h1 data-testid="app-page-title">${m.name}</h1><p>${m.source}</p>
+  // Like the live page: a spinner first, the card's content 1.5 s later.
+  return shell(`<p><a href="/ai-hub/models/catalog">Model Catalog</a> / ${m.name}</p><div id="detail"><svg role="progressbar" aria-valuetext="Loading..." width="40" height="40"><circle cx="20" cy="20" r="15"/></svg></div>
+<script>setTimeout(() => { document.getElementById("detail").innerHTML = ${JSON.stringify(`<h1 data-testid="app-page-title">${m.name}</h1><p>${m.source}</p>
 <h2>Performance</h2><p>Validated on 1 x H100: 1,200 tokens per second.</p>
-<button onclick="fetch('/api/k8s/apis/serving.kserve.io/v1beta1/namespaces/x/inferenceservices',{method:'POST'})">Deploy</button>`);
+<button onclick="fetch('/api/k8s/apis/serving.kserve.io/v1beta1/namespaces/x/inferenceservices',{method:'POST'})">Deploy</button>`)}; }, 1500);</script>`);
 }
 
 http.createServer((req, res) => {
