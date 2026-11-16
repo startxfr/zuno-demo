@@ -19,6 +19,8 @@ gateway makes that decision is in [Appendix B](#appendix-b---lld).
 **The message:** "Sensitive data stays in the cluster even if the caller says otherwise. When no local model can
 answer, Zuno refuses rather than leaking."
 
+![The 5-minute version of the data sovereignty demo, recorded live in a terminal: the data classes each provider may serve, a real call to Arkos labelled C1 that the gateway raises to C3 and a local model answers, then each agent's classification floor. The provider list and the floors are the files in Git, not the live configuration.](../../../assets/img/demo/ai-gateway-sovereignty.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
