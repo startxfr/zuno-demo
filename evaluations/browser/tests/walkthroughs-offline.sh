@@ -28,6 +28,7 @@ lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
+routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -347,6 +348,39 @@ expect "grafana: a write to Grafana during the take fails it" bash -c "test $rc 
 out="$(evalhub g-star-scout FAKE_STAR=1 RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: in a scout that write is refused before it leaves the browser, and fails the scout" bash -c "test $rc -eq 1 && grep -q '^SCOUT: failed' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+fi
+if wanted ai-gateway-routing; then
+echo "== ai-gateway-routing (two takes of two screens)"
+out="$(routing r-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "routing: a scout of both takes exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "routing: a scout approves, writes and creates nothing" grep -q 'left: {"approved":0,"writes":0}{"chats":0,"toggled":0}' <<<"$out"
+expect "routing: each take's scout.json reports its own screens" python3 - "$work/r-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+chat = {x["step"]: x for x in json.loads((d / "chat" / "scout.json").read_text())["steps"]}
+dash = {x["step"]: x for x in json.loads((d / "dashboard" / "scout.json").read_text())["steps"]}
+assert list(chat) == ["enter", "owned", "picker", "closed"] and chat["picker"]["zuno_code_listed"] is True and chat["picker"]["label"] == "Zuno", chat
+assert list(dash) == ["enter", "owned", "chain", "dashboard", "panel-providers", "closed"], list(dash)
+assert "var-client=open-webui" in dash["dashboard"]["url"] and "from=now-1h" in dash["dashboard"]["url"], dash["dashboard"]
+assert dash["panel-providers"]["names_a_local_model"] is True and dash["panel-providers"]["names_codestral"] is False, dash["panel-providers"]
+assert json.loads((d / "scout.json").read_text())["status"] == "done"
+PY
+out="$(routing r-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "routing: a good run of both takes exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "routing: the chat is gone, nothing written to Grafana" grep -q 'left: {"approved":0,"writes":0}{"chats":0,"toggled":0}' <<<"$out"
+expect "routing: the dashboard take waited for the Codestral row" bash -c "grep -q 'does not name mistral-codestral yet: waiting' <<<\"\$0\" && grep -q 'the panel names mistral-codestral; a local model for open-webui in the hour: local-gpt-oss-maas' <<<\"\$0\"" "$out"
+expect "routing: each take has its own markers and its own motion_from" python3 - "$work/r-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+chat = json.loads((d / "chat" / "markers.json").read_text()); dash = json.loads((d / "dashboard" / "markers.json").read_text())
+assert [x["name"] for x in chat["markers"]] == ["login", "home", "picker", "code-picked", "q-sent", "q-done", "end"] and chat["motion_from"] == "home", chat
+assert [x["name"] for x in dash["markers"]] == ["login", "dashboard", "providers", "end"] and dash["motion_from"] == "dashboard", dash
+assert chat["persona"] == "sale-01" and len(chat["created"]) == 1 and chat["cleaned"] is True and chat["owned"]["same"] is True, chat
+assert dash["persona"] == "ai-ops-01" and dash["created"] == [] and dash["cleaned"] is None and dash["owned"] == {"before": 0, "after": 0, "same": True}, dash
+assert chat["status"] == dash["status"] == "pass" and (d / "dashboard" / "recording.webm").stat().st_size > 0
+PY
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"

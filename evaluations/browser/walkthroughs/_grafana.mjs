@@ -68,9 +68,11 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
   return chain;
 }
 
-// Open a dashboard by its uid, the time range in the address only (nothing is saved): the address reached.
-export async function grafanaDashboard(page, base, uid, { from = "now-6h", to = "now" } = {}) {
-  await page.goto(`${base}/d/${uid}/?orgId=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+// Open a dashboard by its uid, the time range and its variables in the address only (nothing is saved): the address
+// reached.
+export async function grafanaDashboard(page, base, uid, { from = "now-6h", to = "now", vars = {} } = {}) {
+  const chosen = Object.entries(vars).map(([name, value]) => `&var-${encodeURIComponent(name)}=${encodeURIComponent(value)}`).join("");
+  await page.goto(`${base}/d/${uid}/?orgId=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${chosen}`);
   await waitUntil(page, { what: `the dashboard ${uid}`, timeoutMs: 60000, done: async () => (await firstVisible(page, grafana.READY.slice(0, 3))) || undefined });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(1000);

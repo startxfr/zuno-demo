@@ -1,0 +1,26 @@
+---
+# ai-gateway-routing: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE
+# the first take: tune it with `make demo gif ai-gateway-routing` once a take exists.
+# `make demo record ai-gateway-routing` films TWO takes in one run (evaluations/browser/walkthroughs/
+# ai-gateway-routing.mjs): `chat`, sale-01 on Open WebUI, then `dashboard`, ai-ops-01 on Grafana. Every moment names
+# its take.
+# Markers of `chat`: login, home, picker, code-picked, q-sent, q-done, end. Of `dashboard`: login, dashboard,
+# providers, end. The dashboard take waits until its panel names mistral-codestral, up to four minutes: none of that
+# wait is in the cut (stills only on that take).
+# Rows 3:15 and 4:15 are words: the close is a caption on the panel.
+record_notice: >-
+  two recorded browser sessions: sale-01 on Open WebUI asks one Zuno Code question (the answer and the chat title: two
+  Codestral calls on sale-01's budget; the chat it creates is deleted at the end, and the take fails if sale-01's chats
+  differ before and after), then ai-ops-01 on Grafana, read only (sign-in through OpenShift and Keycloak, the
+  dashboard Five experiences over the last hour, nothing saved); traces and metrics of the answer remain, as for any
+  use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {take: chat, still: login, hold: 3, caption: "Sign in with the company account"}
+  - {take: chat, still: picker, hold: 5, step: "0:00", caption: "0:00  Two models: I pick a kind of work, not a provider"}
+  - {take: chat, from: code-picked, to: q-done, fit: 10, hold: 5, step: "0:45", caption: "0:45  A code question goes to a code model"}
+  - {take: dashboard, still: dashboard, hold: 4, caption: "The platform operator's view: who served what"}
+  - {take: dashboard, still: providers, hold: 10, step: "2:00", caption: "2:00  The proof: which provider served Open WebUI"}
+  - {take: dashboard, still: end, hold: 6, step: "4:15", caption: "The platform picks the model for each task"}

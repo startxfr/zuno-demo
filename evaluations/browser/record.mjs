@@ -78,6 +78,8 @@ export function shapeProblems(walk) {
     else {
       for (const t of walk.takes) {
         if (!t || !MARKER_NAME.test(t.name || "") || typeof t.persona !== "string" || !t.persona) problems.push(`take ${JSON.stringify(t)} needs a name and a persona`);
+        else if (t.markers !== undefined && (!Array.isArray(t.markers) || !t.markers.length || t.markers.some((m) => !MARKER_NAME.test(m)) || new Set(t.markers).size !== t.markers.length
+                                             || !t.markers.includes(t.motion_from))) problems.push(`take ${t.name}: its own \`markers\` need unique names and a \`motion_from\` among them`);
       }
       if (new Set(walk.takes.map((t) => t && t.name)).size !== walk.takes.length) problems.push("take names must be unique");
     }
@@ -311,8 +313,9 @@ async function scoutOne(take, out) {
 
 // One take, of one persona, into `out`: its own browser context, video, markers.json and PNGs.
 async function takeOne(take, out) {
+  const wanted = take.markers || walk.markers;   // a take of several may play other screens: its own markers
   const record = { demo: id, kind: "browser", ...(take.name ? { take: take.name } : {}), persona: take.persona, viewport: walk.viewport, started: new Date().toISOString(),
-                   motion_from: walk.motion_from, markers: [], created: [], cleaned: null,
+                   motion_from: take.motion_from || walk.motion_from, markers: [], created: [], cleaned: null,
                    owned: { before: null, after: null, same: null }, status: "fail", detail: "" };
   const browser = await chromium.launch();
   const context = await browser.newContext({
@@ -324,7 +327,7 @@ async function takeOne(take, out) {
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
 
   async function mark(name) {
-    const expected = walk.markers[record.markers.length];
+    const expected = wanted[record.markers.length];
     if (name !== expected) throw new Error(`marker ${name} out of order: ${expected || "no marker"} was expected`);
     const t = Math.round((Date.now() - t0) / 10) / 100;
     await page.screenshot({ path: path.join(out, `${name}.png`) });
@@ -343,7 +346,7 @@ async function takeOne(take, out) {
     ownedBefore = await ownedIds();   // before anything is sent: an unreadable list stops the take for the price of a sign-in
     record.owned.before = ownedBefore.length;
     await walk.run(ctx);
-    const missing = walk.markers.slice(record.markers.length);
+    const missing = wanted.slice(record.markers.length);
     if (missing.length) throw new Error(`markers not reached: ${missing.join(", ")}`);
   } catch (e) {
     failures.push(String(e && e.message ? e.message : e).split("\n")[0].slice(0, 300));
@@ -390,7 +393,9 @@ async function takeOne(take, out) {
   return { code: failures.length ? 1 : 0, line: record.status === "pass" ? "PASS" : `FAIL ${record.detail}` };
 }
 
-// A walkthrough that films several personas exports `takes: [{name, persona}]` (ADR-0618, identity-personas): the
+// A walkthrough that films several personas exports `takes: [{name, persona}]` (an entry may carry its own `markers`
+// and `motion_from` when its take plays other screens than the first)
+//  (ADR-0618, identity-personas): the
 // same phases are played once per entry, each in its own browser context (nothing of one sign-in reaches the next)
 // and its own sub-directory OUT/<name>/, which holds exactly what a single take leaves in OUT. OUT/takes.json lists
 // them ({demo, takes: [{name, persona, dir, status, detail}], status}); a later take is still played when an earlier

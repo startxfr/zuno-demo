@@ -9,6 +9,7 @@
 import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8095);
+let loads = 0;      // loads of the Five experiences dashboard
 let approved = 0;   // "Authorize Access" approved: a take or a scout must leave it at 0
 let writes = 0;     // writes received by Grafana's API: must stay 0 (FAKE_STAR=1 aside, refused in a scout)
 
@@ -66,5 +67,15 @@ http.createServer((req, res) => {
   if (u.pathname.startsWith("/api/") && req.method !== "GET") { writes += 1; return json(200, {}); }
   if (u.pathname === "/") return html(page("Home - Grafana", `<main><h1>Welcome to Grafana</h1><span>ai-ops-01</span></main>`));
   if (u.pathname.startsWith("/d/zuno-trustyai")) return html(DASHBOARD);
+  if (u.pathname.startsWith("/d/zuno-three-experiences")) {
+    // ai-gateway-routing: the Codestral row reaches the panel late, as a real call does: from the second load of the
+    // dashboard on (FAKE_NO_PROOF=1: never).
+    loads += 1;
+    const rows = ["open-webui local-gpt-oss-maas success 1"].concat(loads >= 2 && process.env.FAKE_NO_PROOF !== "1" ? ["open-webui mistral-codestral success 2"] : []);
+    return html(page("Five experiences - Grafana", `<header><h1>Zuno Platform / Five experiences</h1><span>Last 1 hour</span> <span>client ${u.searchParams.get("var-client") || "All"}</span></header>
+<main><div class="react-grid-layout"><div style="height:700px"><h3>Same models, same routing</h3></div>
+<section data-testid="data-testid Panel header Which provider served each experience (over range)" style="border:1px solid #888;padding:8px"><header><h2>Which provider served each experience (over range)</h2></header>
+${rows.map((row) => `<div>${row}</div>`).join("")}</section><div style="height:600px"></div></div></main>`));
+  }
   return json(404, {});
 }).listen(port, "127.0.0.1");
