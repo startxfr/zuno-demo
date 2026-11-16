@@ -19,6 +19,8 @@ their groups. The pods, the objects and the two paths (upload, question) are in 
 **The message:** "A document you upload is answered from a minute later, with its source. It stays yours: neither a
 colleague's assistant nor your team's sees it."
 
+![The 5-minute version of the UnifAI live RAG demo, recorded live as consultant-01: the two uploaded documents indexed, a question answered from the travel policy with its source, and a question the documents do not answer. The list on the left shows the persona's earlier test sessions.](../assets/img/demo/unifai-live-rag.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
