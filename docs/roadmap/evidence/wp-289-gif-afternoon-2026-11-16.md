@@ -267,6 +267,28 @@ The take failed after the Agent turn: the workflow step went to the web-app page
 
 **Not proposed for publication yet**, because of the Zuno Agent finding above. All Dify takes are on hold; the coder is making the guard default-deny (as relayed).
 
+## Take: guardrails (passed, no GIF yet)
+
+Owner's named go in demo333, take at `df554323` (as relayed). Directory `guardrails-20261116-233501`; the writer read it. Both takes are `pass`.
+
+| Item | `agent` take | `dashboard` take |
+|---|---|---|
+| Persona | `consultant-02`, with Dify's administrator account | `ai-ops-01` |
+| Markers | 5: `login`, `agent`, `q-sent`, `q-done`, `end` (40.6 s) | 4: `login`, `dashboard`, `detections`, `end` (37.4 s) |
+| Created and cleaned | One conversation created and deleted | none |
+| Owned before and after | 0 and 0 | 0 and 0 |
+| `private_addresses` | count 0 | count 0 |
+
+As relayed: the DAN sentence was sent once; the model answered "I'm sorry, but I can't comply with that." The writes sent to Dify, in order: `POST` refresh-token (401), `POST` login (200), `POST` `apps/<id>/chat-messages` (200). The declared effect happened: the Zuno Agent's edited date moved again (a fourth move; the writer did not read the date). `markers.json` of the two takes carries no `writes` key; the list comes from the coordinator.
+
+**The count on the panel is not only the take's.** `make demo check guardrails`, which `record` requires, runs the golden-path probe, and the probe sends the same prompt. It ran twice before the take (as relayed): at 22:16 UTC it failed on a page timeout, at 22:34 UTC it passed, and the owner approved the re-run. So the detections on the panel are the probes' plus the take's, and the last step is the take's. The panel frame the writer opened shows the series `dify (detected)` at 1 from about 22:19 and at 2 at its right end, and the writer cannot say from the frame which request made each step.
+
+**Review.** The writer opened 3 of the 9 marker images, and no frames of a GIF: `agent/q-done.png` (the Zuno Agent's Orchestrate page; the DAN sentence; the answer above; the account name in the corner is a single letter; no node name or address), `dashboard/detections.png` (the panel "Guardrails evaluations by experience (over range)", last hour; legend entries `dify (clean)`, `dify (detected)` and the other clients; no node name or address), and `agent/login.png` (the Keycloak sign-in, empty fields). As relayed, demo333 counted 4 of 9 reviewed and a full review was asked.
+
+**No GIF yet.** The first cut was 38.0 s (the answer came in 4.4 s) and `gif.py` refused it. The coordinator's `16eb4a9a` makes it 42.0 s on the take; the re-cut is pending (as relayed). Not published.
+
+**Page.** `guardrails.md` row 0:45 says what was seen on 2026-11-16; row 2:00 says the detection is recorded, not blocked, and that Check has already sent the prompt once, so the count is the probes' plus the live step's.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
