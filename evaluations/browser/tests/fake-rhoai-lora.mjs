@@ -73,7 +73,7 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
   return null;
 }
 
-// MLflow 3.15's own UI as the rescout of 2026-11-16 saw it: a workspace picker, a toggle GenAI | Model training on
+// MLflow 3.15's own UI as the rescouts of 2026-11-16 saw it: a workspace picker, a toggle GenAI | Model training (div role=button aria-pressed) on
 // GenAI, a left menu Home | Experiments; the GenAI Home says "Create your first experiment". The training view's
 // Experiments page lists the experiments of the workspace chosen (zuno-mlops, or "default" with FAKE_MLFLOW_WORKSPACE),
 // in either view; with FAKE_MLFLOW_TRAINING_ONLY=1 only in the training view (a radio: the take's declared switch);
@@ -81,7 +81,7 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
 const MLFLOW_HOME = `<!doctype html><title>MLflow</title><body style="font:16px sans-serif"><header>MLflow
 <button id="ws">Workspace: ${knob("FAKE_MLFLOW_WORKSPACE") ? "default" : "zuno-mlops"}</button>
 <div role="listbox" id="wslist" hidden><div role="option" id="pick">zuno-mlops</div></div>
-<div role="radiogroup"><button role="radio" aria-checked="true" id="genai">GenAI</button><button role="radio" aria-checked="false" id="training">Model training</button></div></header>
+<div><div role="button" aria-pressed="true" id="genai">GenAI</div><div role="button" aria-pressed="false" id="training">Model training</div></div></header>
 <nav><a href="#home" id="home">Home</a> <a href="#experiments" id="exp">Experiments</a> <a href="#prompts">Prompts</a></nav>
 <main id="view"><h2>Home</h2><p>Recent Experiments: Create your first experiment</p><button>Create experiment</button></main>
 <script>
@@ -98,7 +98,7 @@ $("ws").onclick = () => { $("wslist").hidden = false; };
 $("pick").onclick = () => { ws = "zuno-mlops"; $("ws").textContent = "Workspace: zuno-mlops"; $("wslist").hidden = true; render(); };
 $("training").onclick = () => {
   ${knob("FAKE_TOGGLE_WRITE") ? `fetch("/mlflow/ajax-api/2.0/mlflow/users/preferences", { method: "POST", body: "{}" });` : ""}
-  mode = "training"; $("training").setAttribute("aria-checked", "true"); $("genai").setAttribute("aria-checked", "false"); render();
+  mode = "training"; $("training").setAttribute("aria-pressed", "true"); $("genai").setAttribute("aria-pressed", "false"); render();
 };
 $("exp").onclick = (e) => { e.preventDefault(); page = "experiments"; render(); };
 fetch("/mlflow/ajax-api/2.0/mlflow/experiments/search", { method: "POST", body: "{}" });

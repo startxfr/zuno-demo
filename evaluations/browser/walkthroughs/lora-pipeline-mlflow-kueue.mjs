@@ -84,7 +84,8 @@ const LAUNCH_MLFLOW = ["main a:has-text('Launch MLflow')", "a:has-text('Launch M
 // MLflow 3.15's own UI (the rescout of 18:50): a toggle GenAI | Model training, GenAI selected, whose Home said "Create
 // your first experiment"; a left menu Home, Experiments, Prompts. Looked for in MLflow's own frames only (the page,
 // once Launch MLflow is followed, or a frame the dashboard embeds), never in the dashboard's menu.
-const TRAINING_VIEW = ["[role='radio']:has-text('Model training')", "button:has-text('Model training')", "label:has-text('Model training')"];   // guess
+// Seen in the rescout of 2026-11-16 19:54: a <div role="button" aria-pressed="false">Model training</div> beside "GenAI".
+const TRAINING_VIEW = ["[role='button'][aria-pressed]:has-text('Model training')", "[role='radio']:has-text('Model training')", "button:has-text('Model training')"];
 const EXPERIMENTS_LINK = ["nav a:has-text('Experiments')", "a[href*='experiments']:has-text('Experiments')", "a:text-is('Experiments')"];   // guess
 
 // The requests sent so far that `sends` names and that are not a GET: a take fails if there is one.
@@ -293,9 +294,10 @@ const SCREENS = [
         const toggle = !TRAINING_VIEW_DECLARED && await anyFrame(page, TRAINING_VIEW, true);
         const seen = `MLflow's own UI ${onIt ? `in the workspace ${WORKSPACE} ` : ""}lists ${listed.length ? listed.join(", ") : "none"}`
           + `${dashboardList ? `, the dashboard says "No experiments" for ${PROJECT}` : ""} (${how.join(" > ")})`;
+        const view = TRAINING_VIEW_DECLARED ? (toggleSent ? "in MLflow's Model training view too" : "and MLflow's Model training switch was not found") : "";
         throw new Error(toggle
           ? `no experiment ${EXPERIMENT} outside MLflow's "Model training" view, a radio a take switches only as a declared change, the owner's decision: ${seen}`
-          : `no experiment ${EXPERIMENT}: ${seen}; row 2:45 may have nothing to show on this cluster (its fallback: the WP-116 record)`);
+          : `no experiment ${EXPERIMENT} ${view}: ${seen}; row 2:45 may have nothing to show on this cluster (its fallback: the WP-116 record)`);
       }
       await click(picker, { changes });
       workspace = picker.matched;
