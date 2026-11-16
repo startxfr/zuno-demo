@@ -525,6 +525,9 @@ assert list(steps) == ["enter", "owned", "sign-in", "home", "home-shapes", "temp
 assert [c["step"] for c in steps["sign-in"]["chain"]] == ["sso-link", "home"] and steps["owned"]["count"] == 0, steps["sign-in"]
 assert steps["jobs"]["job"] == 102 and steps["jobs"]["jobs"] == {"visible": 2, "by_agent": 1} and steps["jobs"]["filter"].startswith("#filter-input"), steps["jobs"]
 assert steps["templates"]["launch_actions"] > 0 and steps["templates"]["launch_enabled"] == 0, steps["templates"]
+assert steps["templates"]["pager"] == "1 - 10 of 25" and steps["templates"]["words"]["zuno-day3-test"] is False and steps["templates"]["columns_cut"] == [], steps["templates"]
+assert steps["jobs"]["columns_cut"] == ["Started"] and steps["jobs"]["pager"] == "1 - 2 of 2", steps["jobs"]
+assert [v for k, v in steps["job"]["words"].items() if "Success" in k] == [True], steps["job"]
 assert steps["job"]["url"] == "/execution/jobs/playbook/102/details" and steps["project"]["words"]["\\bdevel\\b"] is True, (steps["job"], steps["project"])
 assert all(steps[n]["main"] and steps[n]["nav"] for n in ("templates-shapes", "jobs-shapes", "job-shapes", "project-shapes")), "shapes"
 assert steps["guard"]["refused"] == [] and s["private_addresses"]["flagged"] is False, s
@@ -538,6 +541,8 @@ expect "aap: the markers in order, nothing created, the jobs launched by consult
 assert names == ["login", "home", "templates", "jobs", "job", "project", "end"] and m["motion_from"] == "home" and m["status"] == "pass", m
 assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
 assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+assert m["notes"]["session_refreshes"] >= 1 and m["notes"]["session_refresh_bytes"] == "2" and m["notes"]["session_refresh_keys"] == "none", m.get("notes")
+assert m["notes"]["job"] == 102 and m["notes"]["zuno_mcp_jobs_visible"] == 1, m.get("notes")
 '
 expect "aap: the log names the sign-in chain, the job opened and the project's source" bash -c "grep -q 'sign-in: sso-link a\[href\*=' <<<\"\$0\" && grep -q '\"job\":102' <<<\"\$0\" && grep -q 'project: .*\"open\":\"main a:text-is' <<<\"\$0\"" "$out"
 out="$(aap a-uiauth FAKE_SSO_HIDDEN=1)"; rc=$?

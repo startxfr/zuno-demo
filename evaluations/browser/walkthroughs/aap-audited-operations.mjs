@@ -134,6 +134,26 @@ async function guard(page, base, state) {
   });
 }
 
+// The pager of a list ("1 - 10 of 25"), as AAP draws it: a list may hold more than its first page shows (the rescout
+// of 2026-11-16 saw 10 of the templates, zuno-day3-test not among them).
+async function pager(page) {
+  const text = await page.locator(MAIN).first().innerText().catch(() => "");
+  const found = text.match(/\b\d+\s*-\s*\d+\s+of\s+\d+\b/);
+  return found ? found[0] : "";
+}
+
+// The column headers of the list on screen that the window cuts on the right (the rescout of 2026-11-16: the jobs
+// list's Started column at 1280 px). Reported by name; a caption never names a cut column.
+async function cutColumns(page) {
+  return read(page, (root) => {
+    const scope = document.querySelector(root) || document.body;
+    return [...scope.querySelectorAll("th, [role='columnheader']")].filter((h) => {
+      const r = h.getBoundingClientRect();
+      return r.width > 1 && r.right > innerWidth + 1;
+    }).map((h) => (h.innerText || "").trim().slice(0, 30));
+  }, MAIN).catch(() => []);
+}
+
 // What the session refreshes let through looked like: their count, the sizes of their bodies, their keys' names.
 const sessionSeen = (state) => `${state.session.count} (body bytes ${state.session.bytes.length ? [...new Set(state.session.bytes)].join("/") : "-"}, `
   + `keys ${state.session.keys.length ? state.session.keys.join(", ") : "none"})`;
@@ -275,6 +295,7 @@ const SCREENS = [
     const enabled = [];
     for (let i = 0; i < Math.min(await launch.count(), 40); i += 1) enabled.push(await launch.nth(i).isEnabled().catch(() => false));
     return { how, url: page.url().replace(/[?#].*/, ""), launch_actions: enabled.length, launch_enabled: enabled.filter(Boolean).length,
+             pager: await pager(page), columns_cut: await cutColumns(page),
              words: await wordsOnScreen(page, [/zuno-day0-check/, /zuno-day3-test/, /-workflow\b/]) };
   } },
   { name: "jobs", show: async ({ page, base, state }) => {
@@ -300,7 +321,9 @@ const SCREENS = [
       throw new Error(`${persona} sees no ${TEMPLATE} job launched by ${LAUNCHER} (${TEMPLATE} jobs it sees: ${seen.visible}; by ${LAUNCHER}: ${seen.by_agent}): `
         + "the page's Start asks for one (the delegation scenario with Approve); its fallback is the consultant-02 profile");
     }
-    return { how, filter: filter || `no filter box among ${FILTER.join(" | ")}: the whole list`, url: page.url().replace(/[#].*/, ""), jobs: seen, job: state.job };
+    if (state.notes) Object.assign(state.notes, { job: Number(state.job), zuno_mcp_jobs_visible: Number(seen.by_agent) || 0 });
+    return { how, filter: filter || `no filter box among ${FILTER.join(" | ")}: the whole list`, url: page.url().replace(/[#].*/, ""), jobs: seen, job: state.job,
+             pager: await pager(page), columns_cut: await cutColumns(page) };
   } },
   { name: "job", show: async ({ page, base, state }) => {
     if (!state.job) throw new Error("no job to open (see the jobs screen)");
@@ -321,7 +344,7 @@ const SCREENS = [
         + "not for the GIF (zuno-demo-reorg, 2026-11-16); see the scout's job-shapes");
     }
     return { url: new URL(page.url()).pathname, below_the_window: frame.page,
-             words: await wordsOnScreen(page, [/Launched by/i, /Revision/i, /Successful|Failed|Running/, /Output/]) };
+             words: await wordsOnScreen(page, [/Launched by/i, /Revision/i, /\bSuccess(ful)?\b|\bFailed\b|\bRunning\b/, /Output/]) };
   } },
   { name: "project", show: async ({ page, base }) => {
     const how = await go(page, base, "projects");
@@ -372,6 +395,12 @@ export async function run(ctx) {
   await mark("end");
   disarm(state);
   log(`AAP's session refreshes let through (POST ${SESSION.path}): ${sessionSeen(state)}`);
+  // Kept in markers.json (the recorder's `notes`): the count, the body sizes and the keys' names, never a value.
+  if (state.notes) {
+    Object.assign(state.notes, { session_refreshes: state.session.count,
+                                 session_refresh_bytes: [...new Set(state.session.bytes)].join("/").slice(0, 200) || "-",
+                                 session_refresh_keys: state.session.keys.join(", ").slice(0, 200) || "none" });
+  }
 }
 
 // The same screens as a take, without video. Each screen is a step, then a step `<screen>-shapes` that dumps what is

@@ -28,8 +28,13 @@ let outputs = 0;
 let sessions = 0;
 const SESSION_BODY = process.env.FAKE_SESSION_BODY === "1" ? JSON.stringify({ theme: "dark", expires_in: 1800, padding: "x".repeat(60) }) : "{}";
 
-const TEMPLATES = ["zuno-day0-check", "zuno-day1-build", "zuno-day1-check", "zuno-day1-check-workflow", "zuno-day1-install",
-                   "zuno-day1-install-workflow", "zuno-day1-reconcile", "zuno-day2-check", "zuno-day3-test"];
+// 25 templates, listed by name 10 to a page as AAP did for the rescout of 2026-11-16: zuno-day3-test is not on page 1.
+const TEMPLATES = ["zuno-day0-check", "zuno-day1-build", "zuno-day1-build-workflow", "zuno-day1-check", "zuno-day1-check-workflow",
+                   "zuno-day1-install", "zuno-day1-install-workflow", "zuno-day1-reconcile", "zuno-day1-reconcile-workflow", "zuno-day2-build",
+                   "zuno-day2-build-workflow", "zuno-day2-check", "zuno-day2-check-workflow", "zuno-day2-install", "zuno-day2-install-workflow",
+                   "zuno-day3-backup", "zuno-day3-release", "zuno-day3-restore", "zuno-day3-run", "zuno-day3-scenario-failover-node-inject",
+                   "zuno-day3-scenario-failover-node-restore", "zuno-day3-scenario-failover-node-workflow", "zuno-day3-stresstest", "zuno-day3-test",
+                   "zuno-day1-check-extra"].sort();
 const JOBS = [{ id: 101, name: "zuno-day1-check", by: "admin" }, { id: 102, name: "zuno-day0-check", by: "zuno-mcp" },
               { id: 103, name: "zuno-day0-check", by: "admin" }].filter((j) => !(knob("FAKE_NO_MCP_JOB") && j.by === "zuno-mcp"));
 
@@ -62,15 +67,17 @@ function view(path, query, user) {
   }
   if (path === "/execution/templates") {
     if (knob("FAKE_HANG")) return `<h1>Templates</h1><p>Loading...</p>`;
-    return `<h1>Templates</h1>` + table(TEMPLATES.map((t) => `<tr><td><a href="/execution/templates/job-template/1/details">${t}</a></td>`
-      + `<td><button aria-label="Launch template" disabled>Launch</button></td></tr>`));
+    return `<h1>Templates</h1>` + table(TEMPLATES.slice(0, 10).map((t) => `<tr><td><a href="/execution/templates/job-template/1/details">${t}</a></td>`
+      + `<td><button aria-label="Launch template" disabled>Launch</button></td></tr>`)) + `<p>1 - 10 of ${TEMPLATES.length}</p>`;
   }
   if (path === "/execution/jobs") {
     const name = query.get("name") || "";
     const rows = JOBS.filter((j) => !name || j.name === name).sort((a, b) => b.id - a.id)
-      .map((j) => `<tr><td><a href="/execution/jobs/playbook/${j.id}/output">${j.id} - ${j.name}</a></td><td>Successful</td><td>${j.by}</td></tr>`);
+      .map((j) => `<tr><td><a href="/execution/jobs/playbook/${j.id}/output">${j.id} - ${j.name}</a></td><td>Success</td><td>${j.by}</td><td style="padding-left:900px">2026-11-16</td></tr>`);
     return `<h1>Jobs</h1><input id="filter-input" aria-label="filter"><button aria-label="apply filter"
-onclick="location.href='/execution/jobs?name='+encodeURIComponent(document.getElementById('filter-input').value)">Go</button>` + table(rows);
+onclick="location.href='/execution/jobs?name='+encodeURIComponent(document.getElementById('filter-input').value)">Go</button>`
+      + `<table><thead><tr><th>Name</th><th>Status</th><th>Launched by</th><th style="padding-left:900px">Started</th></tr></thead><tbody>${rows.join("")}</tbody></table>`
+      + `<p>1 - ${rows.length} of ${rows.length}</p>`;
   }
   const job = path.match(/^\/execution\/jobs\/playbook\/(\d+)\/(output|details)$/);
   if (job) {
@@ -83,7 +90,7 @@ onclick="location.href='/execution/jobs?name='+encodeURIComponent(document.getEl
       return `<h1>${found.id} - ${found.name}</h1>${tabs}<pre>TASK [day0 check] ok: [ip-10-1-2-3.ec2.internal]</pre>`;
     }
     const low = `<dt>Execution node</dt><dd>aap-controller-task-0</dd><dt>Instance group</dt><dd>default</dd>`;
-    return `<h1>${found.id} - ${found.name}</h1>${tabs}<dl>${knob("FAKE_DETAILS_LOW") ? low : ""}<dt>Status</dt><dd>Successful</dd><dt>Job template</dt><dd>${found.name}</dd>`
+    return `<h1>${found.id} - ${found.name}</h1>${tabs}<dl>${knob("FAKE_DETAILS_LOW") ? low : ""}<dt>Status</dt><dd>Success</dd><dt>Job template</dt><dd>${found.name}</dd>`
       + `<dt>Launched by</dt><dd>${found.by}</dd><dt>Project</dt><dd>zuno-demo</dd><dt>Revision</dt><dd>0123abcd</dd>`
       + `${knob("FAKE_DETAILS_LOW") ? "" : `<div style="height:1400px"></div>${low}`}</dl>`;
   }
