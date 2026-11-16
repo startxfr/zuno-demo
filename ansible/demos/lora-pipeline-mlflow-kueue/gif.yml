@@ -1,0 +1,24 @@
+---
+# lora-pipeline-mlflow-kueue: the first cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Written
+# BEFORE the first scout and take: tune it with `make demo gif lora-pipeline-mlflow-kueue` once a take exists.
+# `make demo record lora-pipeline-mlflow-kueue` takes the 5-minute version as ai-dev-01 on the OpenShift AI dashboard
+# and MLflow (evaluations/browser/walkthroughs/lora-pipeline-mlflow-kueue.mjs).
+# Markers written by the walkthrough, in order: login, dashboard, pipeline, trainjob, mlflow, end. Every screen is held
+# about 2 s by the walkthrough itself, so each motion moment has frames to cut. The graph is of the version the cluster
+# lists (v0-3-0-tekos on 2026-11-16: the take fails on another one). Row 3:45 (the WP-133 evidence) is not filmed: no
+# caption speaks of the registry or of serving. Rows 0:00 and 4:30 are words.
+record_notice: >-
+  a recorded browser session as ai-dev-01 on the OpenShift AI dashboard and MLflow: the project Zuno MLOps, the graph
+  of the tekos pipeline (version v0-3-0-tekos), the Training jobs page and the MLflow experiment mlops-comage, read
+  only: no run started, nothing created or changed, no prompt, no model call; the sign-in is an OpenShift session of
+  ai-dev-01
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
+  - {still: dashboard, hold: 4, step: "0:00", caption: "0:00  One pipeline adapts a model to one agent"}
+  - {from: dashboard, to: pipeline, fit: 7, hold: 6, step: "0:45", caption: "0:45  Data, training, the agent's own tests, registry"}
+  - {from: pipeline, to: trainjob, fit: 5, hold: 5, step: "1:45", caption: "1:45  Training ran on a GPU node added for the run"}
+  - {from: trainjob, to: mlflow, fit: 5, hold: 6, step: "2:45", caption: "2:45  MLflow records each run and its parameters"}
+  - {still: end, hold: 5, step: "4:30", caption: "A fine-tuned model is a build artefact like any other"}

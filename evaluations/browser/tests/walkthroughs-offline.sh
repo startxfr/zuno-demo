@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations, quotas) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations, quotas, lora-pipeline-mlflow-kueue) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -29,6 +29,7 @@ rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
 aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
 quotas() { take quotas fake-quotas.mjs 8089 "$@" RECORD_BASE_URL_GITHUB=http://127.0.0.1:8088; }
+lora() { take lora-pipeline-mlflow-kueue fake-rhoai-lora.mjs 8087 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
@@ -674,6 +675,42 @@ expect "quotas: a banner over the page on GitHub fails the take: the layout figh
 out="$(quotas q-star FAKE_STAR=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "quotas: a dashboard that writes to Grafana fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /api/user/stars/dashboard/uid/zuno-three-experiences to Grafana' <<<\"\$0\"" "$out"
+fi
+if wanted lora-pipeline-mlflow-kueue; then
+echo "== lora-pipeline-mlflow-kueue"
+out="$(lora l-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a scout exits 0, SCOUT: done, nothing started or changed" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0}' <<<\"\$0\"" "$out"
+expect "lora: the scout dumps the menu's links with their addresses, then plays the three screens" scouted l-scout '
+assert list(steps) == ["enter", "owned", "menu", "pipeline", "pipeline-shapes", "trainjob", "trainjob-shapes", "mlflow", "mlflow-shapes", "closed"], list(steps)
+links = {l["text"]: l["href"] for l in steps["menu"]["links"]}
+assert links.get("Training jobs") == "/develop-train/training-jobs" and links.get("Pipeline definitions") == "/develop-train/pipelines/definitions" and links.get("Projects") == "/projects", links
+assert steps["pipeline"]["version"] == {"v0-3-0-tekos": True, "v0-4-0-tekos": False} and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
+assert steps["trainjob"]["link"] == "nav a:text-is(\x27Training jobs\x27)" and steps["mlflow"]["workspace"] == "none chosen", (steps["trainjob"], steps["mlflow"])
+'
+out="$(lora l-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a good take exits 0, RESULT: PASS, nothing started or changed" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0}' <<<\"\$0\"" "$out"
+expect "lora: the markers in order, nothing created or owned, no node name at a marker" markers l-pass '
+assert names == ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"] and m["motion_from"] == "dashboard" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: MLflow listing the experiment only in its workspace: the workspace zuno-mlops is chosen, the take passes" bash -c "test $rc -eq 0 && grep -q 'mlflow: {\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\"" "$out"
+out="$(lora l-notrain FAKE_NO_TRAINING=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: no Training jobs page in the menu fails the take and names the terminal row" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL no Training jobs page in the menu' <<<\"\$0\"" "$out"
+out="$(lora l-v4 FAKE_VERSION=v0-4-0)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a graph of another version than v0-3-0-tekos fails the take: the page's row names it" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is not of the version v0-3-0-tekos' <<<\"\$0\"" "$out"
+out="$(lora l-write FAKE_WRITE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a page that writes to MLflow fails the take; MLflow's searches (POSTs) do not" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /mlflow/ajax-api/2.0/mlflow/runs/set-tag' <<<\"\$0\"" "$out"
+out="$(lora l-dialog FAKE_DIALOG=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a dialog over the dashboard fails the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL a dialog covers the dashboard' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
