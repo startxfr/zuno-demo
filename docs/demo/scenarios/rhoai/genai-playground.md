@@ -17,6 +17,8 @@ in [Appendix B](#appendix-b---lld).
 **The message:** "Developers and operators try our models, their own documents and our tools in Red Hat's playground.
 The platform still decides which model budget and which tools each person gets."
 
+![The 5-minute version of the GenAI playground demo, recorded live as ai-ops-01 in the OpenShift AI portal: the playground of the Zuno Playground project with its model and subscription, one question answered by the local model with its speed, and the MCP settings where the tool gateway is listed, not connected in this browser. Rows 1:45 and 3:00, the tool call, are not in the recording.](../../../assets/img/demo/genai-playground.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
