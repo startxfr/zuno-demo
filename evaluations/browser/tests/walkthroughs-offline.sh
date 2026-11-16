@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations, quotas) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -28,6 +28,7 @@ lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
 aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
+quotas() { take quotas fake-quotas.mjs 8089 "$@" RECORD_BASE_URL_GITHUB=http://127.0.0.1:8088; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
@@ -53,7 +54,7 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana}.get(s["demo"], [])
+declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -640,6 +641,39 @@ PY
 out="$(guardrails gr-noproof FAKE_NO_PROOF=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -5
 expect "guardrails: without the detection on the panel the dashboard take fails" bash -c "test $rc -eq 1 && grep -q 'dashboard: .*does not name dify (detected) within 4 minutes' <<<\"\$0\"" "$out"
+fi
+if wanted quotas; then
+echo "== quotas"
+out="$(quotas q-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a scout exits 0, SCOUT: done, nothing written to Grafana or GitHub" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"github_writes\":0}' <<<\"\$0\"" "$out"
+expect "quotas: the scout reads the class table and the evidence on GitHub in the window, and panel 7 alone with its columns" scouted q-scout '
+assert list(steps) == ["enter", "owned", "chain", "classes", "classes-shapes", "dashboard", "panel", "evidence", "closed"], list(steps)
+for name in ("classes", "evidence"):
+    assert steps[name]["lead_uncovered"] is True and steps[name]["absent"] == [] and steps[name]["url"].endswith("/blob/devel/docs/demo/scenarios/governance/quotas.md"), steps[name]
+assert steps["panel"]["view"] == "viewPanel=panel-7" and steps["panel"]["no_data"] is False and steps["panel"]["not_in_window"] == [], steps["panel"]
+assert steps["dashboard"]["title_on_screen"] is True and steps["closed"]["writes"] == 0, steps["dashboard"]
+'
+out="$(quotas q-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a good take exits 0, RESULT: PASS, nothing written" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"github_writes\":0}' <<<\"\$0\"" "$out"
+expect "quotas: the markers in order, nothing created or owned, no node name at a marker" markers q-pass '
+assert names == ["login", "classes", "dashboard", "panel", "evidence", "end"] and m["motion_from"] == "classes" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(quotas q-nodata FAKE_NO_DATA=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a panel with No data fails the take and names the page's Start" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*shows \"No data\": no token spend in the last 24 hours' <<<\"\$0\"" "$out"
+out="$(quotas q-down FAKE_GITHUB_DOWN=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: GitHub out of reach fails the take and names option B" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*could not be reached.*fall back to option B' <<<\"\$0\"" "$out"
+out="$(quotas q-banner FAKE_GITHUB_BANNER=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a banner over the page on GitHub fails the take: the layout fights the scroll" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*not wholly inside the window on GitHub.*fall back to option B' <<<\"\$0\" && grep -q 'github_writes\":0' <<<\"\$0\"" "$out"
+out="$(quotas q-star FAKE_STAR=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "quotas: a dashboard that writes to Grafana fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /api/user/stars/dashboard/uid/zuno-three-experiences to Grafana' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
