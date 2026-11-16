@@ -69,7 +69,7 @@ async function ask(ctx, prompt, count, sentMarker, doneMarker) {
 export async function enter(ctx) {
   await unifaiSignIn(ctx, ctx.take.persona);
   // The workspace is chosen here, before owned(): the list a take compares is the team workspace's.
-  const seen = await openSelector(ctx.page, EXPECTED[ctx.take.persona], { changes });
+  const seen = await openSelector(ctx.page, EXPECTED[ctx.take.persona], { changes, state: ctx.state });
   const missing = Object.keys(seen.listed).filter((name) => !seen.listed[name]);
   if (missing.length) throw new Error(`the workspace selector of ${ctx.take.persona} does not list ${missing.join(", ")}: not what the page says`);
   ctx.state.selector = seen;
@@ -85,11 +85,12 @@ export async function owned({ page, state }) {
 
 export async function run(ctx) {
   const { page, mark, log, state, take } = ctx;
-  if (unifai.SESSION_ID.test(page.url())) throw new Error("a session is already open in the hub: the take must create its own");
-  await mark("hub");
+  // The hub opens the workspace's most recent session by itself (somebody else's, scout of 2026-11-16): nothing is
+  // typed there. The take's own session is created first, and the hub is shown with it.
   const id = await newSession(page, state, WORKFLOW, { changes });
   log(`session ${id} created (${WORKFLOW}, workspace ${WORKSPACE})`);
   await page.waitForTimeout(1000);
+  await mark("hub");
   if (take.name === "consultant-02") {
     await ask(ctx, prompts["0:45"], 1, "q1-sent", "q1-done");
     await ask(ctx, prompts["1:45"], 2, "q2-sent", "q2-done");

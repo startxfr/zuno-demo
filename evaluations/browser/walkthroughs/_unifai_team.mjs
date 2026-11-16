@@ -6,8 +6,26 @@
 // seen live: "Team" and the chosen workspace are screen state only (the clicks send nothing, nothing is kept; a page
 // reload returns to Personal, so a take never reloads), the hub is the route of Agentic Chats, its "+" is titled
 // "New session from workflow" and its dialog confirms with "Start Session". Selectors marked `guess` are from that
-// reading.
-import { click, firstVisible, pageApi, read, unifai, waitUntil } from "./_helpers.mjs";
+// reading. Seen live by the scouts of 2026-11-16: the Team switch, the selector and its entries, the hub's "+" and
+// its dialog match; the hub OPENS BY ITSELF the workspace's most recent session (anybody's: on that day one whose
+// workflow no longer validated, with an error toast), and the dialog's rows do carry a Human-in-the-Loop switch (never
+// clicked: the click guard refuses it). So a take creates its own session FIRST and shows the hub only then.
+import { click, firstVisible, pageApi, read, unifai, unifaiDisclosure, waitUntil } from "./_helpers.mjs";
+
+// A click of this module, named: a click that times out says which one it was. Under load (the scout of 2026-11-16,
+// load 6 to 10) UnifAI's "AI Disclosure" notice can come after the sign-in helper stopped waiting for it, and then
+// covers the page: when a click fails and the notice is on screen, it is accepted as usual and the click made again.
+async function press(page, target, what, { changes = [], state = {} } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await click(target, { changes, timeout: 8000 });
+    } catch (error) {
+      const notice = await page.locator(unifai.DIALOG).filter({ hasText: unifai.DISCLOSURE }).first().isVisible().catch(() => false);
+      if (attempt >= 3 || !notice) throw new Error(`the click on ${what} failed (${String(error.message || error).split("\n")[0].slice(0, 120)})${notice ? ", the AI Disclosure notice is still on screen" : ""}`);
+      await unifaiDisclosure(page, state);
+    }
+  }
+}
 
 export const TEAM = ["button:text-is('Team')"];                                                             // guess (Sidebar.tsx)
 export const SELECTOR = ["button:has(svg.lucide-chevron-down)", "button:has-text('Select team')"];          // guess (Sidebar.tsx)
@@ -20,13 +38,13 @@ export const START = "Start Session";                                           
 export const entry = (page, name) => page.locator("button").filter({ hasText: new RegExp(`^\\s*${name}\\s*(\\d+\\s*members?)?\\s*$`) }).first();
 
 // Switch to Team and open the workspace selector: which of the expected workspaces are listed.
-export async function openSelector(page, expected, { changes = [] } = {}) {
+export async function openSelector(page, expected, { changes = [], state = {} } = {}) {
   const team = await firstVisible(page, TEAM);
   if (!team) throw new Error(`the Team switch was not found (${TEAM.join(" | ")})`);
-  await click(team, { changes });
+  await press(page, team, "the Team switch", { changes, state });
   const selector = await waitUntil(page, { what: "the workspace selector", timeoutMs: 20000, done: async () => (await firstVisible(page, SELECTOR)) || undefined });
   await page.waitForTimeout(1200);   // the teams load, the first one is shown on the button
-  await click(selector, { changes });
+  await press(page, selector, "the workspace selector", { changes, state });
   await entry(page, expected[0]).waitFor({ timeout: 20000 }).catch(() => {});
   const listed = {};
   for (const name of expected) listed[name] = await entry(page, name).isVisible().catch(() => false);
@@ -36,12 +54,12 @@ export async function openSelector(page, expected, { changes = [] } = {}) {
 // Choose the workspace and open its Collaboration Hub. The team's id is read from the hub's own request for its
 // sessions (its `teamId`), so the list read later is that workspace's and no other.
 export async function openHub(page, state, workspace, { changes = [] } = {}) {
-  await click(entry(page, workspace), { changes });   // screen state only: no request, nothing kept
+  await press(page, entry(page, workspace), `the workspace ${workspace}`, { changes, state });   // screen state only: no request, nothing kept
   await page.waitForTimeout(800);
   const hub = await firstVisible(page, HUB);
   if (!hub) throw new Error(`the Collaboration Hub link was not found (${HUB.join(" | ")})`);
   const asked = page.waitForRequest((r) => /\/api2\/sessions\/session\.user\.list/.test(r.url()) && Boolean(new URL(r.url()).searchParams.get("teamId")), { timeout: 30000 });
-  await click(hub, { changes });
+  await press(page, hub, "the Collaboration Hub link", { changes, state });
   state.teamId = new URL((await asked).url()).searchParams.get("teamId");
   await waitUntil(page, { what: "the Collaboration Hub", timeoutMs: 30000, done: async () => (await firstVisible(page, ADD)) || undefined });
   await page.waitForTimeout(1000);
@@ -65,7 +83,7 @@ export async function newSession(page, state, workflow, { changes = [] } = {}) {
   if (state.scout) throw new Error("a scout never creates a session");
   const add = await firstVisible(page, ADD);
   if (!add) throw new Error(`the new-session button was not found (${ADD.join(" | ")})`);
-  await click(add, { changes });
+  await press(page, add, "the new-session button", { changes, state });
   const dialog = page.locator(unifai.DIALOG).filter({ hasText: START }).first();
   await dialog.waitFor({ timeout: 15000 });
   const search = await firstVisible(page, unifai.SEARCH);
@@ -84,7 +102,10 @@ export async function newSession(page, state, workflow, { changes = [] } = {}) {
   state.sessionId = String(id);
   state.created.push({ kind: "session", id: state.sessionId });
   await dialog.waitFor({ state: "hidden", timeout: 15000 });
-  await waitUntil(page, { what: "the chat input", timeoutMs: 30000, done: async () => (await firstVisible(page, unifai.INPUT)) || undefined });
+  await waitUntil(page, { what: "the take's own session in the hub", timeoutMs: 30000,
+    done: async () => ((page.url().match(unifai.SESSION_ID) || [])[1] === state.sessionId && (await firstVisible(page, unifai.INPUT))) || undefined });
+  // The session the hub had opened by itself may have left an error toast: it must be gone before a picture.
+  await page.getByText(/Validation Error|Request failed/).first().waitFor({ state: "hidden", timeout: 12000 }).catch(() => {});
   return state.sessionId;
 }
 

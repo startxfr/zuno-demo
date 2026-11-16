@@ -18,8 +18,9 @@ const page = (title, body) => `<!doctype html><title>${title}</title><body style
 const PROXY = page("Log In", `<form action="/oauth/start"><button>Log in with OpenShift</button></form>`);
 const CHOOSER = page("Log in", `<h1>Log in with...</h1><a class="idp" title="Log in with openshift" href="/kc">openshift</a>`);
 const LOGIN = page("Sign in", `<form method="get" action="/cb"><input id="username" name="u"><input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`);
-const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account tempo-tempo-jaegerui in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
-<form action="/approve"><label><input type="checkbox" checked value="user:info"> user:info</label><input type="submit" name="approve" value="Allow selected permissions"></form>`);
+const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account tempo-tempo in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
+<form action="/approve"><label><input type="checkbox" checked value="user:info"> user:info</label><label><input type="checkbox" checked value="user:check-access"> user:check-access</label>
+<input type="submit" name="approve" value="Allow selected permissions"> <input type="submit" name="deny" value="Deny"></form>`);   // as seen live on 2026-11-16
 const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [["zuno.persona", "consultant-02"], ["zuno.client", "unifai"], ["zuno.agent", "tekos"], ["zuno.task", "answer-technical-question"],
   ["zuno.classification", "C2"], ["zuno.model_kind", "local"], ["zuno.provider", "local-gpt-oss-maas"], ["zuno.model", "gpt-oss-20b"], ["zuno.latency_ms", "912"],
   ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"]];

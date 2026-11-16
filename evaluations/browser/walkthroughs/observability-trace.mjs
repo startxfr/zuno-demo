@@ -42,6 +42,12 @@ export const prompts = { "0:45": "In one short sentence, say what you can help m
 export const url = unifai.url;
 export const sends = unifai.sends;
 
+// OpenShift's "Authorize Access" page of the Tempo UI's own proxy, as the scout of 2026-11-16 met it: service account
+// tempo-tempo of zuno-monitoring, for ai-ops-01, user:info and user:check-access. The sign-in approves it ONLY when
+// `changes` lists this sentence, and it does not: that is the owner's decision, not taken yet. Until then the take
+// and the scout stop on that page.
+const TEMPO_AUTHORIZE = { persona: "ai-ops-01", client: ["tempo-tempo", "zuno-monitoring"],
+  change: "approves OpenShift's Authorize Access page for the Tempo search UI's proxy as ai-ops-01 (user:info and user:check-access), which stores one OAuth authorization for ai-ops-01 on the cluster" };
 const WORKSPACE = "agent-tekos";
 const WORKFLOW = "tekos";
 const TEAMS = ["agent-arkos", "agent-tekos", "consultant"];   // consultant-02's workspaces (the unifai-agents page)
@@ -67,11 +73,11 @@ export async function enter(ctx) {
     state.writes = [];
     // Read only: any request to the Tempo UI that is not a GET is kept, and fails the take.
     page.on("request", (r) => { if (r.url().startsWith(tempo(domain)) && !["GET", "HEAD", "OPTIONS"].includes(r.method())) state.writes.push(`${r.method()} ${new URL(r.url()).pathname}`); });
-    await proxySignIn({ ...ctx, base: tempo(domain) }, take.persona, { changes, what: "the Tempo search UI", ready: READY });
+    await proxySignIn({ ...ctx, base: tempo(domain) }, take.persona, { changes, what: "the Tempo search UI", ready: READY, authorize: TEMPO_AUTHORIZE });
     return;
   }
   await unifaiSignIn(ctx, take.persona);
-  const seen = await openSelector(page, TEAMS, { changes });
+  const seen = await openSelector(page, TEAMS, { changes, state });
   if (!seen.listed[WORKSPACE]) throw new Error(`the workspace selector of ${take.persona} does not list ${WORKSPACE}`);
   state.selector = seen;
   if (state.scout) return;
@@ -84,11 +90,11 @@ export async function owned({ page, state, take }) {
 }
 
 async function runChat({ page, mark, log, state }) {
-  if (unifai.SESSION_ID.test(page.url())) throw new Error("a session is already open in the hub: the take must create its own");
-  await mark("hub");
+  // The hub opens the workspace's most recent session by itself: the take's own is created first, then shown.
   const id = await newSession(page, state, WORKFLOW, { changes });
   log(`session ${id} created (${WORKFLOW}, workspace ${WORKSPACE})`);
   await page.waitForTimeout(1000);
+  await mark("hub");
   await unifaiAsk(page, prompts["0:45"], state);
   const shown = await waitUntil(page, { what: "the question in the thread", timeoutMs: 20000, done: async () => (await page.getByText(prompts["0:45"], { exact: true }).count()) > 0 || undefined }).catch(() => false);
   if (!shown) throw new Error("the question was typed but does not show in the thread: it was not sent");

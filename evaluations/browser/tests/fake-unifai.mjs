@@ -93,7 +93,18 @@ function route() {
 }
 route();
 // The sidebar's links do not reload the page (a single-page application): the chosen team survives them.
-for (const a of document.querySelectorAll("nav a")) a.onclick = (e) => { e.preventDefault(); history.pushState(null, "", a.getAttribute("href")); sid = ""; $("messages").innerHTML = ""; show.sig = ""; route(); };
+for (const a of document.querySelectorAll("nav a")) a.onclick = async (e) => {
+  e.preventDefault(); history.pushState(null, "", a.getAttribute("href")); sid = ""; $("messages").innerHTML = ""; show.sig = ""; route();
+  // As UnifAI on 2026-11-16: the Collaboration Hub opens the workspace's most recent session by itself, here one
+  // whose workflow no longer validates, with an error toast for a few seconds.
+  if (team && a.getAttribute("href") === "/agentic-chats") {
+    const list = await (await fetch("/api2/sessions/session.user.list?limit=100&offset=0&userId=team-" + team + "&teamId=team-" + team)).json();
+    if (!list.sessions.length) return;
+    sid = list.sessions[0].session_id; history.replaceState(null, "", "/agentic-chats/" + sid);
+    const toast = document.createElement("div"); toast.textContent = "Validation Error: Failed to validate the workflow. Please try again."; toast.style.cssText = "position:fixed;right:8px;bottom:8px;background:#fdd;padding:8px";
+    document.body.appendChild(toast); setTimeout(() => toast.remove(), 3000);
+  }
+};
 function flows() {
   $("flows").innerHTML = "";
   for (const name of (team ? ["tekos", "arkos"] : PERSONAL_FLOWS).filter((f) => f.includes($("search").value))) {
@@ -101,7 +112,7 @@ function flows() {
     const label = document.createElement("span"); label.textContent = name; label.onclick = () => { picked = name; };
     const hitl = document.createElement("button"); hitl.setAttribute("role", "switch"); hitl.setAttribute("aria-checked", "false");
     hitl.style.cssText = "width:30px;height:16px"; hitl.onclick = () => fetch("/fake/touched", { method: "POST" });
-    row.append(label); if (!team) row.append(hitl);   // no Human-in-the-Loop switch in the team dialog (SessionModals.tsx)
+    row.append(label, hitl);   // the team dialog carries the switch too (scout of 2026-11-16)
     $("flows").appendChild(row);
   }
 }

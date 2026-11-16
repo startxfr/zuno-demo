@@ -738,8 +738,8 @@ for name, teams in (("consultant-02", ["agent-arkos", "agent-tekos", "consultant
     s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
     assert list(steps) == ["enter", "owned", "selector", "hub", "workflows", "closed"] and all(x["ok"] for x in s["steps"]), s
     assert steps["selector"]["listed"] == {t: True for t in teams}, steps["selector"]
-    assert steps["hub"]["team_id_read"] is True and steps["hub"]["sessions"] == 1 and steps["hub"]["session_open"] is False and steps["hub"]["add_selector"], steps["hub"]
-    assert steps["workflows"] == {**steps["workflows"], "workflow_exact_matches": 1, "start_button": 1, "switches": 0}, steps["workflows"]
+    assert steps["hub"]["team_id_read"] is True and steps["hub"]["sessions"] == 1 and steps["hub"]["session_open"] is True and steps["hub"]["add_selector"], steps["hub"]
+    assert steps["workflows"] == {**steps["workflows"], "workflow_exact_matches": 1, "start_button": 1, "switches": 1}, steps["workflows"]
     assert "Earlier" not in json.dumps(s) and s["changes"] == [], s["changes"]
 PY
 out="$(agents a-pass)"; rc=$?
