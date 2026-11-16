@@ -17,6 +17,12 @@
 // run() therefore refuses to start (`DELETE`: how a session is deleted, unknown) until a scout has shown the session
 // list's controls and the owner has decided. scout() does everything up to the connected Control UI and describes
 // it; it sends nothing, opens no session, and stores no session title.
+//
+// Seen by the scout of 2026-11-16: the Control UI at /chat, connected; "New session", a select "Filter sessions by
+// agent", and for each of the six earlier sessions "Pin session" and "Open session menu"; a textarea; "Collapse
+// sidebar" (the sidebar lists the earlier sessions' titles: a take hides it or the owner accepts them). Connect
+// writes one key to the browser's storage, openclaw-device-identity-v1: the browser of a take is new each time, so
+// each take is a new device to the gateway; whether the gateway keeps a record of it is not known from here.
 import { click, describe, firstVisible, newText, read, settled, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
 export const persona = "consultant-02";
@@ -37,8 +43,9 @@ export const sends = /\/api\/[^?]*(sessions?|messages?|chat)\b/i;
 const DELETE = null;
 const UI_PASSWORD = ["input[placeholder='optional' i]"];                                  // seen by the browser check (run.mjs)
 const CONNECT = ["button:has-text('Connect')"];                                           // seen by the browser check
-const NEW_SESSION = ["button:has-text('New session')", "a:has-text('New session')", "button:has-text('Nouvelle session')"];   // guess (the page's row 0:00)
-const INPUT = ["textarea", "[contenteditable='true']"];                                   // guess
+const NEW_SESSION = ["button:has-text('New session')", "a:has-text('New session')", "button:has-text('Nouvelle session')"];   // the first seen live, 2026-11-16
+const INPUT = ["textarea", "[contenteditable='true']"];                                   // "textarea" seen live, 2026-11-16
+const SESSION_MENU = ["button[aria-label='Open session menu']", "button[title='Open session menu']"];   // seen live, 2026-11-16
 const TOOL = /Confluence-page-search/i;                                                   // the page's row 0:45
 const ANSWER_TIMEOUT_MS = 240000;
 
@@ -114,6 +121,28 @@ export async function scout({ page, base, step, state }) {
     return { controls: seen.map((el) => ({ tag: el.tag, role: el.role, label: el.attrs["aria-label"] || el.attrs.title || "", placeholder: el.attrs.placeholder || "" }))
                            .filter((el) => el.label || el.placeholder || el.role).slice(0, 60),
              delete_like: seen.filter((el) => /delete|remove|trash|supprim/i.test(`${el.attrs["aria-label"] || ""} ${el.attrs.title || ""}`)).length };
+  });
+  // ONE session menu is opened, its entries read by their label, and it is closed with Escape: nothing is chosen.
+  // Opening a menu is not a setting. This is what tells whether a session can be deleted from the Control UI.
+  await step("session-menu", async () => {
+    const menus = page.locator(SESSION_MENU.join(", "));
+    const count = await menus.count();
+    if (!count) return { menus: 0 };
+    const before = await describe(page, "body", 200);
+    await menus.first().click({ timeout: 10000 });   // a menu button (it may carry aria-haspopup, never a switch)
+    await page.waitForTimeout(800);
+    const items = page.locator("[role='menuitem'], [role='menu'] button, [role='menu'] a, [role='menu'] li");
+    const labels = [];
+    for (let i = 0; i < Math.min(await items.count(), 15); i += 1) {
+      if (await items.nth(i).isVisible().catch(() => false)) labels.push(((await items.nth(i).innerText().catch(() => "")) || (await items.nth(i).getAttribute("aria-label")) || "").trim().replace(/\s+/g, " ").slice(0, 40));
+    }
+    const opened = (await describe(page, "body", 200)).length - before.length;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    const still = await page.locator("[role='menu']").first().isVisible().catch(() => false);
+    if (still) { await page.mouse.click(640, 400); await page.waitForTimeout(400); }   // a click on the empty middle of the page closes it
+    return { menus: count, entries: labels, delete_like: labels.filter((l) => /delete|remove|supprim|trash|archive/i.test(l)), controls_added_by_the_menu: opened,
+             closed: !(await page.locator("[role='menu']").first().isVisible().catch(() => false)) };
   });
   await step("composer", async () => {
     const input = await firstVisible(page, INPUT);

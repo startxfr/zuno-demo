@@ -918,10 +918,11 @@ out="$(claw c-scout RECORD_SCOUT=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "openclaw: a scout exits 0, SCOUT: done, and sends nothing" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"sent\":0}' <<<\"\$0\"" "$out"
 expect "openclaw: scout.json describes the connected Control UI and keeps no session title" scouted c-scout '
-assert list(steps) == ["enter", "owned", "control-ui", "controls", "composer", "closed"], list(steps)
+assert list(steps) == ["enter", "owned", "control-ui", "controls", "session-menu", "composer", "closed"], list(steps)
+assert steps["session-menu"] == {**steps["session-menu"], "menus": 1, "entries": ["Rename", "Delete"], "delete_like": ["Delete"], "closed": True}, steps["session-menu"]
 ui = steps["control-ui"]
 assert ui["on_its_own_address"] is True and ui["password_field_still_on_screen"] is False and ui["new_session_selector"] and ui["storage_added"] == ["local:openclaw.control.settings"], ui
-assert steps["composer"]["selector"] == "textarea" and any(c["label"] == "Session menu" for c in steps["controls"]["controls"]), steps["controls"]
+assert steps["composer"]["selector"] == "textarea" and any(c["label"] == "Open session menu" for c in steps["controls"]["controls"]), steps["controls"]
 assert "FAKE-EARLIER-SESSION-TITLE" not in json.dumps(s)
 '
 expect "openclaw: the password typed in the plain field was masked in the scout's pictures' page (no file holds it)" bash -c "! grep -r -l offline-claw-secret '$work/c-scout' >/dev/null"
