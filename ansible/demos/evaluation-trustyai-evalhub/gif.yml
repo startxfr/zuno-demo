@@ -12,7 +12,8 @@ record_notice: >-
   no prompt, no model call, no evaluation started, nothing created, nothing saved or starred in Grafana; the sign-in
   is the only trace (an OpenShift and a Grafana session of ai-ops-01) and, if OpenShift shows its Authorize Access
   page for Grafana's proxy, the take approves it (user:info and user:check-access): one OAuth authorization of
-  ai-ops-01 stays on the cluster
+  ai-ops-01 stays on the cluster; Grafana's product announcement, if it shows, is closed by its cross, which stores
+  in Grafana's user storage of ai-ops-01 that the notice was seen
 target_seconds: [40, 60]
 width: 960
 fps: 10

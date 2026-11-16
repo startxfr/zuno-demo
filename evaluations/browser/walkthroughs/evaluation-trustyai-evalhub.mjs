@@ -26,7 +26,8 @@ export const markers = ["login", "dashboard", "jobs", "ragas", "garak", "end"];
 export const motion_from = "dashboard";
 // The one declared change (the owner's decision of 2026-11-16): OpenShift's "Authorize Access" page for Grafana's proxy,
 // approved for ai-ops-01 if it shows (the first time that persona comes through the proxy). Nothing else is changed.
-export const changes = [grafana.AUTHORIZE_CHANGE];
+// And Grafana's product announcement, closed by its cross (the owner's decision of 2026-11-16, 11:25).
+export const changes = [grafana.AUTHORIZE_CHANGE, grafana.NEWS_CHANGE];
 export const prompts = {};
 export const url = grafana.url;
 export const sends = grafana.writes;

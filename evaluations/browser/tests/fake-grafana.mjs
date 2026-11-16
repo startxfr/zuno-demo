@@ -11,11 +11,13 @@ import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8095);
 let loads = 0;      // loads of the Five experiences dashboard
+let stored = 0;     // entries written to Grafana's user storage (FAKE_NEWS=storage: the close of the announcement)
 let approved = 0;   // "Authorize Access" approved: a take or a scout must leave it at 0
 let writes = 0;     // writes received by Grafana's API: must stay 0 (FAKE_STAR=1 aside, refused in a scout)
 
 // FAKE_NEWS=1: Grafana's announcement covers every signed-in page a moment after it loads, until it is closed (kept in
-// the browser); FAKE_NEWS=server: closing it also saves a preference on the server; FAKE_NEWS=other: another dialog.
+// the browser); FAKE_NEWS=server: closing it also saves a preference on the server; FAKE_NEWS=storage: closing it
+// writes one entry to Grafana's user storage, as Grafana did on 2026-11-16; FAKE_NEWS=other: another dialog.
 const NEWS = !process.env.FAKE_NEWS ? "" : `<div role="dialog" id="news" hidden style="position:fixed;top:80px;left:200px;width:800px;height:500px;background:#223;color:#fff;z-index:9">
 <button aria-label="Close" id="news-close">x</button><span>${process.env.FAKE_NEWS === "other" ? "Your session is about to expire" : "NEW</span><h2>Grafana Assistant is now available to OSS users</h2><span>1/4"}</span></div>
 <script>
@@ -23,6 +25,7 @@ setTimeout(() => { if (!localStorage.getItem("grafana.whatsnew.dismissed")) docu
 document.getElementById("news-close").onclick = () => {
   localStorage.setItem("grafana.whatsnew.dismissed", "1");
   if (${process.env.FAKE_NEWS === "server"}) fetch("/api/user/preferences", { method: "PATCH", body: "{}" });
+  if (${process.env.FAKE_NEWS === "storage"}) fetch("/apis/userstorage.grafana.app/v0alpha1/namespaces/default/user-storage/", { method: "POST", body: JSON.stringify({ metadata: { name: "grafana-whatsnew:1" }, spec: { data: { dismissed: "seen-1" } } }) });
   document.getElementById("news").hidden = true;
 };
 </script>`;
@@ -74,7 +77,8 @@ http.createServer((req, res) => {
   const html = (body) => { res.writeHead(200, { "Content-Type": "text/html" }); res.end(body); };
   const json = (code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
   const to = (location, cookie) => { res.writeHead(302, { Location: location, ...(cookie ? { "Set-Cookie": cookie } : {}) }); res.end(); };
-  if (u.pathname === "/fake/count") return json(200, { approved, writes });
+  if (u.pathname === "/fake/count") return json(200, { approved, writes, ...(stored ? { stored } : {}) });
+  if (u.pathname.startsWith("/apis/userstorage.grafana.app/") && req.method === "POST" && signed) { stored += 1; return json(201, {}); }
   if (u.pathname === "/oauth/start") return html(CHOOSER);
   if (u.pathname === "/kc") return html(LOGIN);
   if (u.pathname === "/cb") return process.env.FAKE_AUTHORIZE ? html(AUTHORIZE) : to("/", "s=1; Path=/");

@@ -48,8 +48,9 @@ import json, pathlib, sys
 d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
-declared = {"kagent": "clicks Skip wizard", "evaluation-trustyai-evalhub": "approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "ai-gateway-routing": "approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01"}
-assert len(s["changes"]) == (1 if s["demo"] in declared else 0) and all(c.startswith(declared[s["demo"]]) for c in s["changes"]), s["changes"]
+grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
+declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana}.get(s["demo"], [])
+assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
 }
@@ -388,12 +389,21 @@ out="$(evalhub g-news-scout FAKE_NEWS=1 RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: a scout reports the announcement, how it was closed and what the close stored" scouted g-news-scout '
 n = steps["dashboard"]["news"]
-assert n == {"shown": 1, "closed_by": "[role=\x27dialog\x27] button[aria-label=\x27Close\x27]", "refused": [], "storage_added": ["local:grafana.whatsnew.dismissed"]}, n
+assert n == {"shown": 1, "closed_by": "[role=\x27dialog\x27] button[aria-label=\x27Close\x27]", "refused": [], "allowed": [], "storage_added": ["local:grafana.whatsnew.dismissed"], "declared": True}, n
 assert steps["dashboard"]["dialog_on_screen"] is False
 '
 out="$(evalhub g-news-server FAKE_NEWS=server)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: a close that wants to save a preference is refused in the browser and stops the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL closing Grafana.s announcement wanted to send PATCH /api/user/preferences to Grafana: refused before it left the browser' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-news-stored FAKE_NEWS=storage RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: the one declared write of the close (Grafana's user storage) is let through, once, and reported by its keys" scouted g-news-stored '
+n = steps["dashboard"]["news"]
+assert n["refused"] == [] and n["shown"] == 1 and len(n["allowed"]) == 1, n
+assert n["allowed"][0]["request"] == "POST /apis/userstorage.grafana.app/v0alpha1/namespaces/default/user-storage/" and n["allowed"][0]["keys"] == ["metadata", "spec", "spec.data"] and n["allowed"][0]["bytes"] > 0, n
+assert "seen-1" not in json.dumps(s)
+'
+expect "grafana: that write reached Grafana's user storage, and nothing else was written" grep -q 'left: {"approved":0,"writes":0,"stored":1}' <<<"$out"
 out="$(evalhub g-news-other FAKE_NEWS=other)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: another dialog stops the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL a dialog covers Grafana and it is not its product announcement (\"xYour session is about to expire\")' <<<\"\$0\"" "$out"

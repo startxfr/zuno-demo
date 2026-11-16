@@ -32,7 +32,8 @@ export const markers = takes[0].markers;
 export const motion_from = takes[0].motion_from;
 // The one declared change (the owner's decision of 2026-11-16): OpenShift's "Authorize Access" page for Grafana's proxy,
 // approved for ai-ops-01 if it shows (the first time that persona comes through the proxy). Nothing else is changed.
-export const changes = [grafana.AUTHORIZE_CHANGE];
+// And Grafana's product announcement, closed by its cross (the owner's decision of 2026-11-16, 11:25).
+export const changes = [grafana.AUTHORIZE_CHANGE, grafana.NEWS_CHANGE];
 export const prompts = { "0:45": "write Python code that checks the format of an email address" };
 export const url = owui.url;
 // A scout refuses a chat message to Open WebUI and any write to Grafana.

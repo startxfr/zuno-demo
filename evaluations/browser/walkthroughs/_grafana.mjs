@@ -30,6 +30,13 @@ export const grafana = {
   AUTHORIZE: /Authorize Access/i,                                                                                             // seen live 2026-11-16
   // The declared change a walkthrough lists in `changes` to let the sign-in approve that page (the owner's decision).
   AUTHORIZE_CHANGE: "approves OpenShift's Authorize Access page for Grafana's proxy as ai-ops-01 (user:info and user:check-access), which stores one OAuth authorization for ai-ops-01 on the cluster",
+  // The second declared change (the owner's decision of 2026-11-16, 11:25): Grafana's product announcement is closed by
+  // its cross, which may store a per-user "seen" flag. Declared by the walkthroughs; grafanaNews() still refuses any
+  // other write to Grafana while it closes. The scout of 2026-11-16 showed the one request of the close: a POST to
+  // Grafana's user storage (NEWS_WRITE); the owner then confirmed it. It is let through only when the walkthrough
+  // declares the change; its body is reported by its size and the names of its keys, never its values.
+  NEWS_CHANGE: "closes Grafana's product announcement by its cross, which stores in Grafana's user storage of ai-ops-01 that the notice was seen",
+  NEWS_WRITE: { method: "POST", path: /^\/apis\/userstorage\.grafana\.app\/[^/]+\/namespaces\/[^/]+\/user-storage\/?$/ },
   AUTHORIZE_PERSONA: "ai-ops-01",
   AUTHORIZE_CLIENT: ["grafana-oauth-proxy", "zuno-monitoring"],
   AUTHORIZE_SCOPES: ["user:info", "user:check-access"],
@@ -44,12 +51,13 @@ export const grafana = {
 // Grafana's own announcement ("NEW  Grafana Assistant is now available to OSS users", 1/4, seen live on 2026-11-16
 // over the home page AND over the dashboard): a take would film it over the panels. It is closed by its own close
 // button (or Escape), and the close is MEASURED the way the other first-screen notices are: while it is closed, every
-// request to Grafana that is not a GET and not a query is refused before it leaves the browser and kept by its path,
+// request to Grafana that is not a GET and not a query (and not the one declared write, grafana.NEWS_WRITE) is
+// refused before it leaves the browser and kept by its path,
 // and the browser-storage keys it adds are kept by name. A close that only writes to the browser is fine (nothing on
 // the server, nothing of the persona's settings). A close that wants to write to Grafana stops the take: nothing was
 // written, and whether a take may save that for the persona is the owner's decision. Any OTHER dialog stops the take.
 const seenNews = new WeakMap();   // page -> {shown, closed_by, refused: [], storage_added: []}
-export const grafanaNewsSeen = (page) => seenNews.get(page) || { shown: 0, closed_by: "", refused: [], storage_added: [] };
+export const grafanaNewsSeen = (page) => seenNews.get(page) || { shown: 0, closed_by: "", refused: [], allowed: [], storage_added: [], declared: false };
 const NEWS = { DIALOG: "[role='dialog']", IS: /Grafana Assistant|is now available to|What's new in Grafana/i, // seen live: "NEW", "Grafana Assistant is now available to OSS users"
                CLOSE: ["[role='dialog'] button[aria-label='Close']", "[role='dialog'] button[aria-label*='close' i]", "[role='dialog'] button[data-testid*='close' i]"] };   // guess
 const QUIET = /\/api\/(ds\/query|frontend-metrics|live\/)|\/log-grafana-javascript-agent|\/api\/frontend\/assets/;   // reads and telemetry: let through, not state
@@ -68,7 +76,15 @@ export async function grafanaNews(page, { watchMs = 3000 } = {}) {
     const refused = [];
     const guard = (route) => {
       const r = route.request();
-      if (r.method() === "GET" || QUIET.test(new URL(r.url()).pathname)) return route.continue();
+      const path = new URL(r.url()).pathname;
+      if (r.method() === "GET" || QUIET.test(path)) return route.continue();
+      if (seen.declared && r.method() === grafana.NEWS_WRITE.method && grafana.NEWS_WRITE.path.test(path)) {
+        let body = null;
+        try { body = r.postDataJSON(); } catch { /* not JSON */ }
+        const keys = body && typeof body === "object" ? Object.keys(body).flatMap((k) => [k, ...(body[k] && typeof body[k] === "object" && !Array.isArray(body[k]) ? Object.keys(body[k]).map((inner) => `${k}.${inner}`) : [])]) : [];
+        seen.allowed.push({ request: `${r.method()} ${path}`, bytes: (r.postData() || "").length, keys: keys.filter((k) => !/^metadata\./.test(k)).slice(0, 20) });
+        return route.continue();
+      }
       refused.push(`${r.method()} ${new URL(r.url()).pathname}`);
       return route.abort();
     };
@@ -154,6 +170,8 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
     if (landed === "authorize") throw stop("the page came back after it was approved once");
   }
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  // Whether the walkthrough declared the close of the announcement decides whether its one write is let through.
+  seenNews.set(page, { ...grafanaNewsSeen(page), declared: changes.includes(grafana.NEWS_CHANGE) });
   state.grafana.news = await grafanaNews(page);
   return chain;
 }
