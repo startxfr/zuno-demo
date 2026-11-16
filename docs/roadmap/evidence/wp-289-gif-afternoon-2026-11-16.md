@@ -12,14 +12,16 @@ says what the frame holds ("seven real Confluence onboarding pages, role titles"
 
 | Demo | Take directory | GIF bytes | Seconds | Moments | Published in | Reviews |
 |---|---|---|---|---|---|---|
-| `mcp-tools-by-group` (re-take, row 1:30 in full) | `mcp-tools-by-group-20261116-133009` | 1 996 199 | 53.0 | 7 | recorded, awaiting the owner's go, replaces `c1230da7` | recording session: N = 54, as relayed; writer: 2 of 18 images opened |
+| `mcp-tools-by-group` (re-take, row 1:30 in full) | `mcp-tools-by-group-20261116-133009` | 1 996 199 | 53.0 | 7 | `a9186a2c` (replaces `c1230da7`) | recording session: N = 54, as relayed; writer: 2 of 18 images opened |
 
 ## Per demo
 
-### `mcp-tools-by-group` re-take (browser, two personas): recorded, awaiting the owner's go
+### `mcp-tools-by-group` re-take (browser, two personas): published, replaces `c1230da7`
 
-Status: **recorded, awaiting the owner's go.** Sent to the owner as the replacement of the published GIF (`c1230da7`), which stays
-in place until then (as relayed).
+Status: **published in `a9186a2c`** (`devel`, 2026-11-16 13:52 CET), replacing the GIF of `c1230da7`, on the owner's "go pour le remplacement de
+mcp-tools-by-group" given in `zuno-demo-reorg`'s session at about 14:15 CET (as relayed; the writer has not seen it). Writer's check on `devel`:
+`docs/assets/img/demo/mcp-tools-by-group.gif` is 1 996 199 bytes, SHA-256 `10fbb00b1d70...`, equal to the take's GIF. The page rows 1:30
+and 2:45 were picked after it as `93dca48f`. The catalogue still has 17 GIF files (a replacement adds none).
 
 | Item | Value |
 |---|---|
@@ -44,7 +46,7 @@ characters (as relayed). The writer opened 2 images and sampled no frames.
 **Point for the owner's review of the GIF.** The table is real company content, which the owner allowed (order of 13:2x CET).
 It also shows the Atlassian host and page ids in the URLs; these are not secrets, but the repository is public.
 
-**Pages.** The "You should see" cells of rows 1:30 and 2:45 change at publication (a separate commit, not in this file's commit).
+**Pages.** The "You should see" cells of rows 1:30 and 2:45 now state what this take shows (`93dca48f`).
 
 **What stays on the server.** The chats were deleted. The Confluence search of `consultant-02` and the failed Drive call of `sale-01`
 stay in the platform's tool-call records (ADR-0618 clause 12).
