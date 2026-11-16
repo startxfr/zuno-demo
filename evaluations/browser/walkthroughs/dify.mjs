@@ -114,6 +114,9 @@ export async function run({ page, base, mark, log, state }) {
   await mark("end");
   const refused = state.refused();
   if (refused.length) log(`saves of the applications refused in the browser: ${refused.join(", ")}`);
+  log(`writes the take sent to Dify, in order: ${state.refused.sent().answered.join("; ") || state.refused.sent().sent.join("; ") || "none"}`);
+  const through = state.refused.through();
+  if (through.length) throw new Error(`a write to Dify that the take does not allow got through: ${through.join(", ")}: an application may have been changed, check it`);
 }
 
 // What a take will meet, for the price of the two sign-ins: Studio, each of the two applications' pages with their
@@ -158,7 +161,8 @@ export async function scout({ page, base, step, state }) {
     await page.keyboard.press("Escape");
     const after = await difyConversations(page, agent);
     if (!after || after.length !== before) throw new Error(`Zuno Agent holds ${after ? after.length : "?"} conversations after the scout, ${before} before it`);
-    return { conversations: after.length, saves_refused: state.refused() };
+    if (state.refused.through().length) throw new Error(`a write to Dify that the scout does not allow got through: ${state.refused.through().join(", ")}`);
+    return { conversations: after.length, saves_refused: state.refused(), writes_through: state.refused.through() };
   });
 }
 

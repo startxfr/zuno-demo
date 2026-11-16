@@ -60,7 +60,10 @@ const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.cl
               "zuno.latency_ms", "zuno.estimated_cost_usd", "zuno.outcome", "zuno.run_id"];
 const WAIT_FOR_TRACE_MS = 180000;
 const READY = [".SearchForm", ".SearchTracePage", "[data-testid='SearchForm']", "#jaeger-ui-root", "main"];       // guess (Jaeger UI)
-const RESULT = [".ResultItem a.ResultItemTitle--item", ".ResultItem a", "a[href*='/trace/']"];                             // ".ResultItem a" seen live, 2026-11-16
+// A result's title link. Never a bare a[href*='/trace/']: the page's own "Compare" link holds /trace/ too, and the
+// rescout of 2026-11-16 followed it before the results were drawn.
+const RESULT = [".ResultItem a.ResultItemTitle--item", ".ResultItem a[href*='/trace/']:not([href*='...']):not([href*='compare'])"];   // both seen live, 2026-11-16
+const NO_RESULT = /No trace results|No traces? found/i;
 const SPAN_NAME = [".span-row .span-name", ".span-name", "[data-testid='span-name']"];                                      // guess
 const DETAIL = [".detail-row", ".SpanDetail", "[data-testid='span-detail']"];                                              // guess
 const TAGS_HEADER = [".detail-row .AccordianKeyValues--header:has-text('Tags')", ".AccordianKeyValues--header:has-text('Tags')", "[role='switch']:has-text('Tags')"];   // guess
@@ -117,7 +120,10 @@ async function runChat({ page, mark, log, state }) {
 async function search(page, base) {
   await page.goto(searchAddress(base));
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  // The results are drawn after the page: a result, or the page's own "no result" words, is waited for (20 s).
+  await waitUntil(page, { what: "the search's results", timeoutMs: 20000,
+    done: async () => (await firstVisible(page, RESULT)) || NO_RESULT.test(await page.locator("body").innerText().catch(() => "")) || undefined }).catch(() => {});
+  await page.waitForTimeout(800);
   const first = await firstVisible(page, RESULT);
   return first ? { matched: first.matched, count: await page.locator(first.matched).count() } : { matched: "", count: 0 };
 }
@@ -125,7 +131,7 @@ async function search(page, base) {
 // Open the newest trace of the results, then a model_call span, then its tags: what is on screen at each step.
 async function openTrace(page, found) {
   await click(page.locator(found.matched).first(), { changes });
-  await page.waitForURL(/\/trace\/[0-9a-f]{8,}/, { timeout: 30000 });
+  await page.waitForURL((u) => /\/trace\/[0-9a-f]{8,}/.test(u.pathname) && !/compare|\.\.\./.test(u.pathname), { timeout: 30000 });
   await waitUntil(page, { what: "the trace's spans", timeoutMs: 30000, done: async () => (await firstVisible(page, SPAN_NAME)) || undefined });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(1000);

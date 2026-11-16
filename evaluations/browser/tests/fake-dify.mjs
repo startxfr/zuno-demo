@@ -42,6 +42,13 @@ const AGENT_PAGE = shell(`<main><h1>Zuno Agent</h1><div id="spin" role="status">
 <textarea placeholder="Talk to Bot" id="in" style="width:500px"></textarea></section></main>
 <script>setTimeout(() => { document.getElementById("spin").remove(); document.getElementById("editor").hidden = false; }, 4000);   // the editor draws after its shell, as on 2026-11-16</script>
 <script>
+// The Agent's editor writes to its application by itself, by paths nobody guessed: on load, after a message, and
+// when the page is left (a beacon). All must be refused; \`saved\` counts the ones that reached the server.
+fetch("/console/api/apps/${AGENT}/model-config", { method: "POST", headers: { "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});
+fetch("/console/api/apps/${AGENT}/some-unguessed-autosave", { method: "PUT", headers: { "X-CSRF-Token": ${csrf} }, body: "{}" }).catch(() => {});
+addEventListener("pagehide", () => { navigator.sendBeacon("/console/api/apps/${AGENT}/touch-on-leave", "{}"); });
+</script>
+<script>
 document.getElementById("in").addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
   e.preventDefault();
@@ -111,7 +118,8 @@ http.createServer((req, res) => {
       setTimeout(() => { run.status = process.env.FAKE_RUN_FAILS === "1" ? "failed" : "succeeded"; res.writeHead(200, { "Content-Type": "text/plain" }); res.end(`Start confluence.page.search Summarise End ${run.status}`); }, 1000);
     });
   }
-  if (/\/workflows\/draft$|\/model-config$/.test(u.pathname) && req.method !== "GET") { saved += 1; return json(200, {}); }
+  if (/\/workflows\/draft$|\/model-config$|\/some-unguessed-autosave$|\/touch-on-leave$/.test(u.pathname) && req.method !== "GET") { saved += 1; return json(200, {}); }
+  if (u.pathname === "/console/api/workspaces/current") return json(200, { id: "w" });
   if (u.pathname === "/signin") { res.writeHead(302, { Location: "/" }); return res.end(); }
   // As Dify on 2026-11-16: the first page is Home, with Studio in its left menu and the web apps listed.
   // Its Recents cards carry the applications' names and open the WEB APP, not the editor (the trap of 2026-11-16).

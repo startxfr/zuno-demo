@@ -592,13 +592,15 @@ assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["landed"] ==
 assert steps["api"] == {**steps["api"], "conversations": 1, "workflow_runs": 1, "profile_status": 200}, steps["api"]
 assert steps["agent"]["selector"] == "textarea[placeholder*=\x27Talk\x27 i]" and steps["agent"]["url"].endswith("/app/<id>/configuration"), steps["agent"]
 assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["topic_selector"] == "[placeholder=\x27Topic\x27 i]", steps["run-form"]
-assert steps["closed"]["saves_refused"] == ["POST /console/api/apps/<id>/workflows/draft"], steps["closed"]
+# default deny: the saves nobody guessed, and the one sent while the page is left, are refused too
+assert sorted(steps["closed"]["saves_refused"]) == ["POST /console/api/apps/<id>/model-config", "POST /console/api/apps/<id>/touch-on-leave", "POST /console/api/apps/<id>/workflows/draft", "PUT /console/api/apps/<id>/some-unguessed-autosave"] and steps["closed"]["writes_through"] == [], steps["closed"]
 '
 out="$(dify d-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "dify: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
 expect "dify: its conversation is gone, its run stays, no save of an application reached Dify" grep -q 'left: {"conversations":1,"runs":2,"saved":0}' <<<"$out"
-expect "dify: the log says the run cannot be deleted and which saves were refused" bash -c "grep -q 'succeeded; it stays in the application.s run log' <<<\"\$0\" && grep -q 'saves of the applications refused in the browser: POST /console/api/apps/<id>/workflows/draft' <<<\"\$0\"" "$out"
+expect "dify: the log says the run cannot be deleted and which saves were refused" bash -c "grep -q 'succeeded; it stays in the application.s run log' <<<\"\$0\" && grep -q 'saves of the applications refused in the browser: .*PUT /console/api/apps/<id>/some-unguessed-autosave.*POST /console/api/apps/<id>/workflows/draft' <<<\"\$0\"" "$out"
+expect "dify: the log lists every write the take sent, in order, with its status" grep -q 'writes the take sent to Dify, in order: POST /console/api/login -> 200; POST /console/api/apps/<id>/chat-messages -> 200; POST /console/api/apps/<id>/workflows/draft/run -> 200' <<<"$out"
 expect "dify: markers.json follows the contract" markers d-pass '
 assert names == ["login", "studio", "agent", "q-sent", "q-done", "workflow", "run-form", "run-done", "end"], names
 assert m["persona"] == "consultant-02" and m["motion_from"] == "studio" and m["status"] == "pass", m
@@ -887,8 +889,8 @@ expect "maas: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '
 expect "maas: a scout creates no key" grep -q 'left: {"keys":1,"live":1,"checks":0}' <<<"$out"
 expect "maas: scout.json reports the list's shape and the dialog, no key value" scouted m-scout '
 assert list(steps) == ["enter", "owned", "portal", "keys", "create-dialog", "closed"], list(steps)
-assert steps["keys"]["list_path"] == "/maas-consumer-portal/maas/api/v1/api-keys" and steps["keys"]["list_request"] == {"method": "POST", "path": "/maas-consumer-portal/maas/api/v1/api-keys/search", "envelope": {"data": {"items": "list(1)", "total": "number"}}, "search_body_keys": ["filters", "pagination"]} and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
-assert steps["create-dialog"]["subscription_on_screen"] is True and steps["create-dialog"]["submit_selector"] and steps["create-dialog"]["name_selector"], steps["create-dialog"]
+assert steps["keys"]["list_path"] == "/maas-consumer-portal/maas/api/v1/api-keys" and steps["keys"]["list_request"] == {"method": "POST", "path": "/maas-consumer-portal/maas/api/v1/api-keys/search", "envelope": {"data": {"object": "string", "data": "list(1)", "has_more": "boolean", "subscriptionDetails": "null"}}, "search_body_keys": ["filters", "pagination"]} and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
+assert steps["create-dialog"]["subscription_offered"] is True and steps["create-dialog"]["submit_selector"] == "[role=\x27dialog\x27] button:has-text(\x27Create API key\x27)" and steps["create-dialog"]["name_selector"], steps["create-dialog"]
 assert "sk-oai-" not in json.dumps(s)
 '
 out="$(maas m-pass 2>&1)"; rc=$?

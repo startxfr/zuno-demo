@@ -50,8 +50,13 @@ http.createServer((req, res) => {
     const listed = asked && process.env.FAKE_NO_TRACE !== "1" && (searches >= 2 || process.env.FAKE_TRACE_NOW === "1");
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><form class="SearchForm"><label>Service <input value="${u.searchParams.get("service") || ""}"></label>
 <label>Operation <input value="${u.searchParams.get("operation") || ""}"></label><label>Tags <input value="${asked ? "zuno.persona=consultant-02" : ""}"></label>
-<span>Last 15 Minutes</span><button type="button">Find Traces</button></form>
-<div class="SearchResults">${listed ? `<div class="ResultItem"><a class="ResultItemTitle--item" href="/trace/${TRACE}">unifai: workflow.run ${TRACE.slice(0, 7)}</a><span>14 Spans</span></div>` : "<p>No trace results. Try another query.</p>"}</div></div>`));
+<span>Last 15 Minutes</span><button type="button">Find Traces</button></form><a href="/trace/...">Compare</a>
+<div class="SearchResults" id="late" hidden>
+${listed ? `<div class="ResultItem"><a class="ResultItemTitle--item" href="/trace/${TRACE}">unifai: workflow.run ${TRACE.slice(0, 7)}</a><span>14 Spans</span></div>` : "<p>No trace results. Try another query.</p>"}</div></div>
+<script>setTimeout(() => { document.getElementById("late").hidden = false; }, 2500);   // the results are drawn after the page, as on 2026-11-16</script>`));
+  }
+  if (u.pathname === "/trace/...") {
+    return html(page("Jaeger UI", `<div id="jaeger-ui-root"><h1>A Select a Trace... vs B Select a Trace...</h1></div>`));
   }
   if (u.pathname === `/trace/${TRACE}`) {
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><h1 class="TracePageHeader">unifai: workflow.run</h1>

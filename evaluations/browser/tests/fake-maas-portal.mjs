@@ -21,8 +21,11 @@ const LOGIN = page("Sign in", `<form method="get" action="/cb"><input id="userna
 const PORTAL = page("Red Hat AI portal", `<nav><a href="#endpoints">AI asset endpoints</a> <a href="#keys" id="nav-keys">API keys</a> <a href="#playground">Playground</a></nav>
 <main><div id="keys" hidden><h1>API keys</h1><button id="create">Create API key</button><ul id="list"></ul></div>
 <div role="dialog" id="dialog" hidden style="border:1px solid #888;padding:16px"><h2>Create API key</h2><label>Name <input type="text" id="name"></label>
-<label>Subscription <select id="sub"><option>gpt-oss-20b-ocp-ai-dev</option></select></label><span>gpt-oss-20b-ocp-ai-dev</span>
-<button type="button" id="cancel">Cancel</button><button type="submit" id="submit">Create</button></div>
+<label>Description <textarea id="desc"></textarea></label>
+<div>Subscription <button type="button" id="sub-toggle" aria-expanded="false">Select a subscription</button>
+<ul role="menu" id="sub-menu" hidden><li role="menuitem" data-v="gpt-oss-20b-ocp-ai-dev">gpt-oss-20b-ocp-ai-dev 5,000,000 tokens per hour</li></ul></div>
+<div>Expiration <button type="button">30 days</button></div>
+<button type="submit" id="submit" disabled>Create API key</button><button type="button" id="cancel">Cancel</button></div>
 <div id="once" hidden><h2>Copy your key now, it is shown once</h2><p id="value" style="font-size:28px"></p></div></main>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -30,13 +33,19 @@ async function list() {
   // As the portal on 2026-11-16: the list is read by a POST to .../api-keys/search.
   const body = await (await fetch("/maas-consumer-portal/maas/api/v1/api-keys/search", { method: "POST", headers: { "Content-Type": "application/json", "X-Portal": "1" }, body: JSON.stringify({ filters: {}, pagination: { limit: 50 } }) })).json();
   $("list").innerHTML = "";
-  for (const k of body.data.items) { const li = document.createElement("li"); li.textContent = k.name + " (" + k.status + ")"; $("list").appendChild(li); }
+  for (const k of body.data.data) { const li = document.createElement("li"); li.textContent = k.name + " (" + k.status + ")"; $("list").appendChild(li); }
 }
 $("nav-keys").onclick = (e) => { e.preventDefault(); $("keys").hidden = false; list(); };
 $("create").onclick = () => { $("dialog").hidden = false; };
+// As the portal's dialog on 2026-11-16: the subscription is chosen in a menu, and the button is disabled until then.
+let sub = "";
+$("sub-toggle").onclick = () => { $("sub-menu").hidden = false; };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sub-menu").hidden) { $("sub-menu").hidden = true; e.stopPropagation(); } });
+$("sub-menu").firstElementChild.onclick = (e) => { sub = e.currentTarget.dataset.v; $("sub-toggle").textContent = sub; $("sub-menu").hidden = true; $("submit").disabled = !$("name").value; };
+$("name").oninput = () => { $("submit").disabled = !($("name").value && sub); };
 $("cancel").onclick = () => { $("dialog").hidden = true; };
 $("submit").onclick = async () => {
-  const r = await fetch("/maas-consumer-portal/maas/api/v1/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("name").value, subscription: $("sub").value }) });
+  const r = await fetch("/maas-consumer-portal/maas/api/v1/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("name").value, subscription: sub }) });
   const made = await r.json();
   $("dialog").hidden = true; $("once").hidden = false; $("value").textContent = made.key; console.log("key shown once: " + made.key);
   if (${process.env.FAKE_REREAD === "1"}) fetch("/maas-consumer-portal/maas/api/v1/check", { method: "PUT", body: made.key });
@@ -67,7 +76,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys/search" && req.method === "POST") {
     if (req.headers["x-portal"] !== "1") return json(400, { error: "the portal's own header is missing" });
     // As the portal on 2026-11-16: the list is not `data` itself but inside it.
-    return json(200, { data: { items: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })), total: keys.size } });
+    return json(200, { data: { object: "list", data: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })), has_more: false, subscriptionDetails: null } });
   }
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys" && req.method === "POST") {
     return body((raw) => {

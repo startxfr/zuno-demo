@@ -53,8 +53,10 @@ const SHELL = [/AI asset endpoints/, /API keys/, /Playground/];   // the page's 
 const NAV_KEYS = ["nav a[href*='/maas/keys']", "nav a:has-text('API keys')", "a:has-text('API keys')", "[role='tab']:has-text('API keys')", "button:has-text('API keys')"];   // guess
 const CREATE = ["button:has-text('Create API key')", "button:has-text('Create key')", "button:has-text('Create')", "button:has-text('Generate')"];   // guess
 const DIALOG = "[role='dialog']";
-const NAME = ["[role='dialog'] input[type='text']", "[role='dialog'] input:not([type])", "[role='dialog'] textarea"];   // guess: the key's name
-const SUBMIT = ["[role='dialog'] button[type='submit']", "[role='dialog'] button:has-text('Create')", "[role='dialog'] button:has-text('Generate')"];   // guess
+// The dialog as the scout of 2026-11-16 saw it: Name*, Description, Subscription* ("Select a subscription"),
+// Expiration* (30 days by default, left as it is), "Create API key" (disabled until filled) and Cancel.
+const NAME = ["[role='dialog'] input[type='text']", "[role='dialog'] input:not([type])"];   // the key's name: the dialog's first text input
+const SUBMIT = ["[role='dialog'] button:has-text('Create API key')", "[role='dialog'] button[type='submit']", "[role='dialog'] button:has-text('Create')"];   // the first seen live
 
 const maas = (domain) => process.env.RECORD_BASE_URL_MAAS || `https://maas.${domain}/zuno-ai-run/gpt-oss-20b`;
 const CHAT_BODY = prompts["3:00"].match(/-d '(.*)'$/)[1];
@@ -167,13 +169,15 @@ export async function run({ page, domain, mark, log, state, interceptSecret, fet
   if (name) { await name.click(); await page.keyboard.type(state.keyName, { delay: 20 }); }
   // The subscription: when the dialog does not already show it, its chooser is opened and the entry clicked.
   if (!(await shows(dialog, SUBSCRIPTION))) {
-    const chooser = await firstVisible(page, [`${DIALOG} [role='combobox']`, `${DIALOG} select`, `${DIALOG} button[aria-haspopup]`]);   // guess
+    const chooser = await firstVisible(page, [`${DIALOG} button:has-text('Select a subscription')`, `${DIALOG} [role='combobox']`, `${DIALOG} select`, `${DIALOG} button[aria-haspopup]`]);   // the first seen live, 2026-11-16
     if (chooser) { await click(chooser, { changes }); await page.waitForTimeout(500); }
   }
-  const option = await shows(page, SUBSCRIPTION);
-  if (!option) throw new Error(`the create dialog does not offer the subscription ${SUBSCRIPTION}`);
-  if (await page.locator("[role='option'], [role='menuitem']").filter({ hasText: SUBSCRIPTION }).first().isVisible().catch(() => false)) await click(option, { changes });
+  // The entry of the open list (its text may carry more than the name), else the name as a text of its own.
+  const entry = page.locator("[role='option'], [role='menuitem'], [role='listbox'] li, [role='menu'] li").filter({ hasText: SUBSCRIPTION }).first();
+  if (await entry.isVisible().catch(() => false)) await click(entry, { changes });
+  else if (!(await shows(page, SUBSCRIPTION))) throw new Error(`the create dialog does not offer the subscription ${SUBSCRIPTION}`);
   await page.waitForTimeout(600);
+  if (!(await dialog.getByText(SUBSCRIPTION).first().isVisible().catch(() => false))) throw new Error(`the create dialog does not show ${SUBSCRIPTION} as chosen`);
   await mark("create-form");
 
   // From here a key may exist. The recorder stands between the portal and the answer of the create call.
@@ -184,6 +188,7 @@ export async function run({ page, domain, mark, log, state, interceptSecret, fet
   page.on("request", (r) => { if ((r.postData() || "").includes(MASK) || decodeURIComponent(r.url()).includes(MASK)) sentBack.push(`${r.method()} ${new URL(r.url()).pathname}`); });
   const submit = await firstVisible(page, SUBMIT);
   if (!submit) throw new Error(`the dialog's create button was not found (${SUBMIT.join(" | ")})`);
+  if (await page.locator(submit.matched).first().isDisabled().catch(() => false)) throw new Error("the dialog's create button is still disabled: a required field (Name, Subscription, Expiration) is not filled");
   await click(submit, { changes });
   const answer = await Promise.race([created, page.waitForTimeout(60000).then(() => null)]);
   if (!answer) throw new Error("the create call was not seen within 60 s (no POST to a path ending in api-keys): a key may exist, check the portal by hand");
@@ -237,7 +242,18 @@ export async function scout({ page, step, state }) {
     await page.locator(DIALOG).first().waitFor({ timeout: 15000 });
     await page.waitForTimeout(800);
     return { text: (await newText(page, text)).slice(0, 20).map((l) => l.slice(0, 80)), name_selector: ((await firstVisible(page, NAME)) || {}).matched || "",
-             submit_selector: ((await firstVisible(page, SUBMIT)) || {}).matched || "", subscription_on_screen: Boolean(await shows(page, SUBSCRIPTION)),
+             submit_selector: ((await firstVisible(page, SUBMIT)) || {}).matched || "", subscription_offered: await (async () => {
+               // The subscription's list is opened, read and closed with Escape: nothing is chosen.
+               if (await shows(page, SUBSCRIPTION)) return true;
+               const chooser = await firstVisible(page, [`${DIALOG} button:has-text('Select a subscription')`, `${DIALOG} [role='combobox']`]);
+               if (!chooser) return false;
+               await click(chooser, { changes });
+               await page.waitForTimeout(600);
+               const offered = await page.locator("[role='option'], [role='menuitem'], [role='listbox'] li, [role='menu'] li").filter({ hasText: SUBSCRIPTION }).first().isVisible().catch(() => false);
+               await page.keyboard.press("Escape");
+               await page.waitForTimeout(300);
+               return offered;
+             })(),
              controls: (await describe(page, DIALOG, 40)).slice(0, 25) };
   });
   await step("closed", async () => {

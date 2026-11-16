@@ -87,6 +87,11 @@ async function runAgent({ page, domain, mark, log, state }) {
   await mark("q-done");
   await page.waitForTimeout(800);
   await mark("end");
+  const refused = state.refused();
+  if (refused.length) log(`writes to Dify refused in the browser: ${refused.join(", ")}`);
+  log(`writes the take sent to Dify, in order: ${state.refused.sent().answered.join("; ") || state.refused.sent().sent.join("; ") || "none"}`);
+  const through = state.refused.through();
+  if (through.length) throw new Error(`a write to Dify that the take does not allow got through: ${through.join(", ")}: an application may have been changed, check it`);
 }
 
 async function runDashboard({ page, domain, mark, log, state }) {
@@ -150,7 +155,8 @@ export async function scout({ page, domain, step, state, take }) {
   await step("closed", async () => {
     const after = await difyConversations(page, state.app);
     if (!after || after.length !== before) throw new Error(`${APP} holds ${after ? after.length : "?"} conversations after the scout, ${before} before it`);
-    return { conversations: after.length, saves_refused: state.refused() };
+    if (state.refused.through().length) throw new Error(`a write to Dify that the scout does not allow got through: ${state.refused.through().join(", ")}`);
+    return { conversations: after.length, saves_refused: state.refused(), writes_through: state.refused.through() };
   });
 }
 
