@@ -4,6 +4,6 @@
   "description": "WP-243 / ADR-0606: one browser check per experience, run in mcr.microsoft.com/playwright:v1.48.0-jammy",
   "type": "module",
   "dependencies": {
-    "playwright": "1.48.0"
+    "playwright": "1.55.1"
   }
 }
