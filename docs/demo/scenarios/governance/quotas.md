@@ -24,6 +24,8 @@ the decision that delegates quotas, keys and exposure to MaaS, the per-person an
 **The message:** "One person, one budget, whatever the screen. Spending it in one experience spends it in all of
 them."
 
+![The 5-minute version of the quotas demo, recorded live as ai-ops-01: the table of budget classes and the evidence of a shared budget, read on the demo's public page, and the Grafana panel of tokens spent per group across the experiences over the last day. Row 4:00 is words.](../../../assets/img/demo/quotas.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
