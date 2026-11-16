@@ -13,6 +13,8 @@ with namespaced Roles only. It calls the model and the tools through a token pro
 **The message:** "An operations assistant may read the cluster through the same gateway, identity and audit as every
 other tool. It never sees a secret and cannot change anything."
 
+![The 5-minute version of the kagent demo, recorded live as ai-ops-01: the agent list, the read-only zuno-sre agent and its five governed tools, its answer on which pods of a Zuno namespace are not running, and its refusal to read a Secret. The take skips the first-run wizard.](../../../assets/img/demo/kagent.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
