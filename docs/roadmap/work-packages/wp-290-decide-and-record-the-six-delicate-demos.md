@@ -40,7 +40,7 @@ owner's messages. Four of the six are decided; two are not asked yet.
 | `a2a-delegation-approval` | **Approve, one job per take** | The take clicks Approve. Each take leaves one AAP job that cannot be deleted. The owner's go is given for each take, in the session of the recording (`zuno-demo-reorg-demo333`). |
 | `maas-portal-api-keys` | **Create, hide, revoke** | The take creates the key with the key field hidden before the dialog opens, proves the call with the key masked, and revokes the key by its id. The take fails if the revoke fails. |
 | `openclaw` | **Like `guardrails`** | The Control UI password is a declared second secret, read at run time. It is never in git, in a log or on a frame. |
-| `genai-playground` | **Skip the paste** | The take does not paste the token and shows the saved connection. |
+| `genai-playground` | **Skip the paste** | The take does not paste the token and shows the saved connection. Scout of 2026-11-16 (as relayed): the MCP server `zuno-mcp-gateway` is listed but not connected in a fresh browser. The coordinator decided: no token in the recorder. The GIF covers rows 0:00 and 0:45 and the MCP settings as found; rows 1:45 and 3:00 stay words. |
 | `blender-3d` | not asked yet | Open. |
 | `world-model` | not asked yet | Open. |
 
