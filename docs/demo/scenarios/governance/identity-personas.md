@@ -22,6 +22,8 @@ Open WebUI. How the groups travel from the realm to each application is in [Appe
 **The message:** "One company account, and its groups decide everything: which agents, which tools and data, which
 cluster rights, in every application."
 
+![The 5-minute version of the identity and personas demo, recorded live as consultant-02 then sale-01: the same company sign-in, the UnifAI teams each persona belongs to, and the same question in Open WebUI answered with six tool names for the consultant and three for the salesperson.](../../../assets/img/demo/identity-personas.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
