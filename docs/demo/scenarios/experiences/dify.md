@@ -69,7 +69,7 @@ applications. What only a person does:
   - then Dify's own form, as `dify-admin@zuno.local`, password from Vault `zuno/dify/admin`, typed off screen. There
     is no per-person Dify account, by design.
 - [ ] **Studio** lists the three applications: **Zuno Agent**, **Zuno Technical Documentation** and **Zuno Confluence
-  Search**.
+  Search**. On 2026-11-16 it also listed a fourth, **Strategic Consulting Expert** (an agent); where it comes from was not checked.
 - [ ] Run each application once before the audience arrives. It wakes the model and catches the Workflow stall (D1)
   off stage. Time the Agent turn: it took 82 s on 2026-11-06, before the experience clients moved to gpt-oss-20b first
   (2026-11-07), and it was not timed since.
@@ -94,7 +94,7 @@ Profile **consultant-02**, signed in to Dify.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Show **Studio** | "A no-code canvas: a business user draws an AI app from boxes. Three examples are imported at every install." | Three applications: **Zuno Agent** (Agent), **Zuno Technical Documentation** (Chatflow), **Zuno Confluence Search** (Workflow). |
+| 0:00 | After the sign-ins Dify opens on its **Home** page: click **Studio** in the left menu | "A no-code canvas: a business user draws an AI app from boxes. Three examples are imported at every install." | **Studio** with the three examples: **Zuno Agent** (Agent), **Zuno Technical Documentation** (Chatflow), **Zuno Confluence Search** (Workflow). On 2026-11-16 a fourth application, **Strategic Consulting Expert**, was listed too (edited 11 days before); ignore it on stage. The single Dify account is displayed as "x" (workspace "x's Workspace"). |
 | 0:45 | Open **Zuno Agent** and ask in its chat pane: `Find our onboarding pages in Confluence` | "The agent searches Confluence through the platform's tool gateway. Dify holds no Confluence key and no model key." | A call to the tool `confluence.page.search`, then the onboarding pages with their titles, for example MNGD2-AP001 Onboarding Chef de projet métier (six pages on 2026-11-05). |
 | 2:30 | Open **Zuno Confluence Search**, click **Run**, enter the topic `onboarding` | "The same search, drawn as a fixed workflow: a tool box, then a summary box. No code." | Start, `confluence.page.search`, Summarise and End succeeded, in about 3 s. The output `summary` lists one page per line with its space. |
 | 3:45 | Say who Dify acts as | "Dify has no single sign-on. I passed the company sign-in at the door, but behind Dify every call is made as one persona, consultant-02: its tools, its documents, its budget." | |

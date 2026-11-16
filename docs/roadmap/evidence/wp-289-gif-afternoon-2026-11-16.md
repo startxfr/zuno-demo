@@ -175,3 +175,8 @@ one transitional "Loading…" frame. `make demo start quotas` was **not** run: t
 - `lora-pipeline-mlflow-kueue`: the Experiments page shows "No experiments" for the project Zuno MLOps. Page row 2:45 is at risk; to settle with the assist.
 - `dify`: the sign-in lands on a new Home page and shows four apps. The Vault read of the Dify admin password was done by demo333 with the owner's agreement: 3 helper runs, each creating and deleting for a few seconds an `ansible-seeder-login-token` in `zuno-vault`. The value was never printed.
 - On `devel`, unscouted: `maas-portal-api-keys`, `openclaw` (scout only), `a2a-delegation-approval`.
+
+### dify: first scout facts (as relayed by the coder)
+
+Scout of 2026-11-16 at 16:43 (`scout-enter.png`); the writer opened that image. After the two sign-ins Dify opens on a **Home** page ("Welcome back", the single Dify account displayed as "x", workspace "x's Workspace"), not on Studio; Studio is one click on the left menu. Four applications are listed, not three: the three examples and a fourth, **Strategic Consulting Expert** (an agent, edited 11 days ago). Its origin was not checked. Not yet seen: Studio, the Agent's chat pane, the workflow run. Page: row 0:00 and the checklist state this.
+
