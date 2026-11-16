@@ -11,8 +11,9 @@ record_notice: >-
   two recorded browser sessions: consultant-02 on UnifAI, team workspace agent-tekos, asks Tekos one question (one
   answer on consultant-02's budget; the session it creates is deleted at the end, and the take fails if the
   workspace's sessions differ before and after; the titles of earlier sessions of the workspace's members show in
-  the list); then ai-ops-01 on the Tempo search UI, read only (sign-in through OpenShift and Keycloak, one search,
-  one trace and one span opened, nothing saved); the trace and the metrics of the answer remain, as for any use
+  the list); then ai-ops-01 on the Tempo search UI, read only (sign-in through OpenShift and Keycloak; if OpenShift shows its
+  Authorize Access page for the Tempo UI's proxy the take approves it, user:info and user:check-access: one OAuth
+  authorization of ai-ops-01 stays on the cluster; one search, one trace and one span opened, nothing saved); the trace and the metrics of the answer remain, as for any use
 target_seconds: [40, 60]
 width: 960
 fps: 10

@@ -19,9 +19,8 @@
 // never rehearsed): the Tempo search UI is the Jaeger UI, and its selectors below are that UI's, marked `guess`.
 //
 // Two things the first scout must tell before any take:
-//  - the Tempo UI's own OpenShift proxy may ask "Authorize Access" for ai-ops-01, for another client than Grafana's.
-//    Nothing here approves it: the scout stops on that page, its picture shows the client and the scopes, and it is
-//    the owner's decision.
+//  - the Tempo UI's own OpenShift proxy asks "Authorize Access" for ai-ops-01 (the scout of 2026-11-16 stopped on
+//    it): approved as a declared change since the owner's decision of that day, see `changes`.
 //  - an opened span shows a "Process" line (the pod's address, its host): the recorder counts node names and private
 //    addresses on the page at each step; if it finds some at `tags`, a take would fail there. scout() opens the newest
 //    existing trace (read only) so that this is known for the price of a sign-in.
@@ -37,17 +36,17 @@ export const page = "docs/demo/scenarios/governance/observability-trace.md";
 export const viewport = { width: 1280, height: 800 };
 export const markers = takes[0].markers;
 export const motion_from = takes[0].motion_from;
-export const changes = [];
+// OpenShift's "Authorize Access" page of the Tempo UI's own proxy, as the scout of 2026-11-16 met it: service account
+// tempo-tempo of zuno-monitoring, for ai-ops-01, user:info and user:check-access. The owner's decision of 2026-11-16
+// (in demo333's session): approve it, as a DECLARED change, for exactly that client and those two scopes. Any other
+// page still stops the take (proxySignIn, _grafana.mjs).
+const TEMPO_AUTHORIZE = { persona: "ai-ops-01", client: ["tempo-tempo", "zuno-monitoring"],
+  change: "approves OpenShift's Authorize Access page for the Tempo search UI's proxy as ai-ops-01 (user:info and user:check-access), which stores one OAuth authorization for ai-ops-01 on the cluster" };
+export const changes = [TEMPO_AUTHORIZE.change];
 export const prompts = { "0:45": "In one short sentence, say what you can help me with." };
 export const url = unifai.url;
 export const sends = unifai.sends;
 
-// OpenShift's "Authorize Access" page of the Tempo UI's own proxy, as the scout of 2026-11-16 met it: service account
-// tempo-tempo of zuno-monitoring, for ai-ops-01, user:info and user:check-access. The sign-in approves it ONLY when
-// `changes` lists this sentence, and it does not: that is the owner's decision, not taken yet. Until then the take
-// and the scout stop on that page.
-const TEMPO_AUTHORIZE = { persona: "ai-ops-01", client: ["tempo-tempo", "zuno-monitoring"],
-  change: "approves OpenShift's Authorize Access page for the Tempo search UI's proxy as ai-ops-01 (user:info and user:check-access), which stores one OAuth authorization for ai-ops-01 on the cluster" };
 const WORKSPACE = "agent-tekos";
 const WORKFLOW = "tekos";
 const TEAMS = ["agent-arkos", "agent-tekos", "consultant"];   // consultant-02's workspaces (the unifai-agents page)

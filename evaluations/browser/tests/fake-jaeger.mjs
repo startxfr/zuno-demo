@@ -3,7 +3,7 @@
 // search was never seen live): the proxy's page, the provider chooser, the Keycloak form, a search page driven by its
 // address, a trace page with its spans, and a span's detail with a Tags accordion and a Process line.
 // The search lists a trace from its second load on, as a real export does (FAKE_NO_TRACE=1: never; FAKE_TRACE_NOW=1:
-// at once). Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" for the Tempo UI's own client;
+// at once). Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" for the Tempo UI's own client (=other: for another client);
 // FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; FAKE_NO_TAGS=1 the span has no
 // zuno.* tag.
 import http from "node:http";
@@ -18,7 +18,7 @@ const page = (title, body) => `<!doctype html><title>${title}</title><body style
 const PROXY = page("Log In", `<form action="/oauth/start"><button>Log in with OpenShift</button></form>`);
 const CHOOSER = page("Log in", `<h1>Log in with...</h1><a class="idp" title="Log in with openshift" href="/kc">openshift</a>`);
 const LOGIN = page("Sign in", `<form method="get" action="/cb"><input id="username" name="u"><input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`);
-const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account tempo-tempo in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
+const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account ${process.env.FAKE_AUTHORIZE === "other" ? "some-other-proxy" : "tempo-tempo"} in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
 <form action="/approve"><label><input type="checkbox" checked value="user:info"> user:info</label><label><input type="checkbox" checked value="user:check-access"> user:check-access</label>
 <input type="submit" name="approve" value="Allow selected permissions"> <input type="submit" name="deny" value="Deny"></form>`);   // as seen live on 2026-11-16
 const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [["zuno.persona", "consultant-02"], ["zuno.client", "unifai"], ["zuno.agent", "tekos"], ["zuno.task", "answer-technical-question"],
@@ -35,8 +35,8 @@ http.createServer((req, res) => {
   if (u.pathname === "/fake/count") return json(200, { approved, writes });
   if (u.pathname === "/oauth/start") return html(CHOOSER);
   if (u.pathname === "/kc") return html(LOGIN);
-  if (u.pathname === "/cb") return process.env.FAKE_AUTHORIZE === "1" ? html(AUTHORIZE) : to("/", "s=1; Path=/");
-  if (u.pathname === "/approve") { approved += 1; return to("/", "s=1; Path=/"); }
+  if (u.pathname === "/cb") return process.env.FAKE_AUTHORIZE ? html(AUTHORIZE) : to("/", "s=1; Path=/");
+  if (u.pathname === "/approve") { if (u.searchParams.has("approve")) approved += 1; return to("/", u.searchParams.has("approve") ? "s=1; Path=/" : ""); }
   if (!signed) return html(PROXY);
   if (req.method !== "GET") { writes += 1; return json(200, {}); }
   if (u.pathname === "/" ) return to("/search");

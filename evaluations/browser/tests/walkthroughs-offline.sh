@@ -799,14 +799,18 @@ assert chat["persona"] == "consultant-02" and len(chat["created"]) == 1 and chat
 assert tr["persona"] == "ai-ops-01" and tr["created"] == [] and tr["cleaned"] is None, tr
 assert tr["notes"] == {"traces_listed": 1} and "notes" not in chat, (tr.get("notes"), chat.get("notes"))   # a walkthrough's own notes
 PY
-out="$(trace t-authorize FAKE_AUTHORIZE=1 RECORD_SCOUT=1)"; rc=$?
+out="$(trace t-authorize FAKE_AUTHORIZE=1 RECORD_SCOUT=1 FAKE_TRACE_NOW=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "trace: the Tempo UI's own Authorize Access page stops the scout, nothing approved" bash -c "test $rc -eq 1 && grep -q 'left: .*{\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
-expect "trace: its scout.json says why" python3 - "$work/t-authorize" <<'PY'
+expect "trace: the Tempo UI's declared Authorize Access page is approved once, and the scout goes on" bash -c "test $rc -eq 0 && grep -q 'left: .*{\"approved\":1,\"writes\":0}' <<<\"\$0\"" "$out"
+expect "trace: its scout.json says so, and declares the change" python3 - "$work/t-authorize" <<'PY'
 import json, pathlib, sys
-s = json.loads((pathlib.Path(sys.argv[1]) / "trace" / "scout.json").read_text())
-assert "the take stops there: the walkthrough does not declare that change" in s["steps"][0]["error"] and "the Tempo search UI" in s["steps"][0]["error"], s["steps"][0]
+s = json.loads((pathlib.Path(sys.argv[1]) / "trace" / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+assert steps["chain"]["authorized"] is True and [c["step"] for c in steps["chain"]["chain"]] == ["proxy", "chooser", "keycloak", "authorize", "application"], steps["chain"]
+assert len(s["changes"]) == 1 and s["changes"][0].startswith("approves OpenShift's Authorize Access page for the Tempo search UI's proxy as ai-ops-01"), s["changes"]
 PY
+out="$(trace t-authorize-other FAKE_AUTHORIZE=other RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "trace: an Authorize Access page of another client stops the scout, nothing approved" bash -c "test $rc -eq 1 && grep -q 'left: .*{\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
 out="$(trace t-addresses FAKE_ADDRESSES=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a span whose Process line holds an address fails the trace take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'trace: .*the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
