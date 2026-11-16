@@ -38,12 +38,15 @@ export const prompts = {
 };
 export const url = (domain) => `https://rh-ai.${domain}/maas-consumer-portal`;
 // The requests a scout refuses: a key created, revoked or changed.
-export const sends = /api-?keys/i;
+// (The portal READS its key list by a POST, .../api-keys/search, scout of 2026-11-16: that one is a read and passes.)
+export const sends = /api-?keys(?!\/search(\/|\?|$))/i;
 
 const SUBSCRIPTION = "gpt-oss-20b-ocp-ai-dev";   // the page's row 1:00
 const KEY = /sk-oai-[A-Za-z0-9_-]{8,}/;          // the page: a key starting with sk-oai-
 const MASK = "sk-oai-••••••••••••••••••••••••";
-const KEYS_API = /api-?keys/i;                   // guess: the portal's key calls hold "api-keys" in their path
+const KEYS_API = /api-?keys/i;                   // seen live: /maas-consumer-portal/maas/api/v1/api-keys/search (the list, a POST)
+const SEARCH = /api-?keys\/search\/?$/i;         // the list: a read made by POST
+const CREATE_API = /api-?keys\/?(\?.*)?$/i;      // guess: the create is a POST to the collection itself
 const PROVIDER_LINK = ["a[title='Log in with openshift']", "a.idp:text-is('openshift')", "a:text-is('openshift')"];   // seen live for rh-ai, 2026-11-16
 const APPROVE = /\/oauth\/authorize\/approve|Authorize Access/i;
 const SHELL = [/AI asset endpoints/, /API keys/, /Playground/];   // the page's row 0:00
@@ -72,23 +75,31 @@ const live = (row) => !/revok|expired|inactive|deleted/i.test(String(row.status 
 // Open the API keys page and read the list the portal itself fetched: {path, rows}. The path is kept: the revoke
 // uses it. The list is read from the portal's own request, so no endpoint is guessed.
 async function openKeys(page, state) {
-  const listed = page.waitForResponse((r) => r.request().method() === "GET" && KEYS_API.test(new URL(r.url()).pathname) && r.status() === 200, { timeout: 30000 }).catch(() => null);
+  const isList = (r) => { const path = new URL(r.url()).pathname; return r.status() === 200 && ((r.request().method() === "GET" && KEYS_API.test(path)) || (r.request().method() === "POST" && SEARCH.test(path))); };
+  const listed = page.waitForResponse(isList, { timeout: 60000 }).catch(() => null);
   const link = await firstVisible(page, NAV_KEYS);
   if (!link) throw new Error(`the API keys entry was not found (${NAV_KEYS.join(" | ")})`);
   await click(link, { changes });
   const response = await listed;
-  if (!response) throw new Error("the portal fetched no key list (no GET whose path holds api-keys): the take could not tell what it creates");
-  const list = rows(await response.json().catch(() => null));
-  if (!list) throw new Error("the portal's key list is not a list");
-  state.keysPath = new URL(response.url()).pathname;
-  state.keysUrl = response.url();
+  if (!response) throw new Error("the portal fetched no key list (no GET whose path holds api-keys, no POST to api-keys/search): the take could not tell what it creates");
+  const body = await response.json().catch(() => null);
+  const list = rows(body);
+  if (!list) throw new Error(`the portal's key list is not a list (its answer holds: ${body && typeof body === "object" ? Object.keys(body).slice(0, 10).join(", ") : typeof body})`);
+  // The same request is made again later to read the list: its address, its method, its body and its own headers
+  // (never logged; the session's cookies are the browser's).
+  const request = response.request();
+  const headers = Object.fromEntries(Object.entries(await request.allHeaders()).filter(([name]) => /^(content-type|accept|authorization|x-)/i.test(name)));
+  state.list = { url: response.url(), method: request.method(), data: request.postData() || undefined, headers };
+  state.keysPath = new URL(response.url()).pathname.replace(/\/search\/?$/i, "");
+  state.listShape = { method: request.method(), path: new URL(response.url()).pathname, envelope: Array.isArray(body) ? [] : Object.keys(body).slice(0, 10),
+                      search_body_keys: (() => { try { return Object.keys(JSON.parse(request.postData() || "{}")); } catch { return []; } })() };
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   return list;
 }
 
-// The key list again, read by the same request the portal made (the persona's session, the page's origin).
+// The key list again, by the same request the portal made (the persona's session, the page's own headers).
 async function keys(page, state) {
-  const got = await page.request.get(state.keysUrl, { failOnStatusCode: false, timeout: 30000 });
+  const got = await page.request.fetch(state.list.url, { method: state.list.method, data: state.list.data, headers: state.list.headers, failOnStatusCode: false, timeout: 30000 });
   const list = got.status() === 200 ? rows(await got.json().catch(() => null)) : null;
   if (!list) throw new Error(`ai-dev-01's key list could not be read (HTTP ${got.status()})`);
   return list;
@@ -154,7 +165,7 @@ export async function run({ page, domain, mark, log, state, interceptSecret, fet
 
   // From here a key may exist. The recorder stands between the portal and the answer of the create call.
   state.creating = true;
-  const created = interceptSecret("MAAS_API_KEY", { url: KEYS_API, method: "POST", pattern: KEY, mask: MASK });
+  const created = interceptSecret("MAAS_API_KEY", { url: CREATE_API, method: "POST", pattern: KEY, mask: MASK });
   // If the portal ever sends the value it was given back to its server, the mask would break that call: it is seen.
   const sentBack = [];
   page.on("request", (r) => { if ((r.postData() || "").includes(MASK) || decodeURIComponent(r.url()).includes(MASK)) sentBack.push(`${r.method()} ${new URL(r.url()).pathname}`); });
@@ -162,7 +173,7 @@ export async function run({ page, domain, mark, log, state, interceptSecret, fet
   if (!submit) throw new Error(`the dialog's create button was not found (${SUBMIT.join(" | ")})`);
   await click(submit, { changes });
   const answer = await Promise.race([created, page.waitForTimeout(60000).then(() => null)]);
-  if (!answer) throw new Error("the create call was not seen within 60 s (no POST whose path holds api-keys): a key may exist, check the portal by hand");
+  if (!answer) throw new Error("the create call was not seen within 60 s (no POST to a path ending in api-keys): a key may exist, check the portal by hand");
   if (answer.status >= 300 || !answer.found) throw new Error(`the portal's create call answered HTTP ${answer.status} with ${answer.found ? "a" : "no"} key in it`);
   state.keyId = answer.body ? strictId(answer.body) : "";
   state.created.push({ kind: "api-key", id: state.keyId || state.keyName });
@@ -202,7 +213,7 @@ export async function scout({ page, step, state }) {
   if (!state.scout) throw new Error("scout() runs only in scout mode");
   const before = state.listed.filter(live).length;
   await step("portal", async () => ({ shell: state.shell }));
-  await step("keys", async () => ({ list_path: state.keysPath, keys: state.listed.length, not_revoked: before,
+  await step("keys", async () => ({ list_path: state.keysPath, list_request: state.listShape, keys: state.listed.length, not_revoked: before,
                                     fields: [...new Set(state.listed.flatMap((row) => Object.keys(row || {})))].sort().slice(0, 30),
                                     create_selector: ((await firstVisible(page, CREATE)) || {}).matched || "" }));
   await step("create-dialog", async () => {
@@ -238,7 +249,7 @@ export async function cleanup({ page, domain, log, state, fetchWithSecret }) {
     if (mine.length === 1) id = idOf(mine[0]);
   }
   if (!id) throw new Error(`${named} could not be found by an id: it was NOT revoked; revoke it by hand in the portal (API keys)`);
-  const gone = await page.request.delete(`${new URL(state.keysUrl).origin}${state.keysPath.replace(/\/$/, "")}/${encodeURIComponent(id)}`, { failOnStatusCode: false, timeout: 30000 });
+  const gone = await page.request.delete(`${new URL(state.list.url).origin}${state.keysPath.replace(/\/$/, "")}/${encodeURIComponent(id)}`, { headers: state.list.headers, failOnStatusCode: false, timeout: 30000 });
   // The proof, when the recorder holds the key: the gateway must refuse it now. When it holds none (the create
   // answer carried no key it could take out), the delete's own answer and the list are all there is.
   const proof = await fetchWithSecret("MAAS_API_KEY", { url: `${maas(domain)}/v1/models`, headers: { Authorization: "Bearer {secret}" } }).catch(() => null);

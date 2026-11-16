@@ -27,7 +27,8 @@ const PORTAL = page("Red Hat AI portal", `<nav><a href="#endpoints">AI asset end
 <script>
 const $ = (id) => document.getElementById(id);
 async function list() {
-  const body = await (await fetch("/maas-consumer-portal/api/v1/api-keys")).json();
+  // As the portal on 2026-11-16: the list is read by a POST to .../api-keys/search.
+  const body = await (await fetch("/maas-consumer-portal/maas/api/v1/api-keys/search", { method: "POST", headers: { "Content-Type": "application/json", "X-Portal": "1" }, body: JSON.stringify({ filters: {}, pagination: { limit: 50 } }) })).json();
   $("list").innerHTML = "";
   for (const k of body.data) { const li = document.createElement("li"); li.textContent = k.name + " (" + k.status + ")"; $("list").appendChild(li); }
 }
@@ -35,10 +36,10 @@ $("nav-keys").onclick = (e) => { e.preventDefault(); $("keys").hidden = false; l
 $("create").onclick = () => { $("dialog").hidden = false; };
 $("cancel").onclick = () => { $("dialog").hidden = true; };
 $("submit").onclick = async () => {
-  const r = await fetch("/maas-consumer-portal/api/v1/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("name").value, subscription: $("sub").value }) });
+  const r = await fetch("/maas-consumer-portal/maas/api/v1/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("name").value, subscription: $("sub").value }) });
   const made = await r.json();
   $("dialog").hidden = true; $("once").hidden = false; $("value").textContent = made.key; console.log("key shown once: " + made.key);
-  if (${process.env.FAKE_REREAD === "1"}) fetch("/maas-consumer-portal/api/v1/check", { method: "PUT", body: made.key });
+  if (${process.env.FAKE_REREAD === "1"}) fetch("/maas-consumer-portal/maas/api/v1/check", { method: "PUT", body: made.key });
   list();
 };
 </script>`);
@@ -62,11 +63,12 @@ http.createServer((req, res) => {
   if (u.pathname === "/kc") return html(LOGIN);
   if (u.pathname === "/cb") { res.writeHead(302, { Location: "/maas-consumer-portal/", "Set-Cookie": "s=1; Path=/" }); return res.end(); }
   if (!signed) return u.pathname.includes("/api/") ? json(401, {}) : html(CHOOSER);
-  if (u.pathname === "/maas-consumer-portal/api/v1/check") { checks += 1; return json(200, {}); }
-  if (u.pathname === "/maas-consumer-portal/api/v1/api-keys" && req.method === "GET") {
+  if (u.pathname === "/maas-consumer-portal/maas/api/v1/check") { checks += 1; return json(200, {}); }
+  if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys/search" && req.method === "POST") {
+    if (req.headers["x-portal"] !== "1") return json(400, { error: "the portal's own header is missing" });
     return json(200, { data: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })) });
   }
-  if (u.pathname === "/maas-consumer-portal/api/v1/api-keys" && req.method === "POST") {
+  if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys" && req.method === "POST") {
     return body((raw) => {
       const id = "k-" + crypto.randomUUID().slice(0, 8);
       const secret = "sk-oai-" + crypto.randomBytes(18).toString("base64url");
@@ -74,7 +76,8 @@ http.createServer((req, res) => {
       json(201, process.env.FAKE_NO_ID === "1" ? { key: secret, name: JSON.parse(raw).name } : { id, key: secret, name: JSON.parse(raw).name });
     });
   }
-  const one = u.pathname.match(/^\/maas-consumer-portal\/api\/v1\/api-keys\/([^/]+)$/);
+  if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys/search") return json(405, {});
+  const one = u.pathname.match(/^\/maas-consumer-portal\/maas\/api\/v1\/api-keys\/([^/]+)$/);
   if (one && req.method === "DELETE") {
     if (process.env.FAKE_REFUSE_REVOKE === "1" || !keys.has(one[1])) return json(403, {});
     keys.get(one[1]).status = "revoked";

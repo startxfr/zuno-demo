@@ -873,7 +873,7 @@ expect "maas: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '
 expect "maas: a scout creates no key" grep -q 'left: {"keys":1,"live":1,"checks":0}' <<<"$out"
 expect "maas: scout.json reports the list's shape and the dialog, no key value" scouted m-scout '
 assert list(steps) == ["enter", "owned", "portal", "keys", "create-dialog", "closed"], list(steps)
-assert steps["keys"]["list_path"] == "/maas-consumer-portal/api/v1/api-keys" and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
+assert steps["keys"]["list_path"] == "/maas-consumer-portal/maas/api/v1/api-keys" and steps["keys"]["list_request"] == {"method": "POST", "path": "/maas-consumer-portal/maas/api/v1/api-keys/search", "envelope": ["data"], "search_body_keys": ["filters", "pagination"]} and steps["keys"]["fields"] == ["id", "name", "status", "subscription"] and steps["keys"]["not_revoked"] == 1, steps["keys"]
 assert steps["create-dialog"]["subscription_on_screen"] is True and steps["create-dialog"]["submit_selector"] and steps["create-dialog"]["name_selector"], steps["create-dialog"]
 assert "sk-oai-" not in json.dumps(s)
 '
@@ -903,7 +903,7 @@ echo "$out" | sed 's/^/    /' | tail -3
 expect "maas: a create answer without an id: the key is found by this take's own name and revoked" bash -c "test $rc -eq 0 && grep -q 'left: {\"keys\":2,\"live\":1,' <<<\"\$0\"" "$out"
 out="$(maas m-reread FAKE_REREAD=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "maas: a portal that sends the shown key back to its server stops the take, and the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/api/v1/check)' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":1}' <<<\"\$0\"" "$out"
+expect "maas: a portal that sends the shown key back to its server stops the take, and the key is revoked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the portal sent the key it was shown back to its server (PUT /maas-consumer-portal/maas/api/v1/check)' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":1}' <<<\"\$0\"" "$out"
 fi
 if wanted openclaw; then
 echo "== openclaw (a second credential typed in a plain field; no take yet)"
