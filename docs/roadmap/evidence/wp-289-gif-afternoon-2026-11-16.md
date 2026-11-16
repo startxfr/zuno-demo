@@ -272,3 +272,17 @@ The take failed after the Agent turn: the workflow step went to the web-app page
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
 
 A lora rescout at `889fe3c9` passed 8 of 8 (as relayed); its take is with the owner.
+
+## Take: lora-pipeline-mlflow-kueue (not yet a publication candidate)
+
+| Item | Value |
+|---|---|
+| Take | `lora-pipeline-mlflow-kueue-20261116-211512`: `ai-dev-01`, `pass`, 5 markers in 37.9 s, cut at `889fe3c9` (as relayed) |
+| Owner's go | Given in demo333's session, told "writes watched, not blocked" (as relayed) |
+| Created and cleaned | `created` empty, `cleaned` null; owned 0 before and 0 after; `private_addresses` count 0; no write watched (as relayed) |
+| GIF | 1 590 868 bytes (read from the take), SHA-256 `c46fbd50492c...`, 44.0 s as relayed, 5 moments |
+
+**Review.** demo333 opened the 5 marker images (as relayed). The writer opened 2 (`pipeline.png`, `trainjob.png`) and no frames. `pipeline.png`: the pipeline version `v0-4-0-tekos`, a version dropdown, tabs Graph, Summary and Pipeline spec, a graph of four nodes `component` to `component-4`, and the step names in the description line; the account `ai-dev-01` in the header; no node name, no address. `trainjob.png`: the **Jobs** page of Zuno MLOps with one row, `lora-comage-4c28m`, type TrainJob, nodes 0, cluster queue "-", created "2 months ago"; no status column at 1280 px.
+
+**Not yet a publication candidate.** Two captions overstate; the assist fixes `gif.yml` and the GIF is re-cut from the same take (as relayed). Page: row 1:45 now matches the Jobs frame: the job, its type and its age. Its `Complete` state and its date 2026-09-08 come from `oc get trainjob`, not from the page. Sent to the owner.
+
