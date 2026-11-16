@@ -2,11 +2,13 @@
 // MLflow's UI under /mlflow, for the offline test of walkthroughs/lora-pipeline-mlflow-kueue.mjs
 // (tests/walkthroughs-offline.sh). Its own file: tests/fake-rhoai.mjs (model-catalog-registry) stays as it is. Shaped
 // like the walkthrough's GUESSES, not like RHOAI: it proves the walkthrough's own logic, not the real selectors.
-// It serves the provider chooser and Keycloak (as seen live), a menu with Home, Projects and a collapsed "Develop &
-// train" group (a sub-group "Pipelines" inside, and the link "Training jobs"), the projects list, the project Zuno
-// MLOps with its Pipelines tab (the three pipelines by display name), the graph of the tekos version (its steps as SVG
-// text), the Training jobs page with lora-comage-4c28m, and MLflow's experiments and runs (its searches are POSTs).
-// Knobs: FAKE_NO_TRAINING=1 the menu has no Training jobs page; FAKE_VERSION=v0-4-0 the graph is of v0-4-0-tekos;
+// It serves the provider chooser and Keycloak (as seen live), the menu as the scout of 2026-11-16 dumped it (Home,
+// Projects /projects, a collapsed "Develop & train" group with a sub-group "Pipelines", Experiments
+// /develop-train/mlflow/experiments and Jobs /develop-train/training-jobs), the projects list, the project Zuno MLOps
+// with its Pipelines tab (?section=pipelines-projects, the three pipelines by display name), the graph of the tekos
+// version (its steps as SVG text), the Jobs page that shows lora-comage-4c28m only at /develop-train/training-jobs/
+// zuno-mlops, and the dashboard's Experiments page embedding MLflow in a frame (its searches are POSTs).
+// Knobs: FAKE_NO_TRAINING=1 there is no Jobs page; FAKE_VERSION=v0-4-0 the graph is of v0-4-0-tekos;
 // FAKE_MLFLOW_WORKSPACE=1 MLflow lists the experiment only once the workspace zuno-mlops is chosen; FAKE_WRITE=1 the
 // experiment page sets a tag on a run (a write); FAKE_DIALOG=1 a welcome dialog covers the dashboard.
 // /fake/count says {writes}: the non-GET requests that are not MLflow searches. No cluster.
@@ -32,7 +34,8 @@ function shell(body, { dialog = false } = {}) {
 <button aria-expanded="false" ${toggle("hub")}>AI hub</button><div id="hub" hidden><a href="/ai-hub/models">Models</a></div>
 <button aria-expanded="false" ${toggle("dev")}>Develop &amp; train</button><div id="dev" hidden>
 <button aria-expanded="false" ${toggle("pipes")}>Pipelines</button><div id="pipes" hidden><a href="/develop-train/pipelines/definitions">Pipeline definitions</a><a href="/develop-train/pipelines/runs">Runs</a></div>
-${knob("FAKE_NO_TRAINING") ? "" : `<a href="/develop-train/training-jobs">Training jobs</a>`}</div></nav>
+<a href="/develop-train/mlflow/experiments">Experiments</a>
+${knob("FAKE_NO_TRAINING") ? "" : `<a href="/develop-train/training-jobs">Jobs</a>`}</div></nav>
 <main>${body}</main>
 ${dialog ? `<div class="modal" role="dialog" aria-modal="true"><div><h2>Welcome to Red Hat OpenShift AI</h2></div></div>` : ""}`;
 }
@@ -44,9 +47,9 @@ function view(path, query) {
   if (path === "/") return `<h1>Welcome, ai-dev-01</h1><p>Your projects</p>`;
   if (path === "/projects") return `<h1>Projects</h1><table><tr><td><a href="/projects/zuno-ai-run">Zuno AI Run</a></td></tr><tr><td><a href="/projects/zuno-mlops">Zuno MLOps</a></td></tr></table>`;
   if (path === "/projects/zuno-mlops") {
-    const onPipelines = query.get("section") === "pipelines";
+    const onPipelines = query.get("section") === "pipelines-projects";
     const tabs = ["Overview", "Workbenches", "Pipelines"].map((t) => `<button role="tab" aria-selected="${(t === "Pipelines") === onPipelines}"
-onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipelines" : ""}'">${t}</button>`).join("");
+onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipelines-projects" : ""}'">${t}</button>`).join("");
     return `<h1>Zuno MLOps</h1><div role="tablist">${tabs}</div>` + (onPipelines
       ? `<table>${PIPELINES.map((p, i) => `<tr><td><a href="/pipelines/zuno-mlops/p${i}/view">${p}</a></td></tr>`).join("")}</table>` : `<p>Overview of the project.</p>`);
   }
@@ -54,7 +57,9 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
     return `<h1>${PIPELINES[2]}</h1><p>Version: <span>${VERSION}</span></p><button>Create run</button>
 <svg width="900" height="160">${["prepare-dataset", "train-lora", "evaluate", "push-registry"].map((s, i) => `<rect x="${20 + i * 220}" y="40" width="180" height="40" fill="#ddd"/><text x="${30 + i * 220}" y="65">${s}</text>`).join("")}</svg>`;
   }
-  if (path === "/develop-train/training-jobs") return `<h1>Training jobs</h1><p>Project: Zuno MLOps</p><table><tr><td>lora-comage-4c28m</td><td>Complete</td><td>2026-09-08</td></tr></table>`;
+  if (path === "/develop-train/training-jobs" && !knob("FAKE_NO_TRAINING")) return `<h1>Jobs</h1><p>Select a project to see its training jobs.</p>`;
+  if (path === "/develop-train/training-jobs/zuno-mlops" && !knob("FAKE_NO_TRAINING")) return `<h1>Jobs</h1><p>Project: Zuno MLOps</p><table><tr><td>lora-comage-4c28m</td><td>Complete</td><td>2026-09-08</td></tr></table>`;
+  if (path === "/develop-train/mlflow/experiments") return `<h1>Experiments</h1><iframe src="/mlflow/" title="MLflow" style="width:100%;height:560px;border:1px solid #ccc"></iframe>`;
   return null;
 }
 
@@ -81,7 +86,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/kc") return send(LOGIN);
   if (u.pathname === "/cb") { res.writeHead(302, { location: "/", "set-cookie": `sid=${u.searchParams.get("u")}; Path=/` }); return res.end(); }
   if (!signed) return send(CHOOSER);
-  if (u.pathname === "/mlflow") return send(MLFLOW_HOME);
+  if (u.pathname === "/mlflow" || u.pathname === "/mlflow/") return send(MLFLOW_HOME);
   if (u.pathname === "/mlflow/experiments/7") return send(MLFLOW_EXPERIMENT);
   const body = view(u.pathname, u.searchParams);
   if (body === null) return send(shell("<h1>Not found</h1>"), 404);

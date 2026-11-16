@@ -697,9 +697,11 @@ expect "lora: a scout exits 0, SCOUT: done, nothing started or changed" bash -c 
 expect "lora: the scout dumps the menu's links with their addresses, then plays the three screens" scouted l-scout '
 assert list(steps) == ["enter", "owned", "menu", "pipeline", "pipeline-shapes", "trainjob", "trainjob-shapes", "mlflow", "mlflow-shapes", "closed"], list(steps)
 links = {l["text"]: l["href"] for l in steps["menu"]["links"]}
-assert links.get("Training jobs") == "/develop-train/training-jobs" and links.get("Pipeline definitions") == "/develop-train/pipelines/definitions" and links.get("Projects") == "/projects", links
+assert links.get("Jobs") == "/develop-train/training-jobs" and links.get("Experiments") == "/develop-train/mlflow/experiments" and links.get("Projects") == "/projects", links
 assert steps["pipeline"]["version"] == {"v0-3-0-tekos": True, "v0-4-0-tekos": False} and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
-assert steps["trainjob"]["link"] == "nav a:text-is(\x27Training jobs\x27)" and steps["mlflow"]["workspace"] == "none chosen", (steps["trainjob"], steps["mlflow"])
+assert steps["trainjob"]["how"] == ["menu nav a[href=\x27/develop-train/training-jobs\x27]", "address /develop-train/training-jobs/zuno-mlops"], steps["trainjob"]
+assert steps["mlflow"]["workspace"] == "none chosen" and steps["mlflow"]["embedded"] is True and steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]"], steps["mlflow"]
+assert steps["pipeline"]["how"][0] == "menu nav a[href=\x27/projects\x27]" and any(f.startswith("/mlflow/") for f in steps["mlflow-shapes"]["frames"]), (steps["pipeline"], steps["mlflow-shapes"]["frames"])
 '
 out="$(lora l-pass)"; rc=$?
 echo "$out" | sed 's/^/    /'
@@ -711,10 +713,10 @@ assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "re
 '
 out="$(lora l-ws FAKE_MLFLOW_WORKSPACE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: MLflow listing the experiment only in its workspace: the workspace zuno-mlops is chosen, the take passes" bash -c "test $rc -eq 0 && grep -q 'mlflow: {\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\"" "$out"
+expect "lora: MLflow listing the experiment only in its workspace: the workspace zuno-mlops is chosen, the take passes" bash -c "test $rc -eq 0 && grep -q 'mlflow: {.*\"workspace\":\"button:has-text(.Workspace.)\"' <<<\"\$0\"" "$out"
 out="$(lora l-notrain FAKE_NO_TRAINING=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: no Training jobs page in the menu fails the take and names the terminal row" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL no Training jobs page in the menu' <<<\"\$0\"" "$out"
+expect "lora: no Jobs page fails the take and names the terminal row" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the Jobs page (/develop-train/training-jobs) does not show lora-comage-4c28m' <<<\"\$0\"" "$out"
 out="$(lora l-v4 FAKE_VERSION=v0-4-0)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a graph of another version than v0-3-0-tekos fails the take: the page's row names it" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is not of the version v0-3-0-tekos' <<<\"\$0\"" "$out"
