@@ -23,6 +23,15 @@
 // unknown 2), and the shapes of each screen (unknown 5). What a chat leaves on the server is not known before that:
 // owned() is empty until it is.
 //
+// The first scout (2026-11-16 16:11, demo333, at a6f7635b): the sign-in lands on /maas-consumer-portal/gen-ai-studio/assets;
+// the menu link `nav a:text-is('Playground')` opens the playground of zuno-playground ("New chat", "Compare chat", no
+// chat history list); Settings > Model shows the model gpt-oss-20b and the subscription gpt-oss-20b-agents (not the
+// page's gpt-oss-20b-ocp-ai-ops) in PatternFly menu toggles; Settings > MCP lists zuno-mcp-gateway with "0 active" and a
+// lock: no saved connection in a fresh browser, the token is kept in the browser. zuno-demo-reorg's decision:
+// TOOLS_ROW stays off, no token is given to the recorder, and the subscription shown is filmed as it is, never chosen.
+// localStorage holds one key (mod-arch.namespace.lastUsed), sessionStorage none; the page reads its models, MCP
+// servers, vector stores and status with GETs only, and asked for no chat store.
+//
 // Selectors: the portal's left menu "Playground", the playground's address
 // /maas-consumer-portal/gen-ai-studio/playground/zuno-playground, the "Settings" button and its tabs Model, Prompt,
 // Knowledge, MCP, the MCP row `zuno-mcp-gateway` with its "9 active" tools and its Auth lock, the "Send a message..."
@@ -48,7 +57,7 @@ const PORTAL = "/maas-consumer-portal";
 const PLAYGROUND = `${PORTAL}/gen-ai-studio/playground/zuno-playground`;          // seen in the WP-220 screenshot
 const PROJECT = "Zuno Playground";
 const MODEL = "publishers/zuno-ai-run/models/gpt-oss-20b";
-const SUBSCRIPTION = "gpt-oss-20b-ocp-ai-ops";
+const SUBSCRIPTION = /^gpt-oss-20b-[a-z0-9-]+$/;   // the subscription shown (gpt-oss-20b-agents in the scout): read, never chosen
 const SERVER = "zuno-mcp-gateway";
 const PROVIDER = "openshift";
 const PROVIDER_LINK = [`a[title='Log in with ${PROVIDER}']`, `a.idp:text-is('${PROVIDER}')`, `a:text-is('${PROVIDER}')`];   // seen live, 2026-11-16
@@ -57,8 +66,9 @@ const NAV_PLAYGROUND = ["nav a:text-is('Playground')", "a:text-is('Playground')"
 const CREATE = ["button:has-text('Create playground')", "a:has-text('Create playground')"];                                 // never clicked
 const SETTINGS = ["button:has-text('Settings')", "[aria-label='Settings']"];                                               // WP-220 screenshot
 const TAB = (name) => [`[role='tab']:has-text('${name}')`, `button:text-is('${name}')`, `button:has-text('${name}')`];      // WP-220: Model | Prompt | Knowledge | MCP
-const MODEL_PICKER = ["[aria-label*='model' i][aria-haspopup]", "button[aria-haspopup]:has-text('publishers/')", "[data-testid*='model' i] button"];   // guess
-const SUBSCRIPTION_PICKER = ["[aria-label*='subscription' i][aria-haspopup]", "button[aria-haspopup]:has-text('gpt-oss-20b-ocp')", "[data-testid*='subscription' i] button"];   // guess
+// PatternFly menu toggles (the scout of 2026-11-16); the model is chosen only when another one is shown.
+const MODEL_PICKER = ["button.pf-v6-c-menu-toggle:has-text('publishers/')", "button.pf-v5-c-menu-toggle:has-text('publishers/')",
+                      "[aria-label*='model' i][aria-haspopup]", "button[aria-haspopup]:has-text('publishers/')"];   // guess
 const INPUT = ["textarea[placeholder*='Send a message' i]", "[contenteditable='true'][aria-label*='message' i]", "textarea"];   // WP-220 screenshot: "Send a message..."
 const CHIPS = /TTFT|T\/s/;                                                                                                  // WP-220 screenshot: "TTFT: 630ms", "169 T/s"
 const DIALOG = "[role='dialog'][aria-modal='true'], .pf-v5-c-backdrop, .pf-v6-c-backdrop";
@@ -190,15 +200,24 @@ async function clickNav(page) {
   return link.matched;
 }
 
-// Settings > Model: the model and the subscription the page names, chosen only when another one is shown. Each
-// choice runs under the guard: whatever it would send is refused and listed.
+// The text of the first element on screen matching `re` (a hidden list option does not count), or "".
+async function shownText(page, re) {
+  const all = page.getByText(re);
+  for (let i = 0; i < Math.min(await all.count(), 10); i += 1) {
+    if (await all.nth(i).isVisible().catch(() => false)) return (await all.nth(i).innerText().catch(() => "")).trim();
+  }
+  return "";
+}
+
+// Settings > Model: the model the page names, chosen only when another one is shown (the choice runs under the
+// guard: whatever it would send is refused and listed); the subscription shown is read, never chosen.
 async function modelSettings(page, state) {
   const tab = await settingsTab(page, "Model");
   const shown = async () => ({ model: await page.getByText(MODEL).first().isVisible().catch(() => false),
-                               subscription: await page.getByText(SUBSCRIPTION).first().isVisible().catch(() => false) });
+                               subscription: await shownText(page, SUBSCRIPTION) });
   const before = await shown();
   const chosen = [];
-  for (const [what, pickers, value] of [["model", MODEL_PICKER, MODEL], ["subscription", SUBSCRIPTION_PICKER, SUBSCRIPTION]]) {
+  for (const [what, pickers, value] of [["model", MODEL_PICKER, MODEL]]) {
     if (before[what]) continue;
     const picker = await firstVisible(page, pickers);
     if (!picker) throw new Error(`the ${what} ${value} is not shown and no ${what} picker was found (${pickers.join(" | ")})`);
@@ -211,8 +230,9 @@ async function modelSettings(page, state) {
     chosen.push({ what, sent: since(state, from).requests.filter((r) => !/^(GET|HEAD|OPTIONS) /.test(r)) });
   }
   const after = await shown();
-  if (!after.model || !after.subscription) throw new Error(`Settings > Model does not show ${MODEL} and ${SUBSCRIPTION} (${JSON.stringify(after)})`);
-  return { tab, before, chosen };
+  if (!after.model) throw new Error(`Settings > Model does not show ${MODEL} (${JSON.stringify(after)})`);
+  if (!after.subscription) throw new Error("Settings > Model shows no gpt-oss-20b subscription");
+  return { tab, before, chosen, subscription_shown: after.subscription };
 }
 
 // Enter: the guard, then the sign-in. A take stops on a refused request; a scout lists it and goes on, so that it
@@ -286,8 +306,10 @@ export async function scout(ctx) {
   await step("storage", async () => ({ keys: await read(page, () => ({ local: Object.keys(localStorage).slice(0, 60), session: Object.keys(sessionStorage).slice(0, 60) })),
                                        store_like_requests: state.requests.filter((r) => STORE.test(r.split(" ")[1] || "")).slice(0, 40) }));
   await step("closed", async () => {
-    const typed = await read(page, () => [...document.querySelectorAll("textarea")].some((t) => t.value.length > 0)).catch(() => false);
-    if (typed) throw new Error("a message box is not empty after the scout");
+    // The message box only (the scout of 2026-11-16 counted another text box: the chat shows a welcome message).
+    const box = await firstVisible(page, INPUT.slice(0, 2));
+    const typed = box ? ((await box.inputValue().catch(() => null)) ?? (await box.innerText().catch(() => ""))) : "";
+    if (typed.trim()) throw new Error("the message box is not empty after the scout");
     noWrites(state, "the scout");
     return { refused: [], requests_seen: state.requests.length };
   });
