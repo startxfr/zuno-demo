@@ -43,6 +43,7 @@ const AGENT_NAME = new RegExp(`(^|/)${AGENT}$`);   // the agent as a list shows 
 const WIZARD = "Skip wizard";                                                                    // seen by the browser check (run.mjs)
 const AGENT_LINK = [`a[href*='/agents/${NAMESPACE}/${AGENT}']`, `a:has-text('${AGENT}')`, `text=${AGENT}`];   // guess
 const INPUT = ["textarea[placeholder*='message' i]", "form textarea", "textarea"];               // guess
+const SEND = ["form button[type='submit']", "button:has-text('Send')"];                              // the button reads "Send" (failed.png, 2026-11-16)
 const BUSY = ["button[aria-label*='Stop' i]", "button:has-text('Stop')", "text=/^Thinking/"];    // guess: an answer in progress
 const SESSION_LINK = "a[href*='/chat/']";                                                        // guess: an earlier session
 const SESSION_ID = /\/chat\/([A-Za-z0-9][A-Za-z0-9_-]{7,})/;                                     // guess: the id in the address bar
@@ -90,13 +91,49 @@ async function createdSession(page, state, prompt) {
   return { id: fresh[0].id, from: "the session list (the one new session)" };
 }
 
+// Type a question and send it, and return only once it HAS been sent. On 2026-11-16 the first take typed the question
+// and pressed Enter, and kagent sent nothing: the text stayed in the input, and the marker was taken all the same.
+// So: Enter first; if the input still holds the question after four seconds, the Send button; then Ctrl+Enter. A try
+// is made only while the question is still in the input, so it is never sent twice. Then the question must show in
+// the thread (or the session id in the address bar) before anything is marked.
 async function ask(page, prompt, state) {
   if (state && state.scout) throw new Error("a scout never types in the chat input");
   const input = await firstVisible(page, INPUT);
   if (!input) throw new Error(`the chat input was not found (${INPUT.join(" | ")})`);
+  const box = page.locator(input.matched).first();
+  const held = async () => (await box.inputValue().catch(() => "")).includes(prompt.slice(0, 20));
   await input.click();
   await page.keyboard.type(prompt, { delay: 25 });
-  await page.keyboard.press("Enter");
+  if (!(await held())) throw new Error("the question typed is not in the chat input");
+  const ways = [
+    ["Enter", async () => page.keyboard.press("Enter")],
+    ["the Send button", async () => {
+      // An Enter that only added a line is taken back first: the question is sent as the page writes it.
+      const now = await box.inputValue();
+      for (let extra = now.length - now.trimEnd().length; extra > 0; extra -= 1) await page.keyboard.press("Backspace");
+      const send = await firstVisible(page, SEND);
+      if (!send) throw new Error(`no Send button among ${SEND.join(" | ")}`);
+      await click(send, { changes });
+    }],
+    ["Ctrl+Enter", async () => { await box.focus(); await page.keyboard.press("Control+Enter"); }],
+  ];
+  const tried = [];
+  for (const [name, send] of ways) {
+    tried.push(name);
+    await send().catch((error) => tried.push(`(${error.message.split("\n")[0]})`));
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline && await held()) await page.waitForTimeout(200);
+    if (!(await held())) {
+      if (state) state.sentBy = name;
+      const shown = Date.now() + 20000;
+      while (Date.now() < shown) {
+        if (SESSION_ID.test(page.url()) || (await page.locator("body").innerText()).includes(prompt.slice(0, 30))) return name;
+        await page.waitForTimeout(300);
+      }
+      throw new Error(`the question left the input (${name}) but shows neither in the thread nor as a session in the address bar`);
+    }
+  }
+  throw new Error(`the question was typed but not sent: it is still in the chat input after ${tried.join(", ")}`);
 }
 
 // Open the agent's chat from the list: the selector that matched.
@@ -210,7 +247,7 @@ export async function run({ page, mark, log, state }) {
 
   let before = await page.locator("body").innerText();
   state.sent = true;   // from here a session may exist, even if its id is never read: cleanup() must not stay silent
-  await ask(page, prompts["0:45"], state);
+  log(`question 1 sent by ${await ask(page, prompts["0:45"], state)}`);
   await mark("q1-sent");
   const made = await createdSession(page, state, prompts["0:45"]);
   if (!made) throw new Error("the session the first question created could not be told from the others (no id in the address bar, not exactly one new session)");

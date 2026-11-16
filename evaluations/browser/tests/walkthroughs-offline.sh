@@ -103,6 +103,14 @@ assert m["cleaned"] is False and m["owned"] == {"before": 1, "after": 2, "same":
 out="$(kagent k-noid FAKE_NO_URL=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: with no id in the address bar the session is found as the one new session, and deleted" bash -c "test $rc -eq 0 && grep -q 'id read from the session list' <<<\"\$0\" && grep -q 'left: {\"sessions\":1,' <<<\"\$0\"" "$out"
+out="$(kagent k-button FAKE_ENTER=newline)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "kagent: when Enter only adds a line the Send button sends the question, once and as written" bash -c "test $rc -eq 0 && grep -q 'question 1 sent by the Send button' <<<\"\$0\" && grep -q 'left: {\"sessions\":1,' <<<\"\$0\"" "$out"
+out="$(kagent k-dead FAKE_ENTER=dead)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "kagent: a question that is never sent fails the take before q1-sent, with no session" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the question was typed but not sent: it is still in the chat input after Enter, the Send button, Ctrl+Enter' <<<\"\$0\" && grep -q 'left: {\"sessions\":1,' <<<\"\$0\"" "$out"
+expect "kagent: that take stopped at the agent marker" markers k-dead '
+assert [x["name"] for x in m["markers"]] == ["login", "agents", "agent"] and m["created"] == [], m'
 out="$(kagent k-other FAKE_NO_URL=1 FAKE_OTHER_NAME=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "kagent: a new session that is not named like the question is not taken for the take's, and nothing is deleted" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the session the first question created could not be told from the others.*may remain in kagent' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,' <<<\"\$0\"" "$out"

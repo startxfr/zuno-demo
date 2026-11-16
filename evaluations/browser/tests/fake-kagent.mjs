@@ -25,7 +25,7 @@ const APP = `<!doctype html><title>kagent (fake)</title>
 <div id="chat" hidden><h2>zuno-kagent/zuno-sre</h2>
 <aside><a href="/agents/zuno-kagent/zuno-sre/chat/${EARLIER}">An earlier session</a>
 <ul><li>k8s.resource.read</li><li>k8s.resource.list</li><li>k8s.events.read</li><li>k8s.logs.read</li><li>metrics.query</li></ul></aside>
-<div id="messages"></div><form onsubmit="return false"><textarea id="in" placeholder="Send a message..."></textarea></form></div>
+<div id="messages"></div><form onsubmit="return false"><textarea id="in" placeholder="Send a message..."></textarea><button type="button" id="send">Send</button></form></div>
 <script>
 const $ = (id) => document.getElementById(id);
 let sid = (location.pathname.match(/\\/chat\\/([^/]+)$/) || [])[1] || "";
@@ -53,14 +53,21 @@ async function show() {
   for (const m of list) { const p = document.createElement("p"); p.textContent = m.text; $("messages").appendChild(p); }
 }
 setInterval(show, 300);
-$("in").addEventListener("keydown", async (e) => {
-  if (e.key !== "Enter") return;
-  e.preventDefault();
+// FAKE_ENTER=newline: Enter only adds a line, as kagent did on 2026-11-16; the Send button sends.
+// FAKE_ENTER=dead: nothing sends at all.
+const mode = ${JSON.stringify(process.env.FAKE_ENTER || "")};
+async function send() {
   const text = $("in").value; $("in").value = "";
   const r = await fetch("/api/a2a/zuno-kagent/zuno-sre", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, session: sid }) });
   const made = (await r.json()).session;
   if (!sid) { sid = made; if (!${process.env.FAKE_NO_URL === "1"}) history.replaceState(null, "", "/agents/zuno-kagent/zuno-sre/chat/" + sid); }
+}
+$("in").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || mode) return;
+  e.preventDefault();
+  send();
 });
+$("send").addEventListener("click", () => { if (mode !== "dead") send(); });
 </script>`;
 
 function answer(text) {
