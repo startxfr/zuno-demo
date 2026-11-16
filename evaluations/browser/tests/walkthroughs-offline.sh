@@ -700,9 +700,10 @@ expect "lora: the scout dumps the menu's links with their addresses, then plays 
 assert list(steps) == ["enter", "owned", "menu", "pipeline", "pipeline-shapes", "trainjob", "trainjob-shapes", "mlflow", "mlflow-shapes", "closed"], list(steps)
 links = {l["text"]: l["href"] for l in steps["menu"]["links"]}
 assert links.get("Jobs") == "/develop-train/training-jobs" and links.get("Experiments") == "/develop-train/mlflow/experiments" and links.get("Projects") == "/projects", links
-assert steps["pipeline"]["version"] == {"v0-3-0-tekos": True, "v0-4-0-tekos": False} and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
+assert steps["pipeline"]["versions_shown"] == ["v0-3-0-tekos"] and steps["pipeline"]["merge_export_on_screen"] is False, steps["pipeline"]
 assert steps["trainjob"]["how"] == ["menu nav a[href=\x27/develop-train/training-jobs\x27]", "address /develop-train/training-jobs/zuno-mlops"], steps["trainjob"]
-assert steps["mlflow"]["workspace"] == "none chosen" and steps["mlflow"]["embedded"] is True and steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]"], steps["mlflow"]
+assert steps["mlflow"]["workspace"] == "none chosen" and steps["mlflow"]["embedded"] is False and steps["mlflow"]["dashboard_list"] == "No experiments", steps["mlflow"]
+assert steps["mlflow"]["how"] == ["menu nav a[href=\x27/develop-train/mlflow/experiments\x27]", "Launch MLflow: /mlflow/"], steps["mlflow"]
 assert steps["pipeline"]["how"][0] == "menu nav a[href=\x27/projects\x27]" and any(f.startswith("/mlflow/") for f in steps["mlflow-shapes"]["frames"]), (steps["pipeline"], steps["mlflow-shapes"]["frames"])
 '
 out="$(lora l-pass)"; rc=$?
@@ -721,7 +722,13 @@ echo "$out" | sed 's/^/    /'
 expect "lora: no Jobs page fails the take and names the terminal row" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the Jobs page (/develop-train/training-jobs) does not show lora-comage-4c28m' <<<\"\$0\"" "$out"
 out="$(lora l-v4 FAKE_VERSION=v0-4-0)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: a graph of another version than v0-3-0-tekos fails the take: the page's row names it" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is not of the version v0-3-0-tekos' <<<\"\$0\"" "$out"
+expect "lora: a graph of another version than v0-3-0-tekos fails the take: the page's row names it" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the graph on screen is of v0-4-0-tekos, not v0-3-0-tekos' <<<\"\$0\"" "$out"
+out="$(lora l-frame FAKE_DASHBOARD_FRAME=1 FAKE_NO_VERSION_NAME=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: MLflow embedded in the dashboard's page and a graph that names no version: the take passes and says so" bash -c "test $rc -eq 0 && grep -q '\"versions_shown\":\[\]' <<<\"\$0\" && grep -q '\"embedded\":true' <<<\"\$0\"" "$out"
+out="$(lora l-empty FAKE_MLFLOW_EMPTY=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: no experiment mlops-comage in the dashboard or in MLflow's own UI fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*mlops-comage' <<<\"\$0\"" "$out"
 out="$(lora l-write FAKE_WRITE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a page that writes to MLflow fails the take; MLflow's searches (POSTs) do not" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /mlflow/ajax-api/2.0/mlflow/runs/set-tag' <<<\"\$0\"" "$out"

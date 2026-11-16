@@ -6,8 +6,11 @@
 // Projects /projects, a collapsed "Develop & train" group with a sub-group "Pipelines", Experiments
 // /develop-train/mlflow/experiments and Jobs /develop-train/training-jobs), the projects list, the project Zuno MLOps
 // with its Pipelines tab (?section=pipelines-projects, the three pipelines by display name), the graph of the tekos
-// version (its steps as SVG text), the Jobs page that shows lora-comage-4c28m only at /develop-train/training-jobs/
-// zuno-mlops, and the dashboard's Experiments page embedding MLflow in a frame (its searches are POSTs).
+// version (drawn after a spinner, its steps as SVG text), the Jobs page that shows lora-comage-4c28m only at
+// /develop-train/training-jobs/zuno-mlops, and the dashboard's Experiments page as the rescout of 2026-11-16 saw it:
+// "No experiments" for Zuno MLOps and a "Launch MLflow" link to MLflow's own UI, which lists mlops-comage (its searches
+// are POSTs). FAKE_DASHBOARD_FRAME=1 the Experiments page embeds MLflow in a frame instead; FAKE_MLFLOW_EMPTY=1 MLflow's
+// own UI lists only "Default"; FAKE_NO_VERSION_NAME=1 the graph page names no version.
 // Knobs: FAKE_NO_TRAINING=1 there is no Jobs page; FAKE_VERSION=v0-4-0 the graph is of v0-4-0-tekos;
 // FAKE_MLFLOW_WORKSPACE=1 MLflow lists the experiment only once the workspace zuno-mlops is chosen; FAKE_WRITE=1 the
 // experiment page sets a tag on a run (a write); FAKE_DIALOG=1 a welcome dialog covers the dashboard.
@@ -54,18 +57,25 @@ onclick="location.href='/projects/zuno-mlops${t === "Pipelines" ? "?section=pipe
       ? `<table>${PIPELINES.map((p, i) => `<tr><td><a href="/pipelines/zuno-mlops/p${i}/view">${p}</a></td></tr>`).join("")}</table>` : `<p>Overview of the project.</p>`);
   }
   if (path === "/pipelines/zuno-mlops/p2/view") {
-    return `<h1>${PIPELINES[2]}</h1><p>Version: <span>${VERSION}</span></p><button>Create run</button>
+    const graph = `<h1>${PIPELINES[2]}</h1>${knob("FAKE_NO_VERSION_NAME") ? "" : `<p>Version: <span>${VERSION}</span></p>`}<button>Create run</button>
 <svg width="900" height="160">${["prepare-dataset", "train-lora", "evaluate", "push-registry"].map((s, i) => `<rect x="${20 + i * 220}" y="40" width="180" height="40" fill="#ddd"/><text x="${30 + i * 220}" y="65">${s}</text>`).join("")}</svg>`;
+    // Drawn after a spinner, as the rescout of 2026-11-16 caught the page ("Loading").
+    return `<div id="graph"><div role="progressbar">Loading</div></div><script>setTimeout(() => { document.getElementById("graph").innerHTML = ${JSON.stringify(graph)}; }, 2500);</script>`;
   }
   if (path === "/develop-train/training-jobs" && !knob("FAKE_NO_TRAINING")) return `<h1>Jobs</h1><p>Select a project to see its training jobs.</p>`;
   if (path === "/develop-train/training-jobs/zuno-mlops" && !knob("FAKE_NO_TRAINING")) return `<h1>Jobs</h1><p>Project: Zuno MLOps</p><table><tr><td>lora-comage-4c28m</td><td>Complete</td><td>2026-09-08</td></tr></table>`;
-  if (path === "/develop-train/mlflow/experiments") return `<h1>Experiments</h1><iframe src="/mlflow/" title="MLflow" style="width:100%;height:560px;border:1px solid #ccc"></iframe>`;
+  if (path === "/develop-train/mlflow/experiments") {
+    if (knob("FAKE_DASHBOARD_FRAME")) return `<h1>Experiments</h1><iframe src="/mlflow/" title="MLflow" style="width:100%;height:560px;border:1px solid #ccc"></iframe>`;
+    return `<h1>Experiments</h1><p>Project <button>Zuno MLOps</button> <a href="/projects/zuno-mlops">Go to Zuno MLOps</a> <a href="/mlflow/" target="_blank">Launch MLflow</a></p>
+<input placeholder="Search"><table><tr><th>Name</th></tr><tr><td>No experiments</td></tr></table>`;
+  }
   return null;
 }
 
 const MLFLOW_HOME = `<!doctype html><title>MLflow</title><body style="font:16px sans-serif"><header>MLflow <button id="ws">Workspace: default</button>
 <div role="listbox" id="wslist" hidden><div role="option" onclick="document.getElementById('exps').hidden=false;document.getElementById('wslist').hidden=true">zuno-mlops</div></div></header>
-<main><h2>Experiments</h2><div id="exps"${knob("FAKE_MLFLOW_WORKSPACE") ? " hidden" : ""}><a href="/mlflow/experiments/7">mlops-comage</a></div></main>
+<main><h2>Experiments</h2><table><tr><td><a href="/mlflow/experiments/0">Default</a></td></tr></table>
+<div id="exps"${knob("FAKE_MLFLOW_WORKSPACE") ? " hidden" : ""}>${knob("FAKE_MLFLOW_EMPTY") ? "" : `<a href="/mlflow/experiments/7">mlops-comage</a>`}</div></main>
 <script>document.getElementById("ws").onclick = () => { document.getElementById("wslist").hidden = false; };
 fetch("/mlflow/ajax-api/2.0/mlflow/experiments/search", { method: "POST", body: "{}" });</script>`;
 const MLFLOW_EXPERIMENT = `<!doctype html><title>mlops-comage - MLflow</title><body style="font:16px sans-serif"><main><h2>mlops-comage</h2>

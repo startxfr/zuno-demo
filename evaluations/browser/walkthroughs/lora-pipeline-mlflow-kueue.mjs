@@ -62,6 +62,11 @@ const PIPELINE_LINK = [`main a:text-is('${PIPELINE}')`, `main a:has-text('${PIPE
 const PROJECT_PICKER = ["main button:has-text('Project')", "[data-testid*='project-selector' i]", "main [aria-label*='project' i]"];   // guess
 const WORKSPACE_PICKER = ["button:has-text('Workspace')", "[aria-label*='workspace' i]", "[data-testid*='workspace' i]"];       // guess (MLflow)
 const SLOW_MS = 90000;   // the menu took 48 s to show under load (scout of 2026-11-16)
+// A page still loading: the rescout of 2026-11-16 (dfdf7322) checked the graph page while it showed "Loading" and a spinner.
+const LOADING = "main [role='progressbar'], main .pf-v6-c-spinner, main .pf-v5-c-spinner";
+const VERSIONS = /\bv\d+-\d+-\d+-[a-z0-9-]+\b/g;   // version names as the chart makes them (v0-3-0-tekos)
+const NO_EXPERIMENTS = /No experiments/i;                                                                                  // seen, 2026-11-16 rescout
+const LAUNCH_MLFLOW = ["main a:has-text('Launch MLflow')", "a:has-text('Launch MLflow')"];                                // seen, 2026-11-16 rescout
 
 // The requests sent so far that `sends` names and that are not a GET: a take fails if there is one.
 function writesSeen(page) {
@@ -154,14 +159,22 @@ const SCREENS = [
     if (!tab) { await page.goto(`${base}${PROJECT_PAGE}?section=pipelines-projects`); how.push("address ?section=pipelines-projects"); await settle(page); }
     else if ((await tab.getAttribute("aria-selected").catch(() => null)) !== "true") { await click(tab, { changes }); how.push(tab.matched); await settle(page); }
     how.push(await clickOne(page, PIPELINE_LINK, `the pipeline ${PIPELINE}`, SLOW_MS));
-    await waitUntil(page, { what: "the pipeline's graph", timeoutMs: SLOW_MS, done: async () => {
+    // The graph, drawn: its four steps on screen and no spinner left, twice in a row 1.5 s apart.
+    let ready = 0;
+    await waitUntil(page, { what: "the pipeline's graph", timeoutMs: SLOW_MS, everyMs: 1500, done: async () => {
       const seen = await wordsOnScreen(page, STEPS);
-      return Object.values(seen).every(Boolean) || undefined;
-    } }).catch(() => { throw new Error(`the graph's steps (${STEPS.map((s) => s.source).join(", ")}) are not all on screen`); });
+      const loading = await page.locator(LOADING).first().isVisible().catch(() => false);
+      ready = Object.values(seen).every(Boolean) && !loading ? ready + 1 : 0;
+      return ready >= 2 || undefined;
+    } }).catch(() => { throw new Error(`the graph's steps (${STEPS.map((s) => s.source).join(", ")}) are not all on screen with no spinner left`); });
     await noDialog(page, "pipeline's graph");
-    const version = await wordsOnScreen(page, [new RegExp(VERSION), /v0-4-0-tekos/]);
-    if (!version[VERSION]) throw new Error(`the graph on screen is not of the version ${VERSION} (${JSON.stringify(version)}): the page's 0:45 row names it`);
-    return { how, url: new URL(page.url()).pathname, version, merge_export_on_screen: await page.getByText(/merge-export/).first().isVisible().catch(() => false) };
+    // The version names drawn on the page: another version than the page's fails the take; none drawn is reported.
+    const shownVersions = await read(page, (source) => [...new Set((document.querySelector("main") || document.body).innerText.match(new RegExp(source, "g")) || [])], VERSIONS.source).catch(() => []);
+    if (shownVersions.length && !shownVersions.includes(VERSION)) {
+      throw new Error(`the graph on screen is of ${shownVersions.join(", ")}, not ${VERSION}: the page's 0:45 row names it`);
+    }
+    return { how, url: new URL(page.url()).pathname, versions_shown: shownVersions,
+             merge_export_on_screen: await page.getByText(/merge-export/).first().isVisible().catch(() => false) };
   } },
   { name: "trainjob", show: async ({ page, base }) => {
     const how = [await goMenu(page, base, HREF.jobs)];
@@ -192,6 +205,27 @@ const SCREENS = [
     const how = [await goMenu(page, base, HREF.mlflow)];
     let workspace = "";
     let frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT}`, 60000, true).catch(() => null);
+    let dashboardList = "";
+    if (!frame && await frameWith(page, NO_EXPERIMENTS)) {
+      // The rescout of 2026-11-16: the dashboard's Experiments page for Zuno MLOps said "No experiments". MLflow's own UI,
+      // behind "Launch MLflow", is opened in the same page (its address, never a new tab) and looked at.
+      dashboardList = "No experiments";
+      const launch = await anyFrame(page, LAUNCH_MLFLOW);
+      const href = launch ? await launch.getAttribute("href").catch(() => null) : null;
+      if (!href) throw new Error(`the dashboard lists no experiment for ${PROJECT} ("No experiments") and offers no Launch MLflow link (${LAUNCH_MLFLOW.join(" | ")})`);
+      const target = new URL(href, page.url());
+      await page.goto(target.href);
+      await settle(page);
+      how.push(`Launch MLflow: ${target.host === new URL(base).host ? "" : target.host}${target.pathname}`);
+      frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's own UI`, 60000, true).catch(() => null);
+    }
+    if (!frame && dashboardList) {
+      const listed = await read(page, () => [...document.querySelectorAll("td a, [role='gridcell'] a, [role='row'] a")].map((a) => (a.innerText || "").trim()).filter(Boolean).slice(0, 12)).catch(() => []);
+      if (!(await anyFrame(page, WORKSPACE_PICKER))) {
+        throw new Error(`no experiment ${EXPERIMENT}: the dashboard says "No experiments" for ${PROJECT}, and MLflow's own UI (${new URL(page.url()).host}${new URL(page.url()).pathname}) lists ${listed.length ? listed.join(", ") : "none"} `
+          + "with no workspace picker: row 2:45 has nothing to show on this cluster (its fallback: the WP-116 record)");
+      }
+    }
     if (!frame) {
       const picker = await anyFrame(page, WORKSPACE_PICKER);
       if (!picker) throw new Error(`MLflow shows neither the experiment ${EXPERIMENT} nor a workspace picker (${WORKSPACE_PICKER.join(" | ")})`);
@@ -207,7 +241,7 @@ const SCREENS = [
     await noDialog(page, "MLflow experiment");
     const words = {};
     for (const word of [/base_model/, /lora_r\b/, /gate_passed/, /train_loss|loss/]) words[word.source] = await runs.getByText(word).first().isVisible().catch(() => false);
-    return { how, workspace: workspace || "none chosen", embedded: runs !== page.mainFrame(), url: page.url().replace(/[?].*/, ""), words };
+    return { how, dashboard_list: dashboardList || "listed", workspace: workspace || "none chosen", embedded: runs !== page.mainFrame(), url: page.url().replace(/[?#].*/, ""), words };
   } },
 ];
 
