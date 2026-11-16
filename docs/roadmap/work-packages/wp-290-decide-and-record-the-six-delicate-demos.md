@@ -1,6 +1,6 @@
 # WP-290: Decide and record the six delicate demos
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-16: 1 of 6 demos published, `genai-playground`; the other five wait for scouts, the owner's choices and go)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-289](wp-289-record-the-repeats-of-the-proven-patterns.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -46,3 +46,10 @@ owner's messages. Four of the six are decided; two are not asked yet.
 
 The choices carry the rule that every GIF still needs the owner's named go before publication, and that no secret is on a frame.
 Nothing is recorded yet for these four: each is a take to scout and review like the others.
+
+## Progress (2026-11-16)
+
+`genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
+The other five are not recorded. `maas-portal-api-keys` failed its scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 6 of 6. `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
+

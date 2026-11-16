@@ -193,7 +193,7 @@ Owner's gos in demo333's session.
 - One more Vault read of the Dify admin password (value never printed).
 - Workstation: six orphaned containers of the coordinator's own timed-out offline suites ran from 14:38 and loaded the box (load 15, then 3 after they were stopped). `timeout` kills the script, not its container. The coder is asked to add an exit trap.
 
-### genai-playground (take, not published)
+### genai-playground (published)
 
 | Item | Value |
 |---|---|
@@ -211,7 +211,7 @@ A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the pro
 
 **What stays on the server.** Whether the playground keeps this chat server-side is not known: nothing was deleted. The model call stays in the platform's call records.
 
-**Not published.** Sent to the owner.
+**Published** as `1a4ff89b`, on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The writer compared the file in the commit with the take's GIF: 1 046 464 bytes, SHA-256 `df603fdf6cf0...`, equal. It is the first demo of WP-290 with a GIF. The catalogue has 20 GIF files of 30 demos. No "(untested ...)" mark on rows 0:00 and 0:45 needed lifting (none there); rows 1:45 and 3:00 stay words, the prompt of row 3:00 being untested in the playground.
 
 ### observability-trace: rescout of 19:33 (as relayed by the coder)
 
@@ -231,15 +231,20 @@ A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the pro
 
 The GIF is over the 5 MB aim (about 5.8 MiB) and under the 8 MB limit.
 
-**What the images show.** The recording session's own count is 6 of 13 marker images opened (partial; a full review is asked for), as relayed. The writer opened 2 images (`consultant-02/q1-done.png`, `ai-ops-01/q-done.png`) and no frames. `consultant-02/q1-done.png`: the Collaboration Hub, team `agent-tekos`, workflow `tekos`, answer "I can help you with precise, concise technical questions about OpenShift, Kubernetes, and the surrounding Red Hat ecosystem." The live-workflow panel lists `knowledge-tekos`; the model line reads `local-gpt-oss-maas · gpt-oss-20b`. `ai-ops-01/q-done.png`: the answer says no pod of `zuno-ai-run` is in a failed or pending state, all are `Running` or `Completed` with no restarts; the mark "1 tool used · 1 call" is on the step; the tool is not named. No node name and no address on either image. **Points for the owner:** the header shows the persona display names, and the session list shows earlier session titles (accepted by the owner, as for `unifai-live-rag`; none is copied here).
+**What the images show.** The recording session's own count is 6 of 13 marker images opened (partial at first). Update, as relayed: demo333 later opened all 13 marker images and 27 frames and searched the take log for patterns, and found nothing private; the earlier session titles are test prompts only. The writer opened 2 images (`consultant-02/q1-done.png`, `ai-ops-01/q-done.png`) and no frames. `consultant-02/q1-done.png`: the Collaboration Hub, team `agent-tekos`, workflow `tekos`, answer "I can help you with precise, concise technical questions about OpenShift, Kubernetes, and the surrounding Red Hat ecosystem." The live-workflow panel lists `knowledge-tekos`; the model line reads `local-gpt-oss-maas · gpt-oss-20b`. `ai-ops-01/q-done.png`: the answer says no pod of `zuno-ai-run` is in a failed or pending state, all are `Running` or `Completed` with no restarts; the mark "1 tool used · 1 call" is on the step; the tool is not named. No node name and no address on either image. **Points for the owner:** the header shows the persona display names, and the session list shows earlier session titles (accepted by the owner, as for `unifai-live-rag`; none is copied here).
 
 As relayed: the `consultant-02` second answer is generic troubleshooting steps, not opened by the writer.
 
 **Page.** Row 3:00 now says what was seen: a short answer from the live cluster with the "1 tool used" mark, worded differently at each run. The caption of the cut list still says "real pods and events"; that is the coder's, to change.
 
-**Not published.** Sent to the owner; a re-cut follows.
+**Not published.** Sent to the owner; the publication waits for the caption fix and a re-cut.
 
 ### dify (take failed, as relayed)
 
 The take failed after the Agent turn: the workflow step went to the web-app page. One `consultant-02` turn was spent. The conversation was deleted. No run-log entry was left.
+
+## Later facts (as relayed)
+
+- `observability-trace`: the chat take passed. The trace take **failed**: it opened the OpenClaw error trace again, not its own. One `tekos` answer was spent.
+- `lora-pipeline-mlflow-kueue`, rescout at `396c4440`: the pipeline step is fine with versions shown `[v0-4-0-tekos]`. MLflow's own UI (workspace `zuno-mlops`) lists no experiment in its default view. The result of the training view was not reported yet.
 

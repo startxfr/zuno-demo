@@ -1196,7 +1196,7 @@ ADR-0618 extends it to every scenario of the catalogue (terminal demos included,
 | WP-287 | [wp-287](work-packages/wp-287-record-terminal-demos-as-real-sessions-checked-as-text.md) | 0618 | WP-286 | Done | none |
 | WP-288 | [wp-288](work-packages/wp-288-record-the-first-batch-of-browser-demos.md) | 0618 | WP-286, WP-287 | Done | none |
 | WP-289 | [wp-289](work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) | 0618 | WP-288 | Repo work merged (13 of 18 demos published) | the owner's go for each remaining take; the owner's decisions on `dify` and `guardrails` |
-| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Not started | the owner's decision for each of the six demos, one by one |
+| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Repo work merged (1 of 6 demos published) | the owner's decision for each of the six demos, one by one |
 
 ### OKF stream phases
 
@@ -1342,6 +1342,7 @@ moving.
 
 ## Change log
 
+- 2026-11-16 — WP-290 Repo work merged (1 of 6): `genai-playground` is published (`1a4ff89b`) on the owner's go of 20:05 CET; the catalogue has 20 GIFs of 30 demos. The other five are not recorded. Facts and review are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-16 — WP-289 (13 of 18): `aap-audited-operations` (`bbdec534`) and `quotas` (`41ebd891`) are published on the owner's go of 18:36 CET; the catalogue has 19 GIFs of 30 demos. Five of WP-289 remain (`dify`, `guardrails`, `unifai-agents`, `observability-trace`, `lora-pipeline-mlflow-kueue`). Facts and reviews are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-16 — WP-288 Done and WP-289 Repo work merged (11 of 18): 17 GIFs of the 30 catalogue demos are published on `devel` (the sprint of the night and the morning, then the owner's go of 12:59 CET for 12 of them in one step). The four demos of WP-288 and 11 of the 18 of WP-289 are published; seven of WP-289 remain (`dify`, `guardrails`, `unifai-agents`, `observability-trace`, `aap-audited-operations`, `quotas`, `lora-pipeline-mlflow-kueue`) and the six delicate demos of WP-290. Facts, reviews and the deferred list are in [the sprint evidence](evidence/wp-289-gif-sprint-2026-11-16.md).
 - 2026-11-15 — WP-287 Done: the `vault-pki` demo was captured as a real terminal session, passed the text gate (no hit, 76 lines), was reviewed as text before any pixel, replayed in xterm.js and cut into a 42.0 s, 1.3 MB GIF, published with the owner's named "go vault-pki" (commit afb13dae). The first take at 100 columns wrapped the tables, so the window is now a setting of the demo (136x30). Limits in the evidence wp-287-terminal-recording-vault-pki-2026-11-15.md: small text at 960 px, one terminal demo, the allowed-make-row path and the gate's refusal proven offline only. ADR-0618 stays Accepted.
