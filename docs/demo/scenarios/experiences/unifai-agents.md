@@ -15,6 +15,8 @@ The operator, the custom resources and the call path are in [Appendix B](#append
 **The message:** "Agents are published from a signed release, and what an agent may do follows the person who asks.
 UnifAI holds no model key and no tool credential."
 
+![The 5-minute version of the UnifAI agents demo, recorded live as consultant-02 then ai-ops-01 in the team workspace of the Tekos agent: the workspaces a person gets from their groups, a consultant's cluster question answered in general terms, and the same question from the platform operator answered from the live cluster with one tool call. The list on the left shows earlier test sessions of the team.](../../../assets/img/demo/unifai-agents.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
