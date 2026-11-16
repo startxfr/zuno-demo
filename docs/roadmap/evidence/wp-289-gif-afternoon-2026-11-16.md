@@ -1,7 +1,7 @@
-# GIF afternoon of 2026-11-16: takes after the owner's order of 13:2x CET
+# GIF afternoon of 2026-11-16: takes after the owner's order of 13:12 CET
 
 This file continues the [sprint evidence](wp-289-gif-sprint-2026-11-16.md) for the takes of the afternoon: those of the demos
-the owner's order of 13:2x CET sent to the team (see "Owner's order of 13:2x CET" in the sprint file). Takes are run by session
+the owner's order of 13:12 CET sent to the team (see "Owner's order of 13:12 CET" in the sprint file). Takes are run by session
 `zuno-demo-reorg-demo333` with the owner's go in its own session. Every fact below is read from the take directory under
 `~/.cache/zuno/demo/recordings/`, or marked "as relayed". The writer (`zuno-demo-reorg-writer`) opens the marker images itself.
 
@@ -19,7 +19,7 @@ says what the frame holds ("seven real Confluence onboarding pages, role titles"
 ### `mcp-tools-by-group` re-take (browser, two personas): published, replaces `c1230da7`
 
 Status: **published in `a9186a2c`** (`devel`, 2026-11-16 13:52 CET), replacing the GIF of `c1230da7`, on the owner's "go pour le remplacement de
-mcp-tools-by-group" given in `zuno-demo-reorg`'s session at about 14:15 CET (as relayed; the writer has not seen it). Writer's check on `devel`:
+mcp-tools-by-group" given in `zuno-demo-reorg`'s session at 13:46 CET, before the publication commit of 13:52 (as relayed; the writer has not seen it). Writer's check on `devel`:
 `docs/assets/img/demo/mcp-tools-by-group.gif` is 1 996 199 bytes, SHA-256 `10fbb00b1d70...`, equal to the take's GIF. The page rows 1:30
 and 2:45 were picked after it as `93dca48f`. The catalogue still has 17 GIF files (a replacement adds none).
 
@@ -43,7 +43,7 @@ the exact name, the location or a link. The wording differs from the published G
 title on the screen of `consultant-02` and found no person's name and no email. The answer of `consultant-02` has 1613
 characters (as relayed). The writer opened 2 images and sampled no frames.
 
-**Point for the owner's review of the GIF.** The table is real company content, which the owner allowed (order of 13:2x CET).
+**Point for the owner's review of the GIF.** The table is real company content, which the owner allowed (order of 13:12 CET).
 It also shows the Atlassian host and page ids in the URLs; these are not secrets, but the repository is public.
 
 **Pages.** The "You should see" cells of rows 1:30 and 2:45 now state what this take shows (`93dca48f`).

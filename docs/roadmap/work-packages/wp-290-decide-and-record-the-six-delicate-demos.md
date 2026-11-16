@@ -30,7 +30,7 @@ One decision per demo, each with the owner:
 - No secret is on a frame, and no GIF is published without the owner's named go.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
 
-## Owner's choices of 2026-11-16 (about 13:35 CET)
+## Owner's choices of 2026-11-16 (13:17 CET)
 
 Given in `zuno-demo-reorg`'s session by the owner's answers to a question with options, and relayed by it; the writer has not seen the
 owner's messages. Four of the six are decided; two are not asked yet.

@@ -41,8 +41,8 @@ demos of this brief, **11**: `gitops-day0-3`, `image-signing-admission`, `extern
 
 **Seven demos of this brief are not published.**
 
-- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decided on 2026-11-16, 13:2x CET, that the take may show them (deferred entry d, order below). The run log it leaves cannot be deleted by the user.
-- `guardrails`: rows 0:45 and 2:00 need Dify's own admin password, a second credential (deferred entry c; the owner allowed it on 2026-11-16, 13:2x CET, never in git). The Grafana half
+- `dify`: row 0:45 shows real Confluence page titles on a frame, and the repository is public. The owner decided on 2026-11-16, 13:12 CET, that the take may show them (deferred entry d, order below). The run log it leaves cannot be deleted by the user.
+- `guardrails`: rows 0:45 and 2:00 need Dify's own admin password, a second credential (deferred entry c; the owner allowed it on 2026-11-16, 13:12 CET, never in git). The Grafana half
   is no longer blocked: the Grafana sign-in now authorizes once and closes the announcement as declared changes.
 - `unifai-agents`: two personas; not scouted.
 - `observability-trace`: the Tempo half is wholly unscouted and the page says "not rehearsed"; the possible simplification is
@@ -61,7 +61,7 @@ answer (scan the frames of each answer span).
 Rows that carried "(untested command)" or "(untested prompt)" and were run by a published take have the mark lifted. The marks
 that remain belong to rows no take has run.
 
-## Owner's order of 2026-11-16, 13:2x CET
+## Owner's order of 2026-11-16, 13:12 CET
 
 As given in `zuno-demo-reorg`'s session and relayed by it. The owner asked to continue, with the team of agents, on `dify`,
 `guardrails`, `quotas`, `observability-trace`, `aap-audited-operations`, `lora-pipeline-mlflow-kueue` and the demos planned next, and

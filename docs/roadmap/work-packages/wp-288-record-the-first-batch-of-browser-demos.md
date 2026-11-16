@@ -42,7 +42,7 @@ The four demos are recorded, reviewed and published on `devel`. Facts are in the
 | Demo | Take | Published in | Owner's go |
 |---|---|---|---|
 | `kagent` | `kagent-20261116-112558` | `6b130198` | the advance go "Go de publication pour kagent, unifai-live-rag et lightspeed" |
-| `unifai-live-rag` | `unifai-live-rag-20261116-104643` | `2df2bf90` | "Les 12" at about 13:05 CET, with the earlier session titles visible (7.2 MB) |
+| `unifai-live-rag` | `unifai-live-rag-20261116-104643` | `2df2bf90` | "Les 12" at 12:59 CET, with the earlier session titles visible (7.2 MB) |
 | `identity-personas` | `identity-personas-20261116-101640` | `517a92ce` | "Les 12" |
 | `model-serving-llmd-mig` | `model-serving-llmd-mig-20261116-095927` | `21bca7e2` | "Les 12" |
 
