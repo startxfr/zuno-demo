@@ -1,0 +1,27 @@
+---
+# aap-audited-operations: the first cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Written
+# BEFORE the first scout and take: tune it with `make demo gif aap-audited-operations` once a take exists.
+# `make demo record aap-audited-operations` takes the 5-minute version as consultant-03 (aap_reader) in AAP
+# (evaluations/browser/walkthroughs/aap-audited-operations.mjs).
+# Markers written by the walkthrough, in order: login, home, templates, jobs, job, project, end. Every screen is held
+# about 2 s by the walkthrough itself, so each motion moment has frames to cut.
+# `jobs` and `job` are two stills with no motion between them: the job is opened on its Details tab by its address,
+# and its Output (which may print node names or paths) must never reach a frame of the GIF.
+# The job shown is the latest zuno-day0-check run launched by zuno-mcp that consultant-03 can see: the take fails when
+# there is none. Row 4:15 is words.
+record_notice: >-
+  a recorded browser session in AAP as consultant-03 (aap_reader), read only: the templates, the jobs, the Details tab
+  of one zuno-day0-check run launched by zuno-mcp (never its Output) and the project zuno-demo; every request to AAP
+  other than a read is refused in the browser, nothing is launched, synced or approved, no model call; AAP may create
+  the user consultant-03 at its first Keycloak sign-in, as the page's 0:00 row does
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in to AAP with the company account, through Keycloak"}
+  - {still: home, hold: 4, step: "0:00", caption: "0:00  AAP, as consultant-03, in the reader group"}
+  - {from: home, to: templates, fit: 5, hold: 5, step: "0:45", caption: "0:45  Every operation is a template, declared in Git"}
+  - {from: templates, to: jobs, fit: 6, hold: 4, step: "2:00", caption: "2:00  The runs of zuno-day0-check"}
+  - {still: job, hold: 7, step: "2:00", caption: "2:00  One run, launched by an agent's account, zuno-mcp"}
+  - {from: job, to: project, fit: 5, hold: 5, step: "3:15", caption: "3:15  The same repository and branch as the cluster"}
+  - {still: end, hold: 5, step: "4:15", caption: "Jobs from Git, each recorded with who launched it"}

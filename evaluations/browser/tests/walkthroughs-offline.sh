@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -27,6 +27,7 @@ unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
+aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
@@ -504,6 +505,46 @@ expect "tools: a Drive tool call is not taken for the Confluence one: consultant
 out="$(tools t-long FAKE_LONG_ANSWER=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "tools: a long answer is scrolled to its end before q2-done, the tool call above it, no title in the log" bash -c "test $rc -eq 0 && grep -q 'its end inside the window after [1-9][0-9]* scroll(s), the tool call above it$' <<<\"\$0\" && ! grep -q 'FAKE-CONFLUENCE-TITLE' <<<\"\$0\"" "$out"
+fi
+if wanted aap-audited-operations; then
+echo "== aap-audited-operations"
+out="$(aap a-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a scout exits 0, SCOUT: done, nothing written, no Output opened" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0}' <<<\"\$0\"" "$out"
+expect "aap: the scout plays every screen, dumps its shapes, finds job 102 (zuno-mcp's, not the latest) and no launch action" scouted a-scout '
+assert list(steps) == ["enter", "owned", "sign-in", "home", "home-shapes", "templates", "templates-shapes", "jobs", "jobs-shapes", "job", "job-shapes",
+                       "project", "project-shapes", "guard"], list(steps)
+assert [c["step"] for c in steps["sign-in"]["chain"]] == ["sso-link", "home"] and steps["owned"]["count"] == 0, steps["sign-in"]
+assert steps["jobs"]["job"] == 102 and steps["jobs"]["jobs"] == {"visible": 2, "by_agent": 1} and steps["jobs"]["filter"].startswith("#filter-input"), steps["jobs"]
+assert steps["templates"]["launch_actions"] > 0 and steps["templates"]["launch_enabled"] == 0, steps["templates"]
+assert steps["job"]["url"] == "/execution/jobs/playbook/102/details" and steps["project"]["words"]["\\bdevel\\b"] is True, (steps["job"], steps["project"])
+assert all(steps[n]["main"] and steps[n]["nav"] for n in ("templates-shapes", "jobs-shapes", "job-shapes", "project-shapes")), "shapes"
+assert steps["guard"]["refused"] == [] and s["private_addresses"]["flagged"] is False, s
+'
+out="$(aap a-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a good take exits 0, RESULT: PASS, nothing written, no Output opened" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"writes\":0,\"outputs\":0}' <<<\"\$0\"" "$out"
+expect "aap: the markers in order, nothing created, the jobs launched by consultant-03 the same, no node name at a marker" markers a-pass '
+assert names == ["login", "home", "templates", "jobs", "job", "project", "end"] and m["motion_from"] == "home" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+expect "aap: the log names the sign-in chain, the job opened and the project's source" bash -c "grep -q 'sign-in: sso-link a\[href\*=' <<<\"\$0\" && grep -q '\"job\":102' <<<\"\$0\" && grep -q 'project: .*\"open\":\"main a:text-is' <<<\"\$0\"" "$out"
+out="$(aap a-uiauth FAKE_SSO_HIDDEN=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: no Keycloak link on AAP's sign-in page: the address from ui_auth, AAP's own form never filled" bash -c "test $rc -eq 0 && grep -q 'sign-in: ui_auth ui_auth' <<<\"\$0\" && grep -q 'left: {\"writes\":0,' <<<\"\$0\"" "$out"
+out="$(aap a-loop FAKE_LOGIN_LOOP=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a sign-in that comes back to AAP's sign-in page fails the take and says so" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*came back to AAP.s sign-in page' <<<\"\$0\"" "$out"
+out="$(aap a-nojob FAKE_NO_MCP_JOB=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: no zuno-day0-check job by zuno-mcp fails the take, with what the reader sees and the fallback" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sees no zuno-day0-check job launched by zuno-mcp (zuno-day0-check jobs it sees: 1; by zuno-mcp: 0)' <<<\"\$0\"" "$out"
+out="$(aap a-write FAKE_UI_WRITE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a page that wants to write is refused in the browser and fails the take, nothing reaches AAP" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*wanted to send POST /api/gateway/v1/user_preferences/' <<<\"\$0\" && grep -q 'left: {\"writes\":0,' <<<\"\$0\"" "$out"
+out="$(aap a-dialog FAKE_DIALOG=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "aap: a dialog over the first screen fails the take, nothing dismissed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*a dialog covers AAP.s first screen' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
