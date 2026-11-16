@@ -68,7 +68,7 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
+declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana, "lora-pipeline-mlflow-kueue": ["switches MLflow\x27s own UI from its GenAI view"]}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -738,7 +738,10 @@ echo "$out" | sed 's/^/    /'
 expect "lora: no experiment mlops-comage in the dashboard or in MLflow's own UI fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*mlops-comage' <<<\"\$0\"" "$out"
 out="$(lora l-training FAKE_MLFLOW_TRAINING_ONLY=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "lora: an experiment listed only in MLflow's training view fails the take: switching that radio is the owner's decision" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*Model training.*a declared change, the owner.s decision' <<<\"\$0\"" "$out"
+expect "lora: an experiment listed only in MLflow's training view: the declared switch sends no write, the take passes" bash -c "test $rc -eq 0 && grep -q '\"training_view\":{\"sent\":\[[^]]*\],\"refused\":\[\]}' <<<\"\$0\"" "$out"
+out="$(lora l-togglewrite FAKE_MLFLOW_TRAINING_ONLY=1 FAKE_TOGGLE_WRITE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "lora: a view switch that would write is refused and fails the take (option B)" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL switching MLflow to its Model training view wanted to send POST /mlflow/ajax-api/2.0/mlflow/users/preferences' <<<\"\$0\"" "$out"
 out="$(lora l-write FAKE_WRITE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "lora: a page that writes to MLflow fails the take; MLflow's searches (POSTs) do not" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*sent POST /mlflow/ajax-api/2.0/mlflow/runs/set-tag' <<<\"\$0\"" "$out"

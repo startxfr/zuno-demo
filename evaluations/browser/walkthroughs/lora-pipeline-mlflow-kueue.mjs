@@ -30,9 +30,11 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "dashboard", "pipeline", "trainjob", "mlflow", "end"];
 // The provider chooser and the sign-in (up to dashboard) are never shown as motion.
 export const motion_from = "dashboard";
-// MLflow's view toggle "Model training" is a radio, which the shared click() refuses unless it is declared here; whether
-// a take may switch it is the owner's decision (TRAINING_VIEW_DECLARED below, off).
-const TRAINING_VIEW_DECLARED = false;
+// MLflow's view toggle "Model training" is a radio, which the shared click() refuses unless it is declared here. Declared
+// by zuno-demo-reorg's decision of 2026-11-16 (option A), on one condition: the switch sends no write. While it is
+// clicked, every request that is not a GET, HEAD or OPTIONS (MLflow's searches, POSTs that read, aside) is refused
+// before it leaves the browser and fails the take or the scout: then the decision is option B (no MLflow row).
+const TRAINING_VIEW_DECLARED = true;
 const TRAINING_CHANGE = "switches MLflow's own UI from its GenAI view to its Model training view (a view of the page, nothing saved on the server)";
 export const changes = TRAINING_VIEW_DECLARED ? [TRAINING_CHANGE] : [];
 export const url = (domain) => `https://rh-ai.${domain}`;
@@ -167,6 +169,31 @@ async function anyFrame(page, selectors, mlflowOnly = false) {
   return null;
 }
 
+// Switch MLflow's own UI to its Model training view (the declared change), watching what the switch sends for 3 s: every
+// request is noted by method and path; one that is not a GET, HEAD or OPTIONS, nor one of MLflow's searches, is
+// refused. Returns {sent, refused}.
+async function switchView(page, toggle) {
+  const sent = [];
+  const refused = [];
+  const watch = (route) => {
+    const r = route.request();
+    const path = new URL(r.url()).pathname;
+    sent.push(`${r.method()} ${path}`);
+    if (["GET", "HEAD", "OPTIONS"].includes(r.method()) || /\/search$/.test(path)) return route.fallback();
+    refused.push(`${r.method()} ${path}`);
+    return route.abort();
+  };
+  await page.route("**/*", watch);
+  try {
+    await click(toggle, { change: TRAINING_CHANGE, changes });
+    await page.waitForTimeout(3000);
+  } finally {
+    await page.unroute("**/*", watch);
+  }
+  await settle(page);
+  return { sent: [...new Set(sent)].slice(0, 30), refused: [...new Set(refused)] };
+}
+
 // The screens of the rows, in order: each returns what it found, for the log (a take) or the step (a scout).
 const SCREENS = [
   { name: "pipeline", show: async ({ page, base }) => {
@@ -225,6 +252,7 @@ const SCREENS = [
     let workspace = "";
     let frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT}`, wait(60000), true).catch(() => null);
     let dashboardList = "";
+    let toggleSent = null;
     if (!frame && await frameWith(page, NO_EXPERIMENTS)) {
       // The rescout of 2026-11-16: the dashboard's Experiments page for Zuno MLOps said "No experiments". MLflow's own UI,
       // behind "Launch MLflow", is opened in the same page (its address, never a new tab) and looked at.
@@ -246,7 +274,14 @@ const SCREENS = [
     }
     if (!frame && TRAINING_VIEW_DECLARED) {
       const toggle = await anyFrame(page, TRAINING_VIEW, true);
-      if (toggle) { await click(toggle, { change: TRAINING_CHANGE, changes }); how.push(toggle.matched); await settle(page); }
+      if (toggle) {
+        toggleSent = await switchView(page, toggle);
+        how.push(toggle.matched);
+        if (toggleSent.refused.length) {
+          throw new Error(`switching MLflow to its Model training view wanted to send ${toggleSent.refused.join(", ")}: refused before it left the browser; `
+            + "the declared switch must send no write (zuno-demo-reorg's condition): option B, no MLflow row");
+        }
+      }
       frame = await waitFrameWith(page, EXPERIMENT, `the experiment ${EXPERIMENT} in MLflow's training view`, wait(30000), true).catch(() => null);
     }
     if (!frame) {
@@ -274,7 +309,8 @@ const SCREENS = [
     await noDialog(page, "MLflow experiment");
     const words = {};
     for (const word of [/base_model/, /lora_r\b/, /gate_passed/, /train_loss|loss/]) words[word.source] = await runs.getByText(word).first().isVisible().catch(() => false);
-    return { how, dashboard_list: dashboardList || "listed", workspace: workspace || "none chosen", embedded: runs !== page.mainFrame(), url: page.url().replace(/[?#].*/, ""), words };
+    return { how, dashboard_list: dashboardList || "listed", workspace: workspace || "none chosen", training_view: toggleSent || "not needed",
+             embedded: runs !== page.mainFrame(), url: page.url().replace(/[?#].*/, ""), words };
   } },
 ];
 
