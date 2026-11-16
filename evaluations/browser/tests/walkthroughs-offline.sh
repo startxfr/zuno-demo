@@ -41,6 +41,7 @@ agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
 trace() { take observability-trace "fake-unifai.mjs fake-jaeger.mjs" 8097 "$@" FAKE_TEAM_MODE=1 RECORD_BASE_URL_TEMPO=http://127.0.0.1:8093; }
 maas() { take maas-portal-api-keys fake-maas-portal.mjs 8092 "$@" RECORD_BASE_URL=http://127.0.0.1:8092/maas-consumer-portal RECORD_BASE_URL_MAAS=http://127.0.0.1:8092/zuno-ai-run/gpt-oss-20b; }
 claw() { local name="$1"; shift; take openclaw fake-openclaw.mjs 8091 "$name" OPENCLAW_UI_PASSWORD=offline-claw-secret FAKE_UI_PASSWORD=offline-claw-secret "$@"; }
+a2a() { take a2a-delegation-approval fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1 FAKE_APPROVALS=1; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -60,7 +61,7 @@ d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
 grafana = ["approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "closes Grafana\x27s product announcement by its cross"]
-declared = {"kagent": ["clicks Skip wizard"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
+declared = {"kagent": ["clicks Skip wizard"], "a2a-delegation-approval": ["clicks Approve on the approval card of aap.cluster.audit"], "evaluation-trustyai-evalhub": grafana, "ai-gateway-routing": grafana, "guardrails": grafana, "quotas": grafana}.get(s["demo"], [])
 assert len(s["changes"]) == len(declared) and all(c.startswith(w) for c, w in zip(s["changes"], declared)), s["changes"]
 exec(sys.argv[2])
 PY
@@ -928,6 +929,34 @@ import json, pathlib, sys
 s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
 assert "could not connect to its gateway" in s["steps"][0]["error"], s["steps"][0]
 PY
+fi
+if wanted a2a-delegation-approval; then
+echo "== a2a-delegation-approval (the take clicks Approve)"
+out="$(a2a x-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "a2a: a scout exits 0, SCOUT: done, creates no session and launches nothing" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,\"touched\":0,\"launches\":0}' <<<\"\$0\"" "$out"
+expect "a2a: scout.json reports the hub of agent-arkos and declares the Approve click" scouted x-scout '
+assert list(steps) == ["enter", "owned", "selector", "hub", "workflows", "closed"], list(steps)
+assert steps["selector"]["listed"]["agent-arkos"] is True and steps["hub"]["team_id_read"] is True and steps["workflows"]["workflow_exact_matches"] == 1, steps
+'
+out="$(a2a x-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "a2a: a good take exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "a2a: its session is gone and exactly one AAP job was launched" grep -q 'left: {"sessions":2,"touched":0,"launches":1}' <<<"$out"
+expect "a2a: markers.json follows the contract and notes the job" markers x-pass '
+assert names == ["login", "hub", "q-sent", "card", "approved", "q-done", "end"], names
+assert m["status"] == "pass" and len(m["created"]) == 1 and m["cleaned"] is True and m["owned"]["same"] is True, m
+assert m["notes"] == {"approvals": 1, "rejections": 0, "aap_job": "1401"}, m["notes"]
+'
+out="$(a2a x-second FAKE_SECOND_CARD=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "a2a: a second card is rejected: still one job" bash -c "test $rc -eq 0 && grep -q 'a second approval card came: rejected' <<<\"\$0\" && grep -q '\"launches\":1}' <<<\"\$0\"" "$out"
+out="$(a2a x-other FAKE_OTHER_TOOL=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "a2a: a card for another tool is never approved; the take fails, rejects it and deletes its session" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the approval card on screen does not name aap.cluster.audit: nothing is approved' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,\"touched\":0,\"launches\":0}' <<<\"\$0\"" "$out"
+out="$(a2a x-nodelegation FAKE_NO_DELEGATION=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "a2a: a turn without delegation fails the take and says the turn was spent; nothing launched" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL Arkos answered without delegating' <<<\"\$0\" && grep -q '\"launches\":0}' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret -e offline-claw-secret -e offline-claw-wrong '$work' >/dev/null"

@@ -16,6 +16,7 @@ const EARLIER = "22222222-2222-2222-2222-222222222222";
 const sessions = new Map([[EARLIER, { blueprint: "consultant-01-my-assistant", status: "COMPLETED", messages: [] }]]);
 // unifai-agents (FAKE_TEAM_MODE=1): one earlier session of another member in the team workspace agent-tekos.
 if (process.env.FAKE_TEAM_MODE === "1") sessions.set("33333333-3333-3333-3333-333333333333", { blueprint: "tekos", status: "COMPLETED", messages: [], team: "team-agent-tekos" });
+let launches = 0;   // AAP jobs launched by an approval (a2a-delegation-approval)
 let touched = 0;   // clicks on a row's checkbox or a Human-in-the-Loop switch: a take or a scout must leave it at 0
 
 const WELCOME = `<!doctype html><title>UnifAI (fake)</title><h1>Welcome to UnifAI</h1><button onclick="location.href='/api1/auth/login'">Login using SSO</button>`;
@@ -135,6 +136,19 @@ async function show() {
   const r = await fetch("/api2/sessions/session.chat.get?sessionId=" + sid);
   if (r.status !== 200) return;
   const chat = await r.json();
+  // a2a-delegation-approval: a pending approval is a card with Approve and Reject.
+  const want = chat.pending_approval ? chat.pending_approval.tool + ":" + chat.pending_approval.n : "";
+  if (want !== (show.card || "")) {
+    show.card = want;
+    const old = document.getElementById("approval"); if (old) old.remove();
+    if (want) {
+      const card = document.createElement("div"); card.id = "approval"; card.style.cssText = "border:2px solid #c60;padding:8px;margin:8px 0";
+      card.innerHTML = "<h4>Approval Required</h4><p>Tekos wants to call " + chat.pending_approval.tool + "</p><button>Approve</button><button>Reject</button>";
+      const decide = (approved) => fetch("/api2/sessions/session.approval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sid, approved }) });
+      card.querySelectorAll("button")[0].onclick = () => decide(true); card.querySelectorAll("button")[1].onclick = () => decide(false);
+      $("live").after(card);
+    }
+  }
   // As UnifAI on 2026-11-16: the thread does not follow, and an answer is behind the agent's card, drawn only once
   // the thread has been scrolled to its end (FAKE_STUCK=1: never drawn). An answer once drawn stays drawn.
   const end = $("thread").scrollTop + $("thread").clientHeight >= $("thread").scrollHeight - 4;
@@ -179,7 +193,7 @@ http.createServer((req, res) => {
   const body = (then) => { let raw = ""; req.on("data", (c) => { raw += c; }); req.on("end", () => then(raw ? JSON.parse(raw) : {})); };
   const id = u.searchParams.get("sessionId") || "";
   const user = decodeURIComponent(((req.headers.cookie || "").match(/(?:^|; )u=([^;]*)/) || [])[1] || "");
-  if (u.pathname === "/fake/count") return json(200, { sessions: sessions.size, touched });
+  if (u.pathname === "/fake/count") return json(200, { sessions: sessions.size, touched, ...(process.env.FAKE_APPROVALS === "1" ? { launches } : {}) });
   if (u.pathname === "/fake/touched") { touched += 1; return json(200, {}); }
   if (u.pathname === "/api1/terms/approve") return json(200, { approved: true });
   if (u.pathname === "/api1/auth/login") { res.writeHead(200, { "Content-Type": "text/html" }); return res.end(LOGIN); }
@@ -202,6 +216,13 @@ http.createServer((req, res) => {
       if (!s) return json(404, {});
       s.status = "RUNNING";
       s.messages.push({ role: "user", content: b.inputs.user_prompt });
+      // a2a-delegation-approval: the delegating question stops on an approval (FAKE_NO_DELEGATION=1: Arkos answers by
+      // itself; FAKE_OTHER_TOOL=1: the card is for another tool; FAKE_SECOND_CARD=1: a second card after the first).
+      if (/delegation tool/.test(b.inputs.user_prompt) && process.env.FAKE_NO_DELEGATION !== "1") {
+        s.cards = 1;
+        setTimeout(() => { s.pending = { tool: process.env.FAKE_OTHER_TOOL === "1" ? "aap.inventory.delete" : "aap.cluster.audit", n: 1 }; }, 1200);
+        return json(202, { sessionId: b.sessionId });
+      }
       setTimeout(() => {
         const refused = process.env.FAKE_REFUSE_MODEL === "1";
         s.messages.push({ role: "assistant", content: refused ? "" : answer(b.inputs.user_prompt, user),
@@ -213,7 +234,21 @@ http.createServer((req, res) => {
   }
   if (u.pathname === "/api2/sessions/session.status.get") return sessions.has(id) ? json(200, sessions.get(id).status) : json(500, { error: "not found" });
   if (u.pathname === "/api2/sessions/session.chat.get") {
-    return sessions.has(id) ? json(200, { messages: sessions.get(id).messages, output: "", status: sessions.get(id).status, status_message: null }) : json(500, { error: "not found" });
+    return sessions.has(id) ? json(200, { messages: sessions.get(id).messages, output: "", status: sessions.get(id).status, status_message: null, pending_approval: sessions.get(id).pending || null }) : json(500, { error: "not found" });
+  }
+  if (u.pathname === "/api2/sessions/session.approval" && req.method === "POST") {
+    return body((b) => {
+      const s = sessions.get(b.sessionId);
+      if (!s || !s.pending) return json(409, {});
+      s.pending = null;
+      if (b.approved) { launches += 1; s.job = 1400 + launches; }
+      if (b.approved && process.env.FAKE_SECOND_CARD === "1" && s.cards === 1) { s.cards = 2; setTimeout(() => { s.pending = { tool: "aap.cluster.audit", n: 2 }; }, 800); return json(200, {}); }
+      setTimeout(() => {
+        s.messages.push({ role: "assistant", content: s.job ? `Tekos launched the audit: https://aap.apps.fake.invalid/#/jobs/playbook/${s.job}/output` : "The audit was not approved, nothing ran.", metadata: {} });
+        s.status = "COMPLETED";
+      }, 1200);
+      return json(200, {});
+    });
   }
   if (u.pathname === "/api2/sessions/session.cancel") return json(409, {});
   if (u.pathname === "/api2/sessions/session.delete" && req.method === "DELETE") {
