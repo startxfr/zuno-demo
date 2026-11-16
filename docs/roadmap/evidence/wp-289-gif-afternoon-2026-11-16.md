@@ -120,3 +120,9 @@ Scouts at `a6f7635b` and `5477cf1a`, with the owner's go in demo333's session. N
 | `dify`, `guardrails` | Not scouted. They wait for the owner's answer on how the Dify admin password is read from Vault. |
 
 The WP-290 brief now says the same under `genai-playground`.
+
+### genai-playground: subscription and MCP row (as relayed by the assist)
+
+Scout at `a6f7635b`, 2026-11-16 at 16:11. In **Settings**, **Model** the portal shows `ai-ops-01` the subscription `gpt-oss-20b-agents`; the page named `gpt-oss-20b-ocp-ai-ops`. The model matches. Not seen: whether the dropdown offers `gpt-oss-20b-ocp-ai-ops`. The take never chooses a subscription and no caption names one. The MCP row shows `zuno-mcp-gateway` with "0 active" in a fresh browser; the GIF caption says "listed, no token in this browser".
+
+Page: row 0:00 and the checklist now say the subscription shown may differ (option A of the assist). Possible platform finding, **not verified**: if `gpt-oss-20b-agents` is the agents' subscription and is offered to a person, a person draws on the agents' budget. The assist has not read the `MaaSSubscription` objects. Whether it goes on the deferred list is the coordinator's call.

@@ -83,7 +83,7 @@ The file prepares nothing; the two browser windows are the presenter's. What onl
   **OpenShift** sign-in, with Keycloak behind it.
 - [ ] Open **Playground** and pick the project **Zuno Playground**. Never press **Create playground** in any other
   project.
-- [ ] **Settings**, **Model**: `publishers/zuno-ai-run/models/gpt-oss-20b`, subscription `gpt-oss-20b-ocp-ai-ops`
+- [ ] **Settings**, **Model**: `publishers/zuno-ai-run/models/gpt-oss-20b`. The subscription shown may differ: on 2026-11-16 the portal showed `gpt-oss-20b-agents` to ai-ops-01. If you want `gpt-oss-20b-ocp-ai-ops`, choose it; whether the dropdown offers it was not checked.
   (window 1) or `gpt-oss-20b-ocp-ai-dev` (window 2). The human subscriptions cover gpt-oss-20b only.
 - [ ] Warm the model: ask one question in window 1 before the audience arrives.
 - [ ] The MCP token of each persona, fetched before the session in that persona's window:
@@ -113,7 +113,7 @@ Window 1, **ai-ops-01**.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | **Playground**, project **Zuno Playground**, **Settings**, **Model** | "This is Red Hat's GenAI playground, inside the OpenShift AI portal. I signed in with my company account. The playground is already set up for us: our models, a vector database, our tools." | Model `publishers/zuno-ai-run/models/gpt-oss-20b`, subscription `gpt-oss-20b-ocp-ai-ops`. |
+| 0:00 | **Playground**, project **Zuno Playground**, **Settings**, **Model** | "This is Red Hat's GenAI playground, inside the OpenShift AI portal. I signed in with my company account. The playground is already set up for us: our models, a vector database, our tools." | Model `publishers/zuno-ai-run/models/gpt-oss-20b`, and a subscription. The portal showed `gpt-oss-20b-agents` on 2026-11-16 (scout); `gpt-oss-20b-ocp-ai-ops` is the one the persona's group names, and was not checked in the dropdown. |
 | 0:45 | Ask: `Réponds en une phrase : quelle est la capitale de la France ?` | "The model runs on our own GPUs. The call goes through Models-as-a-Service and counts against my group's subscription: 5 million tokens an hour." | `La capitale de la France est Paris.` and the metric chips. On 2026-11-06: about 160 tokens per second, first token in 630 to 690 ms ([screenshot](../../../assets/img/wp220-playground-chart-chat-ai-ops.png)). |
 | 1:45 | **Settings**, **MCP**: on the row `zuno-mcp-gateway`, click the lock in **Auth**, paste ai-ops-01's token (screen sharing paused), **Save** | "Red Hat's playground lists one MCP server: our own tool gateway. The gateway does not trust the playground. It checks my own OpenShift token and gives me the tools of my group." | **Connection successful**, `9 out of 9 tools are active` ([screenshot](../../../assets/img/wp220-playground-chart-mcp-9-tools.png)). |
 | 3:00 | Ask: `How many pods of zuno-ai-run are not Running? Answer with the number only: no pod names, no IP addresses, no node names.` *(untested prompt in the playground)* | "As an AI platform operator I may read the cluster. The model chose the tool; the gateway checked my groups before the call. It cannot read a Secret, and the cluster tools cannot change anything." | A **Tool response: k8s.resource.list** block under the answer, then a number. Leave the tool response closed on stage: it holds the raw pod list. The number changes from day to day. |
