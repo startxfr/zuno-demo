@@ -129,7 +129,7 @@ Page: row 0:00 and the checklist now say the subscription shown may differ (opti
 
 ## Takes of the late afternoon (not published)
 
-### aap-audited-operations
+### aap-audited-operations (published)
 
 | Item | Value |
 |---|---|
@@ -146,9 +146,9 @@ Success, launched by `zuno-mcp`, inventory `zuno`, credential `zuno-cluster-read
 before the instance group. Reported by the recording session, accepted: the AAP account name `admin` on the project page. The writer
 did not open that image. No node name was seen on the two images the writer opened.
 
-**Not published.** Sent to the owner.
+**Published** as `bbdec534`, on the owner's go of 18:36:28 CET (coordinator's log), before the commit at 18:36:50. The writer compared the file in the commit with the take's GIF: 3 232 151 bytes, SHA-256 `d3c837e41a9d...`, equal.
 
-### quotas
+### quotas (published)
 
 | Item | Value |
 |---|---|
@@ -166,7 +166,9 @@ hours, columns client and group, token counts per group, no person's name. Group
 `evidence.png`: the repository page `quotas.md` on GitHub, with the WP-190 evidence paragraph (no secret). The recording session reports
 one transitional "Loading…" frame. `make demo start quotas` was **not** run: the panel held spend from earlier the same day.
 
-**Not published.** Sent to the owner.
+**Published** as `41ebd891`, on the same go, before the commit at 18:36:51. The writer compared the file in the commit with the take's GIF: 5 016 713 bytes, SHA-256 `76d62e17e770...`, equal.
+
+The catalogue now has 19 GIF files of 30 demos. No "(untested ...)" mark was lifted: the marks left on these two pages are on rows these takes did not run (`quotas` 13:00 and the 15-minute prompt).
 
 ## Scouts, later (as relayed)
 
@@ -179,4 +181,15 @@ one transitional "Loading…" frame. `make demo start quotas` was **not** run: t
 ### dify: first scout facts (as relayed by the coder)
 
 Scout of 2026-11-16 at 16:43 (`scout-enter.png`); the writer opened that image. After the two sign-ins Dify opens on a **Home** page ("Welcome back", the single Dify account displayed as "x", workspace "x's Workspace"), not on Studio; Studio is one click on the left menu. Four applications are listed, not three: the three examples and a fourth, **Strategic Consulting Expert** (an agent, edited 11 days ago). Its origin was not checked. Not yet seen: Studio, the Agent's chat pane, the workflow run. Page: row 0:00 and the checklist state this.
+
+## Scouts at `8f655617` and a workstation finding (as relayed)
+
+Owner's gos in demo333's session.
+
+- `dify`: 9 of 9. The Agent page was still loading when read. The workflow run form was seen; nothing was started.
+- `guardrails`: the paths of both takes are fine.
+- `openclaw`: 6 of 6. The storage key `openclaw-device-identity-v1` was added in the browser. Earlier session titles are visible in the sidebar: none is copied here, and the take must not show them.
+- `maas-portal-api-keys`: failed at `enter`. The portal lists the keys with a `POST .../api-keys/search`, and the scout guard refused it. Nothing was created.
+- One more Vault read of the Dify admin password (value never printed).
+- Workstation: six orphaned containers of the coordinator's own timed-out offline suites ran from 14:38 and loaded the box (load 15, then 3 after they were stopped). `timeout` kills the script, not its container. The coder is asked to add an exit trap.
 
