@@ -268,7 +268,9 @@ export async function run({ page, mark, log, state }) {
   await page.waitForTimeout(1000);
   await mark("q2-done");
   // After the marker, so the image exists for the review; before any PASS.
-  if (!second.some((line) => REFUSAL.test(line))) {
+  // The model writes typographic apostrophes ("I’m sorry, but I can’t read Secret resources.", the take of 2026-11-16):
+  // they are read as plain ones.
+  if (!second.some((line) => REFUSAL.test(line.replace(/[\u2018\u2019\u02BC]/g, "'")))) {
     throw new Error("the answer to the Secret question does not read as a refusal: review q2-done.png, this take must not be published");
   }
 

@@ -71,7 +71,7 @@ $("send").addEventListener("click", () => { if (mode !== "dead") send(); });
 </script>`;
 
 function answer(text) {
-  if (/Secret/.test(text)) return process.env.FAKE_LEAK === "1" ? "Here is the data: root_token: s.FAKEFAKEFAKE" : "I cannot read Secret or ConfigMap data.";
+  if (/Secret/.test(text)) return process.env.FAKE_LEAK === "1" ? "Here is the data: root_token: s.FAKEFAKEFAKE" : "I’m sorry, but I can’t read Secret resources.";
   return "k8s.resource.list called. 20 pods are Running, 0 are not Running.";
 }
 
