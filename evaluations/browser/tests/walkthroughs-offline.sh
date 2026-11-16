@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes, model-catalog-registry) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -26,6 +26,7 @@ kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
 rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
+tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
@@ -405,6 +406,47 @@ assert chat["persona"] == "sale-01" and len(chat["created"]) == 1 and chat["clea
 assert dash["persona"] == "ai-ops-01" and dash["created"] == [] and dash["cleaned"] is None and dash["owned"] == {"before": 0, "after": 0, "same": True}, dash
 assert chat["status"] == dash["status"] == "pass" and (d / "dashboard" / "recording.webm").stat().st_size > 0
 PY
+fi
+if wanted mcp-tools-by-group; then
+echo "== mcp-tools-by-group"
+out="$(tools t-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "tools: a scout of both personas exits 0, SCOUT: done, no chat, no search" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"chats\":0,\"searches\":0}' <<<\"\$0\"" "$out"
+expect "tools: one scout.json per take, the home page with no earlier chat on screen" python3 - "$work/t-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
+assert [(x["name"], x["status"]) for x in t["takes"]] == [("sale-01", "done"), ("consultant-02", "done")], t
+for name in ("sale-01", "consultant-02"):
+    s = json.loads((d / name / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+    assert list(steps) == ["enter", "owned", "home", "closed"] and s["refused_requests"] == [], s
+    assert steps["home"]["chat_link_on_screen"] is False and all(steps["home"]["words"].values()) and steps["closed"]["chats"] == 1, steps
+PY
+out="$(tools t-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "tools: a good run of both takes exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && test \$(grep -c '^RESULT:' <<<\"\$0\") -eq 1" "$out"
+expect "tools: the four chats are gone, one Confluence search ran" grep -q 'left: {"chats":0,"searches":1}' <<<"$out"
+expect "tools: the log carries the tools answers and sale-01's 2:45 answer, never consultant-02's 1:30 answer" bash -c "grep -q 'answer of sale-01 to the 0:00 question' <<<\"\$0\" && grep -q 'answer of consultant-02 to the 0:45 question' <<<\"\$0\" && grep -q 'answer of sale-01 to the 2:45 question' <<<\"\$0\" && grep -q 'answer of consultant-02 to the 1:30 question: [0-9]* chars, not logged' <<<\"\$0\" && ! grep -q 'FAKE-CONFLUENCE-TITLE' <<<\"\$0\"" "$out"
+expect "tools: the chip is filmed with nothing beside it, and sale-01 saw no Confluence tool" bash -c "grep -q 'other new lines at the chip: 0$' <<<\"\$0\" && grep -q 'a Confluence tool name on screen after sale-01.s answer: no' <<<\"\$0\"" "$out"
+expect "tools: each take's markers, two chats created and deleted, the chip taken before the answer" python3 - "$work/t-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); t = json.loads((d / "takes.json").read_text())
+assert t["status"] == "pass" and [x["status"] for x in t["takes"]] == ["pass", "pass"], t
+want = {"sale-01": ["login", "home", "q1-sent", "q1-done", "home-2", "q2-sent", "q2-done", "end"],
+        "consultant-02": ["login", "home", "q1-sent", "q1-done", "home-2", "q2-sent", "chip", "end"]}
+for name, names in want.items():
+    m = json.loads((d / name / "markers.json").read_text())
+    assert [x["name"] for x in m["markers"]] == names and m["motion_from"] == "home" and m["status"] == "pass", m
+    assert len(m["created"]) == 2 and {c["kind"] for c in m["created"]} == {"chat"} and m["cleaned"] is True and m["owned"] == {"before": 1, "after": 1, "same": True}, m
+    assert all((d / name / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / name / "recording.webm").stat().st_size > 0
+c = {x["name"]: x["t"] for x in json.loads((d / "consultant-02" / "markers.json").read_text())["markers"]}
+assert 0.5 < c["chip"] - c["q2-sent"] < 2.5, c   # the stand-in shows the tool call 1 s after the send, its answer 2.5 s later
+PY
+out="$(tools t-nochip FAKE_NO_TOOL_CALL=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "tools: no tool call on screen fails consultant-02's take at once, sale-01 passes, nothing left" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL consultant-02: no Confluence tool call on screen for consultant-02' <<<\"\$0\" && grep -q 'the answer finished with no tool call on screen' <<<\"\$0\" && grep -q 'left: {\"chats\":0,' <<<\"\$0\" && ! grep -q 'FAKE-CONFLUENCE-TITLE' <<<\"\$0\"" "$out"
+out="$(tools t-early FAKE_ANSWER_WITH_CHIP=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "tools: answer text beside the chip is counted in the log, never copied" bash -c "test $rc -eq 0 && grep -q 'other new lines at the chip: 1 (lengths [0-9]*): check chip.png before the cut' <<<\"\$0\" && ! grep -q 'FAKE-CONFLUENCE-TITLE' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
