@@ -48,7 +48,8 @@ import json, pathlib, sys
 d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text())
 steps = {x["step"]: x for x in s["steps"]}
 assert s["status"] == "done" and all(x["ok"] for x in s["steps"]) and s["refused_requests"] == [], s
-assert s["changes"] == ([] if s["demo"] != "kagent" else [c for c in s["changes"] if c.startswith("clicks Skip wizard")]) and len(s["changes"]) <= 1, s["changes"]
+declared = {"kagent": "clicks Skip wizard", "evaluation-trustyai-evalhub": "approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01", "ai-gateway-routing": "approves OpenShift\x27s Authorize Access page for Grafana\x27s proxy as ai-ops-01"}
+assert len(s["changes"]) == (1 if s["demo"] in declared else 0) and all(c.startswith(declared[s["demo"]]) for c in s["changes"]), s["changes"]
 exec(sys.argv[2])
 PY
 }
@@ -366,7 +367,20 @@ echo "$out" | sed 's/^/    /'
 expect "grafana: a panel that shows No data fails the take and names its row" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the panel \"Garak attack success rate (jailbreak probes)\" (row 2:30) shows \"No data\"' <<<\"\$0\"" "$out"
 out="$(evalhub g-authorize FAKE_AUTHORIZE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "grafana: OpenShift's Authorize Access page stops the take, and nothing is approved" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL OpenShift asks ai-ops-01 to authorize Grafana.s proxy' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+expect "grafana: the declared Authorize Access page is approved once, and the take passes" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"approved\":1,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-authorize-scout FAKE_AUTHORIZE=1 RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: a scout approves it too, and its chain says so" scouted g-authorize-scout '
+c = steps["chain"]
+assert c["authorize_shown"] is True and c["authorized"] is True and [x["step"] for x in c["chain"]] == ["proxy", "chooser", "keycloak", "authorize", "grafana"], c
+assert c["chain"][-1]["matched"] == "input[name=\x27approve\x27]", c["chain"]
+'
+out="$(evalhub g-authorize-more FAKE_AUTHORIZE=more)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: an Authorize Access page that asks for one more permission stops the take, nothing approved" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL OpenShift asks ai-ops-01 to authorize Grafana.s proxy (\"Authorize Access\") and the take stops there: it asks for more than user:info and user:check-access (user:full)' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+out="$(evalhub g-authorize-other FAKE_AUTHORIZE=other)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "grafana: an Authorize Access page of another client stops the take, nothing approved" bash -c "test $rc -eq 1 && grep -q 'the take stops there: the page is not the one the owner approved (not on it: grafana-oauth-proxy)' <<<\"\$0\" && grep -q 'left: {\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
 out="$(evalhub g-star FAKE_STAR=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "grafana: a write to Grafana during the take fails it" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the take sent POST /api/user/stars/dashboard/uid/zuno-trustyai to Grafana' <<<\"\$0\"" "$out"

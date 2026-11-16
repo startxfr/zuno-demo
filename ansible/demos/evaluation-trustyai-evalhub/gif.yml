@@ -10,7 +10,9 @@ record_notice: >-
   a recorded browser session as ai-ops-01 on Grafana, read only: it signs in through OpenShift (provider openshift)
   and Keycloak, opens the dashboard TrustyAI evaluation & guardrails over the last 7 days and looks at three panels;
   no prompt, no model call, no evaluation started, nothing created, nothing saved or starred in Grafana; the sign-in
-  itself is the only trace (an OpenShift and a Grafana session of ai-ops-01)
+  is the only trace (an OpenShift and a Grafana session of ai-ops-01) and, if OpenShift shows its Authorize Access
+  page for Grafana's proxy, the take approves it (user:info and user:check-access): one OAuth authorization of
+  ai-ops-01 stays on the cluster
 target_seconds: [40, 60]
 width: 960
 fps: 10

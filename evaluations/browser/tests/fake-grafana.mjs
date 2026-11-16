@@ -4,7 +4,8 @@
 // page with "Log in with OpenShift", the chooser, the Keycloak form, then the dashboard zuno-trustyai with its three
 // evaluation panels far down the page, each drawn only once it is near the screen and after a query (a POST, as in
 // Grafana: a read). It proves the walkthrough's own logic, not Grafana's real selectors.
-// Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" after the sign-in (approving it counts as approved);
+// Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" after the sign-in (approving it counts as approved;
+// =more: with a third permission; =other: for another client);
 // FAKE_NO_DATA=1 the Garak panel shows "No data"; FAKE_STAR=1 the dashboard stars itself when opened (a write).
 import http from "node:http";
 
@@ -18,8 +19,12 @@ const PROXY = page("Log In", `<form action="/oauth/start"><button>Log in with Op
 const CHOOSER = page("Log in", `<h1>Log in with...</h1><a class="idp" title="Log in with startx-htpasswd_auth" href="/htpasswd">startx-htpasswd_auth</a><br>
 <a class="idp" title="Log in with openshift" href="/kc">openshift</a>`);
 const LOGIN = page("Sign in", `<form method="get" action="/cb"><input id="username" name="u"><input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`);
-const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account grafana-oauth-proxy is requesting permission to access your account (ai-ops-01)</p>
-<form action="/approve"><button>Allow selected permissions</button></form>`);
+// As seen live on 2026-11-16. FAKE_AUTHORIZE=more asks for one more permission; FAKE_AUTHORIZE=other is another client.
+const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account ${process.env.FAKE_AUTHORIZE === "other" ? "some-other-proxy" : "grafana-oauth-proxy"} in project zuno-monitoring is requesting permission to access your account (ai-ops-01)</p>
+<form action="/approve"><p>Requested permissions</p>
+<label><input type="checkbox" name="scope" value="user:info" checked> user:info</label><br><label><input type="checkbox" name="scope" value="user:check-access" checked> user:check-access</label><br>
+${process.env.FAKE_AUTHORIZE === "more" ? '<label><input type="checkbox" name="scope" value="user:full" checked> user:full</label><br>' : ""}
+<input type="submit" name="approve" value="Allow selected permissions"> <input type="submit" name="deny" value="Deny"></form>`);
 
 const PANELS = [
   ["Exchanges evaluated, by outcome", ["clean 412", "detected 3"]],
@@ -60,8 +65,8 @@ http.createServer((req, res) => {
   if (u.pathname === "/fake/count") return json(200, { approved, writes });
   if (u.pathname === "/oauth/start") return html(CHOOSER);
   if (u.pathname === "/kc") return html(LOGIN);
-  if (u.pathname === "/cb") return process.env.FAKE_AUTHORIZE === "1" ? html(AUTHORIZE) : to("/", "s=1; Path=/");
-  if (u.pathname === "/approve") { approved += 1; return to("/", "s=1; Path=/"); }
+  if (u.pathname === "/cb") return process.env.FAKE_AUTHORIZE ? html(AUTHORIZE) : to("/", "s=1; Path=/");
+  if (u.pathname === "/approve") { if (u.searchParams.has("approve")) approved += 1; return to("/", u.searchParams.has("approve") ? "s=1; Path=/" : ""); }
   if (!signed) return u.pathname.startsWith("/api") ? json(401, {}) : html(PROXY);
   if (u.pathname === "/api/ds/query") return json(200, { results: {} });
   if (u.pathname.startsWith("/api/") && req.method !== "GET") { writes += 1; return json(200, {}); }

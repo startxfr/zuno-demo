@@ -8,21 +8,32 @@
 // (--provider=openshift, a SubjectAccessReview on pods of zuno-monitoring) and trusts its X-Forwarded-User header
 // (auth.proxy, auto_sign_up, no login form of its own). So the sign-in chain is: the proxy's own page with one
 // button, OpenShift's provider chooser (`openshift` is the Keycloak provider), the Keycloak form, and, the first time
-// a user comes through this proxy, OpenShift's "Authorize Access" page. NOT yet seen live: every selector below is a
-// guess, marked `guess`; scout() of the walkthrough reports the chain as it really is.
+// a user comes through this proxy, OpenShift's "Authorize Access" page. The chain up to that page was seen live on
+// 2026-11-16 (the scouts of evaluation-trustyai-evalhub and ai-gateway-routing stopped on it); Grafana's own
+// selectors are still guesses, marked `guess`; scout() of the walkthrough reports the chain as it really is.
 //
 // What a sign-in may create, none of it by a click of the take: the OpenShift User and its group memberships (the
-// first sign-in of that persona to OpenShift), the Grafana user (auto_sign_up, the first time). What a take NEVER
-// does: approve "Authorize Access" (it would store an OAuth authorization for the persona on the cluster: the take
-// stops there and says so), save a dashboard or a time range, star, change a preference. The time range is given in
-// the address only.
+// first sign-in of that persona to OpenShift), the Grafana user (auto_sign_up, the first time).
+// "Authorize Access": approving it stores one OAuth authorization for the persona on the cluster. The owner's decision
+// of 2026-11-16: a scout or a take may approve it for ai-ops-01, as a DECLARED change. So it is approved only when the
+// walkthrough lists `grafana.AUTHORIZE_CHANGE` in its `changes`, the persona is ai-ops-01, and the page is exactly the
+// one seen live: the service account grafana-oauth-proxy of zuno-monitoring, for that persona, asking for user:info
+// and user:check-access and nothing more. Anything else (another client, another scope, another persona, the change
+// not declared) stops the take there, as before. What a take NEVER does: save a dashboard or a time range, star,
+// change a preference. The time range is given in the address only.
 import { click, firstVisible, read, waitUntil } from "./_helpers.mjs";
 
 export const grafana = {
   url: (domain) => `https://grafana-route-zuno-monitoring.${domain}`,
   PROXY_BUTTON: ["button:has-text('Log in with OpenShift')", "form[action*='/oauth/start'] button", "a[href*='/oauth/start']"],   // guess (oauth-proxy)
   PROVIDER: "openshift",   // the Keycloak provider of the cluster; never startx-htpasswd_auth
-  AUTHORIZE: /Authorize Access/i,                                                                                             // guess (OpenShift)
+  AUTHORIZE: /Authorize Access/i,                                                                                             // seen live 2026-11-16
+  // The declared change a walkthrough lists in `changes` to let the sign-in approve that page (the owner's decision).
+  AUTHORIZE_CHANGE: "approves OpenShift's Authorize Access page for Grafana's proxy as ai-ops-01 (user:info and user:check-access), which stores one OAuth authorization for ai-ops-01 on the cluster",
+  AUTHORIZE_PERSONA: "ai-ops-01",
+  AUTHORIZE_CLIENT: ["grafana-oauth-proxy", "zuno-monitoring"],
+  AUTHORIZE_SCOPES: ["user:info", "user:check-access"],
+  ALLOW: ["input[name='approve']", "input[type='submit'][value='Allow selected permissions']", "button:has-text('Allow selected permissions')"],   // guess
   READY: ["[data-testid*='Panel header']", "[data-testid='data-testid dashboard controls']", ".react-grid-layout", "main"],   // guess (Grafana 10+)
   LOADING: "[aria-label='Panel loading bar']",                                                                                // guess
   // The requests that would CHANGE something in Grafana. Its queries are POSTs too (/api/ds/query) and are reads:
@@ -36,7 +47,7 @@ const provider = (name) => [`a[title='Log in with ${name}']`, `a.idp:text-is('${
 // form. Returns the chain as it was met, for the scout: [{step, url (no query), matched}]. state.grafana keeps it.
 export async function grafanaSignIn({ page, base, mark, keycloak, state }, persona, { changes = [] } = {}) {
   const chain = [];
-  state.grafana = { chain, authorize_shown: false };
+  state.grafana = { chain, authorize_shown: false, authorized: false };
   const here = () => page.url().replace(/[?#].*/, "");
   await page.goto(`${base}/`);
   const wanted = [...grafana.PROXY_BUTTON, ...provider(grafana.PROVIDER), "#username"];
@@ -52,17 +63,41 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
   chain.push({ step: "keycloak", url: here(), matched: "#username" });
   await mark("login");   // nothing is marked once the password is typed
   await keycloak(persona);
-  // Back on Grafana, or stopped on OpenShift's "Authorize Access" page: never approved by a take or a scout.
-  const landed = await waitUntil(page, { what: "Grafana after the sign-in", timeoutMs: 90000, done: async () => {
+  // Back on Grafana, or on OpenShift's "Authorize Access" page: approved only as the declared change, see above.
+  const land = () => waitUntil(page, { what: "Grafana after the sign-in", timeoutMs: 90000, done: async () => {
     if (await page.getByText(grafana.AUTHORIZE).first().isVisible().catch(() => false)) return "authorize";
     if (page.url().startsWith(base) && !/\/oauth\//.test(page.url()) && await firstVisible(page, grafana.READY)) return "grafana";
     return undefined;
   } });
+  let landed = await land();
   chain.push({ step: landed, url: here(), matched: "" });
   if (landed === "authorize") {
     state.grafana.authorize_shown = true;
-    throw new Error(`OpenShift asks ${persona} to authorize Grafana's proxy ("Authorize Access"): approving it stores an authorization for ${persona} `
-      + "on the cluster, which a take or a scout never does; it is the owner's to approve once by hand, signed in as that persona");
+    const stop = (why) => new Error(`OpenShift asks ${persona} to authorize Grafana's proxy ("Authorize Access") and the take stops there: ${why}; `
+      + `approving it stores an authorization for ${persona} on the cluster, the owner's to approve by hand, signed in as that persona`);
+    if (!changes.includes(grafana.AUTHORIZE_CHANGE)) throw stop("the walkthrough does not declare that change");
+    if (persona !== grafana.AUTHORIZE_PERSONA) throw stop(`the owner's decision covers ${grafana.AUTHORIZE_PERSONA} only`);
+    // The page must be the one the owner decided on: the same client, the same persona, the same two scopes.
+    const asked = await read(page, () => ({
+      text: document.body.innerText,
+      scopes: [...document.querySelectorAll("input[type='checkbox']")].map((box) => ({ name: box.value || box.name || "", checked: box.checked })),
+    }));
+    const absent = [...grafana.AUTHORIZE_CLIENT, `(${persona})`, ...grafana.AUTHORIZE_SCOPES].filter((word) => !asked.text.includes(word));
+    if (absent.length) throw stop(`the page is not the one the owner approved (not on it: ${absent.join(", ")})`);
+    const words = asked.text.match(/\b[a-z]+:[a-z][a-z-]*\b/g) || [];
+    const more = [...new Set(words)].filter((word) => /^(user|role):/.test(word) && !grafana.AUTHORIZE_SCOPES.includes(word));
+    if (more.length || asked.scopes.length !== grafana.AUTHORIZE_SCOPES.length) {
+      throw stop(`it asks for more than ${grafana.AUTHORIZE_SCOPES.join(" and ")} (${more.join(", ") || asked.scopes.length + " permissions listed"})`);
+    }
+    const allow = await firstVisible(page, grafana.ALLOW);
+    if (!allow) throw stop(`its button was not found (${grafana.ALLOW.join(" | ")})`);
+    await click(allow, { changes });   // the page's permissions are left as shown: no checkbox is touched
+    state.grafana.authorized = true;
+    await page.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    landed = await land();
+    chain.push({ step: landed === "authorize" ? "authorize-again" : landed, url: here(), matched: allow.matched });
+    if (landed === "authorize") throw stop("the page came back after it was approved once");
   }
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   return chain;

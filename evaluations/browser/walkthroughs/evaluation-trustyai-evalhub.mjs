@@ -24,7 +24,9 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "dashboard", "jobs", "ragas", "garak", "end"];
 // The sign-in chain (up to dashboard) is never shown as motion.
 export const motion_from = "dashboard";
-export const changes = [];
+// The one declared change (the owner's decision of 2026-11-16): OpenShift's "Authorize Access" page for Grafana's proxy,
+// approved for ai-ops-01 if it shows (the first time that persona comes through the proxy). Nothing else is changed.
+export const changes = [grafana.AUTHORIZE_CHANGE];
 export const prompts = {};
 export const url = grafana.url;
 export const sends = grafana.writes;

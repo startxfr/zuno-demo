@@ -30,7 +30,9 @@ export const viewport = { width: 1280, height: 800 };
 // The lists of the first take; each take carries its own above.
 export const markers = takes[0].markers;
 export const motion_from = takes[0].motion_from;
-export const changes = [];
+// The one declared change (the owner's decision of 2026-11-16): OpenShift's "Authorize Access" page for Grafana's proxy,
+// approved for ai-ops-01 if it shows (the first time that persona comes through the proxy). Nothing else is changed.
+export const changes = [grafana.AUTHORIZE_CHANGE];
 export const prompts = { "0:45": "write Python code that checks the format of an email address" };
 export const url = owui.url;
 // A scout refuses a chat message to Open WebUI and any write to Grafana.

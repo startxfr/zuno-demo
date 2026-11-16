@@ -12,8 +12,9 @@ record_notice: >-
   two recorded browser sessions: sale-01 on Open WebUI asks one Zuno Code question (the answer and the chat title: two
   Codestral calls on sale-01's budget; the chat it creates is deleted at the end, and the take fails if sale-01's chats
   differ before and after), then ai-ops-01 on Grafana, read only (sign-in through OpenShift and Keycloak, the
-  dashboard Five experiences over the last hour, nothing saved); traces and metrics of the answer remain, as for any
-  use
+  dashboard Five experiences over the last hour, nothing saved; if OpenShift shows its Authorize Access page for
+  Grafana's proxy, the take approves it, user:info and user:check-access: one OAuth authorization of ai-ops-01 stays
+  on the cluster); traces and metrics of the answer remain, as for any use
 target_seconds: [40, 60]
 width: 960
 fps: 10
