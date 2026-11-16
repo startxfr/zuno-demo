@@ -17,6 +17,8 @@ seconds. When nothing is left, the gateway answers 503 at once. How the list is 
 **The message:** "The platform picks the model for each task, falls back when a model is down, and never waits on a
 model that is not there."
 
+![The 5-minute version of the AI gateway routing demo, recorded live: sale-01 picks Zuno Code in Open WebUI and asks a code question, then ai-ops-01 opens the Grafana panel that names the provider that served Open WebUI, Mistral Codestral. Rows 3:15 and 4:15 are words.](../../../assets/img/demo/ai-gateway-routing.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
