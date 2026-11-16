@@ -10,3 +10,15 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
+# The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. The Do commands
+# of rows 0:00, 1:00 and 2:15 are reads that pass the read-only allowlist (nothing scales or patches), so `allow` is
+# empty; row 3:00 (a Grafana panel) has no command and is not filmed. The window is 129x22: the serving and quota
+# tables are 181 and 233 columns wide, and at 129 their lines wrap between columns, with no word cut (measured
+# read-only on 2026-11-16; 136 and 140 cut words, and no narrower width avoids a cut); the tallest screen is 17
+# lines. Row 1:00 shows no node name: the NODE column was dropped from the page on 2026-11-16 (internal addresses
+# and the cloud region are not published).
+record:
+  kind: terminal
+  allow: []
+  cols: 129
+  rows: 22

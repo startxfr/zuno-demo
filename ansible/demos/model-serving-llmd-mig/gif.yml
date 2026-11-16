@@ -1,0 +1,22 @@
+---
+# model-serving-llmd-mig: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record model-serving-llmd-mig` captures the 5-minute version as a real terminal session and checks it as
+# text; `make demo record model-serving-llmd-mig render` replays it in xterm.js and films it, then cuts it with this
+# list. The GIF stays in ~/.cache/zuno/demo/recordings/ until the owner's "go model-serving-llmd-mig".
+# Markers written by the replay: start, then per row with a command <MM-SS>-typed and <MM-SS>-done, then end. Row
+# 3:00 is a Grafana panel: no command, no marker, not in the GIF, and no caption speaks of throughput. Row 1:00 is
+# cut in two, its long command typed then its answer. No count in a caption (models and slices change). Planned
+# before the first take on synthetic markers at the capture's typing pace: check the total and the longest still.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: three read-only `oc get` commands (the served models,
+  the GPU slice of each model pod, the GPU quota), no Secret value; row 3:00 (Grafana) is not
+  filmed
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 00-00-done, fit: 6, hold: 6, step: "0:00", caption: "0:00  Each model is one object in Git, served by vLLM"}
+  - {from: 00-00-done, to: 01-00-typed, fit: 8, hold: 3, step: "1:00", caption: "1:00  Which GPU slice does each model use?"}
+  - {from: 01-00-typed, to: 01-00-done, fit: 2, hold: 6, step: "1:00", caption: "1:00  MIG cuts each card: a slice sized to each model"}
+  - {from: 01-00-done, to: 02-15-done, fit: 5, hold: 6, step: "2:15", caption: "2:15  A quota caps the slices the namespace may hold"}
+  - {still: end, hold: 5, step: "4:15", caption: "Declared in Git, sized to a GPU slice, capped by a quota"}
