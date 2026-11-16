@@ -86,7 +86,7 @@ Profile 1, **consultant-02**.
 |---|---|---|---|
 | 0:00 | Open the Lightspeed panel | "This is the assistant built into the OpenShift console, a Red Hat product. Here it runs on our own model." | The Lightspeed panel and its prompt box. |
 | 0:45 | Ask: `In one sentence, what is a Pod in OpenShift?` | "The answer comes from gpt-oss-20b on our GPUs, through the same MaaS gateway as our developers' keys, and from the official documentation of this OpenShift version." | A one-sentence answer, usually within a minute (219 and 242 characters in the probe runs of 2026-11-12). |
-| 2:00 | Ask: `Which pods are running in the zuno-ai-run namespace?` *(untested prompt)* | "Now it reads the live cluster with my own rights. As a consultant I may read the Zuno namespaces." | A list of pods of `zuno-ai-run` (the gateways, the model pods). |
+| 2:00 | Ask: `List only the names of the pods in the zuno-ai-run namespace. No IP addresses, no node names, no table.` *(untested prompt)* | "Now it reads the live cluster with my own rights. As a consultant I may read the Zuno namespaces." | The names of the pods of `zuno-ai-run` (the gateways, the model pods), and nothing else: no address, no node name. |
 | 3:15 | Ask: `List the pods in the openshift-etcd namespace.` *(untested prompt)* | "Outside what I may see, it gets nothing: it uses my rights, not its own." | An answer saying the user has no permission to list pods there. |
 | 4:15 | Close | "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what the person asking may see." | |
 

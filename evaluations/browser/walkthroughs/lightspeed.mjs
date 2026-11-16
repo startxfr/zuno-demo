@@ -30,7 +30,7 @@ export const motion_from = "console";
 export const changes = [];
 export const prompts = {
   "0:45": "In one sentence, what is a Pod in OpenShift?",
-  "2:00": "Which pods are running in the zuno-ai-run namespace?",
+  "2:00": "List only the names of the pods in the zuno-ai-run namespace. No IP addresses, no node names, no table.",
   "3:15": "List the pods in the openshift-etcd namespace.",
 };
 export const url = (domain) => `https://console-openshift-console.${domain}`;
