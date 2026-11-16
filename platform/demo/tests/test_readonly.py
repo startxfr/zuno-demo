@@ -355,6 +355,12 @@ class StripWatchFlags(unittest.TestCase):
         self.assertEqual(r.strip_watch_flags("oc get pods --watch | tail -f"),
                          ("oc get pods | tail", ["--watch", "-f"]))
 
+    def test_the_spaces_of_the_command_are_kept(self):
+        awk = "git show HEAD:a.yaml | awk '/^  - name:/{n=$3} /^    eligible_for:/{print n, $2}'"
+        self.assertEqual(r.strip_watch_flags(awk), (awk, []))
+        self.assertEqual(r.strip_watch_flags("oc get pods -w | awk '/^a  b/'"), ("oc get pods | awk '/^a  b/'", ["-w"]))
+        self.assertEqual(r.strip_watch_flags("oc get pods -n x  -w"), ("oc get pods -n x", ["-w"]))
+
     def test_never_raises_and_the_caller_judges(self):
         self.assertEqual(r.strip_watch_flags("oc get -f pod.yaml"), ("oc get -f pod.yaml", []))
         self.assertEqual(r.strip_watch_flags("oc delete pod x -w"), ("oc delete pod x -w", []))

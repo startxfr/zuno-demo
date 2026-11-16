@@ -560,9 +560,11 @@ def strip_watch_flags(command: str) -> Tuple[str, List[str]]:
         for flag in WATCH_FLAGS.get((program, verb), ()):
             if flag in segment:
                 removed.append(flag)
+    # Only the flag and the blank before it go: spaces inside quotes are the command's own (an awk pattern such as
+    # '/^  - name:/' must be typed as written), so the rest of the line is never re-spaced.
     for flag in removed:
-        text = re.sub(r"(?<!\S)" + re.escape(flag) + r"(?!\S)", "", text, count=1)
-    return re.sub(r"[ \t]{2,}", " ", text).strip(), removed
+        text = re.sub(r"[ \t]+" + re.escape(flag) + r"(?!\S)", "", text, count=1)
+    return text.strip(), removed
 
 
 def check(command: str, variables: Optional[Dict[str, str]] = None) -> Tuple[bool, str]:
