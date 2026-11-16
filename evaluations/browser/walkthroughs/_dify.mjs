@@ -7,9 +7,9 @@
 // credential (the owner's decision of 2026-11-16): the recorder holds it, this file only asks it to type it into the
 // one password field of Dify's form (`ctx.typeSecret`), and nothing is marked or described while that form is open.
 //
-// NOTHING below was seen live when this was written (2026-11-16): the browser check stops at the front door. Every
-// selector and every API path is a guess from Dify 1.x, marked `guess`; scout() of the walkthrough reports what is
-// really there.
+// Seen live by the first scout (2026-11-16): the two sign-in forms work as guessed, and Dify then opens on its Home
+// page. Everything after Studio is still a guess from Dify 1.x, marked `guess`: the cards, the chat pane, the run
+// form and every API path; scout() of the walkthrough reports what is really there.
 //
 // What a take may write in Dify, and nothing else: one message to the Zuno Agent's chat (a conversation, deleted by
 // its id at the end when Dify's API lists it), one run of the workflow (its run log CANNOT be deleted: said in the
@@ -25,7 +25,10 @@ export const dify = {
   EMAIL: ["input#email", "input[type='email']", "input[name='email']"],                                   // guess
   PASSWORD: ["input#password", "input[type='password']"],                                                // guess
   SUBMIT: ["form button[type='submit']", "button:has-text('Sign in')", "button:has-text('Login')"],      // guess
-  STUDIO: ["a[href='/apps']", "nav a:has-text('Studio')"],                                               // guess
+  // Dify opens on its Home page, not on Studio (scout of 2026-11-16: "Welcome back", a left menu Home / Studio /
+  // Knowledge / Skills / Integrations): Studio is reached by its entry of that menu.
+  STUDIO: ["a[href='/apps']", "a:text-is('Studio')", "nav a:has-text('Studio')", "a:has-text('Studio')"],
+  HOME: /Welcome back/,
   CHAT_INPUT: ["textarea[placeholder*='Talk' i]", "textarea[placeholder*='message' i]", "textarea"],     // guess
   RUN: ["button:has-text('Test Run')", "button:has-text('Run')"],                                        // guess: the workflow's run button
   START_RUN: ["button:has-text('Start Run')", "button:has-text('Start run')", "form button[type='submit']"],   // guess
@@ -52,7 +55,7 @@ export async function difyGuard(page) {
 // Sign in: the front door (Keycloak, the `login` marker on its EMPTY form), then Dify's own form as its single
 // administrator. Nothing is marked, described or logged between the two forms and Studio.
 export async function difySignIn({ page, base, mark, keycloak, typeSecret, state }, persona) {
-  state.dify = { second_form: false, studio: "" };
+  state.dify = { second_form: false, landed: "", studio: "" };
   await page.goto(`${base}/`);
   await page.waitForSelector("#username", { timeout: 30000 });
   await mark("login");   // the EMPTY Keycloak form: nothing is marked once a password is typed
@@ -60,7 +63,7 @@ export async function difySignIn({ page, base, mark, keycloak, typeSecret, state
   const found = await waitUntil(page, { what: "Dify behind its front door", timeoutMs: 90000, done: async () => {
     if (!page.url().startsWith(base)) return undefined;
     if (await firstVisible(page, dify.PASSWORD)) return "form";
-    if (/\/apps(\/|\?|$)/.test(page.url()) && !(await firstVisible(page, dify.PASSWORD))) return "studio";
+    if ((/\/apps(\/|\?|$)/.test(page.url()) || (await firstVisible(page, dify.STUDIO))) && !(await firstVisible(page, dify.PASSWORD))) return "studio";
     return undefined;
   } });
   if (found === "form") {
@@ -74,14 +77,23 @@ export async function difySignIn({ page, base, mark, keycloak, typeSecret, state
     if (!submit) throw new Error(`Dify's sign-in form has no button among ${dify.SUBMIT.join(" | ")}`);
     await Promise.all([page.waitForLoadState("domcontentloaded").catch(() => {}), click(submit)]);
   }
-  await waitUntil(page, { what: "Dify's Studio after its sign-in", timeoutMs: 90000, done: async () => {
+  // Signed in: Dify's Home page (or Studio at once, on an older Dify). The sign-in form must be gone.
+  const landed = await waitUntil(page, { what: "Dify after its sign-in", timeoutMs: 90000, done: async () => {
     if (await firstVisible(page, dify.PASSWORD)) {
       const wrong = await page.getByText(/invalid|incorrect|wrong|failed/i).first().isVisible().catch(() => false);
       if (wrong) throw new Error("Dify refused its administrator's sign-in (the form shows an error)");
       return undefined;
     }
-    return /\/apps(\/|\?|$)/.test(page.url()) || undefined;
+    if (/\/apps(\/|\?|$)/.test(page.url())) return "studio";
+    return (await firstVisible(page, dify.STUDIO)) ? "home" : undefined;
   } });
+  state.dify.landed = landed;
+  if (landed === "home") {
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    const studio = await firstVisible(page, dify.STUDIO);
+    await click(studio);
+    await page.waitForURL(/\/apps(\/|\?|$)/, { timeout: 30000 });
+  }
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   state.dify.studio = page.url().replace(/[?#].*/, "");
 }
@@ -128,8 +140,18 @@ export async function difyRuns(page, appId) {
 // Open an application from Studio by its card: the address reached, without its query.
 export async function difyOpen(page, base, name, { changes = [] } = {}) {
   if (!/\/apps(\/|\?|$)/.test(page.url())) await page.goto(`${base}/apps`);
-  const card = page.getByText(name, { exact: true }).first();
-  await card.waitFor({ timeout: 30000 });
+  // Dify's left menu lists the published web apps by the same names (scout of 2026-11-16): the card is the match in
+  // the page's body, right of that menu, not the menu's entry (which opens the web app, not its editor).
+  const named = page.getByText(name, { exact: true });
+  await named.first().waitFor({ timeout: 30000 });
+  await page.waitForTimeout(800);
+  let card = null;
+  let left = 260;   // the menu's width at 1280 px
+  for (let i = 0; i < Math.min(await named.count(), 10); i += 1) {
+    const box = await named.nth(i).boundingBox().catch(() => null);
+    if (box && box.width > 0 && box.x >= left) { card = named.nth(i); left = box.x + 1e6; }
+  }
+  if (!card) throw new Error(`Studio shows no card named ${name} (only the left menu names it)`);
   await click(card, { changes });
   await page.waitForURL(/\/app\/[0-9a-f-]{8,}\//, { timeout: 30000 });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});

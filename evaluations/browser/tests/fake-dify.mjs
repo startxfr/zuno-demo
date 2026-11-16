@@ -26,10 +26,12 @@ document.getElementById("f").onsubmit = async (e) => {
   e.preventDefault();
   const r = await fetch("/console/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: document.getElementById("email").value, password: btoa(document.getElementById("password").value) }) });
-  if (r.status === 200) location.href = "/apps"; else document.getElementById("error").textContent = "Invalid email or password.";
+  if (r.status === 200) location.href = "/"; else document.getElementById("error").textContent = "Invalid email or password.";
 };
 </script>`;
-const shell = (body) => `<!doctype html><title>Dify</title><body style="font:16px sans-serif;margin:24px"><nav><a href="/apps">Studio</a></nav>${body}`;
+// The left menu lists the web apps by the same names as Studio's cards; its entries open the web app, not the editor.
+const MENU = `<aside style="position:fixed;left:0;top:60px;width:240px"><p>WEB APPS</p><a href="/webapp/agent" style="display:block">Zuno Agent</a><a href="/webapp/flow" style="display:block">Zuno Confluence Search</a></aside>`;
+const shell = (body) => `<!doctype html><title>Dify</title><body style="font:16px sans-serif;margin:24px 24px 24px 280px">${MENU}<nav><a href="/">Home</a> <a href="/apps">Studio</a> <a href="/datasets">Knowledge</a></nav>${body}`;
 const APPS = shell(`<main><h1>Studio</h1>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${AGENT}/configuration'"><div>Zuno Agent</div><small>AGENT</small></div>
 <div class="card" style="border:1px solid #888;padding:8px;margin:8px" onclick="location.href='/app/${DOCS}/workflow'"><div>Zuno Technical Documentation</div><small>CHATFLOW</small></div>
@@ -108,7 +110,9 @@ http.createServer((req, res) => {
     });
   }
   if (/\/workflows\/draft$|\/model-config$/.test(u.pathname) && req.method !== "GET") { saved += 1; return json(200, {}); }
-  if (u.pathname === "/signin" || u.pathname === "/") { res.writeHead(302, { Location: "/apps" }); return res.end(); }
+  if (u.pathname === "/signin") { res.writeHead(302, { Location: "/" }); return res.end(); }
+  // As Dify on 2026-11-16: the first page is Home, with Studio in its left menu and the web apps listed.
+  if (u.pathname === "/") return html(shell(`<main><h1>Welcome back, x</h1><h2>Recents</h2><div>Zuno Agent</div><div>Zuno Confluence Search</div></main>`));
   if (u.pathname === "/apps") return html(APPS);
   if (u.pathname === `/app/${AGENT}/configuration`) return html(AGENT_PAGE);
   if (u.pathname === `/app/${FLOW}/workflow` || u.pathname === `/app/${DOCS}/workflow`) return html(FLOW_PAGE);

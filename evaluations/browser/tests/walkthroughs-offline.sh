@@ -581,7 +581,7 @@ expect "dify: a scout exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '
 expect "dify: a scout creates no conversation, runs nothing, and no save of an application reached Dify" grep -q 'left: {"conversations":1,"runs":1,"saved":0}' <<<"$out"
 expect "dify: scout.json reports the sign-in, the applications and the run form" scouted d-scout '
 assert list(steps) == ["enter", "owned", "sign-in", "studio", "api", "agent", "workflow", "run-form", "closed"], list(steps)
-assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["apps"] == {"Zuno Agent": "agent-chat", "Zuno Technical Documentation": "advanced-chat", "Zuno Confluence Search": "workflow"}, steps["sign-in"]
+assert steps["sign-in"]["second_form"] is True and steps["sign-in"]["landed"] == "home" and steps["sign-in"]["studio"].endswith("/apps") and steps["sign-in"]["apps"] == {"Zuno Agent": "agent-chat", "Zuno Technical Documentation": "advanced-chat", "Zuno Confluence Search": "workflow"}, steps["sign-in"]
 assert steps["api"] == {**steps["api"], "conversations": 1, "workflow_runs": 1, "profile_status": 200}, steps["api"]
 assert steps["agent"]["selector"] == "textarea[placeholder*=\x27Talk\x27 i]" and steps["agent"]["url"].endswith("/app/<id>/configuration"), steps["agent"]
 assert steps["workflow"]["run_selector"] and steps["run-form"]["start_selector"] and steps["run-form"]["fields"] == 1, steps["run-form"]
