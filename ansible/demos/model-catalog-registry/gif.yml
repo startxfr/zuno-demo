@@ -1,0 +1,22 @@
+---
+# model-catalog-registry: the first cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Written
+# BEFORE the first take: tune it with `make demo gif model-catalog-registry` once a take exists.
+# `make demo record model-catalog-registry` takes the 5-minute version as ai-dev-01 on the OpenShift AI dashboard
+# (evaluations/browser/walkthroughs/model-catalog-registry.mjs).
+# Markers written by the walkthrough, in order: login, dashboard, catalog, validated, card, end. Every screen is held
+# about 2 s by the walkthrough itself, so each motion moment has frames to cut. The card's performance data is not
+# checked on this cluster (the page says so): no caption promises it. Rows 3:15 and 4:15 are words.
+record_notice: >-
+  a recorded browser session as ai-dev-01 on the OpenShift AI dashboard: the model catalog, its Red Hat AI validated
+  source and one card, read only: no prompt, no model call, nothing deployed or registered; the sign-in is an
+  OpenShift session of ai-dev-01
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
+  - {still: dashboard, hold: 5, step: "0:00", caption: "0:00  The OpenShift AI dashboard, as a developer"}
+  - {from: dashboard, to: catalog, fit: 6, hold: 4, step: "0:45", caption: "0:45  A model catalog that Red Hat curates"}
+  - {from: catalog, to: validated, fit: 4, hold: 4, step: "2:00", caption: "2:00  Red Hat AI validated: models with tested settings"}
+  - {from: validated, to: card, fit: 5, hold: 5, step: "2:00", caption: "2:00  One validated model, described on its card"}
+  - {still: end, hold: 6, step: "4:15", caption: "Developers start from a curated catalog"}

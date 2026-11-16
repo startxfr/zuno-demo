@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -25,6 +25,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
 lightspeed() { take lightspeed fake-lightspeed.mjs 8096 "$@"; }
+rhoai() { take model-catalog-registry fake-rhoai.mjs 8095 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
@@ -267,6 +268,43 @@ PY
 out="$(identity i-refused FAKE_REFUSE_DELETE=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "identity: a refused delete fails both takes, each named, the second still played" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL consultant-02: the chat .* was NOT deleted from consultant-02.s history.*; sale-01: the chat .* was NOT deleted from sale-01.s history' <<<\"\$0\"" "$out"
+fi
+if wanted model-catalog-registry; then
+echo "== model-catalog-registry"
+out="$(rhoai r-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: a scout exits 0, SCOUT: done, nothing deployed" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"deploys\":0}' <<<\"\$0\"" "$out"
+expect "model-catalog-registry: scout.json reports every guess" scouted r-scout '
+assert list(steps) == ["enter", "owned", "dashboard", "catalog", "card", "closed"], list(steps)
+d = steps["dashboard"]
+assert d["dialog_on_screen"] is False and d["nav_selector"] == "#page-sidebar" and d["catalog_link"] == "" and d["group"].endswith("AI hub\x27)"), d
+c = steps["catalog"]
+assert c["link"] == "nav a:text-is(\x27Catalog\x27)" and c["cards"] == 4 and c["filter_selector"] == "button:has-text(\x27Red Hat AI validated\x27)", c
+assert c["filter_is"].startswith("button") and "checkbox_inside=false" in c["filter_is"] and all(c["words"].values()), c
+k = steps["card"]
+assert k["url"].endswith("/ai-hub/catalog/granite-3.1-8b-instruct") and k["title_selector"] == "[data-testid=\x27app-page-title\x27]" and k["words"]["Deploy"], k
+'
+out="$(rhoai r-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: a good take exits 0, RESULT: PASS, nothing deployed" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"deploys\":0}' <<<\"\$0\"" "$out"
+expect "model-catalog-registry: the log names the validated card it opened" grep -q 'card opened: llama-3.3-70b-instruct-quantized' <<<"$out"
+expect "model-catalog-registry: markers.json follows the contract, read only" markers r-pass '
+assert names == ["login", "dashboard", "catalog", "validated", "card", "end"], names
+assert m["persona"] == "ai-dev-01" and m["motion_from"] == "dashboard" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True}, m
+ts = [x["t"] for x in m["markers"]]
+assert all(b - a >= 1.9 for a, b in zip(ts[1:4], ts[2:5])), ts   # a presenter pause on every screen: frames to cut
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(rhoai r-dialog FAKE_DIALOG=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: a dialog over the dashboard stops the take" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL a dialog covers the dashboard' <<<\"\$0\"" "$out"
+out="$(rhoai r-checkbox FAKE_CHECKBOX=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: a source filter that is a checkbox is not clicked" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL refused to click a checkbox' <<<\"\$0\"" "$out"
+out="$(rhoai r-approve FAKE_APPROVE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "model-catalog-registry: an OAuth grant page stops the take, nothing granted" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL OpenShift asks ai-dev-01 to authorize' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 [[ $failed -eq 0 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
