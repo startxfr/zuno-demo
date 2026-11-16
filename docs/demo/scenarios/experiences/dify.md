@@ -13,6 +13,8 @@ applications are imported at every install.
 **The message:** "Business users can draw their own AI apps. The models, tools, documents and budget behind them stay
 the platform's."
 
+![The 5-minute version of the Dify demo, recorded live as consultant-02 with Dify's administrator account: the example applications in Studio, the Zuno Agent answering a Confluence question with the governed tool, and the Zuno Confluence Search workflow run from its form. The page titles in the answers are real pages of the company's Confluence.](../../../assets/img/demo/dify.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
