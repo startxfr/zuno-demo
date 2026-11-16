@@ -1,0 +1,21 @@
+---
+# service-mesh-kiali: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record service-mesh-kiali` captures the 5-minute version as a real terminal session and checks it as
+# text; `make demo record service-mesh-kiali render` replays it in xterm.js and films it, then cuts it with this list.
+# The GIF stays in ~/.cache/zuno/demo/recordings/ until the owner's "go service-mesh-kiali".
+# Markers written by the replay: start, then per row with a command <MM-SS>-typed and <MM-SS>-done, then end. Row
+# 3:15 is Kiali in a browser: no command, no marker, not in the GIF, and no caption speaks of it. Row 2:15 is cut in
+# two, its long command typed then its answer. Planned before the first take on synthetic markers at the capture's
+# typing pace: check the total and the longest still after it.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: three read-only `oc get` commands on the mesh, names,
+  modes and certificate identities only, no Secret value; row 3:15 (Kiali in a browser) is not filmed
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 00-00-done, fit: 6, hold: 5, step: "0:00", caption: "0:00  Service Mesh 3: one Istio control plane, healthy"}
+  - {from: 00-00-done, to: 01-00-done, fit: 5, hold: 6, step: "1:00", caption: "1:00  Data, identity and AI namespaces refuse plaintext"}
+  - {from: 01-00-done, to: 02-15-typed, fit: 8, hold: 3, step: "2:15", caption: "2:15  Which certificate does each service hold?"}
+  - {from: 02-15-typed, to: 02-15-done, fit: 2, hold: 5, step: "2:15", caption: "2:15  One hour, per ServiceAccount, signed by Vault"}
+  - {still: end, hold: 5, step: "4:15", caption: "Data, identity and model services accept only mutual TLS"}
