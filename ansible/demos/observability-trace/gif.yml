@@ -1,0 +1,25 @@
+---
+# observability-trace: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE
+# the first take: tune it with `make demo gif observability-trace` once a take exists.
+# `make demo record observability-trace` films TWO takes in one run (evaluations/browser/walkthroughs/
+# observability-trace.mjs): `chat`, consultant-02 on UnifAI (team workspace agent-tekos), then `trace`, ai-ops-01 on
+# the Tempo search UI. Every moment names its take.
+# Markers of `chat`: login, hub, q-sent, q-done, end. Of `trace`: login, search, trace, tags, end. The trace take
+# searches again until the trace shows, up to three minutes: none of that wait is in the cut (stills only there).
+# Rows 0:00 and 4:15 are words: the close is a caption on the span's tags.
+record_notice: >-
+  two recorded browser sessions: consultant-02 on UnifAI, team workspace agent-tekos, asks Tekos one question (one
+  answer on consultant-02's budget; the session it creates is deleted at the end, and the take fails if the
+  workspace's sessions differ before and after; the titles of earlier sessions of the workspace's members show in
+  the list); then ai-ops-01 on the Tempo search UI, read only (sign-in through OpenShift and Keycloak, one search,
+  one trace and one span opened, nothing saved); the trace and the metrics of the answer remain, as for any use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {take: chat, still: login, hold: 3, caption: "Sign in with the company account"}
+  - {take: chat, from: q-sent, to: q-done, fit: 6, hold: 4, step: "0:45", caption: "0:45  A consultant asks our technical agent"}
+  - {take: trace, still: search, hold: 6, step: "1:45", caption: "1:45  The operator finds that turn by who asked"}
+  - {take: trace, still: trace, hold: 5, caption: "One trace: UnifAI's spans and the gateway's model calls"}
+  - {take: trace, still: tags, hold: 10, step: "3:00", caption: "3:00  Who, which app, which agent, which model, what cost"}
+  - {take: trace, still: end, hold: 5, step: "4:15", caption: "Every call leaves a count and a trace"}

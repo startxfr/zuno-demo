@@ -20,7 +20,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
   podman run --rm -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
     -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
-    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")"; exit $rc'
+    sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc'
 }
 kagent() { take kagent fake-kagent.mjs 8098 "$@"; }
 unifai() { take unifai-live-rag fake-unifai.mjs 8097 "$@"; }
@@ -37,6 +37,7 @@ routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 
 dify() { local name="$1"; shift; take dify fake-dify.mjs 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret "$@"; }
 guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafana.mjs" 8094 "$name" DIFY_ADMIN_PASSWORD=offline-admin-secret FAKE_ADMIN_PASSWORD=offline-admin-secret RECORD_BASE_URL_DIFY=http://127.0.0.1:8094 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095 "$@"; }
 agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
+trace() { take observability-trace "fake-unifai.mjs fake-jaeger.mjs" 8097 "$@" FAKE_TEAM_MODE=1 RECORD_BASE_URL_TEMPO=http://127.0.0.1:8093; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
 expect() {   # expect <what> <command...>
   if "${@:2}"; then echo "ok    $1"; else echo "FAIL  $1"; failed=1; fi
@@ -751,6 +752,53 @@ expect "agents: a refused delete fails the take and names the session" bash -c "
 out="$(agents a-addresses FAKE_ADDRESSES=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -4
 expect "agents: a cluster answer that names a node fails ai-ops-01's take, its session deleted all the same" bash -c "test $rc -eq 1 && grep -q 'ai-ops-01: .*the page showed node names or private IP addresses' <<<\"\$0\" && grep -q 'left: {\"sessions\":2,' <<<\"\$0\"" "$out"
+fi
+if wanted observability-trace; then
+echo "== observability-trace (UnifAI team chat, then the Tempo search UI)"
+out="$(trace t-scout RECORD_SCOUT=1 FAKE_TRACE_NOW=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "trace: a scout of both takes exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
+expect "trace: a scout creates no session, approves nothing, writes nothing to the Tempo UI" grep -q 'left: {"sessions":2,"touched":0}{"approved":0,"writes":0}' <<<"$out"
+expect "trace: the scout opens the newest trace and a model_call span, read only" python3 - "$work/t-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+chat = {x["step"]: x for x in json.loads((d / "chat" / "scout.json").read_text())["steps"]}
+tr = {x["step"]: x for x in json.loads((d / "trace" / "scout.json").read_text())["steps"]}
+assert list(chat) == ["enter", "owned", "selector", "hub", "closed"] and chat["hub"]["team_id_read"] is True and chat["hub"]["sessions"] == 1, chat
+assert list(tr) == ["enter", "owned", "chain", "search", "trace", "tags", "closed"], list(tr)
+assert [c["step"] for c in tr["chain"]["chain"]] == ["proxy", "chooser", "keycloak", "application"] and tr["chain"]["authorize_shown"] is False, tr["chain"]
+assert tr["search"]["results"] == 1 and "service=ai-gateway" in tr["search"]["url"] and "lookback=15m" in tr["search"]["url"], tr["search"]
+assert tr["trace"]["model_call_spans"] == 2 and tr["trace"]["url"].endswith("/trace/<id>"), tr["trace"]
+assert len(tr["tags"]["tags"]) == 12 and tr["tags"]["in_window"] == {"zuno.persona": True, "zuno.client": True, "zuno.agent": True} and tr["tags"]["private_addresses"] == 0, tr["tags"]
+PY
+out="$(trace t-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "trace: a good run of both takes exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
+expect "trace: the session is gone, nothing approved, nothing written" grep -q 'left: {"sessions":2,"touched":0}{"approved":0,"writes":0}' <<<"$out"
+expect "trace: the trace take searched again until a trace showed" bash -c "grep -q 'the search finds no trace yet: searching again' <<<\"\$0\" && grep -q 'the search lists 1 trace' <<<\"\$0\" && grep -q 'page shows no question text' <<<\"\$0\"" "$out"
+expect "trace: each take has its own markers; the session is cleaned" python3 - "$work/t-pass" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+chat = json.loads((d / "chat" / "markers.json").read_text()); tr = json.loads((d / "trace" / "markers.json").read_text())
+assert [x["name"] for x in chat["markers"]] == ["login", "hub", "q-sent", "q-done", "end"] and chat["motion_from"] == "hub", chat
+assert [x["name"] for x in tr["markers"]] == ["login", "search", "trace", "tags", "end"] and tr["motion_from"] == "search", tr
+assert chat["persona"] == "consultant-02" and len(chat["created"]) == 1 and chat["cleaned"] is True and chat["owned"]["same"] is True, chat
+assert tr["persona"] == "ai-ops-01" and tr["created"] == [] and tr["cleaned"] is None, tr
+PY
+out="$(trace t-authorize FAKE_AUTHORIZE=1 RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "trace: the Tempo UI's own Authorize Access page stops the scout, nothing approved" bash -c "test $rc -eq 1 && grep -q 'left: .*{\"approved\":0,\"writes\":0}' <<<\"\$0\"" "$out"
+expect "trace: its scout.json says why" python3 - "$work/t-authorize" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "trace" / "scout.json").read_text())
+assert "the take stops there: the walkthrough does not declare that change" in s["steps"][0]["error"] and "the Tempo search UI" in s["steps"][0]["error"], s["steps"][0]
+PY
+out="$(trace t-addresses FAKE_ADDRESSES=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "trace: a span whose Process line holds an address fails the trace take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'trace: .*the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
+out="$(trace t-notags FAKE_NO_TAGS=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "trace: a span without its zuno tags fails the take before its marker" bash -c "test $rc -eq 1 && grep -q 'trace: .*the model_call span does not show its tags' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"

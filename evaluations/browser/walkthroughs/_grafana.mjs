@@ -115,14 +115,17 @@ const provider = (name) => [`a[title='Log in with ${name}']`, `a.idp:text-is('${
 
 // Sign in to Grafana through its proxy, OpenShift's chooser and Keycloak. The `login` marker is the EMPTY Keycloak
 // form. Returns the chain as it was met, for the scout: [{step, url (no query), matched}]. state.grafana keeps it.
-export async function grafanaSignIn({ page, base, mark, keycloak, state }, persona, { changes = [] } = {}) {
+// The sign-in of any application behind an OpenShift oauth-proxy (Grafana, the Tempo search UI): see the header.
+// `authorize` ({change, persona, client: [names on the page]}) lets it approve OpenShift's "Authorize Access" page;
+// without it, or when the page is not exactly that one, the take stops there.
+export async function proxySignIn({ page, base, mark, keycloak, state }, persona, { changes = [], what = "Grafana", ready = grafana.READY, authorize = null } = {}) {
   const chain = [];
   state.grafana = { chain, authorize_shown: false, authorized: false };
   const here = () => page.url().replace(/[?#].*/, "");
   await page.goto(`${base}/`);
   const wanted = [...grafana.PROXY_BUTTON, ...provider(grafana.PROVIDER), "#username"];
   for (let hop = 0; hop < 4; hop += 1) {
-    const found = await waitUntil(page, { what: "Grafana's sign-in chain", timeoutMs: 60000, done: async () => (await firstVisible(page, wanted)) || undefined });
+    const found = await waitUntil(page, { what: `the sign-in chain of ${what}`, timeoutMs: 60000, done: async () => (await firstVisible(page, wanted)) || undefined });
     if (found.matched === "#username") break;
     chain.push({ step: grafana.PROXY_BUTTON.includes(found.matched) ? "proxy" : "chooser", url: here(), matched: found.matched });
     await click(found, { changes });
@@ -134,25 +137,25 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
   await mark("login");   // nothing is marked once the password is typed
   await keycloak(persona);
   // Back on Grafana, or on OpenShift's "Authorize Access" page: approved only as the declared change, see above.
-  const land = () => waitUntil(page, { what: "Grafana after the sign-in", timeoutMs: 90000, done: async () => {
+  const land = () => waitUntil(page, { what: `${what} after the sign-in`, timeoutMs: 90000, done: async () => {
     if (await page.getByText(grafana.AUTHORIZE).first().isVisible().catch(() => false)) return "authorize";
-    if (page.url().startsWith(base) && !/\/oauth\//.test(page.url()) && await firstVisible(page, grafana.READY)) return "grafana";
+    if (page.url().startsWith(base) && !/\/oauth\//.test(page.url()) && await firstVisible(page, ready)) return what === "Grafana" ? "grafana" : "application";
     return undefined;
   } });
   let landed = await land();
   chain.push({ step: landed, url: here(), matched: "" });
   if (landed === "authorize") {
     state.grafana.authorize_shown = true;
-    const stop = (why) => new Error(`OpenShift asks ${persona} to authorize Grafana's proxy ("Authorize Access") and the take stops there: ${why}; `
+    const stop = (why) => new Error(`OpenShift asks ${persona} to authorize ${what}'s proxy ("Authorize Access") and the take stops there: ${why}; `
       + `approving it stores an authorization for ${persona} on the cluster, the owner's to approve by hand, signed in as that persona`);
-    if (!changes.includes(grafana.AUTHORIZE_CHANGE)) throw stop("the walkthrough does not declare that change");
-    if (persona !== grafana.AUTHORIZE_PERSONA) throw stop(`the owner's decision covers ${grafana.AUTHORIZE_PERSONA} only`);
+    if (!authorize || !changes.includes(authorize.change)) throw stop("the walkthrough does not declare that change");
+    if (persona !== authorize.persona) throw stop(`the owner's decision covers ${authorize.persona} only`);
     // The page must be the one the owner decided on: the same client, the same persona, the same two scopes.
     const asked = await read(page, () => ({
       text: document.body.innerText,
       scopes: [...document.querySelectorAll("input[type='checkbox']")].map((box) => ({ name: box.value || box.name || "", checked: box.checked })),
     }));
-    const absent = [...grafana.AUTHORIZE_CLIENT, `(${persona})`, ...grafana.AUTHORIZE_SCOPES].filter((word) => !asked.text.includes(word));
+    const absent = [...authorize.client, `(${persona})`, ...grafana.AUTHORIZE_SCOPES].filter((word) => !asked.text.includes(word));
     if (absent.length) throw stop(`the page is not the one the owner approved (not on it: ${absent.join(", ")})`);
     const words = asked.text.match(/\b[a-z]+:[a-z][a-z-]*\b/g) || [];
     const more = [...new Set(words)].filter((word) => /^(user|role):/.test(word) && !grafana.AUTHORIZE_SCOPES.includes(word));
@@ -170,9 +173,16 @@ export async function grafanaSignIn({ page, base, mark, keycloak, state }, perso
     if (landed === "authorize") throw stop("the page came back after it was approved once");
   }
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  return chain;
+}
+
+// Grafana's own sign-in: the chain above with Grafana's declared Authorize Access page, then its announcement.
+export async function grafanaSignIn(ctx, persona, { changes = [] } = {}) {
+  const chain = await proxySignIn(ctx, persona, { changes, what: "Grafana", ready: grafana.READY,
+    authorize: { change: grafana.AUTHORIZE_CHANGE, persona: grafana.AUTHORIZE_PERSONA, client: grafana.AUTHORIZE_CLIENT } });
   // Whether the walkthrough declared the close of the announcement decides whether its one write is let through.
-  seenNews.set(page, { ...grafanaNewsSeen(page), declared: changes.includes(grafana.NEWS_CHANGE) });
-  state.grafana.news = await grafanaNews(page);
+  seenNews.set(ctx.page, { ...grafanaNewsSeen(ctx.page), declared: changes.includes(grafana.NEWS_CHANGE) });
+  ctx.state.grafana.news = await grafanaNews(ctx.page);
   return chain;
 }
 
