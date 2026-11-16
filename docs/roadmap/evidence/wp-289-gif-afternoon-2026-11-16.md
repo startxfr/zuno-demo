@@ -125,7 +125,7 @@ The WP-290 brief now says the same under `genai-playground`.
 
 Scout at `a6f7635b`, 2026-11-16 at 16:11. In **Settings**, **Model** the portal shows `ai-ops-01` the subscription `gpt-oss-20b-agents`; the page named `gpt-oss-20b-ocp-ai-ops`. The model matches. Not seen: whether the dropdown offers `gpt-oss-20b-ocp-ai-ops`. The take never chooses a subscription and no caption names one. The MCP row shows `zuno-mcp-gateway` with "0 active" in a fresh browser; the GIF caption says "listed, no token in this browser".
 
-Page: row 0:00 and the checklist now say the subscription shown may differ (option A of the assist). Possible platform finding, **not verified**: if `gpt-oss-20b-agents` is the agents' subscription and is offered to a person, a person draws on the agents' budget. The assist has not read the `MaaSSubscription` objects. Whether it goes on the deferred list is the coordinator's call.
+Page: row 0:00 and the checklist say a subscription of `ai-ops-01` is shown and that the default is not stable (see the take below). Possible platform finding, **not verified**: if `gpt-oss-20b-agents` is the agents' subscription and is offered to a person, a person draws on the agents' budget. The assist has not read the `MaaSSubscription` objects. Whether it goes on the deferred list is the coordinator's call.
 
 ## Takes of the late afternoon (not published)
 
@@ -192,4 +192,24 @@ Owner's gos in demo333's session.
 - `maas-portal-api-keys`: failed at `enter`. The portal lists the keys with a `POST .../api-keys/search`, and the scout guard refused it. Nothing was created.
 - One more Vault read of the Dify admin password (value never printed).
 - Workstation: six orphaned containers of the coordinator's own timed-out offline suites ran from 14:38 and loaded the box (load 15, then 3 after they were stopped). `timeout` kills the script, not its container. The coder is asked to add an exit trap.
+
+### genai-playground (take, not published)
+
+| Item | Value |
+|---|---|
+| Take | `genai-playground-20261116-183758`: `ai-ops-01`, `pass`, 6 markers, cut at `8f655617` (as relayed) |
+| Owner's go | Given in demo333's session (as relayed) |
+| Created and cleaned | `created` empty, `cleaned` null; owned 0 before and 0 after; `private_addresses` count 0 |
+| GIF | 1 046 464 bytes (read from the take), SHA-256 `df603fdf6cf0...`, 41.0 s as relayed, 6 moments |
+| Model calls | One, as relayed. The answer: "La capitale de la France est Paris." |
+
+A first attempt, `genai-playground-20261116-183648`, failed with no GIF: the project showed the empty state "Create your playground" (never pressed) although the server was Ready. It was transient; the one allowed retry passed.
+
+**What the images show.** The recording session reports N = 17 (5 marker images and 12 frames in a contact sheet), as relayed; the writer opened 2 images (`q1-done.png`, `mcp.png`) and no frames. `q1-done.png`: the Playground with the answer above, the Settings panel on **Model**, the model `publishers/zuno-ai-run/models/gpt-oss-20b` and the subscription `gpt-oss-20b-ocp-ai-ops`; the header shows the account name `ai-ops-01`; no node name, no address. `mcp.png`: the **MCP** tab, one server `zuno-mcp-gateway`, "0 active", a lock icon, no token.
+
+**Subscription.** This take shows `gpt-oss-20b-ocp-ai-ops`; the scout five minutes earlier showed `gpt-oss-20b-agents`. The portal's default is not stable between sessions. The page no longer names one as "the" subscription. Deferred entry n stays unverified.
+
+**What stays on the server.** Whether the playground keeps this chat server-side is not known: nothing was deleted. The model call stays in the platform's call records.
+
+**Not published.** Sent to the owner.
 
