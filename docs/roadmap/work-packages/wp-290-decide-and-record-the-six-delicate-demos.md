@@ -29,3 +29,20 @@ One decision per demo, each with the owner:
 - Each of the six has a recorded owner's decision in this brief, and a GIF or stills carried out, or no GIF by that decision.
 - No secret is on a frame, and no GIF is published without the owner's named go.
 - `python3 platform/demo/consistency.py` (0 problems) and `python3 platform/docs/check_docs.py` pass.
+
+## Owner's choices of 2026-11-16 (about 13:35 CET)
+
+Given in `zuno-demo-reorg`'s session by the owner's answers to a question with options, and relayed by it; the writer has not seen the
+owner's messages. Four of the six are decided; two are not asked yet.
+
+| Demo | Owner's choice | What it means for the take |
+|---|---|---|
+| `a2a-delegation-approval` | **Approve, one job per take** | The take clicks Approve. Each take leaves one AAP job that cannot be deleted. The owner's go is given for each take, in the session of the recording (`zuno-demo-reorg-demo333`). |
+| `maas-portal-api-keys` | **Create, hide, revoke** | The take creates the key with the key field hidden before the dialog opens, proves the call with the key masked, and revokes the key by its id. The take fails if the revoke fails. |
+| `openclaw` | **Like `guardrails`** | The Control UI password is a declared second secret, read at run time. It is never in git, in a log or on a frame. |
+| `genai-playground` | **Skip the paste** | The take does not paste the token and shows the saved connection. |
+| `blender-3d` | not asked yet | Open. |
+| `world-model` | not asked yet | Open. |
+
+The choices carry the rule that every GIF still needs the owner's named go before publication, and that no secret is on a frame.
+Nothing is recorded yet for these four: each is a take to scout and review like the others.
