@@ -95,7 +95,7 @@ Profile **consultant-02**, signed in to Dify.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | After the sign-ins Dify opens on its **Home** page: click **Studio** in the left menu | "A no-code canvas: a business user draws an AI app from boxes. Three examples are imported at every install." | **Studio** with the three examples: **Zuno Agent** (Agent), **Zuno Technical Documentation** (Chatflow), **Zuno Confluence Search** (Workflow). On 2026-11-16 a fourth application, **Strategic Consulting Expert**, was listed too (edited 11 days before); ignore it on stage. The single Dify account is displayed as "x" (workspace "x's Workspace"). |
-| 0:45 | Open **Zuno Agent** and ask in its chat pane: `Find our onboarding pages in Confluence` | "The agent searches Confluence through the platform's tool gateway. Dify holds no Confluence key and no model key." | A call to the tool `confluence.page.search`, then the onboarding pages with their titles, for example MNGD2-AP001 Onboarding Chef de projet métier (six pages on 2026-11-05). |
+| 0:45 | Open **Zuno Agent** and ask in its chat pane: `Find our onboarding pages in Confluence` | "The agent searches Confluence through the platform's tool gateway. Dify holds no Confluence key and no model key." | A call to the tool `confluence.page.search`, then the onboarding pages with their titles, for example MNGD2-AP001 Onboarding Chef de projet métier (six pages on 2026-11-05). A turn in the editor's **Debug & Preview** moves the application's "Edited at" date on its Studio card (seen three times on 2026-11-16); nothing else changed on screen. |
 | 2:30 | Open **Zuno Confluence Search**, click **Run**, enter the topic `onboarding` | "The same search, drawn as a fixed workflow: a tool box, then a summary box. No code." | Start, `confluence.page.search`, Summarise and End succeeded, in about 3 s. The output `summary` lists one page per line with its space. |
 | 3:45 | Say who Dify acts as | "Dify has no single sign-on. I passed the company sign-in at the door, but behind Dify every call is made as one persona, consultant-02: its tools, its documents, its budget." | |
 | 4:15 | Close | "Business users can draw their own AI apps. The models, tools, documents and budget behind them stay the platform's." | |
@@ -131,6 +131,7 @@ Run the 5-minute version, then:
 
 ## Limits
 
+- **A turn on the Agent moves its "Edited at" date.** On 2026-11-16 the **Zuno Agent** card's date moved after each of three takes (18:42, 20:02 and 20:51 UTC), at the Agent's answer in **Debug & Preview**. The third take ran under a guard that lists every write: no configuration write left the browser for the Agent, and Dify's server moved the date by itself. Whether the answer or the deletion of its conversation moves it was not separated. The saved instructions and tools were never compared with a reference. The other applications' dates did not move. A presenter doing this row on stage moves it too.
 - **One persona for every Dify user.** Quota, telemetry and audit see consultant-02; only the front door knows who
   signed in (ADR-0601 decision 5).
 - **One workspace, one local account.** Dify Community has no SSO, and more than one workspace needs written

@@ -105,7 +105,7 @@ Page: the "(untested command)" mark on row 1:00 is lifted, because the take ran 
 - `main` still carries Playwright 1.55.1 while `devel` is pinned to 1.48.0 (see the incident above).
 - The AAP user `consultant-03`: demo333 is to confirm whether AAP created it.
 - Node names are visible in the published `model-serving-llmd-mig` GIF, accepted by the owner for this demo only.
-- **Dify, Zuno Agent's configuration.** Each of the two `dify` takes moved the **Zuno Agent** card's "Edited at" date, at its Agent turn in Debug & Preview (all times UTC, from demo333's own Studio screenshots, as relayed). Scouts at 17:32 and 18:29 that opened the Agent page still read 11/06/2026 16:30, so opening the page does not move it. After take `194159` (Agent turn 18:42) the card read 11/16 18:42; the Studio frame of take `210141`, which the writer opened, shows that value at its start. After take `210141` (Agent turn about 20:02) a fresh scout at 20:12 read 11/16 20:02. The other three applications' dates never moved. The take logs do not list the non-GET requests that were allowed, so what was sent is unknown; the coder adds that logging with the default-deny guard. Whether the saved content differs is **not proven**: instructions and tools look unchanged on screen. To do: compare the Agent's configuration with its reference. Likely consequence for the page, not written yet: a presenter doing the Agent row on stage triggers the same save.
+- **Dify, Zuno Agent's edited date (cause measured, content never compared).** The date moved three times on 2026-11-16 (18:42, 20:02 and 20:51 UTC), once per `dify` take at its Agent turn in Debug & Preview; opening the page moves nothing. The third take ran under the default-deny guard and no configuration write left the browser for the Agent: Dify's server moves the date when the Agent answers, or when its conversation is deleted (not separated). The comparison of the Agent's configuration with a reference is no longer needed for this cause; keep it only as "content never compared". Detail below.
 
 ## Scouts of the remaining demos (as relayed)
 
@@ -300,4 +300,27 @@ The sizes and moments quoted in the two take sections above are those of the fir
 ## Owner's decision on Dify: "one take to know" (answered 21:30:11 CET, as relayed)
 
 One `dify` take under the default-deny guard (the coder's `f974ada4`, in test). Its log lists every write sent and every write refused. The aim is to learn what moves the Zuno Agent's edited date. Cost: one Agent turn, and the date may move once more. The take needs the owner's go in demo333. The coder read upstream Dify's source: by that code a debug turn writes a conversation and a message, not the app (not our exact build). The cause is **not settled**.
+
+## Take: dify "to know" (measured, not published)
+
+Owner's go in demo333 ("Take dify to know"), as relayed. All times UTC.
+
+| Item | Value |
+|---|---|
+| Take | `dify-20261116-215039`: `consultant-02`, `pass`, 9 markers in 61.7 s, started 20:50 |
+| Created and cleaned | One conversation created and deleted; owned 0 before and 0 after; `private_addresses` count 0 |
+| GIF | 2 379 935 bytes (read from the take), SHA-256 `27114b527b11...`, 49.0 s as relayed |
+| Before | Scout at 20:47: Zuno Agent "Edited at 11/16/2026 20:02"; the scout refused nothing and sent no write when it opened the Agent page (as relayed) |
+| Writes sent to Dify, in order (as relayed) | `POST` refresh-token (401), `POST` login (200), `POST` `apps/<id>/chat-messages` (200), `POST` `apps/<id>/workflows/draft/run` (200), then the conversation delete |
+| Refused in the browser | `POST apps/<id>/workflows/draft`, once |
+| After | Scout at 20:52: "Edited at 11/16/2026 20:51"; the other three cards unchanged (as relayed) |
+| Workflow run | Succeeded and **stays** in the run log |
+
+The writer opened `studio.png` (the Studio frame at the take's start): the Zuno Agent card reads "Edited at 11/16/2026 20:02", the other three 11/06 17:27, 11/06 16:30 and 11/05 12:18. The writer opened no other image of this take and no frame; demo333's review count is not relayed.
+
+**Conclusion, as measured and not proven server-side:** no configuration write left the browser for the Agent. Dify's server moves the application's edited date when the Agent answers in Debug & Preview, or when its conversation is deleted; the two were not separated.
+
+**Owner's decision**, answered just before 21:55:25 CET in `zuno-demo-reorg`'s session (as relayed): **"Yes, declared effect"** for `dify` and `guardrails`. The moved date is declared as an effect of those takes.
+
+**Not published.** Sent to the owner; the publication waits for their go.
 
