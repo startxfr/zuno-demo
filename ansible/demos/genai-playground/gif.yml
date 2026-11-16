@@ -1,0 +1,26 @@
+---
+# genai-playground: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written BEFORE
+# the first scout and take: tune it with `make demo gif genai-playground` once a take exists.
+# `make demo record genai-playground` takes the 5-minute version as ai-ops-01 in the MaaS consumer portal's playground
+# (evaluations/browser/walkthroughs/genai-playground.mjs). The owner's choice of 2026-11-16: the MCP token is never
+# pasted; the take shows Settings > MCP as the browser finds it.
+# Markers written by the walkthrough, in order: login, playground, q1-sent, q1-done, mcp, end (rows 0:00, 0:45 and the
+# still of 1:45). Rows 1:45 with a connected gateway and 3:00 (a tool call) come only if the scout finds the connection
+# kept on the server: the walkthrough's TOOLS_ROW then adds q2-sent and q2-done, and this list gains their moments.
+# The 1:45 caption is true whether the gateway shows connected or not. Row 4:15 is words.
+record_notice: >-
+  a recorded browser session as ai-ops-01 in the MaaS consumer portal's playground, project Zuno Playground:
+  Settings > Model, one question on gpt-oss-20b through MaaS (a model call on ai-ops-01's subscription), and
+  Settings > MCP as this browser finds it; no token is pasted or read and the MCP lock is never clicked; any other
+  write to the portal is refused in the browser; whether the playground keeps the chat on the server is not known
+  before the scout
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
+  - {still: playground, hold: 7, step: "0:00", caption: "0:00  Red Hat's playground, set up with our models"}
+  - {from: playground, to: q1-sent, fit: 4, hold: 1, step: "0:45", caption: "0:45  A question to a model on our own GPUs"}
+  - {from: q1-sent, to: q1-done, fit: 5, hold: 8, step: "0:45", caption: "0:45  Answered through MaaS, on my group's subscription"}
+  - {still: mcp, hold: 8, step: "1:45", caption: "1:45  Our tool gateway, the one MCP server listed"}
+  - {still: end, hold: 5, step: "4:15", caption: "The platform decides each person's models and tools"}

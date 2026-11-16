@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP-288: the offline test of the walkthroughs written before their first scout (kagent, unifai-live-rag,
-# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations, quotas, lora-pipeline-mlflow-kueue) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
+# lightspeed, identity-personas with its two takes, model-catalog-registry, mcp-tools-by-group, aap-audited-operations, quotas, lora-pipeline-mlflow-kueue, genai-playground) and of the shared unifai* helpers. Runs record.mjs in the Playwright image against tests/fake-kagent.mjs,
 # tests/fake-unifai.mjs and tests/fake-lightspeed.mjs, inside the container: no cluster, no `oc`, no persona password, no model call.
 # It proves each walkthrough's own logic (phases, markers, what is created and deleted by id, the failures that must
 # fail a take), NOT the real selectors: those are guesses until demo333's scout. tests/record-offline.sh stays the
@@ -30,6 +30,7 @@ tools() { take mcp-tools-by-group fake-owui-tools.mjs 8094 "$@"; }
 aap() { take aap-audited-operations fake-aap.mjs 8092 "$@"; }
 quotas() { take quotas fake-quotas.mjs 8089 "$@" RECORD_BASE_URL_GITHUB=http://127.0.0.1:8088; }
 lora() { take lora-pipeline-mlflow-kueue fake-rhoai-lora.mjs 8087 "$@"; }
+genai() { take genai-playground fake-genai.mjs 8086 "$@"; }
 identity() { take identity-personas "fake-unifai.mjs fake-open-webui.mjs" 8097 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099; }
 evalhub() { take evaluation-trustyai-evalhub fake-grafana.mjs 8095 "$@"; }
 routing() { take ai-gateway-routing "fake-open-webui.mjs fake-grafana.mjs" 8095 "$@" RECORD_BASE_URL_OWUI=http://127.0.0.1:8099 RECORD_BASE_URL_GRAFANA=http://127.0.0.1:8095; }
@@ -800,6 +801,44 @@ expect "trace: a span whose Process line holds an address fails the trace take (
 out="$(trace t-notags FAKE_NO_TAGS=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a span without its zuno tags fails the take before its marker" bash -c "test $rc -eq 1 && grep -q 'trace: .*the model_call span does not show its tags' <<<\"\$0\"" "$out"
+fi
+if wanted genai-playground; then
+echo "== genai-playground"
+out="$(genai g-scout RECORD_SCOUT=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a scout exits 0, SCOUT: done, no question asked, nothing written, the lock never clicked" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\" && grep -q 'left: {\"answers\":0,\"writes\":0,\"locks\":0}' <<<\"\$0\"" "$out"
+expect "genai: the scout reports each screen, the MCP row as this browser sees it, the store-like requests and the storage keys by name" scouted g-scout '
+assert list(steps) == ["enter", "owned", "sign-in", "playground", "playground-shapes", "model", "model-shapes", "mcp", "mcp-shapes", "storage", "closed"], list(steps)
+assert steps["playground"]["url"] == "/maas-consumer-portal/gen-ai-studio/playground/zuno-playground" and steps["playground"]["create_button"] is False, steps["playground"]
+assert steps["mcp"]["row"]["listed"] is True and steps["mcp"]["row"]["connected"] is False and steps["mcp"]["row"]["tools"] == "", steps["mcp"]
+assert "GET /gen-ai/api/v1/conversations" in steps["storage"]["store_like_requests"] and isinstance(steps["storage"]["keys"]["local"], list), steps["storage"]
+assert steps["model"]["chosen"] == [] and steps["model"]["before"] == {"model": True, "subscription": True}, steps["model"]
+'
+out="$(genai g-saved RECORD_SCOUT=1 FAKE_MCP_SAVED=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a connection kept on the server is found by the fresh browser of a scout, by its tools cell" scouted g-saved '
+assert steps["mcp"]["row"]["connected"] is True and steps["mcp"]["row"]["tools"] == "9 active", steps["mcp"]
+'
+out="$(genai g-ssar RECORD_SCOUT=1 FAKE_SSAR=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a scout refuses what the page POSTs on its own, lists it in its step, and fails at the end" bash -c "test $rc -eq 1 && grep -q 'scout closed: FAILED.*POST /api/k8s/apis/authorization.k8s.io/v1/selfsubjectaccessreviews' <<<\"\$0\" && grep -q 'left: {\"answers\":0,\"writes\":0,' <<<\"\$0\"" "$out"
+out="$(genai g-pass)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a good take exits 0, RESULT: PASS, one question answered, nothing else written, the lock never clicked" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"answers\":1,\"writes\":0,\"locks\":0}' <<<\"\$0\" && grep -q 'the 0:45 question sent POST /gen-ai/api/v1/responses' <<<\"\$0\"" "$out"
+expect "genai: the markers of rows 0:00 and 0:45 and the MCP still, nothing created or owned" markers g-pass '
+assert names == ["login", "playground", "q1-sent", "q1-done", "mcp", "end"] and m["motion_from"] == "playground" and m["status"] == "pass", m
+assert m["created"] == [] and m["cleaned"] is None and m["owned"] == {"before": 0, "after": 0, "same": True} and m["private_addresses"]["flagged"] is False, m
+assert all((d / x["png"]).stat().st_size > 0 for x in m["markers"]) and (d / "recording.webm").stat().st_size > 0
+'
+out="$(genai g-model FAKE_OTHER_MODEL=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: another model shown is changed in its list, the choice sends nothing, the take passes" bash -c "test $rc -eq 0 && grep -q '\"chosen\":\[{\"what\":\"model\",\"sent\":\[\]}\]' <<<\"\$0\"" "$out"
+out="$(genai g-write FAKE_OTHER_MODEL=1 FAKE_SELECT_WRITE=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a model choice that would write is refused in the browser and fails the take" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*wanted to send PUT /gen-ai/api/v1/preferences' <<<\"\$0\" && grep -q '\"writes\":0' <<<\"\$0\"" "$out"
+out="$(genai g-create FAKE_CREATE_ONLY=1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "genai: a project with no playground fails the take, Create playground never pressed" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL.*shows \"Create playground\" instead of its playground' <<<\"\$0\" && grep -q 'left: {\"answers\":0,\"writes\":0,' <<<\"\$0\"" "$out"
 fi
 expect "the password is in no file of any take" bash -c "! grep -r -l offline-test '$work' >/dev/null"
 expect "no declared secret value is in any file of any take" bash -c "! grep -r -l -e offline-admin-secret -e offline-wrong-secret '$work' >/dev/null"
