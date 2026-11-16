@@ -41,7 +41,7 @@ Other identities:
 
 `make demo use okf-signed-agent-release 5|15` selects this page.
 Each section below is printed after its action's Ansible file (`ansible/demos/okf-signed-agent-release/<action>.yml`) has run, and says
-what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset). The `tail` of row 1:15 reads a repository file (`platform/okf/agents.lock`): the step runs it, as an allowed read.
+what is left to the presenter. The 6:00 row runs `make d3 admit agents` (an allowed read, `UPDATE_LOCK` unset). The `git show` of row 1:15 reads a repository file (`platform/okf/agents.lock`): the step runs it, as an allowed read.
 
 ### Status
 
@@ -96,7 +96,7 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Open [agents/arkos/agent.okf.md](https://github.com/startxfr/zuno-demo-agents/blob/main/agents/arkos/agent.okf.md) | "Agents are declared by their owners in their own repository: purpose, tasks, tools, data classification. The platform team does not write them." | The OKF sheet of Arkos, with its tasks, its tools and `preferred_classification: C3`. |
-| 1:15 | `tail -2 platform/okf/agents.lock` | "The platform runs exactly one agents release, pinned by its digest. Changing it is a pull request, reviewed like code." | The last two lines of the lock: a `# release vX.Y.Z` comment, then `quay.io/zuno/okf-corp@sha256:<digest>`, the release the lock pins. Read the version and the digest off the screen: they change with each promoted release. |
+| 1:15 | `git show HEAD:platform/okf/agents.lock \| tail -2` *(untested command)* | "The platform runs exactly one agents release, pinned by its digest. Changing it is a pull request, reviewed like code." | The last two lines of the lock: a `# release vX.Y.Z` comment, then `quay.io/zuno/okf-corp@sha256:<digest>`, the release the lock pins. Read the version and the digest off the screen: they change with each promoted release. |
 | 2:15 | `oc logs deploy/mcp-gateway -c okf-fetch -n zuno-ai-run \| grep VERIFIED` | "Before the tool gateway starts, a small container downloads that release and checks its signature: it must come from the release workflow of the agents repository, on a release tag. If it does not verify, the gateway does not start." | `VERIFIED quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/okf-corp@sha256:2918e463...: release 0.14.3 (release), 8 agent(s): advantage 0.2.1, arkos 0.2.2, ...` |
 | 3:30 | Point at the start of the reference | "It reads the release from our own registry, not from the internet. Same digest, same signature check." | The reference starts with `quay-quay-zuno-registry.apps.demo333.startx.fr`, not `quay.io`. |
 | 4:15 | Close | "Agents run only from a signed release, owned by the business, chosen by digest and reviewed like code. If the signature does not verify, the component does not start." | |

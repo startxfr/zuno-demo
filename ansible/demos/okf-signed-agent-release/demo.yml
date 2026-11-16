@@ -10,3 +10,13 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
+# The GIF take (ADR-0618, WP-289): a real terminal session, captured, checked as text, then filmed. The Do commands
+# of rows 1:15 and 2:15 pass the read-only allowlist, so `allow` is empty. Row 0:00 (the Arkos sheet, which lives in
+# the agents repository on GitHub) has no command and is not filmed; row 3:30 points at the 2:15 output. The window
+# is 100x20: the lock's digest line is 93 columns, the VERIFIED line 292 (it wraps at any width), the tallest screen
+# 6 lines (measured read-only on 2026-11-16).
+record:
+  kind: terminal
+  allow: []
+  cols: 100
+  rows: 20
