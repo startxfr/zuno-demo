@@ -72,17 +72,17 @@ class RealPages(unittest.TestCase):
         cls.entries = c.discover(ROOT)
         cls.pages = {e.id: c.load(e) for e in cls.entries}
 
-    def test_36_demos_30_scenarios_6_workshops(self):
+    def test_39_demos_33_scenarios_6_workshops(self):
         kinds = [e.kind for e in self.entries]
-        self.assertEqual(len(self.entries), 36)
-        self.assertEqual(kinds.count("scenario"), 30)
+        self.assertEqual(len(self.entries), 39)
+        self.assertEqual(kinds.count("scenario"), 33)
         self.assertEqual(kinds.count("workshop"), 6)
 
     def test_step_counts(self):
         k5 = sum(len(p.steps("5")) for p in self.pages.values())
         k15_own = sum(len(p.steps15_own) for p in self.pages.values())
-        self.assertEqual(k5, 157)
-        self.assertEqual(k15_own, 275)
+        self.assertEqual(k5, 177)
+        self.assertEqual(k15_own, 304)
 
     def test_fifteen_minute_version_is_cumulative(self):
         for page in self.pages.values():
