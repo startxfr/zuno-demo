@@ -17,3 +17,8 @@ not_rehearsed:
   install: "it writes the add-on into the Blender folders of the workstation that runs the rehearsal"
   uninstall: "it would remove the add-on a presenter installed on the workstation that runs the rehearsal"
 steps: {}
+# The GIF (WP-290, owner's decisions of 2026-11-17): no take. It is cut from a take assembled by hand from the owner's
+# screen captures of 2026-11-07 (gif.yml says which, and how each was cropped); `make demo scout` and `make demo
+# record` refuse it.
+record:
+  kind: assembled

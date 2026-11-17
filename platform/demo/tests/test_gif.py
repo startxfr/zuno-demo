@@ -800,6 +800,23 @@ class WorldModel(unittest.TestCase):
         manifest = presenter.load_manifest(gif.cut_list_path("world-model").parent)
         self.assertEqual(presenter.take_kind(manifest), "assembled")
 
+    def test_the_blender_cut_list_fits_its_page_and_its_assembled_stills(self):
+        """The take assembled on 2026-11-17 from the owner's captures of 2026-11-07: four cropped stills."""
+        cut_list = gif.load_cut_list(gif.cut_list_path("blender-3d"))
+        names = ("panel", "table", "render", "house")
+        take = assembled(demo="blender-3d", viewport={"width": 1920, "height": 1048},
+                         markers=[{"name": n, "t": i, "png": f"{n}.png"} for i, n in enumerate(names)])
+        del take["video"]
+        take["source"] = [{"path": f"~/Pictures/capture-{n}.png", "sha256": sha(n.encode()), "file": f"{n}.png",
+                           "altered": {"sha256": sha(n.encode() * 2), "how": "cropped"}} for n in names]
+        p = gif.plan("blender-3d", cut_list, take, gif.page_times("blender-3d"))
+        self.assertTrue(41 <= p.seconds <= 60, p.seconds)
+        self.assertEqual([m.marker for m in p.moments], list(names))
+        self.assertEqual({m.kind for m in p.moments}, {"still"})
+        self.assertEqual([m.step for m in p.moments], ["0:40", "1:10", "", ""])
+        manifest = presenter.load_manifest(gif.cut_list_path("blender-3d").parent)
+        self.assertEqual(presenter.take_kind(manifest), "assembled")
+
 
 class CaptionWidth(unittest.TestCase):
     """26 px captions: 60 characters fit 960 px and wider; a narrower GIF takes fewer, never cut off silently."""
