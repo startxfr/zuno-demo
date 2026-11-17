@@ -19,6 +19,8 @@ chain and holds the request is in [Appendix B](#appendix-b---lld).
 **The message:** "An agent can ask another agent for help, but never with more rights than the person who asked. And
 before anything is executed, that person decides."
 
+![The 5-minute version of the agent-to-agent delegation demo, recorded live as consultant-02 in the team workspace of the Arkos agent: a request to launch a cluster audit is delegated to the Tekos agent, the platform shows an approval card for the write it wants to do, the consultant approves it, and the audit job runs and its link comes back in the answer. The list on the left shows earlier sessions of the same test prompt, one of them left by the demo's own check.](../../../assets/img/demo/a2a-delegation-approval.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
