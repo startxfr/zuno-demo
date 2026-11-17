@@ -6,8 +6,8 @@ image:
   repository: quay.io/zuno/praxis-ai
   # Pinned by digest (ADR-0619 clause 7), built by the source-image-build Pipeline (WP-291, `make d2 build praxis`)
   # and written here by whoever deploys it. Empty = the chart renders no Deployment: there is no image to run.
-  # fork 0c024efb (tag fork-0c024efba54f), PipelineRun praxis-build-bzbvc, 2026-11-17.
-  digest: "sha256:3daccf8ec4314b15a6fd2168d5d2bedb9c67ca77b3b15904180fb2585a1cf73e"
+  # fork 0c024efb with the core otel feature, PipelineRun praxis-build-nz69t, 2026-11-17.
+  digest: "sha256:e319e228a64c0854ca5a20720b4dc830a9dda5d0340242cc4256ceb10e99f24c"
   pullPolicy: IfNotPresent
 
 replicas: 1
