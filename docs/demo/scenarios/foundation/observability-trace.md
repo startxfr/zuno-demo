@@ -12,6 +12,8 @@ are in [Appendix B](#appendix-b---lld).
 **The message:** "Every model and tool call leaves a count and a trace: who asked, from which experience, which agent
 and model, and what it cost."
 
+![The 5-minute version of the trace demo, recorded live: as consultant-02, a question to the Tekos agent in the team workspace; then, as ai-ops-01 in the trace search, that turn found by who asked, its trace across UnifAI and the gateway, and the tags of the model call: the application, the agent, the model, the estimated cost, the persona and the run. The list on the left of the chat shows earlier test sessions of the team.](../../../assets/img/demo/observability-trace.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
