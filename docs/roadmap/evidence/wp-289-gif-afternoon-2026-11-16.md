@@ -547,6 +547,23 @@ Demo333 scouted it direct through `record.sh --scout`: it found no freeze marker
 - **No GIF.** `gif.py` refused one caption of 61 characters, and the cut planned only 32 s. The coordinator's `24fa7d9e` (committed 06:50:29 CET, read from git by the writer; `gif.yml` only) uses the question, the answer arriving, then the answer as a still, with the target back to 40 to 60 s; dry-run 6 moments, 42.0 s (as relayed). Demo333 re-cuts. **Not published**; no publication go.
 - **What the cluster keeps:** the assistant's possible memory of this third question (declared); one more answer of `consultant-02`'s budget spent (as relayed).
 
+### openclaw: cut v2 (candidate, not published)
+
+The first cut was the coordinator's `24fa7d9e` (42.0 s, 3.7 MB, 6 moments). Demo333's scan of 14 frames plus the 6 PNGs found nothing private (no token, key, node or address, person name or email; the Control UI password field is in no frame; the tool line shows the tool's name and its one argument "onboarding"), and found two captions saying more than the frames: nothing on screen says namespace, rights, or the absence of a key (as relayed). The coordinator's `9df87235` (committed 06:54:25 CET, read from git by the writer; `gif.yml` only) changes them to "0:00  My own assistant, with its own sessions" and "0:45  It calls the platform's Confluence search tool". Demo333 re-cut the same take and checked both captions on their frames: true (as relayed).
+
+| Item | Value (read from `openclaw.gif.json`, written 06:56 CET) |
+|---|---|
+| GIF | 3 916 978 bytes (3.7 MB), 42.0 s planned and real, 960x656, 6 moments, 420 frames; SHA-256 `71dc64eca811...` |
+| Review by the writer | A contact sheet of 13 frames (every 35th, plus the last), not a full scan |
+
+**What the sheet shows.** The Keycloak sign-in ("Sign in with the company account at the door"); the Control UI with an empty chat and the sidebar; the question typed and sent; the tool line and the answer arriving; the answer, a list of seven wiki pages with their addresses, held for the rest of the GIF. No token, no key, no node name, no person name or email on any of the 13 frames. The answer frames show the real wiki page titles, ids and addresses of the company's Confluence, as the owner accepted ("comme guardrails", as relayed); this file copies none. The sidebar shows the assistant's own session titles and technical session names.
+
+**One flag the writer raises.** The **last caption**, held on the last four sampled frames, reads "No key, no internet: the platform decides models and tools". Nothing on those frames shows a key, the absence of internet, or the platform deciding anything: they show the answer and the sidebar. It is the same kind of caption that demo333 found overstating on the first cut; the coordinator's fix changed two captions and not this one. The writer did not check it against the rows of `openclaw.md`, and it may be the page's own message sentence, but the frames do not carry it. To the coordinator to judge.
+
+**Also not shown:** the delete of the take's session (it happens after the last marker), so no frame of the GIF shows it.
+
+The coordinator proposes cut v2 for publication; it is sent to the owner. **Not published**; no publication go.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
