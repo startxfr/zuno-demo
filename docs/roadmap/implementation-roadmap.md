@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-292, WP-293, WP-294, WP-295, WP-296, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
+| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-292, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1215,7 +1215,7 @@ Blender and world-model.
 | WP-293 | [wp-293](work-packages/wp-293-deploy-litellm-as-an-alternative-gateway.md) | 0621 | WP-292 | Not started | owner's decision on ADR-0621 clause 1 first |
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
-| WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: roll Open WebUI |
+| WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
 | WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Not started | owner's go: token-proxy rebuild and roll, kagent |
 | WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Repo work in review | owner's go: Keycloak realm, workstation entry |
 | WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
