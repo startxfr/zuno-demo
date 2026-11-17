@@ -1196,7 +1196,7 @@ ADR-0618 extends it to every scenario of the catalogue (terminal demos included,
 | WP-287 | [wp-287](work-packages/wp-287-record-terminal-demos-as-real-sessions-checked-as-text.md) | 0618 | WP-286 | Done | none |
 | WP-288 | [wp-288](work-packages/wp-288-record-the-first-batch-of-browser-demos.md) | 0618 | WP-286, WP-287 | Done | none |
 | WP-289 | [wp-289](work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) | 0618 | WP-288 | Done | none; the limits are written in the brief |
-| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Repo work merged (3 of 6 demos published) | the owner's decision for each of the six demos, one by one |
+| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Repo work merged (6 of 6 demos published) | the owner's decision to close the brief |
 
 ### OKF stream phases
 
@@ -1342,6 +1342,7 @@ moving.
 
 ## Change log
 
+- 2026-11-17 — WP-290 (6 of 6): `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`) are published on the owner's go of 12:30:26 CET; the last two are assembled from existing media (ADR-0618, update of 2026-11-17). The catalogue has 30 GIFs of 30 demos. WP-288 is Done (2026-11-16) and WP-289 Done (2026-11-17); WP-290 awaits the decision to close. The sprint's close-out, with every open item and where it is recorded, is in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-17 — WP-289 Done: the owner chose "Clore, limites écrites" (12:03:21 CET, as relayed). 18 of 18 demos are published, each on a named go; the guard table rests on the takes' own files; the limits (no measured absence of writes before the write guard, `ai-gateway-sovereignty`'s two model calls, missing records) are written in the brief; every open item stays open where it is recorded. Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-17 — WP-289 (18 of 18) and WP-290 (3 of 6): `openclaw` (`63755c1d`) and `observability-trace` (`6b57720c`) are published on the owner's go of 11:37:38 CET; the catalogue has 27 GIFs of 30 demos. WP-289 has no demo left to publish. Left of WP-290: `a2a-delegation-approval` (a take), `world-model` and `blender-3d` (assembled GIFs, offline). Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-17 — WP-289 (17 of 18) and WP-290 (2 of 6): `guardrails` (`e75b0ce8`) and `maas-portal-api-keys` (`f17dc35b`) are published on the owner's go of 05:18:40 CET; the catalogue has 25 GIFs of 30 demos. One of WP-289 remains (`observability-trace`); four of WP-290 (`openclaw`, `a2a-delegation-approval`, `blender-3d`, `world-model`). Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).

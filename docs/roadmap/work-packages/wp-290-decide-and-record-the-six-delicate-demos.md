@@ -1,6 +1,6 @@
 # WP-290: Decide and record the six delicate demos
 
-- **State:** Repo work merged (2026-11-17: 3 of 6 demos published, `genai-playground`, `maas-portal-api-keys` and `openclaw`; the other three are `a2a-delegation-approval` (a take), `world-model` and `blender-3d` (assembled GIFs, offline, assist))
+- **State:** Repo work merged (2026-11-17: 6 of 6 demos published; the decision to close the brief is the owner's, and the open items and flags are recorded in the afternoon evidence)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-289](wp-289-record-the-repeats-of-the-proven-patterns.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -47,11 +47,15 @@ owner's messages. Four of the six were decided on 2026-11-16 (13:17 CET); the la
 The choices carry the rule that every GIF still needs the owner's named go before publication, and that no secret is on a frame.
 The last two choices were given in `zuno-demo-reorg`'s session by one dialog answered at **11:14:24 CET on 2026-11-17** (read there in its log, as relayed); the answers are "Images fixes de la page" and "Enregistrement de secours". Publication of each still needs the owner's named go. The four other demos are takes to scout and review like the others.
 
+## Published 2026-11-17: 6 of 6
+
+The six GIFs are on `devel`: `genai-playground` (`1a4ff89b`), `maas-portal-api-keys` (`f17dc35b`), `openclaw` (`63755c1d`), `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`), each on a named go of the owner. `world-model` and `blender-3d` are assembled from existing media (ADR-0618, update of 2026-11-17). The guard summaries of the six, read from the takes' files, are in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md), with the sprint's close-out. **What remains before Done** (the coordinator's decision): nothing in the Acceptance; the flags, the declared effects (the AAP job, the assistant's memory, the revoked key) and the limits of the guard stay open where they are recorded.
+
 ## Progress (2026-11-16)
 
 `genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-**Update 2026-11-17:** `maas-portal-api-keys` and `openclaw` are published (below). The other three are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` was rescouted 6 of 6 twice on 2026-11-17 (02:35 and 02:37 CET; the afternoon evidence) and is held. `blender-3d` and `world-model` were decided on 2026-11-17 (the table above); both are offline work for the assist.
+**Update 2026-11-17:** `maas-portal-api-keys` and `openclaw` are published (below), then `a2a-delegation-approval`, `world-model` and `blender-3d` on the owner's go of 12:30:26 CET (commits `5598eb44`, `3421934d` and `f0c57126`; 6 of 6). `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` took on 2026-11-17 (go 12:03:26 CET; the Approve launched AAP job 1457, which stays). `blender-3d` and `world-model` were decided on 2026-11-17 (the table above) and assembled by the assist from existing media.
 
 ### Owner's decision on `openclaw`, session cleanup (2026-11-16, answered just before 21:01:38 CET)
 

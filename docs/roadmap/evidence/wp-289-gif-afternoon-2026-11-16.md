@@ -734,6 +734,50 @@ Read from `markers.json` and `<id>.gif.json` of each directory in the cache; the
 
 **Not published**; no owner publication go.
 
+### Published at 12:31 CET on 2026-11-17: a2a-delegation-approval, world-model and blender-3d
+
+On the owner's go "go de publication pour world-model, blender-3d et a2a-delegation-approval" at **12:30:26 CET** (11:30:26 UTC in the coordinator's log; the zone is CET, UTC plus one, as the commit times show), before the three commits (12:30:53 and 12:31:25 CET, read from git by the writer). The writer compared each file in the commit with the GIF the take directory holds now.
+
+| Demo | Commit | Take | File | SHA-256 |
+|---|---|---|---|---|
+| `a2a-delegation-approval` | `5598eb44` | `a2a-delegation-approval-20261117-120418`, cut v2 (`10ac9597`) | 4 989 471 bytes, 46.0 s | `1c8cc2146b36...`, equal (the first cut was 5 001 136 bytes, `c42bac3b9ce1...`) |
+| `world-model` | `3421934d` | `world-model-20261117-114542`, kind assembled | 4 979 285 bytes, 41.84 s, 640x416 | `0462f687b493...`, equal |
+| `blender-3d` | `f0c57126` | `blender-3d-20261117-115243`, kind assembled | 447 540 bytes, 42.0 s, 960x580 | `2de8f18f6d6d...`, equal |
+
+The tree of `f0c57126` holds **30** GIF files in `docs/assets/img/demo`: the sprint's 30 of 30. The two assembled pages (`docs/demo/world-model.md`, `docs/demo/blender-3d.md`) are not under `scenarios/`; each embeds its GIF at the end of the Introduction, with an alt text that says "cut from the recorded run of 2026-11-08, not live" and "stills taken on 2026-11-07". The `a2a-delegation-approval` caption says the list on the left shows earlier sessions of the same test prompt, one of them left by the demo's own check (deferred entry r). The coordinator's slip, corrected before the push: its first script for the two assembled pages split arguments on colons in the alt texts and wrote nothing; the checks flagged two consistency problems; it redid them; nothing wrong reached `devel` (as relayed).
+
+### Guard summaries of the 6 demos of WP-290 (the writer's check, from the takes' own files, 2026-11-17)
+
+Each take directory was matched by the GIF's SHA-256 (`genai-playground-20261116-183758`: `df603fdf6cf0...`, the figure of its publication check). The writer read `markers.json`, `takes.json` where present, and the record logs.
+
+| # | Demo | Take | What the take's files say it left |
+|---|---|---|---|
+| 1 | `genai-playground` | `genai-playground-20261116-183758`, `ai-ops-01` | `created` empty, `cleaned` null, owned 0 and 0; no `writes` key, so no write account in the file. A chat was sent: **whether the playground keeps it server-side is not known**, nothing was deleted (the evidence's own words); the model call stays |
+| 2 | `maas-portal-api-keys` | `maas-portal-api-keys-20261117-041246`, `ai-dev-01` | One API key created, `cleaned` true, owned 0 and 0. `writes`: 3 sent (two key-list searches, one `POST` of `api-keys`), none refused. The record log (read): "key ... revoked (delete HTTP 200); the gateway now answers 403 with it". What stays (relayed): a key listed as revoked, and the traces and metrics of the three calls |
+| 3 | `openclaw` | `openclaw-20261117-064651`, `consultant-02` | One session created, `cleaned` true, owned 6 and 6. The record log (read): the native confirm accepted (66 characters), the session deleted through the Control UI's menu, "what the assistant memorised of the question stays". `writes` empty, which **proves nothing** (the WebSocket). The two earlier failed takes' sessions were deleted by the delete-only run |
+| 4 | `a2a-delegation-approval` | `a2a-delegation-approval-20261117-120418`, `consultant-02` | One session created, `cleaned` true, owned 256 and 256; 19 writes sent, none refused. The record log (read): "Approve clicked ... AAP launches zuno-day0-check" and "AAP job 1457 named in the answer: it stays in AAP". Also the check's cancelled session (entry r) |
+| 5 | `world-model` | `world-model-20261117-114542`, kind assembled | Nothing on the cluster: `created` empty, no persona, no owned; no take, no cluster action, no GPU node. Sources and review per the file's `source` and `detail` |
+| 6 | `blender-3d` | `blender-3d-20261117-115243`, kind assembled | Nothing on the cluster, same as row 5; the sources are 3 of the owner's 11 captures, each cropped, with both SHA-256 in the cut list's comment (as relayed) |
+
+All six take directories are in the cache. Rows 5 and 6 have no write account because they ran nothing.
+
+### What remains before WP-290 can be Done (the coordinator's call; nothing is marked Done by the writer)
+
+Its Acceptance: each of the six has a recorded owner's decision (met: the table of the brief); a GIF or stills carried out, or no GIF by that decision (met: six published); no secret on a frame and no GIF without a named go (met; see the flags); `consistency.py` and `check_docs.py` pass (met at this commit). What is **not** closed by it, and stays open where recorded: the flags below, the declared effects, and the limits of the guard.
+
+### Sprint close-out (2026-11-17)
+
+**30 of 30** catalogue demos have a GIF on `devel`, each published on a named go of the owner. WP-288 is Done (2026-11-16). WP-289 is Done (2026-11-17, "Clore, limites écrites"). WP-290 has 6 of 6 published and awaits the decision above. **Every open item, with where it is recorded:**
+
+- **Deferred entries a to r** (platform, agents or UnifAI changes that the sprint rule forbade): the sprint evidence, section "Deferred". Entry r is the check's cancelled session.
+- **Owner's items** (this file, "Open items for the owner"): the Playwright pin (`main` 1.55.1, `devel` 1.48.0); the AAP user `consultant-03`; the node names in the published `model-serving-llmd-mig` GIF (accepted for that demo only); the Dify Zuno Agent's edited date (content never compared).
+- **What the cluster keeps** (sprint evidence): Grafana user storage and the OAuth authorizations of `ai-ops-01` (Grafana, Tempo); `consultant-03`; the Dify run log and the Agent's moved date; the assistant's memory of the `openclaw` questions; AAP job 1457; the traces and metrics of every take; a revoked key in the portal.
+- **Pages:** `observability-trace` row 5:00 (the Grafana step) is "not rehearsed"; the `world-model` page row 2:15 says more than the recording shows (the red sky lasts about 0.09 s; the coordinator tells the owner; the page is not changed); the "(untested ...)" marks that remain are on rows no take ran.
+- **Limits of the guard** (WP-289 brief, "Closed on 2026-11-17: the limits"): no measured absence of writes for the takes before the guard; `ai-gateway-sovereignty` makes two model calls; six terminal takes have no record log; the guard sees HTTP only; the published walkthroughs are not converted.
+- **Privacy flags in published GIFs, accepted or for the owner to weigh:** node names (`model-serving-llmd-mig`, accepted); persona display names and earlier sessions' prompt titles in the hub frames (`unifai-agents`, `observability-trace`, `a2a-delegation-approval`); real wiki titles and links (`dify`, `openclaw`, accepted in kind); the cluster's apps domain and the AAP route with job 1457 (`blender-3d`, `a2a-delegation-approval`); the subscription names in the key form (`maas-portal-api-keys`, all already in the repository).
+- **ADR-0618:** its status is unchanged (Accepted); the 2026-11-17 update covers assembled takes and the width. Its status is the coordinator's.
+- **Unreconciled or unverified readings:** the `dify` Agent content never compared; whether the GenAI playground keeps chats server-side (entry n unverified); the native-confirm diagnosis for `openclaw` is confirmed by the result, not by a dialog frame.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
