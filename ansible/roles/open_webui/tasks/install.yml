@@ -1,6 +1,11 @@
 ---
 # ADR-0588 (WP-181): Open WebUI, the general-purpose chat experience.
 # Order: secrets in Vault, the admin group in Keycloak, then the Application.
+# WP-296: open_webui_alt_gateways lives in ansible/clusters/<cluster>.yml (committed, so AAP reads it too). Without
+# this include the role kept its empty default and the Application was applied unchanged (live, 2026-11-17).
+- name: "open-webui | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "open-webui | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
