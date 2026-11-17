@@ -1,6 +1,6 @@
 # WP-290: Decide and record the six delicate demos
 
-- **State:** Repo work merged (2026-11-17: 6 of 6 demos published; the decision to close the brief is the owner's, and the open items and flags are recorded in the afternoon evidence)
+- **State:** Done (2026-11-17: 6 of 6 demos published; the limits and declared effects are written below)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-289](wp-289-record-the-repeats-of-the-proven-patterns.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -47,9 +47,19 @@ owner's messages. Four of the six were decided on 2026-11-16 (13:17 CET); the la
 The choices carry the rule that every GIF still needs the owner's named go before publication, and that no secret is on a frame.
 The last two choices were given in `zuno-demo-reorg`'s session by one dialog answered at **11:14:24 CET on 2026-11-17** (read there in its log, as relayed); the answers are "Images fixes de la page" and "Enregistrement de secours". Publication of each still needs the owner's named go. The four other demos are takes to scout and review like the others.
 
+## Closed on 2026-11-17: the limits and declared effects, written
+
+The owner chose **"Clore WP-290 et lever le gel"** (close WP-290 and lift the freeze) in `zuno-demo-reorg`'s session, answered at **12:50:28 CET on 2026-11-17** (11:50:28 UTC in its log, as relayed), after being told: six GIFs published, each on a named go; the close-out note on `devel`; nothing of the acceptance left; the declared effects; the two privacy flags. Not chosen: close but keep the freeze; leave the brief open.
+
+**Declared effects** (they stay on the cluster): AAP job 1457, launched by the Approve of the `a2a-delegation-approval` take; the assistant's possible memory of the `openclaw` questions; the revoked key of `maas-portal-api-keys`, possibly listed as revoked in the portal; the traces and metrics of every take.
+
+**The two privacy flags**, told to the owner before the choice: the cluster's apps domain in the panel crop of `blender-3d`, and the AAP route with job id 1457 in the motion frames of `a2a-delegation-approval`.
+
+**Limits:** the guard sees HTTP only, so an empty `writes` list proves nothing for `openclaw` (a WebSocket); `world-model` and `blender-3d` are assembled from existing media and ran nothing on the cluster; the page row 2:15 of `world-model` says more than the recording shows (the page is not changed); the diagnosis of the `openclaw` delete is confirmed by its result, not by a dialog frame. **Every open item stays open where it is recorded**: the close-out note of the [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
 ## Published 2026-11-17: 6 of 6
 
-The six GIFs are on `devel`: `genai-playground` (`1a4ff89b`), `maas-portal-api-keys` (`f17dc35b`), `openclaw` (`63755c1d`), `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`), each on a named go of the owner. `world-model` and `blender-3d` are assembled from existing media (ADR-0618, update of 2026-11-17). The guard summaries of the six, read from the takes' files, are in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md), with the sprint's close-out. **What remains before Done** (the coordinator's decision): nothing in the Acceptance; the flags, the declared effects (the AAP job, the assistant's memory, the revoked key) and the limits of the guard stay open where they are recorded.
+The six GIFs are on `devel`: `genai-playground` (`1a4ff89b`), `maas-portal-api-keys` (`f17dc35b`), `openclaw` (`63755c1d`), `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`), each on a named go of the owner. `world-model` and `blender-3d` are assembled from existing media (ADR-0618, update of 2026-11-17). The guard summaries of the six, read from the takes' files, are in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md), with the sprint's close-out. **What remained before Done:** nothing in the Acceptance (see the next section).
 
 ## Progress (2026-11-16)
 
