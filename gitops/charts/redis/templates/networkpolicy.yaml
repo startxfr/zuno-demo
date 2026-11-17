@@ -34,6 +34,16 @@ spec:
               # deployment.yaml's own Deployment label
               # (app.kubernetes.io/name, that chart's own convention).
               app.kubernetes.io/name: ai-gateway
+{{- if .Values.altGatewayPeers.praxis.enabled }}
+        # ADR-0619 clause 2 / WP-292: the alternative gateway Praxis (its own namespace) keeps its session store
+        # here too; one peer element = namespace AND pod label, its pod only.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.altGatewayPeers.praxis.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.altGatewayPeers.praxis.podName }}
+{{- end }}
       ports:
         - protocol: TCP
           port: 6379

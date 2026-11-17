@@ -37,6 +37,16 @@ spec:
           podSelector:
             matchLabels:
               gateway.networking.k8s.io/gateway-name: maas-default-gateway
+{{- if .Values.altGatewayPeers.praxis.enabled }}
+        # ADR-0619 clause 2 / WP-292: the alternative gateway Praxis, in its own namespace, calls this workload as the
+        # ai-gateway does. One peer element = namespace AND pod label (intersection): its pod only.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.altGatewayPeers.praxis.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.altGatewayPeers.praxis.podName }}
+{{- end }}
       ports:
         - protocol: TCP
           port: 8000

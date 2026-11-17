@@ -176,6 +176,8 @@ platformNamespaces:
     allowedFromNamespaces:
       - cert-manager
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: Praxis reaches zuno-redis (session store) and Keycloak's JWKS.
+      - zuno-ai-gateways
       - zuno-auth
       - zuno-data
       # ADR-0420/WP-068: the zuno-signer ServiceAccount and every debug
@@ -282,6 +284,8 @@ platformNamespaces:
     # invisible from zuno-mesh's side).
     allowedFromNamespaces:
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: Praxis exports its spans (OTLP) to the collector.
+      - zuno-ai-gateways
       - zuno-data
       - zuno-auth
       - zuno-ai-build
@@ -613,6 +617,50 @@ platformNamespaces:
       salesforce:
         enabled: false
         instanceHost: ""
+  # ADR-0619 clause 2 / WP-292: the shared namespace of the ALTERNATIVE AI gateways (Praxis AI first), next to the Zuno
+  # ai-gateway, which stays every client's default. Meshed like zuno-ai-run, with a port-8080 exception for the unmeshed
+  # clients, a default-deny ingress baseline, and an egress firewall for Keycloak and the two SaaS hosts only.
+  # allowedFromNamespaces are the callers the ai-gateway admits by namespace or by the zuno.io/experience-client label
+  # (a NetworkPolicy peer by label would need its own policy; this baseline lists the namespaces): UnifAI, the six
+  # experience namespaces (Open WebUI, Dify, kagent, world-model, the two OpenClaw personas), and the monitoring
+  # namespaces for the metrics port. The workload's own ingress policy (ports) is the praxis chart's.
+  - name: zuno-ai-gateways
+    displayName: Zuno AI Gateways
+    description: >-
+      The alternative AI gateways (Praxis AI first), run next to the Zuno ai-gateway, under the same Keycloak
+      identity (ADR-0619).
+    allowedFromNamespaces:
+      - zuno-unifai
+      - zuno-openwebui
+      - zuno-dify
+      - zuno-kagent
+      - zuno-world-model
+      - zuno-claw-consultant-02
+      - zuno-claw-sale-01
+      - openshift-monitoring
+      - openshift-user-workload-monitoring
+    extraLabels:
+      istio-injection: enabled
+      zuno.io/managed: "true"
+    peerAuthentication:
+      mode: STRICT
+      exceptions:
+        - name: praxis-from-unmeshed-clients
+          selector:
+            app.kubernetes.io/name: praxis
+          ports: [8080]
+          reason: >-
+            Unmeshed callers, as for ai-gateway: zuno-unifai (multiagent), the experience namespaces
+            (zuno-openwebui, zuno-world-model, the zuno-dify and zuno-kagent token proxies, the OpenClaw proxies)
+            and openshift-lightspeed.
+    egressFirewall:
+      # Praxis verifies the zuno Keycloak JWT against the issuer and JWKS (ADR-0619 clause 4).
+      keycloak: true
+      hosts:
+        - dnsName: api.anthropic.com
+          reason: Praxis provider anthropic (ADR-0619 clause 3, Claude is one of the two SaaS models).
+        - dnsName: api.mistral.ai
+          reason: Praxis provider mistral-codestral (ADR-0619 clause 3, Codestral is the other SaaS model).
   - name: zuno-mesh
     displayName: Zuno Infra Service Mesh
     description: >-
@@ -625,6 +673,8 @@ platformNamespaces:
       - zuno-data
       - zuno-auth
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: zuno-ai-gateways is injected; its sidecars reach istiod's xDS and istio-csr.
+      - zuno-ai-gateways
       - zuno-ai-build
       # redhat-ods-applications is namespace-injected (istio-injection:
       # enabled below); without this entry its sidecars can't reach

@@ -115,6 +115,17 @@ hardwareProfiles:
 metrics:
   enabled: true
 
+# ADR-0619 clause 2 / WP-292: the alternative AI gateway Praxis AI (namespace zuno-ai-gateways) calls the four local
+# models as the ai-gateway does: its pod is admitted by their NetworkPolicies on 8000 (templates/networkpolicy-*.yaml)
+# and its ServiceAccount has a MaaSSubscription and a MaaSAuthPolicy per model (maas.models below). Off by default:
+# with it off the render is the one of before; the Praxis release turns it on.
+altGatewayPeers:
+  praxis:
+    enabled: false
+    namespace: zuno-ai-gateways
+    podName: praxis
+    serviceAccount: praxis
+
 # WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
 # runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
 # 8000. templates/networkpolicy-evalhub-clients.yaml admits them, per listed model.
