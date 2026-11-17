@@ -45,7 +45,7 @@ demos of this brief, **18**: `gitops-day0-3`, `image-signing-admission`, `extern
 - `guardrails` is published (take `guardrails-20261116-233501`, commit `e75b0ce8`, on the owner's go of 05:18:40 CET on 2026-11-17, as relayed). The panel's count includes the probes of the demo's own check, and the page says so. The take's agent turn moved the Zuno Agent's edited date again (declared). It used Dify's administrator account as a second credential, never written in git.
 - `observability-trace` is published (take `observability-trace-20261117-071006`, commit `6b57720c`, on the owner's go of 11:37:38 CET on 2026-11-17, as relayed). The two earlier trace takes had failed (a selector bug, then tags scrolled out of the window); the passing take followed the coder's framing fixes and a clean rescout. The page's row 5:00, the Grafana step, stays "not rehearsed": the take did not run it.
 
-**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to q: platform, agents or UnifAI
+**Follow-ups outside this brief, all in the evidence file:** the deferred list (entries a to r: platform, agents or UnifAI
 changes that the sprint rule forbade); the Grafana user-storage entry and the OAuth authorization of `ai-ops-01` that now stay
 on the cluster; the stored effect of kagent's **Skip wizard**; the sprint's lesson that marker images are not enough for a chat
 answer (scan the frames of each answer span).

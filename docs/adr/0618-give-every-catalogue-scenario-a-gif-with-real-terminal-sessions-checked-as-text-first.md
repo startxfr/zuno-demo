@@ -157,3 +157,32 @@ precision.
 - **A failing command:** a command that ends with a non-zero exit code fails the take. An entry for a command that may
   fail is not built yet.
 - **Clause 6, markers:** one `typed` and one `done` marker per row, and the driver sends Ctrl-L between rows.
+
+## Update 2026-11-17 (WP-290): assembled takes, and the width of a GIF
+
+The last two delicate demos are decided from media that already exist, so no take is run. This is a dated precision
+to clauses 1, 2 and 9. The clauses stay as decided. The status of this record does not change.
+
+- **Clause 2, an assembled take.** When the owner chooses it for a delicate demo, a GIF may be cut from media that
+  already exist. `world-model` uses the recorded fallback of 2026-11-08. `blender-3d` uses the owner's own screen
+  captures of 2026-11-07, which the owner opened to the team on 2026-11-17 (read only, only those files).
+- **Where it lives.** The take is assembled by hand in the cache, never in Git. Its `markers.json` says
+  `kind: assembled`. It has no persona, it created nothing and it has no `owned` list.
+- **Sources.** Its `source` list names every original with its path and its SHA-256. A file made from an original, such
+  as a frame taken out of a video or a crop, also records its own SHA-256 and one line on how it was made. A cropped
+  image is an altered source: the cut list says what was cropped and why.
+- **What `gif.py` does.** It cuts only from listed sources. It checks every SHA-256 before it cuts, with `--dry-run`
+  too. It refuses a take without a `source` list, a malformed entry, a moment that reads a file the list does not name,
+  a source missing from the take directory and a SHA-256 that differs. It records the `kind` and the `source` in the
+  GIF's own `.gif.json`. A `video` entry of `markers.json`, a plain file name, names the file that motion moments play.
+- **What `make demo` does.** The demo's `demo.yml` says `record: {kind: assembled}`. `make demo scout` and
+  `make demo record` refuse such a demo, with exit code 2, and point to `make demo gif`, which cuts it. The shell
+  completion does not offer the demo after `scout` or `record`. `consistency.py` refuses `allow`, `skip`, `cols` and
+  `rows` on this kind and requires the cut list.
+- **Clause 9, the privacy review applies.** The review covers every image, and the frames of a video with their
+  number. For `world-model` the assist's review looked at 1039 frames by machine and about 150 by eye, and found no text,
+  person or identifier. The owner's go is still needed before a GIF is published.
+- **Clause 1, the width.** The limit is 960 px, or narrower when the frames do not compress. The captions shorten with
+  the width: 60 characters at 960 px and wider, 46 at 640 px. `gif.py` accepts 480 to 1280 px. The `world-model` GIF
+  is 640 px: the same 8 s of generated frames was 24 MB at 960 px and 10 fps, and is 4.7 MB at 640 px and 6 fps. No
+  published cut list changes.
