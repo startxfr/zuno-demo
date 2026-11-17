@@ -12,6 +12,8 @@ while the demo does. The pods, the GPU node and the prompt path are in [Appendix
 **The message:** "Generative AI can build a world you walk into and change. The platform keeps it governed: who may
 use it, what may be asked, what it costs, and a GPU that exists only while it is used."
 
+![The 5-minute version of the world model demo, cut from the recorded run of 2026-11-08, not live: a snowy village and a volcano generated frame by frame, a walk into the world, and the prompt that edits the frame to a red sky. The recording carries its own band saying it was recorded and is real output of the demo's GPU runtime.](../assets/img/demo/world-model.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
