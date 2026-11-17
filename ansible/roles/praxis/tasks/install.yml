@@ -84,6 +84,7 @@
             enabled: "{{ zuno_praxis_saas_enabled | bool }}"
           tokenRateLimit:
             enabled: "{{ zuno_praxis_token_rate_limit_enabled | bool }}"
+            capacity: "{{ zuno_praxis_token_rate_limit_capacity | int }}"
           opentelemetry:
             enabled: "{{ zuno_praxis_otel_enabled | bool }}"
           networkPolicy:

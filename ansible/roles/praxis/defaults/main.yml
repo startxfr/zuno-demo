@@ -18,6 +18,9 @@ zuno_praxis_saas_enabled: false
 # token_rate_limit per subject on the shared Redis, and the OpenTelemetry export: both need OUR build of Praxis (features
 # token-rate-limit-filter and opentelemetry, ADR-0620), not the published image. Off until that image is the one deployed.
 zuno_praxis_token_rate_limit_enabled: false
+# Tokens per authenticated subject per window (1h). A low value shows the 429 live (`-e zuno_praxis_token_rate_limit_capacity=2000`
+# with the 2000 reserved per call: the second call of a subject is refused); install again without it to restore.
+zuno_praxis_token_rate_limit_capacity: 1000000
 zuno_praxis_otel_enabled: false
 # Admit the zuno-agent-gateway proxy in Praxis's NetworkPolicy: pairs with the connectivity-link
 # praxisWorkstationEntry (WP-298), turn both on together.

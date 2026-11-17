@@ -178,7 +178,11 @@ class Chart(unittest.TestCase):
         limit = next(f for f in chain(cfg, "main")["filters"] if f["filter"] == "token_rate_limit")
         self.assertEqual(limit["key"], "authenticated_subject")
         self.assertEqual(limit["backend"]["kind"], "redis")
-        self.assertIn("${REDIS_PASSWORD}", limit["backend"]["url"])
+        # The filter takes the whole URL from one variable; the ExternalSecret builds it, the password percent-encoded.
+        self.assertEqual(limit["backend"]["url"], "${REDIS_URL}")
+        redis = next(d for d in by_kind(docs, "ExternalSecret") if d["metadata"]["name"] == "praxis-redis")
+        self.assertEqual(redis["spec"]["target"]["template"]["data"]["REDIS_URL"],
+                         "redis://:{{ .password | urlquery }}@zuno-redis-master.zuno-auth.svc:6379")
         self.assertEqual(cfg["telemetry"]["otlp_endpoint"], "http://zuno-otel-collector-collector.zuno-monitoring.svc:4317")
         names = [f["filter"] for f in chain(cfg, "main")["filters"]]
         # Declared before token_count (response hooks run in reverse), and token_count after the translation filters.

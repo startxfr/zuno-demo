@@ -493,6 +493,11 @@ zuno_ai_gateway_workstation_entry: true
 zuno_praxis_enabled: true
 # fork 0c024efb, PipelineRun praxis-build-bzbvc (2026-11-17), image tag fork-0c024efba54f
 zuno_praxis_image_digest: "sha256:3daccf8ec4314b15a6fd2168d5d2bedb9c67ca77b3b15904180fb2585a1cf73e"
+# The three switches of WP-292 (owner's go 2026-11-17): Claude and Codestral, the per-subject token limit on the
+# session-store Redis, and the OpenTelemetry export. The workstation entry stays off until WP-298.
+zuno_praxis_saas_enabled: true
+zuno_praxis_token_rate_limit_enabled: true
+zuno_praxis_otel_enabled: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

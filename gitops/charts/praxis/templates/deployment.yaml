@@ -68,11 +68,11 @@ spec:
                   key: api_key
             {{- end }}
             {{- if $v.tokenRateLimit.enabled }}
-            - name: REDIS_PASSWORD
+            - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ $v.tokenRateLimit.redis.secretName }}
-                  key: REDIS_PASSWORD
+                  key: REDIS_URL
             {{- end }}
           volumeMounts:
             - name: config
