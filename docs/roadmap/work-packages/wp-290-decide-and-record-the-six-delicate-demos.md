@@ -33,7 +33,7 @@ One decision per demo, each with the owner:
 ## Owner's choices of 2026-11-16 (13:17 CET)
 
 Given in `zuno-demo-reorg`'s session by the owner's answers to a question with options, and relayed by it; the writer has not seen the
-owner's messages. Four of the six are decided; two are not asked yet.
+owner's messages. Four of the six were decided on 2026-11-16 (13:17 CET); the last two on 2026-11-17 (11:14:24 CET, below).
 
 | Demo | Owner's choice | What it means for the take |
 |---|---|---|
@@ -41,17 +41,17 @@ owner's messages. Four of the six are decided; two are not asked yet.
 | `maas-portal-api-keys` | **Create, hide, revoke** | The take creates the key with the key field hidden before the dialog opens, proves the call with the key masked, and revokes the key by its id. The take fails if the revoke fails. |
 | `openclaw` | **Like `guardrails`** | The Control UI password is a declared second secret, read at run time. It is never in git, in a log or on a frame. |
 | `genai-playground` | **Skip the paste** | The take does not paste the token and shows the saved connection. Scout of 2026-11-16 (as relayed): the MCP server `zuno-mcp-gateway` is listed but not connected in a fresh browser. The coordinator decided: no token in the recorder. The GIF covers rows 0:00 and 0:45 and the MCP settings as found; rows 1:45 and 3:00 stay words. |
-| `blender-3d` | not asked yet | Open. |
-| `world-model` | not asked yet | Open. |
+| `blender-3d` | **Fixed images of the page** (2026-11-17, 11:14:24 CET) | A GIF made of the screenshots already in the demo's page, with captions. Offline work, assigned to the assist: no cluster action. Not chosen: a screen capture by the owner, no GIF. |
+| `world-model` | **Recorded fallback** (2026-11-17, 11:14:24 CET) | A GIF cut from the existing recorded fallback, if its content passes the privacy review. Offline work, assigned to the assist: no cluster action, no GPU node. Not chosen: a live take the next time the GPU node is up, no GIF. |
 
 The choices carry the rule that every GIF still needs the owner's named go before publication, and that no secret is on a frame.
-Nothing is recorded yet for these four: each is a take to scout and review like the others.
+The last two choices were given in `zuno-demo-reorg`'s session by one dialog answered at **11:14:24 CET on 2026-11-17** (read there in its log, as relayed); the answers are "Images fixes de la page" and "Enregistrement de secours". Publication of each still needs the owner's named go. The four other demos are takes to scout and review like the others.
 
 ## Progress (2026-11-16)
 
 `genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-**Update 2026-11-17:** `maas-portal-api-keys` is published (below). The other four are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
+**Update 2026-11-17:** `maas-portal-api-keys` is published (below). The other four are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` was rescouted 6 of 6 twice on 2026-11-17 (02:35 and 02:37 CET; the afternoon evidence) and is held. `blender-3d` and `world-model` were decided on 2026-11-17 (the table above); both are offline work for the assist.
 
 ### Owner's decision on `openclaw`, session cleanup (2026-11-16, answered just before 21:01:38 CET)
 

@@ -606,6 +606,10 @@ So the fold is **proven live, in a scout** (the coder said it had never seen the
 
 Sent to the owner; the coordinator proposes it for publication. **Not published**; no publication go. **What the cluster keeps (as relayed):** the trace in Tempo, one Tekos answer of `consultant-02`'s budget, and the Tempo OAuth authorization of `ai-ops-01` (already listed).
 
+### The last two WP-290 decisions (2026-11-17, 11:14:24 CET, as relayed)
+
+The owner answered one dialog in `zuno-demo-reorg`'s session at **11:14:24 CET on 2026-11-17** (read in its log by the coordinator; the writer has not seen the owner's words). `blender-3d`: **"Images fixes de la page"**, a GIF made of the screenshots already in the demo's page, with captions (not chosen: a screen capture by the owner, no GIF). `world-model`: **"Enregistrement de secours"**, a GIF cut from the existing recorded fallback, if its content passes the privacy review (not chosen: a live take the next time the GPU node is up, no GIF). Both are offline work, assigned to the assist: no cluster action, no GPU node. Publication of each still needs the owner's named go. The WP-290 decisions table is updated. The publication gos for `openclaw` and `observability-trace` are still open (as relayed).
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
