@@ -503,6 +503,28 @@ Demo333 scouted it direct through `record.sh --scout`: it found no freeze marker
 - **The `owned` count of 7 against 8 rows (the coder's design, relayed by the coordinator, who did not re-read the code; the writer did not read it either).** In `openclaw-delete-left`, `owned()` counts the rows **not** in the left list, so that the recorder's before and after comparison proves nothing else was lost or gained. With one valid id in the list (the placeholder matches no row) that is 8 minus 1, so 7. Once both ids are filled it should read **6 before and 6 after** a real run. If the next scout does not read 6, that is a finding.
 - **No session ids in this file.** The coordinator says they are not secrets but need not be in the docs: the text says "the two ids named in the walkthrough file".
 - **Next (as relayed).** The coder fills the second constant in one commit; then a new scout must read both listed; then demo333 asks the owner for the named go. Not run live.
+- **Update: the second constant is filled (as relayed).** The coder's `1eb320bf` is on `devel` as `73567024` (committed 06:27:31 CET, the original at 06:27:14 CET; both read from git by the writer). `openclaw-delete-left` now names its two sessions (hash `dba9cac0...`). The refusal with a placeholder stays tested on a mounted variant, and one more offline case runs the file as it is against the stand-in: its ids are not listed, so nothing is deleted and the run fails. `ONLY=openclaw-delete-left` passed on the coordinator's side. Demo333 rescouts: both ids must read listed and `owned` must read 6; then it asks the owner for the named go. My earlier commits are on `devel` as `d9a83ec1` (`3e5c6d33`) and `de906ef3` (`e8e79fab`, 06:31:57 CET).
+
+### openclaw-delete-left: the delete-only run passed (2026-11-17, WP-290)
+
+**The owner's named go:** the answer **"Delete both"** at **06:36:37 CET on 2026-11-17** in demo333's session (read by `zuno-demo-reorg` in its log, as relayed). Demo333 says the question stated both ids, their ages, that no question is asked, the two native confirms, the direct run, the WebSocket the guard does not see, its about-95% match of the second id and the consequence of a wrong row (as relayed; the writer did not read the question).
+
+**Rescout before** (`openclaw-delete-left-20261117-063505-scout`, started 05:35:07 UTC = 06:35 CET, walkthrough `dba9cac0...`; the writer read `scout.json`): `done`, 5 steps; the `sessions` step reads rows 8, distinct 8, **both constants listed** (`left` true for both), **placeholders 0**; ranks 1 and 2 (ages 1 hour and 4 hours) are the two marked left, the other six are not; `owned` reads **6**, as the coder's design predicted; nothing typed, nothing clicked, native dialogs 0, private addresses 0; refused none, writes none seen.
+
+**The run** (`openclaw-delete-left-20261117-063720`, started 05:37:37 UTC = 06:37 CET; the writer read `markers.json` and opened `end.png`):
+
+| Item | Value |
+|---|---|
+| Result | `pass`, 3 markers (`login`, `ui`, `end`) in 32.2 s |
+| Counts | `listed_before` 8, `deleted` 2, `listed_after` 6; owned **6 before and 6 after**, same; created none |
+| Writes | none sent (the guard cannot see the Control UI's WebSocket, so this proves nothing) |
+| Private addresses | count 0 |
+| Commit | Not recorded in `markers.json`. Demo333 says `devel` `de906ef3`, run direct through `record.sh` (no presenter freeze check; no freeze, checked by the coordinator earlier), as relayed |
+| Native confirms (as relayed) | Two accepted; the log gives type and length only |
+
+`end.png` (opened): the Control UI with **6** sessions listed (ages 14 hours, then 11 and 12 days), the entry "agent:default:main" highlighted, no typed text and no dialog. The two sessions the failed takes left are no longer in the list. The writer did not view the video and did not compare the six remaining rows with the rows of the rescout beyond their ages (14h, 11d, 11d, 11d, 12d, 12d, matching ranks 3 to 8 of the rescout).
+
+**What it proves.** The coder's diagnosis, a native confirm dismissed by the browser driver, is **confirmed live** by this run (as relayed; the writer saw two sessions gone and the count 8 to 6, not the dialogs). "What the cluster keeps" loses the two sessions. What stays is the assistant's possible memory of the two questions (declared effect). Next, as relayed: an `openclaw` rescout (rows 6), then the take on a new owner go.
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
