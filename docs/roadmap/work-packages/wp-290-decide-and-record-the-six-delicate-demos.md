@@ -74,6 +74,10 @@ Neither is retried. Details are in [the afternoon evidence](../evidence/wp-289-g
 
 Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key created and cleaned, owned 0 to 0, private addresses 0 (the writer read `markers.json`). The shown-once dialog was seen for the first time, with the key masked after `sk-oai-`. The recorder drew the calls (401 without the key, 200 with it, one chat completion). The key was revoked and the gateway answered 403 with it (as relayed). Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
+### `openclaw`: the second take failed at the delete; the owner's decision (2026-11-17, as relayed)
+
+Take `openclaw-20261117-052046` (go 05:17:35 CET): the take found its own session (the row-id fix holds live) and the question was answered, but the session stayed listed after Delete... (owned 7 to 8; the writer read `markers.json`). The coder's diagnosis, about 80% sure and unverified live: the Control UI confirms in a native browser dialog that the driver dismissed. The write guard does not see the Control UI's WebSocket, so an empty `writes` list proves nothing for `openclaw`. Two sessions are now left in `consultant-02`'s assistant. Owner's decision at 05:30:42 CET: **"Suppression seule d'abord"**, a delete-only run by constant ids before any new take; each live run needs its own named go. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
 ### Scouts at `d80f25ef` (as relayed)
 
 - `openclaw`: 7 of 7. The session menu lists Pin session, Mark as unread, Rename…, Fork, Move to group, Archive session and Delete….
