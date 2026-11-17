@@ -648,11 +648,11 @@ platformNamespaces:
         - name: praxis-from-unmeshed-clients
           selector:
             app.kubernetes.io/name: praxis
-          ports: [8080]
+          ports: [8080, 9902]
           reason: >-
             Unmeshed callers, as for ai-gateway: zuno-unifai (multiagent), the experience namespaces
             (zuno-openwebui, zuno-world-model, the zuno-dify and zuno-kagent token proxies, the OpenClaw proxies)
-            and openshift-lightspeed.
+            and openshift-lightspeed, on 8080; Prometheus (unmeshed, plaintext) on the metrics port 9902.
     egressFirewall:
       # Praxis verifies the zuno Keycloak JWT against the issuer and JWKS (ADR-0619 clause 4).
       keycloak: true
