@@ -1,0 +1,41 @@
+# ADR-0620. Two Applications use this chart:
+#   d0 (openshift-operators): operator.enabled - the Subscription only. openshift-operators
+#      already has its global OperatorGroup, so none is rendered here.
+#   d1 (zuno-ai-build): sourceBuilds.enabled - the generic Pipeline and the quay.io push Secret.
+# Both default to false so the chart renders nothing by default.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: openshift-pipelines
+    app: openshift-pipelines
+  subscription:
+    enabled: true
+    name: openshift-pipelines-operator-rh
+    namespace: openshift-operators
+    operator:
+      name: openshift-pipelines-operator-rh
+      channel: ""
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: false
+
+sourceBuilds:
+  enabled: false
+  namespace: zuno-ai-build
+  # The catalog tasks the operator installs in its own namespace, read through the cluster resolver.
+  catalogNamespace: openshift-pipelines
+  gitCloneTask: git-clone
+  buildahTask: buildah
+  # quay.io push credential. The owner creates the robot account and writes its username and
+  # token to Vault (zuno/quay-io/zuno-praxis-ai-push); no session handles it. Granted to this
+  # namespace's SecretStore in platform/vault/secret-access.yaml.
+  pushSecret:
+    name: quay-io-zuno-push
+    registry: quay.io
+    vaultKey: quay-io/zuno-praxis-ai-push

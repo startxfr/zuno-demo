@@ -45,7 +45,7 @@ images keep `BuildConfig`.**
 2. **One generic pipeline.** `source-image-build` runs git-clone then buildah, both tasks taken from the operator's
    catalog through the cluster resolver. Its parameters are `git-url`, `git-revision`, `containerfile`, `build-args`,
    `image` and `tag`.
-3. **The source is a switch.** Values hold, per image:
+3. **The source is a switch.** The image's build role defaults (`ansible/roles/<name>_build/defaults/main.yml`) hold, per image:
    - the fork and upstream URLs and default revisions;
    - a `source: fork|upstream` switch;
    - the build arguments for each source.

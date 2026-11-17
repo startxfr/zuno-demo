@@ -1,6 +1,6 @@
 # WP-291: Install OpenShift Pipelines and build Praxis AI from source
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
 - **Depends on:** none
 - **Related:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
@@ -35,3 +35,30 @@ Build `quay.io/zuno/praxis-ai` from the fork `https://github.com/redhat-et/praxi
 
 - Both sources build. The fork digest is written in `gitops/charts/praxis/values.yaml`.
 - `helm template` of both charts passes. `check_app_projects.py` and `check_secret_access.py` pass.
+
+## Result (2026-11-17, repo)
+
+Repo work done; nothing is applied to the cluster.
+
+- **Operator:** component `openshift-pipelines` (Day 1, last).
+  - Role `ansible/roles/openshift_pipelines`, modelled on `lightspeed`: package discovery, d0 Subscription, then a wait for `TektonConfig/config` Ready, then d1.
+  - Chart `gitops/charts/openshift-pipelines` (startx `operator` 21.3.277).
+  - App pair `gitops/apps/openshift-pipelines/` (d0 `zuno-platform`, d1 `zuno-apps`).
+  - Nodes in the AAP day-1 DAG and surveys; Makefile `DAY1_RUN_COMPONENTS`; the four day-1 playbooks.
+- **Pipeline:** `source-image-build` (git-clone, then buildah, through the cluster resolver) and the ExternalSecret `quay-io-zuno-push`.
+  - Both are in the same chart, d1, instead of a separate `source-builds` chart: one component, one removal path.
+  - The push key `quay-io/zuno-praxis-ai-push` (properties `username`, `token`) is granted to `zuno-ai-build` in `platform/vault/secret-access.yaml`.
+- **Build:** component `praxis` (Day 2 build), role `ansible/roles/praxis_build`.
+  - The source switch lives in the role defaults, not in chart values, because the role creates the run.
+  - Revision resolved to a full SHA by `git ls-remote`; image tag `<source>-<sha12>`.
+  - The run carries `sidecar.istio.io/inject: "false"`; the build task gets 4 CPU and 8 Gi.
+  - The role prints the digest. Feature names were checked in both `server/Cargo.toml` files: `api-key-auth-filter` is fork-only.
+  - Wired into `day2_build.yml`, the AAP day-2 build DAG and its survey, and `DAY2_BUILD_COMPONENTS`.
+- **Checks:** `check_docs.py`, `check_app_projects.py`, `check_secret_access.py`, `check_mesh_mtls.py`, `helm lint` and the ansible syntax check pass.
+- **Live steps remaining**, each with the owner's go:
+  1. `make d1 install openshift-pipelines`;
+  2. the owner's quay.io robot for `zuno/praxis-ai` and its token in Vault;
+  3. `make d2 build praxis`, then `-e zuno_praxis_build_source=upstream`.
+
+  Before step 3, check that the catalog tasks are named `git-clone` and `buildah` in `openshift-pipelines` on this operator version.
+

@@ -1,0 +1,50 @@
+---
+# ADR-0620 (WP-291): the OpenShift Pipelines operator (d0), then the source-image-build Pipeline (d1).
+- name: "openshift_pipelines | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "{{ openshift_pipelines_package_name | default('openshift-pipelines-operator-rh') }}"
+    operator_subscription_namespace: "openshift-operators"
+    operator_package_catalog_hint: "pipelines"
+
+- name: "openshift_pipelines | apply the GitOps Application (d0: the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
+  vars:
+    gitops_component_name: "openshift-pipelines"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-openshift-pipelines-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          operator:
+            channel: "{{ operator_package_channel }}"
+            source:
+              name: "{{ operator_package_catalog }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# The Pipeline kind, the cluster resolver and the catalog tasks exist only once the operator's
+# TektonConfig has reconciled; d1 would otherwise sync against a missing CRD.
+- name: "openshift_pipelines | wait for TektonConfig/config to be Ready"
+  kubernetes.core.k8s_info:
+    api_version: operator.tekton.dev/v1alpha1
+    kind: TektonConfig
+    name: config
+  register: _openshift_pipelines_tektonconfig
+  until: >-
+    (_openshift_pipelines_tektonconfig.resources | default([]) | length) == 1 and
+    ((_openshift_pipelines_tektonconfig.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list) == ['True'])
+  retries: 60
+  delay: 15
+
+- name: "openshift_pipelines | apply the GitOps Application (d1: the source-image-build Pipeline)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-pipelines"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-openshift-pipelines-d1"
+    gitops_app_wait_retries: 40
+    gitops_app_wait_delay: 15

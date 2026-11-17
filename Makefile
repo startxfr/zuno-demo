@@ -43,7 +43,7 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # sit Degraded for the whole window while ArgoCD self-healed it back.
 # "nfs-provisioner" (ADR-0608/WP-241) needs only OLM and provides the `nfs`
 # StorageClass that Day 2's "unifai" uses for its shared volumes.
-DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config openshift-pipelines
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environment
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
@@ -78,7 +78,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # tasks/install.yml.
 DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model praxis
 DAY2_VERBS := check install build uninstall reconcile all reinstall
 # Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
 # to them: a Day 2 reconcile never falls back to re-installing a component.

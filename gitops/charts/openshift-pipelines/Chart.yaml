@@ -1,0 +1,16 @@
+apiVersion: v2
+name: openshift-pipelines
+description: >-
+  ADR-0620: the Red Hat OpenShift Pipelines operator (OLM Subscription in
+  openshift-operators, channel/catalog discovered at Ansible run time -
+  ADR-0048) and, in the d1 Application, the generic source-image-build
+  Pipeline in zuno-ai-build that builds third-party images from source
+  (Praxis AI first) and pushes them to quay.io/zuno. First-party images
+  keep BuildConfig (ADR-0056).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"

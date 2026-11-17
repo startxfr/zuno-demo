@@ -90,7 +90,7 @@ jobTemplates:
     playbook: ansible/playbooks/day1_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
   - name: zuno-day1-build
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
@@ -102,13 +102,13 @@ jobTemplates:
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
 
   - name: zuno-day2-check
     playbook: ansible/playbooks/day2_check.yml
@@ -119,7 +119,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [mcp, mlops, token-proxy]
+    surveyComponents: [mcp, mlops, token-proxy, praxis]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
@@ -308,6 +308,9 @@ workflowTemplates:
       # later.
       # WP-156: aiagent-operator, formerly the tail node, was retired.
       - id: rhtas-config
+        successNodes: [openshift-pipelines]
+      # ADR-0620 (WP-291): needs only OLM; last, so it never delays the platform operators.
+      - id: openshift-pipelines
         successNodes: []
   - name: zuno-day1-check-workflow
     jobTemplate: zuno-day1-check
@@ -429,6 +432,8 @@ workflowTemplates:
       - {id: mcp, successNodes: []}
       - {id: mlops, successNodes: []}
       - {id: token-proxy, successNodes: []}
+      # ADR-0620 (WP-291): a PipelineRun, not a BuildConfig; independent of the others.
+      - {id: praxis, successNodes: []}
 
   # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one
   # Job Template fanned out by target_component - each node names its OWN
