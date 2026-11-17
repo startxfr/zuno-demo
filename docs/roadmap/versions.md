@@ -30,7 +30,7 @@ state are not restated here.
 | v0.14 | `v0.14.4` | 2026-11-07 | patch, proven checkpoint before the demonstration of 2026-11-09: WP-225 hardening lots A-C deployed with their new behaviours off, ADR-0608 nfs-provisioner adopted, the WP-226 image policy enforced for the opt-in namespaces, golden path extended, CI quality-gate fix; cut from `devel` 21ddff13 after a passing golden-path run (11/11); in-cluster ledger run 2026-11-07, 12 components in 36 min; the Secret scan run on the tag is red on a documented false positive (`Authorization: Bearer placeholder` in the golden-path probe, fixed in the next tag) |
 | v0.15 | `v0.15.0` | 2026-11-11 | demo-ready band closed: the classification floor (ADR-0565, WP-209) and the golden-path check and freeze window (ADR-0605, WP-238); also carries everything merged since `v0.14.5` (WP-247 Vault Transit signing, WP-224 zuno-unifai firewall, WP-221 revocation rehearsed, WP-211 role fixes, ADR-0408 and ADR-0501 Implemented, ADR-0404/0405/0407 Deprecated); cut from `devel` 24ffd733 after a passing golden-path run (13/13, world model shown as roadmap), merged to `main` 96e66ab3; 8 first-party images rebuilt beforehand so all 12 `:latest` images are signed through the built-in Keycloak (supply-chain check 12/12); in-cluster ledger run 2026-11-11, 12 components in 35 min |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
-| v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610) |
+| v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610); alternative AI gateways next to the Zuno ai-gateway, Praxis AI first (ADR-0619 to ADR-0623) |
 
 ## MVP / v0
 
@@ -344,6 +344,12 @@ its work package is opened when the band starts.
 
 **6 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Implemented`, ADR-0611 `Implemented`, ADR-0612 `Accepted`, ADR-0613 `Proposed`.** Open work
 packages: WP-212, WP-213, WP-215, WP-218, WP-248, and WP-252 to WP-254 (the M4, M2 and M7 hardening windows of ADR-0613, planned for mid-December 2026) (WP-211, Keycloak, and WP-214, Redis, Done 2026-11-11).
+
+One more stream (added 2026-11-17): alternative AI gateways next to the Zuno ai-gateway, which stays every client's
+default (ADR-0619). Praxis AI comes first, built from source by OpenShift Pipelines and pushed to `quay.io/zuno/praxis-ai`
+(ADR-0620), then LiteLLM, Agent Router and Bifrost (ADR-0621 to ADR-0623, Proposed). Each client is wired once, through an
+`altGateways` list. Claude Code on sovereign models is the band's second experience (ADR-0606 clause 2). Open work
+packages: WP-291 to WP-304 (Phase 58).
 
 ## OKF stream
 

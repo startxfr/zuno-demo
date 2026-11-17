@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 8 | 5 | 27 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283 |
+| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-291, WP-292, WP-293, WP-294, WP-295, WP-296, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1198,6 +1198,33 @@ ADR-0618 extends it to every scenario of the catalogue (terminal demos included,
 | WP-289 | [wp-289](work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) | 0618 | WP-288 | Done | none; the limits are written in the brief |
 | WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Done | none; the limits and declared effects are written in the brief |
 
+### Phase 58 — Alternative AI gateways next to the Zuno ai-gateway (added 2026-11-17)
+
+ADR-0619: Praxis AI, then LiteLLM (ADR-0621), Agent Router (ADR-0622) and Bifrost (ADR-0623), run as alternative AI
+gateways in one shared namespace `zuno-ai-gateways`. The Zuno ai-gateway stays every client's default and is not changed.
+Each demo client gets the alternatives once, through a generic `altGateways` list, as an additional connection.
+The alternatives serve the sovereign models (local vLLM, RHOAI MaaS) plus Claude and Codestral, under the same Keycloak
+identity. ADR-0620 installs OpenShift Pipelines to build Praxis from the fork or the upstream source and push it to
+`quay.io/zuno/praxis-ai`. Client order (owner, 2026-11-17): Open WebUI, kagent, Claude Code, UnifAI, Dify, OpenClaw, then
+Blender and world-model.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-291 | [wp-291](work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) | 0620 | none | Not started | owner's go: operator install; quay.io robot and Vault secret; first PipelineRun |
+| WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Not started | owner's go: allow-lists, then the Praxis deploy |
+| WP-293 | [wp-293](work-packages/wp-293-deploy-litellm-as-an-alternative-gateway.md) | 0621 | WP-292 | Not started | owner's decision on ADR-0621 clause 1 first |
+| WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
+| WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
+| WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: roll Open WebUI |
+| WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Not started | owner's go: token-proxy rebuild and roll, kagent |
+| WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Not started | owner's go: Keycloak realm, workstation entry |
+| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
+| WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
+| WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: OpenClaw personas |
+| WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
+| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: world-model web roll |
+| WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Not started | owner's go: one live play of each scenario |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1342,6 +1369,7 @@ moving.
 
 ## Change log
 
+- 2026-11-17 — ADR-0619 to ADR-0623 and WP-291 to WP-304 added (Phase 58, v0.17) by the owner's decisions of the day. Alternative AI gateways run next to the Zuno ai-gateway, which stays the default and unchanged: Praxis AI first, then LiteLLM, Agent Router and Bifrost, in one shared namespace `zuno-ai-gateways`. There is one work package per gateway and one per client, each client wired once through a generic `altGateways` list. The alternatives serve sovereign models plus Claude and Codestral with the existing Vault keys. Praxis is built by an OpenShift Pipelines pipeline from the fork or the upstream source and pushed to `quay.io/zuno/praxis-ai` (ADR-0620, which amends ADR-0056 for third-party source builds only). Claude Code becomes the band's second experience, signing in by Keycloak device flow. ADR-0619 amends ADR-0587 clause 1 by a dated note. Three scenarios are planned: multi-gateway, claude-code-sovereign and agents-alt-gateway.
 - 2026-11-17 — WP-290 Done: the owner chose "Clore WP-290 et lever le gel" (12:50:28 CET, as relayed). Six of six demos are published, each on a named go; the limits and declared effects are written in the brief; every open item stays open where it is recorded (the sprint's close-out, in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md)). The freeze is lifted as the sprint's operating rule only.
 - 2026-11-17 — WP-290 (6 of 6): `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`) are published on the owner's go of 12:30:26 CET; the last two are assembled from existing media (ADR-0618, update of 2026-11-17). The catalogue has 30 GIFs of 30 demos. WP-288 is Done (2026-11-16) and WP-289 Done (2026-11-17); WP-290 awaits the decision to close. The sprint's close-out, with every open item and where it is recorded, is in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-17 — WP-289 Done: the owner chose "Clore, limites écrites" (12:03:21 CET, as relayed). 18 of 18 demos are published, each on a named go; the guard table rests on the takes' own files; the limits (no measured absence of writes before the write guard, `ai-gateway-sovereignty`'s two model calls, missing records) are written in the brief; every open item stays open where it is recorded. Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).

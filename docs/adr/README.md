@@ -399,6 +399,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md) | Proposed | Close the three remaining live hardening items of ADR-0603 (M4, M2, M7) in mid-December |
 | [ADR-0614](0614-split-the-cluster-into-infra-general-worker-and-gpu-node-pools.md) | Implemented | Split the cluster into infra, general-worker and GPU node pools |
 | [ADR-0615](0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) | Accepted | Align the Zuno OKF profile with upstream OKF 0.2 and freeze it as profile 1.0 |
+| [ADR-0619](0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md) | Accepted | Run Praxis AI as an alternative AI gateway next to the default Zuno ai-gateway |
+| [ADR-0620](0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md) | Accepted | Build third-party images from source with OpenShift Pipelines and push them to quay.io |
+| [ADR-0621](0621-run-litellm-as-an-alternative-ai-gateway.md) | Proposed | Run LiteLLM as an alternative AI gateway |
+| [ADR-0622](0622-run-agent-router-as-an-alternative-ai-gateway.md) | Proposed | Run Agent Router as an alternative AI gateway |
+| [ADR-0623](0623-run-bifrost-as-an-alternative-ai-gateway.md) | Proposed | Run Bifrost as an alternative AI gateway |
 
 ## OKF v0.1
 

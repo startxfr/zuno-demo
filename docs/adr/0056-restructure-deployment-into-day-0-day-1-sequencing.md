@@ -4,6 +4,7 @@
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
+- **Amended:** 2026-11-17 (see the dated amendment at the end)
 
 ## Context
 
@@ -63,3 +64,7 @@ See [Standard clauses](README.md#standard-clauses) for Acceptance criteria.
 ## Review evidence
 
 This decision is grounded in real-cluster operational friction discovered this session (CloudNativePG and Crunchy Postgres Operator catalog/channel/package-name mismatches) plus explicit operator requirements for a Day 0/Day 1 deployment split, a uniform per-component check/install/configure lifecycle, and a build/run namespace separation.
+
+## Amendment (2026-11-17): OpenShift Pipelines for third-party source builds
+
+[ADR-0620](0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md) installs OpenShift Pipelines, at the owner's request, for one case only: third-party images the demo must build from source (Praxis AI first). The rejection of Tekton above still holds for first-party components, which keep `BuildConfig`/`ImageStream`. The status of this record is unchanged.
