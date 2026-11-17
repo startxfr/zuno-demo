@@ -15,7 +15,8 @@
 // assistant and deletes it in cleanup() through the Control UI's own menu, "Delete…" (a declared click), and fails if
 // the session is still listed. The Control UI talks to its gateway over a WebSocket: there is no list or delete this
 // file can call, so the sessions are those of the sidebar, told apart by their link (or, failing that, their text,
-// kept in memory only and never written). What the assistant may memorise from the one question (its own 10Gi
+// kept in memory only and never written). The assistant gives the session a title of its own after the first
+// answer (seen 2026-11-17): the take's session is the ONE row that was not there before, whatever its title. What the assistant may memorise from the one question (its own 10Gi
 // volume) STAYS: no take can undo that; it is declared in `changes` and in the record notice.
 //
 // Seen by the scouts of 2026-11-16: the Control UI at /chat, connected; "New session", a select "Filter sessions by
@@ -23,8 +24,8 @@
 // session, Mark as unread, Rename…, Fork, Move to group, Archive session, Delete…; a textarea; "Collapse sidebar".
 // The sidebar lists the earlier sessions' titles: they are on the pictures (collapsing it may be kept by the
 // assistant, so it is not clicked). Connect writes one key to the browser's storage, openclaw-device-identity-v1:
-// the browser of a take is new each time, so each take is a new device to the gateway. NOT seen: a question sent,
-// the tool line, what "Delete…" asks before it deletes: the first take is their scout.
+// the browser of a take is new each time, so each take is a new device to the gateway. Seen by the take of 2026-11-17: the question sent, the Tool line, the answer.
+// NOT seen: what "Delete…" asks before it deletes.
 import crypto from "node:crypto";
 import { click, describe, firstVisible, newText, read, settled, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
@@ -80,16 +81,33 @@ export async function enter({ page, base, mark, keycloak, typeSecret, state }) {
   state.password_field_still_on_screen = Boolean(await firstVisible(page, UI_PASSWORD));
 }
 
-// The sessions of the sidebar: one per "Open session menu" button. Each is known by an id made here from its link's
-// address or, when it has none, from its text without its age ("3h", "10d"): a hash, so that no title is ever kept,
-// logged or written. [{id, index}].
+// The sessions of the sidebar: one per "Open session menu" button. A session's row is the largest box around its
+// button that holds no other session's button (and is no taller than a row): on 2026-11-17 the button's parent was a
+// box without text, every row got the same id, and the take's own session, renamed by the assistant, was not found.
+// Each row is known by an id made here from its link's address or, when it has none, from its text without its age
+// ("now", "3h", "10d"); two rows with the same text are told apart by their rank among them. A hash, so that no title
+// is ever kept, logged or written. [{id, index, by}].
 async function rows(page) {
   const seen = await read(page, (selector) => [...document.querySelectorAll(selector)].map((button) => {
-    const row = button.closest("li, [role='listitem'], [role='option'], a") || button.parentElement;
+    let row = button.parentElement;
+    for (let up = row && row.parentElement; up && up !== document.body; up = up.parentElement) {
+      if (up.querySelectorAll(selector).length > 1 || up.querySelector("textarea") || up.getBoundingClientRect().height > 120) break;
+      row = up;
+    }
     const link = row.matches("a[href]") ? row : row.querySelector("a[href]");
-    return { link: link ? link.getAttribute("href") : "", text: (row.innerText || "").replace(/\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi, "").replace(/\s+/g, " ").trim() };
+    // The row's words without its buttons: a button shown only under the pointer must not change the row's id.
+    const words = row.cloneNode(true);
+    for (const el of words.querySelectorAll("button, [role='button'], svg")) el.remove();
+    return { link: link ? link.getAttribute("href") : "", text: (words.textContent || "").replace(/\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi, "").replace(/\s+/g, " ").trim() };
   }), SESSION_MENU.join(", "));
-  return seen.map((row, index) => ({ index, by: row.link && row.link !== "#" ? "link" : "text", id: crypto.createHash("sha256").update(row.link && row.link !== "#" ? row.link : row.text).digest("hex").slice(0, 16) }));
+  const met = new Map();
+  return seen.map((row, index) => {
+    const linked = Boolean(row.link && row.link !== "#");
+    const key = linked ? row.link : row.text;
+    const rank = (met.get(key) || 0) + 1;
+    met.set(key, rank);
+    return { index, by: linked ? "link" : row.text ? "text" : "nothing", id: crypto.createHash("sha256").update(rank > 1 ? `${key}\n#${rank}` : key).digest("hex").slice(0, 16) };
+  });
 }
 
 // The sessions the persona's sidebar lists (a WebSocket behind it: see the header).
@@ -98,7 +116,9 @@ export async function owned({ page }) {
 }
 
 export async function run({ page, mark, log, state }) {
-  state.before = (await rows(page)).map((row) => row.id);
+  const earlier = await rows(page);
+  if (earlier.some((row) => row.by === "nothing")) throw new Error("the sidebar's sessions are not told apart (a row without link or text): the take could not find its own session to delete it, nothing is sent");
+  state.before = earlier.map((row) => row.id);
   if (state.password_field_still_on_screen) throw new Error("the Control UI still shows its password field after Connect: it must not be in a picture");
   await mark("ui");
   const fresh = await firstVisible(page, NEW_SESSION);
@@ -171,7 +191,13 @@ export async function scout({ page, base, step, state }) {
     const input = await firstVisible(page, INPUT);
     return { selector: input ? input.matched : null, textareas: await page.locator("textarea").count() };
   });
-  await step("sessions", async () => { const list = await rows(page); return { rows: list.length, told_apart_by: [...new Set(list.map((row) => row.by))], distinct: new Set(list.map((row) => row.id)).size }; });
+  // A take finds its own session as the one row that was not there before it: the rows must be told apart.
+  await step("sessions", async () => {
+    const list = await rows(page);
+    const seen = { rows: list.length, told_apart_by: [...new Set(list.map((row) => row.by))], distinct: new Set(list.map((row) => row.id)).size };
+    if (seen.distinct !== seen.rows || seen.told_apart_by.includes("nothing")) throw new Error(`the sidebar's ${seen.rows} sessions are not told apart (${seen.distinct} distinct, by ${seen.told_apart_by.join(", ")}): a take could not find its own session`);
+    return seen;
+  });
   await step("closed", async () => ({ nothing_typed: true, sessions_opened: 0 }));
 }
 
@@ -195,7 +221,11 @@ export async function cleanup({ page, log, state }) {
   // "Delete…" asks before it deletes: its own confirmation, if one shows, is confirmed (the same declared click).
   const confirm = page.locator("[role='dialog'] button, [role='alertdialog'] button").filter({ hasText: /^\s*(Delete|Confirm|Yes)/ }).first();
   if (await confirm.waitFor({ timeout: 5000 }).then(() => true).catch(() => false)) await click(confirm, { change: changes[0], changes });
-  const gone = await waitUntil(page, { what: "the session's removal", timeoutMs: 20000, done: async () => !(await rows(page)).some((row) => row.id === fresh[0].id) || undefined }).catch(() => false);
+  const gone = await waitUntil(page, { what: "the session's removal", timeoutMs: 20000, done: async () => {
+    // Gone when the sidebar lists again only what it listed before the take (a session renamed meanwhile is still one more).
+    const left = await rows(page);
+    return (left.length <= state.before.length && left.every((row) => state.before.includes(row.id))) || undefined;
+  } }).catch(() => false);
   if (!gone) throw new Error(`the session the take created (${fresh[0].id}, the newest of the sidebar) is STILL listed after Delete…: delete it by hand in consultant-02's assistant`);
   log(`session ${fresh[0].id} deleted through the Control UI's menu; what the assistant memorised of the question stays`);
   return true;

@@ -552,9 +552,10 @@ async function takeOne(take, out) {
       record.owned.after = ownedAfter.length;
       const added = ownedAfter.filter((o) => !ownedBefore.includes(o));
       const removed = ownedBefore.filter((o) => !ownedAfter.includes(o));
-      record.owned.same = !added.length && !removed.length;
+      // (the counts too: two items a walkthrough gives the same id must not hide one more)
+      record.owned.same = !added.length && !removed.length && ownedAfter.length === ownedBefore.length;
       if (!record.owned.same) {
-        failures.push(`${take.persona} does not own the same items after the take: ${added.length} more, ${removed.length} fewer (ids in the log)`);
+        failures.push(`${take.persona} does not own the same items after the take: ${added.length || Math.max(0, ownedAfter.length - ownedBefore.length)} more, ${removed.length || Math.max(0, ownedBefore.length - ownedAfter.length)} fewer (ids in the log)`);
         for (const o of added) log(`owned after, not before: ${o}`);
         for (const o of removed) log(`owned before, not after: ${o}`);
       }
