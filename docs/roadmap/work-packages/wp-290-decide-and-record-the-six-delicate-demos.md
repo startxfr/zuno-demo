@@ -61,6 +61,13 @@ Given in `zuno-demo-reorg`'s session by an answer to a question with options, an
 - The take fails if the session remains after the delete.
 - What the assistant may have memorised stays in its memory. This is declared.
 
+### Two failed takes at `feaf7d32` (2026-11-17, as relayed; the writer read the directories)
+
+Neither is retried. Details are in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
+- `maas-portal-api-keys` failed before any key was created: the check did not see the model chosen in the Create dialog, which the frame shows is chosen. A bug in the check. Fixed on `devel` as `723c5e24` (coder's `a8afb3a6`); a rescout comes before the next take. The shown-once dialog is still unseen.
+- `openclaw` failed after the question was answered: the take did not recognise its own session, which the assistant had retitled, so it did not delete it. Owned sessions went from 6 to 7. The session stays until the owner decides (delete by hand, or leave for a later take). The answer frame holds real Confluence titles; the owner chose "comme guardrails".
+
 ### Scouts at `d80f25ef` (as relayed)
 
 - `openclaw`: 7 of 7. The session menu lists Pin session, Mark as unread, Rename…, Fork, Move to group, Archive session and Delete….

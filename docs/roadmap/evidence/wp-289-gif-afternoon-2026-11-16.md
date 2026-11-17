@@ -312,6 +312,32 @@ Scouts at `6df63b54` and `6f836c28`. The only write refused anywhere was `POST /
 
 Between about 00:20 and 00:35 CET the first load of UnifAI and of the Tempo search UI took more than 30 s in 4 of 7 attempts, at a workstation load of 2 to 3. All UnifAI pods were Running. Cause unknown. The coder raises the walkthroughs' first-load waits to 90 s. Entry p of the [sprint evidence](wp-289-gif-sprint-2026-11-16.md).
 
+### Two failed takes at `feaf7d32` (WP-290, 2026-11-17)
+
+Each take ran on an owner's named go in demo333's session, as relayed. **The exact go times are not stated here**: they are in demo333's log, which the writer cannot read; the writer asked `zuno-demo-reorg` for them. The takes' own start times, read from `markers.json`: `maas-portal-api-keys` 01:29:12 UTC (02:29 CET), `openclaw` 01:31:32 UTC (02:31 CET). Neither take is retried yet. The writer read both directories and opened the images named below.
+
+**`maas-portal-api-keys`**, take `maas-portal-api-keys-20261117-022910`, persona `ai-dev-01`.
+
+| Item | Value |
+|---|---|
+| Status | `fail` after 3 markers (`login`, `portal`, `keys`): "the create dialog does not show gpt-oss-20b-ocp-ai-dev as chosen" |
+| Created and cleaned | `created` empty, `cleaned` null; owned 0 before and 0 after; `private_addresses` count 0 |
+| Writes | Two `POST` of the key-list search, both 200, both listed as reads. None refused, none tolerated. No key was created |
+
+`failed.png` (opened): the Create API key dialog over the portal. The subscription field reads `gpt-oss-20b-ocp-ai-dev`, so the model **is** chosen; the name field holds a generated test name; the models table lists one model with its token limit; the account `ai-dev-01` is in the header. No node name and no address. The check was wrong, not the portal (as relayed, and consistent with the frame). The one-time key dialog was **not** reached, so it is still unseen. As relayed: the coder's `a8afb3a6` makes the check read the dialog's visible texts and held values; it is on `devel` as `723c5e24` (suite for this demo PASS, pushed about 02:50 CET). The walkthrough hash moves, so a rescout comes before the next take.
+
+**`openclaw`**, take `openclaw-20261117-023130`, persona `consultant-02`.
+
+| Item | Value |
+|---|---|
+| Status | `fail` after 6 markers (`login`, `ui`, `session`, `q-sent`, `q-done`, `end`): "a question was sent but the sidebar lists no new session" |
+| Created and cleaned | `created` empty, `cleaned` false; owned **6 before and 7 after**; `private_addresses` count 0 |
+| Writes | none sent, none refused |
+
+What the frames show (opened `session.png`, `q-done.png`): in `session.png` the sidebar lists 7 sessions, the first marked "now" with a default `agent:default:dashboard:` name; in `q-done.png` the sidebar lists 7 sessions again, the first marked "now" under a title the assistant derived from the question, and the other six unchanged. So the take's new session was probably the first entry, **renamed by the assistant**, which the take did not recognise. That is the writer's reading of two frames, not a measurement. The question was answered (relayed and visible). The session was not deleted: it stays in `consultant-02`'s assistant, with the assistant's possible memory of the question (declared effect). As relayed: demo333 asks the owner whether to delete it by hand or leave it for a later take. One Confluence answer of `consultant-02`'s budget was spent.
+
+**Privacy.** `q-done.png` shows an answer listing real Confluence page titles, page ids and addresses of the company's wiki. This file copies none of them. As relayed, the owner chose "comme guardrails" for `openclaw` (the real titles may be shown); the next take goes through the privacy review. The earlier sessions' names in the sidebar are not copied either.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
