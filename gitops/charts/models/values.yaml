@@ -847,6 +847,17 @@ weshModel:
   # Flipped 2026-09-05: verified byte-identical to modelsS3 first (226
   # objects, same sizes, empty aws s3 sync --dryrun).
   s3Source: sources
+  # 2026-11-17 (owner report: praxis.qwen3.5-9b-wesh answered with odd symbols).
+  # Root cause, measured on vLLM raw: no sampling defaults in the exported
+  # generation_config.json (6/32 answers with foreign-script tokens, 0/32 with
+  # these values), and the answer landing in `reasoning` (content null) because
+  # the fine-tune never closes the template's `<think>`. Empty map = no flag.
+  defaultChatTemplateKwargs:
+    enable_thinking: false
+  generationConfig:
+    temperature: 0.7
+    top_k: 20
+    top_p: 0.95
   # The variant carries all of Comage's traffic and sits in the larger
   # 48GB slice, so it keeps the same 32768 the other 48GB model uses.
   maxModelLen: 32768

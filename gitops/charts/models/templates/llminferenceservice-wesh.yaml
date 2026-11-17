@@ -111,6 +111,23 @@ spec:
           - --enable-auto-tool-choice
           - --tool-call-parser=qwen3_xml
           - --reasoning-parser=qwen3
+          {{- with .Values.weshModel.defaultChatTemplateKwargs }}
+          # 2026-11-17: the template prefills `<think>` and this fine-tune never
+          # closes it, so the qwen3 reasoning parser filed the whole answer under
+          # `reasoning` (content null, Open WebUI "Réflexion" block). Same flag and
+          # same quoting rule as llminferenceservice-qwen35.yaml: the KServe launcher
+          # evals its args, so the JSON is single-quoted INSIDE the argument.
+          - --default-chat-template-kwargs
+          - {{ printf "'%s'" (toJson .) | quote }}
+          {{- end }}
+          {{- with .Values.weshModel.generationConfig }}
+          # 2026-11-17: the exported generation_config.json carries no sampling
+          # defaults, so a client that sends none (Open WebUI) sampled at T=1.0 over
+          # the whole vocabulary and leaked CJK/Arabic/Cyrillic tokens (6/32 answers
+          # on vLLM raw; 0/32 with these values). Request parameters still win.
+          - --override-generation-config
+          - {{ printf "'%s'" (toJson .) | quote }}
+          {{- end }}
           {{- if .Values.tracing.enabled }}
           # ADR-0523 (WP-082): same native vLLM OTel activation as the
           # other two model workloads - see llminferenceservice-qwen.yaml.
