@@ -618,6 +618,21 @@ The owner answered one dialog in `zuno-demo-reorg`'s session at **11:14:24 CET o
 
 **A `gif.py` change agreed with the assist (as relayed).** A take kind "assembled" (made by hand from existing media; `created` empty, `cleaned` null, no owned count; a required `source` list of path and SHA-256, verified and copied into `gif.json`), a `video` file name in `markers.json`, and a caption limit scaled to the width (unchanged at 960 px). The assist will tell the coordinator the line that ADR-0618 clause 9 needs; that text is the coordinator's. Nothing of this is committed.
 
+### Published at 11:38 CET on 2026-11-17: openclaw and observability-trace
+
+On the owner's go "go de publication d'openclaw et d'observability-trace" at **11:37:38 CET** (the coordinator's log, as relayed), before both commits at **11:38:58 CET** (read from git by the writer). The writer compared each file in the commit with the GIF the take directory holds now.
+
+| Demo | Commit | Take | File | SHA-256 |
+|---|---|---|---|---|
+| `openclaw` | `63755c1d` | `openclaw-20261117-064651`, cut v2 (`9df87235`) | 3 916 978 bytes, 42.0 s | `71dc64eca811...`, equal |
+| `observability-trace` | `6b57720c` | `observability-trace-20261117-071006` | 1 526 414 bytes, 42.0 s | `092005bb6030...`, equal |
+
+The tree of `6b57720c` holds **27** GIF files in `docs/assets/img/demo`. Each commit adds the GIF and its page caption. The `openclaw` caption says the page titles and links are real pages of the company's Confluence, and that the session the recording created was deleted afterwards. The `observability-trace` caption says the list at the left of the chat shows earlier test sessions of the team. Marks: on `observability-trace.md`, row 3:00 said "Not yet checked on a Tekos span"; the take ran that row (all 12 tags on a Tekos span, `zuno.run_id` equal to the session id), so the writer lifted that sentence on the page. Rows 5:00 (Grafana) and the rest of the 15-minute version stay "not rehearsed": no take ran them. `openclaw.md` has no mark on the rows the take ran.
+
+**WP-289 has 18 of 18.** Before it can be Done (the coordinator's decision, not the writer's), per its Acceptance: each demo has a published GIF and a stated review (met: every section above); no GIF without the owner's named go (met); `consistency.py` and `check_docs.py` pass (met at this commit); each demo has "a guard summary that lists what remains on the server": that is the sprint evidence's "What the cluster keeps" and the sections above, and the writer has not checked it demo by demo. Open and **outside the brief**: the deferred entries a to q; the open items for the owner (Playwright pin on `main`, the AAP user `consultant-03`); the Tempo and Grafana authorizations that stay on the cluster; the Grafana step of `observability-trace` row 5:00, not rehearsed; the `dify` and `guardrails` edited-date effect, declared.
+
+**WP-290 has 3 of 6** (`genai-playground`, `maas-portal-api-keys`, `openclaw`). Left: `a2a-delegation-approval` (a take, held), and `world-model` and `blender-3d` (assembled GIFs, offline, assist).
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.

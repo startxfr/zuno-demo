@@ -1,6 +1,6 @@
 # WP-290: Decide and record the six delicate demos
 
-- **State:** Repo work merged (2026-11-17: 2 of 6 demos published, `genai-playground` and `maas-portal-api-keys`; the other four wait for takes, the owner's choices and go)
+- **State:** Repo work merged (2026-11-17: 3 of 6 demos published, `genai-playground`, `maas-portal-api-keys` and `openclaw`; the other three are `a2a-delegation-approval` (a take), `world-model` and `blender-3d` (assembled GIFs, offline, assist))
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-289](wp-289-record-the-repeats-of-the-proven-patterns.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -51,7 +51,7 @@ The last two choices were given in `zuno-demo-reorg`'s session by one dialog ans
 
 `genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-**Update 2026-11-17:** `maas-portal-api-keys` is published (below). The other four are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` was rescouted 6 of 6 twice on 2026-11-17 (02:35 and 02:37 CET; the afternoon evidence) and is held. `blender-3d` and `world-model` were decided on 2026-11-17 (the table above); both are offline work for the assist.
+**Update 2026-11-17:** `maas-portal-api-keys` and `openclaw` are published (below). The other three are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` was rescouted 6 of 6 twice on 2026-11-17 (02:35 and 02:37 CET; the afternoon evidence) and is held. `blender-3d` and `world-model` were decided on 2026-11-17 (the table above); both are offline work for the assist.
 
 ### Owner's decision on `openclaw`, session cleanup (2026-11-16, answered just before 21:01:38 CET)
 
@@ -78,9 +78,11 @@ Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key create
 
 Take `openclaw-20261117-052046` (go 05:17:35 CET): the take found its own session (the row-id fix holds live) and the question was answered, but the session stayed listed after Delete... (owned 7 to 8; the writer read `markers.json`). The coder's diagnosis, about 80% sure and unverified live: the Control UI confirms in a native browser dialog that the driver dismissed. The write guard does not see the Control UI's WebSocket, so an empty `writes` list proves nothing for `openclaw`. Two sessions are now left in `consultant-02`'s assistant. Owner's decision at 05:30:42 CET: **"Suppression seule d'abord"**, a delete-only run by constant ids before any new take; each live run needs its own named go. **Update (2026-11-17, 06:36:37 CET, "Delete both"):** the delete-only run passed: 8 sessions listed, 2 deleted, 6 left, `owned` 6 to 6. The native-confirm diagnosis is confirmed live (as relayed). The next step is an `openclaw` rescout, then the take on a new owner go. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-### `openclaw`: the third take passed (2026-11-17, no GIF yet)
+### `openclaw`: published (2026-11-17)
 
-Take `openclaw-20261117-064651` (go 06:42:25 CET, as relayed): 6 markers in 66.1 s, one session created and **cleaned** (the native confirm accepted), owned 6 to 6, private addresses 0 (the writer read `markers.json`). The answer frame holds real wiki titles and addresses, accepted in kind by the owner ("comme guardrails"); the docs copy none. `gif.py` refused a 61-character caption; the coordinator's `24fa7d9e` re-plans the cut (42.0 s); demo333 re-cuts. Not published. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+`63755c1d` publishes take `openclaw-20261117-064651`, cut v2, on the owner's go "go de publication d'openclaw et d'observability-trace" at 11:37:38 CET (the coordinator's log, as relayed), before the commit at 11:38:58 CET (git). The file is 3 916 978 bytes, 42.0 s, equal to the take's GIF (SHA-256 `71dc64eca811...`, compared by the writer). The last caption is the page's close, as the coordinator answered. The take:
+
+Take `openclaw-20261117-064651` (go 06:42:25 CET, as relayed): 6 markers in 66.1 s, one session created and **cleaned** (the native confirm accepted), owned 6 to 6, private addresses 0 (the writer read `markers.json`). The answer frame holds real wiki titles and addresses, accepted in kind by the owner ("comme guardrails"); the docs copy none. `gif.py` refused a 61-character caption; the coordinator's `24fa7d9e` re-plans the cut (42.0 s); demo333 re-cuts. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
 ### Scouts at `d80f25ef` (as relayed)
 
