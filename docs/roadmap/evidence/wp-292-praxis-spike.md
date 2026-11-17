@@ -383,10 +383,11 @@ insecure_options:
 3. **Routing results.** Chat with the model `auto`: the step `maas` got 503, the step `direct` got 200 from stub 3002, with
    the path `/v1/chat/completions` and the model `qwen3.6-27b-instruct`. `/v1/messages` with the model `auto`: 200, an
    Anthropic message, and the upstream path `/v1/chat/completions`.
-   - **A line to reconcile.** `stub3002.log` of this run has 6 lines: `POST /v1/chat/completions` five times and
-     `POST /v1/messages` once, all `auth=no`. The `/v1/messages` line is not the upstream path that result 3 reports for
-     the translated call. The log does not say which request produced it, and may come from an earlier attempt with an
-     older configuration (`praxis.v1.yaml` is in the directory). Not resolved here.
+   - **The `POST /v1/messages` line of `stub3002.log`** (as relayed): it belongs to the first run (13:05 to 13:38), not
+     to this one. The 3002 stub was never restarted, so its log spans both runs. That line is the request of the first
+     run's finding 5, the outer `path_rewrite` that the router's sub-request did not see. In the second run every request
+     reached 3002 as `/v1/chat/completions`. Read by the writer: the first four lines of the file are the four lines the
+     first run's log held, and the two lines after them are the second run's.
 4. **Cause of the many JWKS fetches (the first run's observation).**
    - As relayed: the gateway's logs repeat `praxis_ai::reload: building new pipelines from reloaded config` about every
      0.5 s. Praxis watches the configuration directory, and the stubs wrote their logs into the same directory, so every
