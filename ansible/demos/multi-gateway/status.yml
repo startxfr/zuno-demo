@@ -1,0 +1,19 @@
+---
+# multi-gateway status: the page's `### Status` reads: the Deployments named there and, where it names them, the Agents. Fast
+# reads only; no model call. The alternative gateway does not exist on the cluster yet, so this file reports it missing.
+# Written by hand for WP-304 on the model of ansible/demos/kagent/status.yml.
+- name: "multi-gateway status | the Deployments"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "praxis", "namespace": "zuno-ai-gateways"}
+      - {"name": "open-webui", "namespace": "zuno-openwebui"}
+      - {"name": "kagent-controller", "namespace": "zuno-kagent"}
+- name: "multi-gateway status | the Agents"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "kagent.dev/v1alpha2", "kind": "Agent", "name": "zuno-diagnose-praxis", "namespace": "zuno-kagent", "condition": "Accepted"}
+      - {"api_version": "kagent.dev/v1alpha2", "kind": "Agent", "name": "zuno-diagnose-praxis", "namespace": "zuno-kagent", "condition": "Ready"}
+- name: "multi-gateway status | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"
