@@ -8,6 +8,8 @@
 # moments `calls` and `answer` are a plain page of the calls MADE BY THE RECORDER with that key: their captions say
 # so. Row 4:15 is words: the close is a caption on the last screen. The marker `portal` is a loading spinner on the
 # take of 2026-11-17 04:12: row 0:00 is shown on `keys` (the empty API keys page) instead.
+# The video does not hold the shown-once dialog (the motion ends on the pressed Create button): it is the still
+# `created`. The revoke is in the take's log only, in no frame: the last caption is the page's close, row 4:15.
 record_notice: >-
   a recorded browser session as ai-dev-01 on the Red Hat AI portal: it creates ONE API key on the subscription
   gpt-oss-20b-ocp-ai-dev and revokes it by its id at the end, pass or fail, then proves the revoke (the gateway must
@@ -22,7 +24,8 @@ fps: 10
 moments:
   - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
   - {still: keys, hold: 4, step: "0:00", caption: "0:00  The Red Hat AI portal: no API key yet"}
-  - {from: keys, to: created, fit: 8, hold: 6, step: "1:00", caption: "1:00  A key on my subscription, no ticket (masked here)"}
+  - {from: create-form, to: created, fit: 4, hold: 1, step: "1:00", caption: "1:00  A key on my subscription: one form, no ticket"}
+  - {still: created, hold: 7, step: "1:00", caption: "1:00  Shown once (the recorder keeps the real key out)"}
   - {still: calls, hold: 8, step: "2:15", caption: "2:15  The recorder's calls: 401 without the key, 200 with it"}
-  - {still: answer, hold: 9, step: "3:00", caption: "3:00  Made by the recorder: any OpenAI-compatible tool works"}
+  - {still: answer, hold: 9, step: "3:00", caption: "3:00  The recorder's call: a standard chat completion"}
   - {still: end, hold: 5, step: "4:15", caption: "The platform keeps the models, the budget and the revoke"}
