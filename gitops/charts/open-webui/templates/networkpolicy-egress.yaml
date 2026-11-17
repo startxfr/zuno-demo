@@ -1,3 +1,4 @@
+{{- include "open-webui.altGatewaysCheck" . -}}
 # ADR-0588 security considerations: the user's token leaves Open WebUI for two
 # in-cluster services only, and egress is limited to them and to Keycloak.
 # In the cluster: DNS and the two gateways. Outside it: HTTPS, narrowed to
@@ -31,6 +32,16 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.egress.gatewayPort }}
+    {{- if .Values.altGateways }}
+    # WP-296 (ADR-0619 clause 5): the alternative gateways' namespace, their pod port only.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.altGatewayNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.altGatewayPort }}
+    {{- end }}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

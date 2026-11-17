@@ -13,6 +13,23 @@ global:
     # subchart's tpl-evaluated env can read it too.
     keycloakIssuerUrl: ""
     keycloakHost: ""
+    # WP-296: the same list as `altGateways` below, where the upstream subchart can read it (a subchart sees
+    # only `global`): its tpl-rendered OPENAI_API_CONFIGS gets one index per entry from it.
+    altGateways: []
+
+# WP-296 (ADR-0619 clause 5): the alternative AI gateways, {name, label, url, models}. Each entry is one more
+# OpenAI connection of Open WebUI, under the user's own token (auth_type system_oauth), its models prefixed
+# with the gateway's name (`praxis.auto`) and tagged with its label; "Zuno" stays the first connection and the
+# default model. Empty (the default): nothing more is rendered.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+# A Helm chart cannot write its subchart's values, so the list is given THREE times, which the role
+# (ansible/roles/open_webui, variable open_webui_alt_gateways) does from one variable, and the chart refuses to
+# render when they disagree:
+#   - here (the contract; the egress rule to egress.altGatewayNamespace);
+#   - global.zuno.altGateways (the same list; OPENAI_API_CONFIGS);
+#   - open-webui.openaiBaseApiUrls: the ai-gateway first, then each entry's url, in the list's order.
+altGateways: []
 
 route:
   # Non-streamed completions outlast the router's 30 s default while the
@@ -27,6 +44,9 @@ egress:
   # The two gateways' namespace and pod port (WP-179 ingress peers).
   gatewayNamespace: zuno-ai-run
   gatewayPort: 8080
+  # The alternative gateways' namespace and pod port (ADR-0619 clause 2); used only when altGateways is not empty.
+  altGatewayNamespace: zuno-ai-gateways
+  altGatewayPort: 8080
   # Pod and Service networks, excluded from the HTTPS-out rule (the role reads
   # them from Network.config.openshift.io/cluster).
   clusterCIDRs:
@@ -143,7 +163,10 @@ open-webui:
     - name: BYPASS_MODEL_ACCESS_CONTROL
       value: "True"
     - name: OPENAI_API_CONFIGS
-      value: '{"0":{"enable":true,"auth_type":"system_oauth","headers":{"X-Zuno-Data-Classification":"C1","X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"}}}'
+      # WP-296: one more index per alternative gateway (global.zuno.altGateways), in the order of
+      # openaiBaseApiUrls: the same token forwarding and headers, its models prefixed with the gateway's name
+      # and tagged with its label. With no alternative gateway the value is the one of before.
+      value: '{"0":{"enable":true,"auth_type":"system_oauth","headers":{"X-Zuno-Data-Classification":"C1","X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"}}{{ range $i, $alt := .Values.global.zuno.altGateways }},"{{ add $i 1 }}":{"enable":true,"auth_type":"system_oauth","prefix_id":{{ $alt.name | toJson }},"tags":[{"name":{{ $alt.label | default $alt.name | toJson }}}],"headers":{"X-Zuno-Data-Classification":"C1","X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"}}{{ end }}}'
     # access_grants: a tool connection without grants is admin-only (WP-180);
     # the mcp-gateway decides what each user sees. C2 on this connection only
     # (ADR-0594): Confluence and the technical docs are listed; the model

@@ -7,3 +7,7 @@ open_webui_admin_users:
 # The Keycloak pod the kcadm calls run in (keycloakCRName zuno, one instance).
 open_webui_keycloak_pod: zuno-0
 open_webui_namespace: zuno-openwebui
+# WP-296 (ADR-0619 clause 5): the alternative AI gateways Open WebUI also lists, in the `altGateways` contract:
+# {name, label, url, models}. Empty: the Application's values are the ones of before. The role writes the list
+# to the three chart values that need it (gitops/charts/open-webui/values.yaml explains why there are three).
+open_webui_alt_gateways: []
