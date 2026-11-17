@@ -27,9 +27,10 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "ui", "end"];
 export const motion_from = "ui";
 // The ids to delete. 3d799c91782010a2: the session of the failed take of 2026-11-17 05:20 (its markers.json).
-// The second entry is a PLACEHOLDER for the session of the failed take of 02:31, whose id is in no file: replace it
-// by the id a scout of this file reports for that row. While it is not a 16-hex id, a run refuses to start.
-export const LEFT = ["3d799c91782010a2", "FILL-IN-THE-ID-OF-THE-02:31-SESSION-FROM-A-SCOUT"];
+// aedb845b2c14a602: the session of the failed take of 02:31, whose id was in no file; found by this file's scout of
+// 2026-11-17 06:10 (rank 2, age 4h) and matched by demo333 against that take's own pictures (same title start, same
+// neighbour below, an age that fits 01:31 UTC). An entry that is not a 16-hex id makes a run refuse to start.
+export const LEFT = ["3d799c91782010a2", "aedb845b2c14a602"];
 export const changes = [
   `clicks Delete… in the menu of each of the ${LEFT.length} sessions two failed takes left (ids listed in this file) and accepts the browser's native confirmation dialog each opens: those sessions are removed from consultant-02's assistant`,
 ];

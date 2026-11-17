@@ -1038,18 +1038,36 @@ echo "== openclaw-delete-left (no question: deletes the listed sessions two fail
 left() { local name="$1"; shift; take openclaw-delete-left fake-openclaw.mjs 8091 "$name" OPENCLAW_UI_PASSWORD=offline-claw-secret FAKE_UI_PASSWORD=offline-claw-secret "$@"; }
 out="$(left l-scout RECORD_SCOUT=1 FAKE_LEFT=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /'
-expect "delete-left: a scout runs with the placeholder, deletes nothing, lists the rows by id, age and rank without a title" python3 - "$work/l-scout" "$out" "$rc" <<'PY'
+expect "delete-left: a scout deletes nothing, lists the rows by id, age and rank without a title, and says which listed ids are there" python3 - "$work/l-scout" "$out" "$rc" <<'PY'
 import hashlib, json, pathlib, sys
 raw = (pathlib.Path(sys.argv[1]) / "scout.json").read_text(); s = json.loads(raw); steps = {x["step"]: x for x in s["steps"]}
 assert sys.argv[3] == "0" and s["status"] == "done" and 'left: {"sent":0,"sessions":4}' in sys.argv[2], (sys.argv[3], s["status"])
 ids = [hashlib.sha256(t.encode()).hexdigest()[:16] for t in ("FAKE-LEFT-ONE", "FAKE-LEFT-TWO", "FAKE-EARLIER-SESSION-TITLE", "FAKE-OLDER-SESSION-TITLE")]
 assert steps["sessions"]["list"] == [{"id": i, "age": "3h", "rank": n + 1, "in_left": False} for n, i in enumerate(ids)], steps["sessions"]["list"]
-assert steps["sessions"]["placeholders"] == 1 and steps["sessions"]["left"] == {"3d799c91782010a2": False, "placeholder": None}, steps["sessions"]
+assert steps["sessions"]["placeholders"] == 0 and steps["sessions"]["left"] == {"3d799c91782010a2": False, "aedb845b2c14a602": False}, steps["sessions"]
 assert "FAKE-" not in raw and "FAKE-" not in sys.argv[2]
 PY
+out="$(left l-real FAKE_LEFT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "delete-left: the file as it is, where its two ids are not listed: nothing is deleted, the run fails" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the sidebar does not list 3d799c91782010a2, aedb845b2c14a602 (of .*): nothing is deleted' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":4}' <<<\"\$0\"" "$out"
+# The same file with a placeholder in place of an id, mounted over it: the refusal stays tested once the ids are filled.
+python3 - "$here/walkthroughs/openclaw-delete-left.mjs" "$work/openclaw-delete-left-placeholder.mjs" <<'PY'
+import re, sys
+out, n = re.subn(r'(?m)^export const LEFT = \[.*\];$', 'export const LEFT = ["3d799c91782010a2", "FILL-IN-AN-ID"];', open(sys.argv[1]).read())
+assert n == 1, n
+open(sys.argv[2], "w").write(out)
+PY
+mounts=(-v "$work/openclaw-delete-left-placeholder.mjs:/work/walkthroughs/openclaw-delete-left.mjs:ro,Z")
 out="$(left l-placeholder FAKE_LEFT=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
-expect "delete-left: with its placeholder the run refuses to start, before any sign-in, and deletes nothing" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL refuses to start: LEFT holds 1 entry(ies) that are not a session id' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":4}' <<<\"\$0\" && ! test -e $work/l-placeholder/login.png" "$out"
+expect "delete-left: with a placeholder the run refuses to start, before any sign-in, and deletes nothing" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL refuses to start: LEFT holds 1 entry(ies) that are not a session id' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":4}' <<<\"\$0\" && ! test -e $work/l-placeholder/login.png" "$out"
+out="$(left l-placeholder-scout RECORD_SCOUT=1 FAKE_LEFT=1 2>&1)"; rc=$?
+expect "delete-left: a scout runs with a placeholder and counts it" python3 - "$work/l-placeholder-scout" "$rc" <<'PY'
+import json, pathlib, sys
+s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+assert sys.argv[2] == "0" and s["status"] == "done" and steps["sessions"]["placeholders"] == 1 and steps["sessions"]["left"] == {"3d799c91782010a2": False, "placeholder": None}, steps["sessions"]
+PY
+mounts=()
 # The same file with the stand-in's two ids in place of LEFT's entries, mounted over it: only the constants differ.
 python3 - "$here/walkthroughs/openclaw-delete-left.mjs" "$work/openclaw-delete-left.mjs" <<'PY'
 import hashlib, re, sys
