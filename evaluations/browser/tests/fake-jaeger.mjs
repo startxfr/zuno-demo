@@ -4,7 +4,8 @@
 // address, a trace page with its spans, and a span's detail with a Tags accordion and a Process line.
 // The search lists a trace from its second load on, as a real export does (FAKE_NO_TRACE=1: never; FAKE_TRACE_NOW=1:
 // at once). Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" for the Tempo UI's own client (=other: for another client);
-// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; FAKE_TALL_LIST=1 a list tag of thirty lines sits among the zuno.* rows (the caption's tags cannot share a window);
+// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; the span carries zuno.user_sub as its last row and a list of groups on several lines; FAKE_TALL_LIST=1: that list has
+// thirty lines (zuno.model falls out of the first picture); FAKE_NO_GROUPS=1: no list (zuno.user_sub then fits in the first picture);
 // FAKE_NO_TAGS=1 the span has no
 // zuno.* tag.
 import http from "node:http";
@@ -27,7 +28,8 @@ const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [...
   ["zuno.classification", "C2"], ["zuno.model_kind", "local"], ["zuno.provider", "local-gpt-oss-maas"], ["zuno.model", "gpt-oss-20b"], ["zuno.latency_ms", "912"],
   ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"],
   // As the take of 2026-11-17 met the span: more rows than the window holds under the UI's fixed header, in alphabetical order.
-  ["zuno.prompt_tokens", "7537"], ...(process.env.FAKE_TALL_LIST === "1" ? [["zuno.groups", Array(30).fill("consultant").join("<br>")]] : []), ["zuno.request_id", "30c7c899"], ...Array.from({ length: 24 }, (_, i) => ["http.filler_" + String(i).padStart(2, "0"), "x"])].sort(([a], [b]) => a.localeCompare(b));
+  ["zuno.prompt_tokens", "7537"], ["zuno.user_sub", "FAKE-SUBJECT-0000"],
+  ...(process.env.FAKE_NO_GROUPS === "1" ? [] : [["zuno.groups", "[<br>" + Array(process.env.FAKE_TALL_LIST === "1" ? 30 : 8).fill("consultant/group").join(",<br>") + "<br>]"]]), ["zuno.request_id", "30c7c899"], ...Array.from({ length: 24 }, (_, i) => ["http.filler_" + String(i).padStart(2, "0"), "x"])].sort(([a], [b]) => a.localeCompare(b));
 const PROCESS = process.env.FAKE_ADDRESSES === "1" ? "Process: ip = 10.131.2.14 k8s.node.name = ip-10-18-3-7.eu-west-3.compute.internal" : "Process: service.name = ai-gateway";
 
 http.createServer((req, res) => {

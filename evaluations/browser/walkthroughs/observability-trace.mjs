@@ -59,18 +59,25 @@ const TEAMS = ["agent-arkos", "agent-tekos", "consultant"];   // consultant-02's
 // first take asked (the page's own recovery row narrows the search the same way, by tags).
 const SEARCH = { service: "ai-gateway", operation: "model_call", tags: { "zuno.persona": "consultant-02", "zuno.agent": "tekos" }, lookback: "15m" };
 const SPAN = "model_call";
-// The tags the page's row 3:00 names. The span's detail lists more zuno.* rows than the window holds under the Jaeger
-// UI's fixed header (the take of 2026-11-17), in alphabetical order, so the take makes TWO pictures of them:
-//  - `tags`: the list's first zuno.* row at the top of the visible area. The tags the GIF's caption names (CAPTION:
-//    who, which app, which agent, which model, what cost) must all be drawn in the window there.
-//  - `tags-run`: the list's last zuno.* row at the bottom. The rows of PROOF must be drawn there: who asked, and the
-//    run, which is the chat take's own session id (seen on 2026-11-17).
-// A named tag the span shows in its detail and that is outside the window at its marker FAILS the take. A tag of the
-// page's row that the span does not carry at all is logged (a matter for the page, not for the picture).
+// The tags the page's row 3:00 names. The span lists its zuno.* rows in alphabetical order (seen 2026-11-17: agent,
+// classification, client, estimated_cost_usd, a list of the persona's groups on several lines, latency_ms, model,
+// model_kind, outcome, persona, prompt_tokens, provider, request_id, run_id, task, user_sub): more than the window
+// holds under the Jaeger UI's fixed header, so the take makes TWO pictures, by framing only (no row is hidden or
+// changed):
+//  - `tags`: zuno.agent as the first row under the fixed header; FIRST_NAMED must be drawn in the window (which app,
+//    which agent, which model, what cost).
+//  - `tags-run`: zuno.run_id as the LAST visible row; LAST_NAMED must be drawn (who asked, and the run, which is the
+//    chat take's own session id).
+// zuno.user_sub (the persona's Keycloak subject, the list's last row) must be in NEITHER picture: any part of it in
+// the window at a marker fails the take. A named tag the span shows and that is outside the window at its marker
+// fails the take too. A tag of the page's row the span does not carry at all is logged (a matter for the page).
 const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.classification", "zuno.model_kind", "zuno.provider", "zuno.model",
               "zuno.latency_ms", "zuno.estimated_cost_usd", "zuno.outcome", "zuno.run_id"];
-const CAPTION = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.model", "zuno.estimated_cost_usd"];
-const PROOF = ["zuno.persona", "zuno.run_id"];
+const FIRST_ROW = "zuno.agent";
+const FIRST_NAMED = ["zuno.agent", "zuno.client", "zuno.estimated_cost_usd", "zuno.model"];
+const LAST_ROW = "zuno.run_id";
+const LAST_NAMED = ["zuno.persona", "zuno.run_id"];
+const NEVER = "zuno.user_sub";
 let chatSession = "";   // the chat take's session id, for the trace take of the same run (one process plays both)
 const WAIT_FOR_TRACE_MS = 180000;
 const READY = [".SearchForm", ".SearchTracePage", "[data-testid='SearchForm']", "#jaeger-ui-root", "main"];       // guess (Jaeger UI)
@@ -185,41 +192,57 @@ async function openSpan(page) {
            error: /\berror\s*=?\s*true\b|otel\.status_code\s*=?\s*ERROR/i.test(text.replace(/\s+/g, " ")) };
 }
 
-// Scroll the span's tag list: its first zuno.* row to the top of the visible area (under whatever the UI keeps fixed
-// there), or its last zuno.* row to the bottom of the window. Then which of TAGS are DRAWN: the tag's own text is what
-// is at its place in the window (not under the fixed header, not scrolled out). {tag: boolean}.
+// Frame the span's tag list, by scrolling only: `row` just under whatever the UI keeps fixed at the top ("first"),
+// or `row` as the last visible row, its bottom on the window's ("last"). Then what is DRAWN: for each of TAGS, whether
+// the tag's own text is what is at its place in the window (not under the fixed header, not scrolled out); and
+// whether ANY part of NEVER is in the window. {drawn: {tag: boolean}, never: boolean}.
 async function placeTags(page, detail, where) {
-  const rows = page.locator(detail).first().getByText(/^zuno\.[a-z_]+$/);
-  if (await rows.count()) {
-    await read(where === "first" ? rows.first() : rows.last(), (el, first) => {
+  const box = page.locator(detail).first();
+  const row = box.getByText(where === "first" ? FIRST_ROW : LAST_ROW, { exact: true }).first();
+  if (await row.count()) {
+    await read(row, (el, [first, selector]) => {
       const move = (dy) => {
         const before = window.scrollY;
         window.scrollBy(0, dy);
         if (window.scrollY !== before) return;
         for (let up = el.parentElement; up; up = up.parentElement) if (up.scrollHeight > up.clientHeight + 4) { const was = up.scrollTop; up.scrollTop += dy; if (up.scrollTop !== was) return; }
       };
-      if (!first) { el.scrollIntoView({ block: "end" }); move(40); return; }
+      if (!first) { el.scrollIntoView({ block: "end" }); return; }
       el.scrollIntoView({ block: "start" });
-      for (let i = 0; i < 4; i += 1) {
-        const box = el.getBoundingClientRect();
-        const at = document.elementFromPoint(box.left + Math.min(box.width / 2, 20), box.top + box.height / 2);
-        if (!at || at === el || el.contains(at) || at.contains(el)) break;
-        move(box.top - at.getBoundingClientRect().bottom - 8);   // what covers it: the row goes just under it
+      const list = el.closest(selector) || el.parentElement;
+      for (let i = 0; i < 3; i += 1) {
+        // Where the list starts to be what is drawn, from the top of the window down: under the fixed header.
+        const at = el.getBoundingClientRect();
+        let top = 0;
+        while (top < window.innerHeight && !list.contains(document.elementFromPoint(at.left + 10, top))) top += 2;
+        if (Math.abs(at.top - top - 6) < 3) break;
+        move(at.top - top - 6);
       }
-    }, where === "first");
+    }, [where === "first", detail]);
   }
   await page.waitForTimeout(500);
   const drawn = {};
   for (const tag of TAGS) {
-    const row = page.locator(detail).first().getByText(tag, { exact: true }).first();
-    drawn[tag] = (await row.count()) > 0 && (await read(row, (el) => {
-      const box = el.getBoundingClientRect();
-      if (!box.width || box.top < 0 || box.bottom > window.innerHeight) return false;
-      const at = document.elementFromPoint(box.left + Math.min(box.width / 2, 20), box.top + box.height / 2);
-      return Boolean(at && (at === el || el.contains(at) || at.contains(el)));
+    const cell = box.getByText(tag, { exact: true }).first();
+    drawn[tag] = (await cell.count()) > 0 && (await read(cell, (el) => {
+      const at = el.getBoundingClientRect();
+      if (!at.width || at.top < 0 || at.bottom > window.innerHeight) return false;
+      const seen = document.elementFromPoint(at.left + Math.min(at.width / 2, 20), at.top + at.height / 2);
+      return Boolean(seen && (seen === el || el.contains(seen) || seen.contains(el)));
     }).catch(() => false));
   }
-  return drawn;
+  // Any part of the row counts: its key cell and what follows it on the same line, a pixel inside the window is enough.
+  const sub = box.getByText(NEVER, { exact: true }).first();
+  const never = (await sub.count()) > 0 && (await read(sub, (el) => {
+    const line = (el.closest("tr") || el.parentElement || el).getBoundingClientRect();
+    if (line.bottom <= 0 || line.top >= window.innerHeight) return false;
+    for (let y = Math.max(line.top, 0) + 1; y < Math.min(line.bottom, window.innerHeight); y += 2) {
+      const seen = document.elementFromPoint(line.left + 12, y);
+      if (seen && ((el.closest("tr") || el).contains(seen) || seen === el)) return true;
+    }
+    return false;
+  }).catch(() => true));
+  return { drawn, never };
 }
 
 async function runTrace({ page, domain, mark, log, state }) {
@@ -247,17 +270,19 @@ async function runTrace({ page, domain, mark, log, state }) {
   log(!span.run_id ? "the span shows no zuno.run_id" : !chatSession ? "the span shows a zuno.run_id; the chat take of this run gave no session id to compare it with"
     : state.notes.run_id_is_the_chat_session ? `the span's zuno.run_id is the chat take's session ${chatSession}` : `the span's zuno.run_id (${span.run_id.slice(0, 40)}) is NOT the chat take's session ${chatSession}: check which turn the trace is`);
   log(`the gateway's span ${(await page.locator("body").innerText()).includes(prompts["0:45"]) ? "page SHOWS the question's text somewhere: check tags.png" : "page shows no question text"}`);
-  const outside = [];
-  for (const [marker, where, named] of [["tags", "first", CAPTION], ["tags-run", "last", PROOF]]) {
-    const drawn = await placeTags(page, span.detail, where);
+  const wrong = [];
+  for (const [marker, where, named] of [["tags", "first", FIRST_NAMED], ["tags-run", "last", LAST_NAMED]]) {
+    const { drawn, never } = await placeTags(page, span.detail, where);
     const shown = TAGS.filter((tag) => drawn[tag]);
-    log(`${marker}: tags drawn in the window: ${shown.join(", ") || "none"}`);
+    log(`${marker}: tags drawn in the window: ${shown.join(", ") || "none"}; ${NEVER} ${never ? "IS in the window" : "is not in the window"}`);
     state.notes[marker === "tags" ? "tags_in_window" : "tags_run_in_window"] = shown.length;
-    outside.push(...named.filter((tag) => span.tags.includes(tag) && !drawn[tag]).map((tag) => `${tag} at ${marker}`));
+    wrong.push(...named.filter((tag) => span.tags.includes(tag) && !drawn[tag]).map((tag) => `${tag} is not drawn at ${marker}`));
+    // Before the marker: a picture that would hold the persona's subject is not made.
+    if (never) throw new Error(`${NEVER} (the persona's Keycloak subject) is in the window at ${marker}: that picture is not made${wrong.length ? `; ${wrong.join(", ")}` : ""}`);
     await page.waitForTimeout(800);
     await mark(marker);
   }
-  if (outside.length) throw new Error(`the span's tags are not all drawn inside the window (${outside.join(", ")}): the picture would not hold the row's proof`);
+  if (wrong.length) throw new Error(`the span's tags are not all drawn inside the window (${wrong.join(", ")}): the picture would not hold the row's proof`);
   await page.waitForTimeout(800);
   await mark("end");
   if (state.writes.length) throw new Error(`the take sent ${[...new Set(state.writes)].join(", ")} to the Tempo search UI: it must change nothing there`);
@@ -288,14 +313,22 @@ export async function scout({ page, domain, step, state, take }) {
       return { url: page.url().replace(/\/trace\/.*/, "/trace/<id>"), span_selector: name.matched, spans: await page.locator(name.matched).count(),
                model_call_spans: await page.locator(name.matched).filter({ hasText: SPAN }).count() };
     });
+    // The two pictures a take makes of the span's tags, each a step with its own image; nothing is clicked after
+    // the span and its Tags are opened.
+    let span = null;
     await step("tags", async () => {
       if (!found.count) return { skipped: "no trace" };
-      const span = await openSpan(page);
+      span = await openSpan(page);
       const { run_id, ...seen } = span;   // the run's id is not kept by a scout
       const first = await placeTags(page, span.detail, "first");
+      return { ...seen, run_id_shown: Boolean(run_id), span_is_an_error: span.error, in_window: first.drawn,
+               caption_in_window: FIRST_NAMED.filter((tag) => span.tags.includes(tag)).every((tag) => first.drawn[tag]), user_sub_in_window: first.never };
+    });
+    await step("tags-run", async () => {
+      if (!span) return { skipped: "no span opened" };
       const last = await placeTags(page, span.detail, "last");
-      return { ...seen, run_id_shown: Boolean(run_id), in_window: { tags: first, "tags-run": last },
-               caption_in_window: CAPTION.filter((tag) => span.tags.includes(tag)).every((tag) => first[tag]), proof_in_window: PROOF.every((tag) => last[tag]), span_is_an_error: span.error, process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
+      return { in_window: last.drawn, proof_in_window: LAST_NAMED.every((tag) => last.drawn[tag]), user_sub_in_window: last.never,
+               process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
     });
     await step("closed", async () => {
       if (state.writes.length) throw new Error(`the scout sent ${[...new Set(state.writes)].join(", ")} to the Tempo search UI`);
