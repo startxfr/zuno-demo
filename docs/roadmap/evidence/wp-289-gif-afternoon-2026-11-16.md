@@ -463,9 +463,28 @@ Take `openclaw-20261117-052046`, persona `consultant-02`, started 04:21:08 UTC (
 
 **What the cluster keeps now (as relayed):** **two** sessions in `consultant-02`'s OpenClaw assistant, left by the two failed takes; the assistant's possible memory of two questions (declared effect); two answers of `consultant-02`'s budget spent. The owner's "Leave it" (04:09:56 CET) covered the first session only; demo333 tells the owner about the second. **No third take** until the coder has diagnosed the delete from the take's files.
 
-### observability-trace: the coder's framing `745e9ba2` (in integration)
+### observability-trace: the coder's framing `745e9ba2` (pushed)
 
-As relayed, not pushed, suite running: agent, client, cost and model are required in the `tags` marker and persona and run_id in `tags-run`; the take stops before the picture if `zuno.user_sub` is in the window; the cut holds stills only; walkthrough hash `09ad43ad...`.
+The coder's `745e9ba2` is on `devel` as `c54b5eb0`, commit time 05:42:46 CET (read from git by the writer; the original `745e9ba2` is dated 05:24:22 CET). As relayed: agent, client, cost and model are required in the `tags` marker and persona and run_id in `tags-run`; the take stops before the picture if `zuno.user_sub` is in the window; the cut holds stills only; walkthrough hash `09ad43ad...`. The `ONLY=observability-trace` suite, `test_gif` and consistency passed on the coordinator's side. A rescout is asked of demo333; no take before a new owner go.
+
+### openclaw: the fix and the delete-only run are on devel (as relayed; not run live)
+
+Both commits are dated 05:53:20 CET in git (the writer read them): `7fcf92f0` (the coder's `30f6ab8e`) and `5852fa69` (the coder's `43f4f4fa`). As relayed by the coordinator:
+
+- **`7fcf92f0`:** the `openclaw` walkthrough accepts **one** native dialog of type confirm, armed only around the Delete... click of the take's own session. It logs the dialog's type and length, never its text; any other dialog is dismissed and fails the take. The scout's `sessions` step now lists rows as `{id, age, rank}`, with no title. Hash `ab1b780c...`.
+- **`5852fa69`:** `walkthroughs/openclaw-delete-left.mjs`, the delete-only run the owner chose at 05:30:42 CET: `consultant-02`, markers `login`, `ui`, `end`, no question, nothing typed. The ids to delete are constants: one known and one placeholder; a real run refuses to start, before any sign-in, while the placeholder is there. It fails, deleting nothing, if a listed id is absent, and fails if any other session is lost or gained. Shared code moved to `walkthroughs/_openclaw.mjs`, outside the walkthrough hash like `_dify.mjs`. No demo page, no cut list, no GIF. Hash `e259cdb2...`.
+- **Checks on the coordinator's side:** `ONLY=openclaw` and `ONLY=openclaw-delete-left` PASS, consistency 0 problems, `test_demo_catalogue` and `test_capture` OK.
+- **A limit to state.** `make demo scout` and `make demo record` need a catalogue entry (the coordinator read `presenter.py` `cmd_scout` and `cmd_record`), so this run is called through `record.sh` directly. That skips the freeze check and the confirmation notice of `presenter.py`. The owner's named go in demo333, naming both ids, stands in their place. **Not run live yet.**
+
+### observability-trace: rescout at `c54b5eb0` (directory `observability-trace-20261117-054400-scout`)
+
+The writer read `scout.json` of the top and of `trace/`, and opened `trace/scout-tags.png` and `trace/scout-tags-run.png`. Started 04:44:12 UTC (05:44 CET); walkthrough `09ad43ad...`; `done`, 8 steps in `trace`; refused none, writes none, private addresses 0. The scout declares the Tempo OAuth authorization of `ai-ops-01` (already in "What the cluster keeps").
+
+- **`user_sub`:** the file says `user_sub_in_window` false, and neither image shows a `zuno.user_sub` row.
+- **`tags` picture** (file): `caption_in_window` **true**; agent, classification, client, model, latency and cost are in the window, persona, task, model_kind, provider, outcome and run_id are not. **The image disagrees with the scout on one row:** the `zuno.model` row is cut by the window's bottom edge and its value is not readable, so the scout's "in window" counted a partly drawn row. Demo333 saw the same (as relayed).
+- **`tags-run` picture:** the coordinator says `proof_in_window` is **false** (as relayed; the writer printed only the `tags` step's flat per-tag list, where `zuno.run_id` is false, and did not read a `tags-run` flag). The image shows `zuno.run_id` on the bottom edge, overlapped by the row's Copy and JSON buttons: the id is not cleanly readable.
+- **`zuno.groups`** is drawn **open** as a list of about ten group names in both pictures (the writer saw it in both; the names are not copied; the coordinator says they are already in the repository).
+- **Asked of the coder (as relayed):** "drawn" means the whole row inside the window with room under `zuno.run_id`, and `zuno.groups` collapsed with the UI's own arrow, said in the take's notes. No take is asked. The trace stays searchable by the scout until about 09:19 CET, six hours after the take's 03:19 UTC (as relayed).
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
