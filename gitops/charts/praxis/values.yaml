@@ -54,6 +54,11 @@ maas:
   host: maas-default-gateway-istio.openshift-ingress.svc.cluster.local
   port: 443
   modelsNamespace: zuno-ai-run
+  # TCP + TLS to the MaaS gateway, and the longest silence between two reads of its answer (a non-streamed answer's
+  # first byte comes at its end: keep this above the longest plain completion). Past either, the step answers 502
+  # and the router goes to the direct step.
+  connectTimeoutMs: 5000
+  readTimeoutMs: 180000
   # The projected ServiceAccount token the gateway presents (audience maas-gateway-auth's kubernetesTokenReview),
   # rotated by the kubelet; credential_inject follows the file without a restart.
   tokenPath: /var/run/secrets/maas/token

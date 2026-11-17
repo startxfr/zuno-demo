@@ -172,6 +172,18 @@ class Chart(unittest.TestCase):
         translate = next(f for f in claude["steps"][0]["filters"] if f["filter"] == "openai_chat_completions_to_anthropic")
         self.assertTrue(translate["api_translation_enabled"])
 
+    def test_the_fallback_reaches_the_direct_step_with_json_and_in_time(self):
+        router = chain(config(self.local), "local")["filters"][0]
+        steps = {s["name"]: s for s in router["steps"]}
+        maas = next(f for f in steps["maas"]["filters"] if f["filter"] == "load_balancer")["clusters"][0]
+        self.assertEqual((maas["total_connection_timeout_ms"], maas["read_timeout_ms"]), (5000, 180000))
+        self.assertNotIn("step_timeout_ms", router)
+        headers = steps["direct"]["filters"][0]
+        self.assertEqual(headers["filter"], "headers")
+        self.assertEqual(headers["request_set"], [{"name": "content-type", "value": "application/json"}])
+        for f in next(f for f in steps["direct"]["filters"] if f["filter"] == "load_balancer")["clusters"]:
+            self.assertNotIn("read_timeout_ms", f)
+
     def test_saas_hosts_bypass_the_controller_tls_origination(self):
         # RHOAI's ExternalModel rule for api.mistral.ai originates TLS (mode SIMPLE) for every namespace; Praxis already
         # speaks TLS, so its own rules pass the bytes through. None without SaaS.

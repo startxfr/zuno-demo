@@ -160,6 +160,13 @@ data:
                       - name: maas
                         endpoints: ["{{ $v.maas.host }}.:{{ $v.maas.port }}"]
                         trusted_private_endpoints: [{{ $v.maas.host | quote }}]
+                        # MaaS only, so a silent MaaS still leaves time for the direct step (live proof of
+                        # 2026-11-17: with the gateway's packets dropped, a call waited the router's whole 600 s
+                        # deadline). The sidecar accepts the TCP connection at once, so the bound is on TCP + TLS;
+                        # the read bound turns a pooled connection that went silent into a 502. Not the router's
+                        # step_timeout_ms: it also cuts the direct step and a streamed answer.
+                        total_connection_timeout_ms: {{ $v.maas.connectTimeoutMs | int64 }}
+                        read_timeout_ms: {{ $v.maas.readTimeoutMs | int64 }}
                         tls:
                           sni: {{ $v.maas.host | quote }}
                           ca: {ca_path: {{ $v.serviceCA.mountPath }}/{{ $v.serviceCA.file }}}
@@ -172,8 +179,13 @@ data:
                     done: true
               - name: direct
                 filters:
+                  # The router sends the second step's sub-request without Content-Type (Praxis defect, reproduced
+                  # with the pinned image: the first step has it, the second has none) and vLLM refuses it with
+                  # 400 "Unsupported Media Type". Every body on this route is JSON, so the header is set again.
                   - filter: headers
                     request_remove: [authorization, x-api-key]
+                    request_set:
+                      - {name: content-type, value: application/json}
                   - filter: path_rewrite
                     replace:
                       pattern: "^/v1/messages$"
