@@ -112,6 +112,15 @@ def test_aliases_default_and_parsing() -> None:
         assert model_tasks.aliases() == {} and model_tasks.listed_models() == []
 
 
+def test_wesh_alias_selects_the_wesh_task() -> None:
+    env = {"MODEL_TASK_ALIASES": "zuno-code=code:Zuno Code,zuno-wesh=wesh:Zuno wesh",
+           "MARKER_FAIL_CLOSED_CLIENTS": "open-webui"}
+    with mock.patch.dict(os.environ, env):
+        assert model_tasks.listed_models() == [("zuno-code", "Zuno Code"), ("zuno-wesh", "Zuno wesh")]
+        assert model_tasks.task_for("open-webui", "zuno-wesh", "chat") == "wesh"
+        assert model_tasks.task_for("unifai", "zuno-wesh", "write-code") == "write-code"
+
+
 def test_task_for_only_maps_experience_clients_and_declared_models() -> None:
     with mock.patch.dict(os.environ, {"MARKER_FAIL_CLOSED_CLIENTS": "open-webui,openclaw-*"}):
         assert model_tasks.task_for("open-webui", "zuno-code", "chat") == "code"

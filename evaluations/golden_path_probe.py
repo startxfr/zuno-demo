@@ -11,6 +11,7 @@ One probe per demonstration moment, each a real call that must get a real answer
                        Tekos (a rejected approval runs no tool, so there is no delegated mcp-gateway call to look for)
   open-webui           one answer through Open WebUI's API, signed in as a persona (OIDC through Keycloak)
   zuno-code            the same, with the declared code model `zuno-code` (ADR-0596, Codestral first)
+  zuno-wesh            the same, with the declared model `zuno-wesh` (ADR-0619 amendment: the wesh fine-tune, ai-gateway path)
   dify, kagent         one answer through the experience's own token proxy, from inside its pod (ADR-0601)
   openclaw             for each persona assistant, one answer from inside its pod through the operator's egress proxy,
                        which injects the openclaw-<persona> token (the path every OpenClaw model call takes)
@@ -293,10 +294,13 @@ def _open_webui_session(ctx: Context):
 
 
 def pick_model(ids: List[str], want: str) -> Optional[str]:
-    """The Open WebUI model id for `want` ('code' -> the zuno-code model, else the default Zuno model)."""
+    """The Open WebUI model id for `want` ('code' -> zuno-code, 'wesh' -> zuno-wesh, else the default Zuno model)."""
     if want == "code":
         return next((i for i in ids if "zuno-code" in i), None)
-    return next((i for i in ids if i == "auto" or i.endswith("auto")), next((i for i in ids if "zuno-code" not in i), None))
+    if want == "wesh":
+        return next((i for i in ids if "zuno-wesh" in i), None)
+    return next((i for i in ids if i == "auto" or i.endswith("auto")),
+                next((i for i in ids if "zuno-code" not in i and "zuno-wesh" not in i), None))
 
 
 def _open_webui_answer(ctx: Context, moment: str, want: str) -> Result:
@@ -306,7 +310,8 @@ def _open_webui_answer(ctx: Context, moment: str, want: str) -> Result:
         ids = [m.get("id", "") for m in (models.json().get("data") or [])] if models.status_code == 200 else []
         model = pick_model(ids, want)
         if not model:
-            return Result(moment, FAIL, f"no {'zuno-code' if want == 'code' else 'Zuno'} model in Open WebUI: {ids}")
+            label = {"code": "zuno-code", "wesh": "zuno-wesh"}.get(want, "Zuno")
+            return Result(moment, FAIL, f"no {label} model in Open WebUI: {ids}")
         prompt = "Write a one-line Python function that adds two numbers." if want == "code" else PROMPT
         first_error = ""
         for attempt in (1, 2):  # one retry on a transport error, never on an HTTP answer; the flake stays visible
@@ -334,6 +339,10 @@ def probe_open_webui(ctx: Context) -> Result:
 
 def probe_zuno_code(ctx: Context) -> Result:
     return _open_webui_answer(ctx, "zuno-code", "code")
+
+
+def probe_zuno_wesh(ctx: Context) -> Result:
+    return _open_webui_answer(ctx, "zuno-wesh", "wesh")
 
 
 _PROXY_SNIPPET = r'''
@@ -824,6 +833,7 @@ PROBES: Dict[str, Callable[[Context], Result]] = {
     "sovereignty": probe_sovereignty,
     "open-webui": probe_open_webui,
     "zuno-code": probe_zuno_code,
+    "zuno-wesh": probe_zuno_wesh,
     "dify": probe_dify,
     "kagent": probe_kagent,
     "openclaw": probe_openclaw,

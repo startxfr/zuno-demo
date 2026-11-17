@@ -438,3 +438,8 @@ toolMarker:
   # routing policy of that task picks the provider, never the model name.
   modelTaskAliases:
     - "zuno-code=code:Zuno Code"
+    # ADR-0619 amendment 2026-11-17 (owner request): "Zuno wesh" answers with the wesh
+    # fine-tune through THIS gateway, so it can be compared in Open WebUI with
+    # praxis.qwen3.5-9b-wesh. The task `wesh` of client open-webui is declared in the
+    # agents release (`models.preferred: [specialized]`).
+    - "zuno-wesh=wesh:Zuno wesh"
