@@ -560,9 +560,15 @@ The first cut was the coordinator's `24fa7d9e` (42.0 s, 3.7 MB, 6 moments). Demo
 
 **One flag the writer raises.** The **last caption**, held on the last four sampled frames, reads "No key, no internet: the platform decides models and tools". Nothing on those frames shows a key, the absence of internet, or the platform deciding anything: they show the answer and the sidebar. It is the same kind of caption that demo333 found overstating on the first cut; the coordinator's fix changed two captions and not this one. The writer did not check it against the rows of `openclaw.md`, and it may be the page's own message sentence, but the frames do not carry it. To the coordinator to judge.
 
+**The coordinator's answer (as relayed).** It is the page's close, row 4:15 of `openclaw.md` (its Say column reads "Everyone can have their own AI assistant. It holds no key, it cannot reach the internet, and the platform decides which models and tools it may use."; the writer checked the row, and the caption shortens that sentence), carried with step "4:15" on the last screen, as every published GIF closes: a row that is words, not a screen. The coordinator keeps it and tells the owner in the proposal that the closing caption is the page's sentence and that no frame shows it. The two captions changed were on moments that claimed to show something. The flag and the answer are recorded as they are.
+
 **Also not shown:** the delete of the take's session (it happens after the last marker), so no frame of the GIF shows it.
 
 The coordinator proposes cut v2 for publication; it is sent to the owner. **Not published**; no publication go.
+
+### observability-trace: the coder's framing v3 `51a80b6f` (pushed)
+
+On `devel` as `cb2ebf0d`, committed 07:02:30 CET (the original `51a80b6f` at 06:43:03 CET; both read from git by the writer; as relayed for the rest): the whole-row meaning of "drawn"; both pictures framed from the bottom; the pointer moved off the rows; `zuno.groups` folded with the UI's own arrow, reported in the scout. **The coder states it never saw the arrow's element, so the fold is unproven live.** Walkthrough hash `5032b93b...`. `ONLY=observability-trace` PASS, `test_gif` OK and consistency 0 problems on the coordinator's side. A rescout is asked of demo333 before the trace leaves the six-hour search at about 09:19 CET. No take is asked.
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
