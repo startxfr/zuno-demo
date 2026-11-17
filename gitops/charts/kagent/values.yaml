@@ -46,6 +46,16 @@ tokenProxy:
   url: http://zuno-token-proxy:8080
   model: auto
 
+# WP-297 (ADR-0619 clause 5): the alternative AI gateways, in the `altGateways` contract of the client charts:
+# {name, label, url, models}. kagent holds no second connection of its own: for each entry the chart renders one
+# more ModelConfig, zuno-model-<name>, on the token proxy's alternate route <tokenProxy.url>/alt/<name>/v1 (the
+# same list must be given to the zuno-token-proxy release of this namespace, which holds the gateway's `url` and
+# the egress rule), and one more Agent, zuno-diagnose-<name>: the agent below, on that ModelConfig. The model is
+# the entry's first `models` item (default tokenProxy.model). Empty (the default): nothing more is rendered.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []
+
 # The declarative agent (ADR-0600 clause 4, WP-207 step 4): a prompt over the governed tools, nothing else.
 agent:
   name: zuno-sre

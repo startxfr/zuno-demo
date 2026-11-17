@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Dict, Mapping, Optional, Tuple
 
@@ -15,6 +16,53 @@ def _headers(raw: str, name: str) -> Dict[str, str]:
     if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
         raise ValueError(f"{name} must be a JSON object of string headers")
     return dict(value)
+
+
+_ALT_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$")
+
+
+@dataclass(frozen=True)
+class AltGateway:
+    """WP-297 (ADR-0619 clause 5): one alternative AI gateway this proxy also fronts.
+
+    `url` is the gateway's OpenAI base URL, as the `altGateways` contract writes it
+    (it ends with `/v1`): `/alt/<name>/v1/<path>` is relayed to `<url>/<path>`."""
+
+    name: str
+    url: str
+    headers: Dict[str, str] = field(default_factory=dict)
+    timeout_s: Optional[float] = None  # None: UPSTREAM_TIMEOUT_S
+
+
+def _alt_gateways(raw: str) -> Tuple[AltGateway, ...]:
+    """ALT_GATEWAYS: a JSON list of {name, url, headers?, timeout_s?}. Unset or empty: none,
+    and the proxy behaves as before. A malformed list stops the proxy at start."""
+    if not raw.strip():
+        return ()
+    value = json.loads(raw)
+    if not isinstance(value, list):
+        raise ValueError("ALT_GATEWAYS must be a JSON list")
+    found = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError("ALT_GATEWAYS: every entry must be a JSON object")
+        unknown = set(entry) - {"name", "url", "headers", "timeout_s"}
+        if unknown:
+            raise ValueError("ALT_GATEWAYS: unknown key(s) " + ", ".join(sorted(unknown)))
+        name, url = entry.get("name"), entry.get("url")
+        if not isinstance(name, str) or not _ALT_NAME.match(name):
+            raise ValueError("ALT_GATEWAYS: name must be a DNS label of at most 40 characters")
+        if not isinstance(url, str) or not re.match(r"^https?://[^/\s]+", url):
+            raise ValueError(f"ALT_GATEWAYS: {name}: url must be an http(s) URL")
+        if any(g.name == name for g in found):
+            raise ValueError(f"ALT_GATEWAYS: {name} is listed twice")
+        headers = _headers(json.dumps(entry.get("headers") or {}), f"ALT_GATEWAYS {name} headers")
+        timeout = entry.get("timeout_s")
+        if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0):
+            raise ValueError(f"ALT_GATEWAYS: {name}: timeout_s must be a positive number")
+        found.append(AltGateway(name=name, url=url.rstrip("/"), headers=headers,
+                                timeout_s=float(timeout) if timeout is not None else None))
+    return tuple(found)
 
 
 def _inbound_keys(path: str) -> Tuple[str, ...]:
@@ -53,6 +101,8 @@ class Settings:
     # WP-225 lot C (ADR-0602 clause 10): the keys a caller must send as
     # `Authorization: Bearer <key>`; empty means no inbound check (the default).
     inbound_keys: Tuple[str, ...] = ()
+    # WP-297 (ADR-0619 clause 5): the alternative gateways reached at /alt/<name>/v1/...; empty by default.
+    alt_gateways: Tuple[AltGateway, ...] = ()
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -84,4 +134,5 @@ class Settings:
             token_timeout_s=float(env.get("TOKEN_TIMEOUT_S", "10")),
             ca_bundle=env.get("CA_BUNDLE") or None,
             inbound_keys=_inbound_keys(env.get("INBOUND_KEYS_FILE", "")),
+            alt_gateways=_alt_gateways(env.get("ALT_GATEWAYS", "")),
         )

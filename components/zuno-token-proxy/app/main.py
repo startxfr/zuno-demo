@@ -2,6 +2,8 @@
 
     /v1/...   -> ai-gateway  /v1/...   (chat completions, models; streaming passthrough)
     /mcp...   -> mcp-gateway /mcp...   (streamable HTTP, SSE passthrough, session header kept)
+    /alt/<name>/v1/... -> the alternative gateway <name> of ALT_GATEWAYS (WP-297, ADR-0619 clause 5):
+              its own URL and fixed headers, the same token; an unknown name is 404, nothing relayed
     /healthz  liveness, /readyz a valid token is held, /metrics counters
 
 `Authorization` from the client (a dummy key) is dropped and replaced. The configured fixed headers
@@ -69,7 +71,16 @@ def _response_headers(upstream: httpx.Headers) -> Dict[str, str]:
 def _timeout_for(settings: Settings, upstream_name: str, method: str) -> httpx.Timeout:
     # MCP tool calls are short POSTs: fail fast. Model calls and the MCP event stream (GET) keep the long timeout.
     read = settings.mcp_timeout_s if upstream_name == "mcp-gateway" and method == "POST" else settings.upstream_timeout_s
+    # WP-297: an alternative gateway may carry its own read timeout; without one it is a model call like any other.
+    for alt in settings.alt_gateways:
+        if upstream_name == _alt_upstream(alt.name) and alt.timeout_s is not None:
+            read = alt.timeout_s
     return httpx.Timeout(read, connect=10.0)
+
+
+def _alt_upstream(name: str) -> str:
+    """The upstream name of an alternative gateway, in the logs and the `upstream` metric label."""
+    return f"alt-{name}"
 
 
 def create_app(
@@ -85,6 +96,17 @@ def create_app(
         timeout=httpx.Timeout(settings.upstream_timeout_s, connect=10.0),
         limits=httpx.Limits(keepalive_expiry=2.0),
     )
+    # WP-297: the alternative gateways get a client of their own, created only when some are configured, which
+    # verifies an HTTPS upstream against CA_BUNDLE (the gateways' client above is left exactly as it was).
+    alt_client: Optional[httpx.AsyncClient] = None
+    if settings.alt_gateways:
+        alt_client = httpx.AsyncClient(
+            transport=upstream_transport,
+            verify=verify,
+            timeout=httpx.Timeout(settings.upstream_timeout_s, connect=10.0),
+            limits=httpx.Limits(keepalive_expiry=2.0),
+        )
+    alternatives = {alt.name: alt for alt in settings.alt_gateways}
     tokens = token_source or TokenSource(settings, token_client)
 
     @asynccontextmanager
@@ -92,11 +114,15 @@ def create_app(
         yield
         await token_client.aclose()
         await upstream_client.aclose()
+        if alt_client is not None:
+            await alt_client.aclose()
 
     app = FastAPI(title="zuno-token-proxy", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.tokens = tokens
 
-    async def relay(request: Request, upstream_name: str, base: str, path: str, fixed: Dict[str, str]) -> Response:
+    async def relay(request: Request, upstream_name: str, base: str, path: str, fixed: Dict[str, str],
+                    client: Optional[httpx.AsyncClient] = None) -> Response:
+        upstream_client_ = client or upstream_client
         started = time.monotonic()
         if not _caller_authenticated(request.headers.get("authorization"), settings.inbound_keys):
             metrics.inc("zuno_token_proxy_requests_total", upstream=upstream_name, code="401")
@@ -110,7 +136,7 @@ def create_app(
         url = base + path
         if request.url.query:
             url += "?" + request.url.query
-        outbound = upstream_client.build_request(
+        outbound = upstream_client_.build_request(
             request.method,
             url,
             headers=_request_headers(request.headers.items(), fixed, token),
@@ -118,7 +144,7 @@ def create_app(
             timeout=_timeout_for(settings, upstream_name, request.method),
         )
         try:
-            upstream = await upstream_client.send(outbound, stream=True)
+            upstream = await upstream_client_.send(outbound, stream=True)
         except httpx.HTTPError as exc:
             logger.warning("%s unreachable after %.1fs: %s %r", upstream_name, time.monotonic() - started, type(exc).__name__, exc)
             metrics.inc("zuno_token_proxy_requests_total", upstream=upstream_name, code="502")
@@ -159,6 +185,16 @@ def create_app(
     async def mcp_gateway(request: Request, path: str = "") -> Response:
         suffix = "/mcp" + ("/" + path if path else "")
         return await relay(request, "mcp-gateway", settings.mcp_gateway_url, suffix, settings.mcp_headers)
+
+    if alternatives:
+        @app.api_route("/alt/{name}/v1/{path:path}", methods=_METHODS)
+        async def alt_gateway(request: Request, name: str, path: str) -> Response:
+            alt = alternatives.get(name)
+            if alt is None:
+                # Counted under one label, whatever the name asked: a caller cannot grow the metric's label set.
+                metrics.inc("zuno_token_proxy_requests_total", upstream="alt-unknown", code="404")
+                return JSONResponse({"error": "unknown alternative gateway"}, status_code=404)
+            return await relay(request, _alt_upstream(alt.name), alt.url, "/" + path, alt.headers, client=alt_client)
 
     return app
 

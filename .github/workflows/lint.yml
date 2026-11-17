@@ -311,6 +311,8 @@ jobs:
           python3 tests/test_tls_verify.py
           # WP-225 lot C: the proxy authenticates its callers (INBOUND_KEYS_FILE).
           python3 tests/test_wp225_inbound_auth.py
+          # WP-297 (ADR-0619 clause 5): the alternative gateways (ALT_GATEWAYS, /alt/<name>/v1/...).
+          python3 tests/test_wp297_alt_gateways.py
       - name: zuno-dify-knowledge tests (ADR-0599)
         working-directory: components/zuno-dify-knowledge
         run: |

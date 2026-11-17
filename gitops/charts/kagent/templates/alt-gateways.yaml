@@ -1,0 +1,37 @@
+{{- /*
+WP-297 (ADR-0619 clause 5): one more model and one more agent per alternative gateway of `altGateways`. The
+model is reached on the zuno-token-proxy's alternate route, with the same dummy key the proxy drops; the tools
+stay behind the mcp-gateway (ADR-0619 clause 6). Nothing is rendered while the list is empty.
+*/ -}}
+{{- range .Values.altGateways }}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$" (toString .name)) }}{{ fail (printf "altGateways: name %q must be a DNS label of at most 40 characters" (toString .name)) }}{{ end }}
+---
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: zuno-model-{{ .name }}
+  labels:
+    zuno.io/managed-by: argocd
+    zuno.io/alt-gateway: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  model: {{ (first (.models | default (list $.Values.tokenProxy.model))) | quote }}
+  provider: OpenAI
+  apiKeySecret: kagent-model-dummy-key
+  apiKeySecretKey: OPENAI_API_KEY
+  openAI:
+    baseUrl: {{ $.Values.tokenProxy.url }}/alt/{{ .name }}/v1
+---
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: zuno-diagnose-{{ .name }}
+  labels:
+    zuno.io/managed-by: argocd
+    zuno.io/alt-gateway: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  {{- include "kagent.diagnoseAgentSpec" (dict "description" (printf "Read-only diagnosis of the Zuno platform namespaces over the governed Kubernetes tools, its model calls through the alternative gateway %s." (.label | default .name)) "modelConfig" (printf "zuno-model-%s" .name) "tools" $.Values.agent.tools) | nindent 2 }}
+{{- end }}
