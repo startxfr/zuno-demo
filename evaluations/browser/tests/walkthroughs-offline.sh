@@ -982,6 +982,8 @@ ui = steps["control-ui"]
 assert ui["on_its_own_address"] is True and ui["password_field_still_on_screen"] is False and ui["new_session_selector"] and ui["storage_added"] == ["local:openclaw.control.settings"], ui
 assert steps["composer"]["selector"] == "textarea" and any(c["label"] == "Open session menu" for c in steps["controls"]["controls"]), steps["controls"]
 assert steps["sessions"] == {**steps["sessions"], "rows": 2, "told_apart_by": ["text"], "distinct": 2} and s["writes"]["refused"] == [], (steps["sessions"], s["writes"])
+rows = steps["sessions"]["list"]
+assert [sorted(r) for r in rows] == [["age", "id", "rank"]] * 2 and [r["rank"] for r in rows] == [1, 2] and all(r["age"] == "3h" and len(r["id"]) == 16 for r in rows) and steps["closed"]["native_dialogs"] == 0, rows
 assert "FAKE-EARLIER-SESSION-TITLE" not in json.dumps(s)
 '
 out="$(claw c-pass 2>&1)"; rc=$?
@@ -995,6 +997,13 @@ assert len(m["created"]) == 1 and m["cleaned"] is True and m["owned"] == {"befor
 assert "FAKE-" not in raw and "FAKE-" not in sys.argv[2]
 PY
 expect "openclaw: the session the assistant renamed after its answer is the one found and deleted" grep -q 'deleted through the Control UI.s menu' <<<"$out"
+expect "openclaw: Delete… asks in a native confirm dialog: one is accepted, its text is not logged" bash -c "grep -q 'asked its confirmation in a native confirm dialog ([0-9]* chars): accepted' <<<\"\$0\" && ! grep -q 'does not expect' <<<\"\$0\"" "$out"
+out="$(claw c-inpage FAKE_INPAGE_CONFIRM=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: a confirmation drawn in the page is confirmed too: PASS, the session deleted" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":2}' <<<\"\$0\"" "$out"
+out="$(claw c-alert FAKE_ALERT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "openclaw: a native dialog nobody expects is dismissed and fails the take; its session is deleted all the same; no dialog text anywhere" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL .*the page opened 1 native dialog(s) the walkthrough does not expect (alert): dismissed' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":2}' <<<\"\$0\" && ! grep -q 'FAKE-' <<<\"\$0\"" "$out"
 out="$(claw c-links FAKE_LINKS=1 2>&1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "openclaw: rows that carry a link are told apart by it: PASS, the session deleted" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"sent\":1,\"sessions\":2}' <<<\"\$0\"" "$out"

@@ -25,7 +25,12 @@
 // The sidebar lists the earlier sessions' titles: they are on the pictures (collapsing it may be kept by the
 // assistant, so it is not clicked). Connect writes one key to the browser's storage, openclaw-device-identity-v1:
 // the browser of a take is new each time, so each take is a new device to the gateway. Seen by the take of 2026-11-17: the question sent, the Tool line, the answer.
-// NOT seen: what "Delete…" asks before it deletes.
+// "Delete…" asks its confirmation in a NATIVE browser dialog (window.confirm), which a browser driven by Playwright
+// answers Cancel by itself when nobody listens: the take of 2026-11-17 05:20 clicked Delete… and the session stayed
+// (its video shows the menu, then nothing in the page). So the take listens to dialogs from its sign-in on: it accepts
+// ONE dialog of type confirm, and only while cleanup() has just clicked Delete… on its own session; every other dialog
+// is dismissed, counted and FAILS the take (a scout too). A dialog's text may quote a session's title: only its type
+// and length are logged.
 import crypto from "node:crypto";
 import { click, describe, firstVisible, newText, read, settled, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 
@@ -36,7 +41,7 @@ export const viewport = { width: 1280, height: 800 };
 export const markers = ["login", "ui", "session", "q-sent", "q-done", "end"];
 export const motion_from = "ui";
 export const changes = [
-  "clicks Delete… in the menu of the session the take created (and confirms it): that session is removed from the assistant",
+  "clicks Delete… in the menu of the session the take created and accepts the browser's native confirmation dialog it opens (one dialog, of type confirm, only then): that session is removed from the assistant",
   "the assistant may keep a memory of this one question (its 10Gi volume); no take can undo that",
 ];
 // The write guard: the Control UI works over its WebSocket; no HTTP write to the assistant is declared, so any is
@@ -57,7 +62,26 @@ const SESSION_MENU = ["button[aria-label='Open session menu']", "button[title='O
 const TOOL = /Confluence-page-search/i;                                                   // the page's row 0:45
 const ANSWER_TIMEOUT_MS = 240000;
 
-export async function enter({ page, base, mark, keycloak, typeSecret, state }) {
+// The native dialogs of the page, from the sign-in on (see the header). state.dialogs: {armed, accepted, seen: [type]}.
+function watchDialogs(page, state, log) {
+  state.dialogs = { armed: false, accepted: 0, seen: [] };
+  page.on("dialog", async (dialog) => {
+    const kind = dialog.type();
+    if (state.dialogs.armed && kind === "confirm" && !state.dialogs.accepted) {
+      state.dialogs.accepted += 1;
+      log(`Delete… asked its confirmation in a native ${kind} dialog (${dialog.message().length} chars): accepted`);
+      await dialog.accept().catch(() => {});
+      return;
+    }
+    state.dialogs.seen.push(kind);
+    log(`a native ${kind} dialog (${dialog.message().length} chars) the walkthrough does not expect: dismissed`);
+    await dialog.dismiss().catch(() => {});
+  });
+}
+const unexpected = (state) => (state.dialogs && state.dialogs.seen.length ? `the page opened ${state.dialogs.seen.length} native dialog(s) the walkthrough does not expect (${state.dialogs.seen.join(", ")}): dismissed` : "");
+
+export async function enter({ page, base, mark, keycloak, typeSecret, state, log }) {
+  watchDialogs(page, state, log);
   await page.goto(`${base}/`);
   await page.waitForSelector("#username", { timeout: 30000 });
   await mark("login");   // the EMPTY Keycloak form: nothing is marked once a password is typed
@@ -98,7 +122,9 @@ async function rows(page) {
     // The row's words without its buttons: a button shown only under the pointer must not change the row's id.
     const words = row.cloneNode(true);
     for (const el of words.querySelectorAll("button, [role='button'], svg")) el.remove();
-    return { link: link ? link.getAttribute("href") : "", text: (words.textContent || "").replace(/\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi, "").replace(/\s+/g, " ").trim() };
+    const AGE = /\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi;
+    const ages = (words.textContent || "").match(AGE) || [];
+    return { link: link ? link.getAttribute("href") : "", age: ages.length ? ages[ages.length - 1].trim() : "", text: (words.textContent || "").replace(/\b(just now|now|\d+\s*(s|sec|m|min|h|hr|d|w|mo|y)\w*)(\s+ago)?\b/gi, "").replace(/\s+/g, " ").trim() };
   }), SESSION_MENU.join(", "));
   const met = new Map();
   return seen.map((row, index) => {
@@ -106,7 +132,7 @@ async function rows(page) {
     const key = linked ? row.link : row.text;
     const rank = (met.get(key) || 0) + 1;
     met.set(key, rank);
-    return { index, by: linked ? "link" : row.text ? "text" : "nothing", id: crypto.createHash("sha256").update(rank > 1 ? `${key}\n#${rank}` : key).digest("hex").slice(0, 16) };
+    return { index, age: row.age, by: linked ? "link" : row.text ? "text" : "nothing", id: crypto.createHash("sha256").update(rank > 1 ? `${key}\n#${rank}` : key).digest("hex").slice(0, 16) };
   });
 }
 
@@ -141,6 +167,7 @@ export async function run({ page, mark, log, state }) {
   await mark("q-done");
   await page.waitForTimeout(800);
   await mark("end");
+  if (unexpected(state)) throw new Error(unexpected(state));
 }
 
 // What a take will meet, for the price of the two sign-ins: the connected Control UI, its controls by kind (no text
@@ -194,11 +221,15 @@ export async function scout({ page, base, step, state }) {
   // A take finds its own session as the one row that was not there before it: the rows must be told apart.
   await step("sessions", async () => {
     const list = await rows(page);
-    const seen = { rows: list.length, told_apart_by: [...new Set(list.map((row) => row.by))], distinct: new Set(list.map((row) => row.id)).size };
+    // Each row by its id, its age as the sidebar words it and its rank from the top: never its title.
+    const seen = { list: list.map((row) => ({ id: row.id, age: row.age, rank: row.index + 1 })), rows: list.length, told_apart_by: [...new Set(list.map((row) => row.by))], distinct: new Set(list.map((row) => row.id)).size };
     if (seen.distinct !== seen.rows || seen.told_apart_by.includes("nothing")) throw new Error(`the sidebar's ${seen.rows} sessions are not told apart (${seen.distinct} distinct, by ${seen.told_apart_by.join(", ")}): a take could not find its own session`);
     return seen;
   });
-  await step("closed", async () => ({ nothing_typed: true, sessions_opened: 0 }));
+  await step("closed", async () => {
+    if (unexpected(state)) throw new Error(unexpected(state));
+    return { nothing_typed: true, sessions_opened: 0, native_dialogs: 0 };
+  });
 }
 
 // Delete the session this take created, through the Control UI's own menu, and nothing else: the ONE session of the
@@ -217,10 +248,20 @@ export async function cleanup({ page, log, state }) {
   if (await button.isVisible().catch(() => false)) await button.click({ timeout: 5000 }); else await button.dispatchEvent("click");
   const entry = page.locator("[role='menuitem'], [role='menu'] button, [role='menu'] li").filter({ hasText: /^\s*Delete/ }).first();
   await entry.waitFor({ timeout: 10000 });
-  await click(entry, { change: changes[0], changes });
-  // "Delete…" asks before it deletes: its own confirmation, if one shows, is confirmed (the same declared click).
-  const confirm = page.locator("[role='dialog'] button, [role='alertdialog'] button").filter({ hasText: /^\s*(Delete|Confirm|Yes)/ }).first();
-  if (await confirm.waitFor({ timeout: 5000 }).then(() => true).catch(() => false)) await click(confirm, { change: changes[0], changes });
+  // "Delete…" asks before it deletes, in a native confirm dialog: ONE is accepted, and only from this click on (the
+  // same declared change). A confirmation drawn in the page instead, if one shows, is confirmed the same way.
+  const strays = state.dialogs.seen.length;
+  state.dialogs.armed = true;
+  try {
+    await click(entry, { change: changes[0], changes });
+    const confirm = page.locator("[role='dialog'] button, [role='alertdialog'] button").filter({ hasText: /^\s*(Delete|Confirm|Yes)/ }).first();
+    const how = await waitUntil(page, { what: "the confirmation of Delete…", timeoutMs: 8000, everyMs: 250,
+      done: async () => (state.dialogs.accepted ? "native" : (await confirm.isVisible().catch(() => false)) ? "page" : undefined) }).catch(() => "");
+    if (how === "page") await click(confirm, { change: changes[0], changes });
+    if (!how) log("Delete… was clicked and asked no confirmation the take knows (no native confirm dialog, none in the page)");
+  } finally {
+    state.dialogs.armed = false;
+  }
   const gone = await waitUntil(page, { what: "the session's removal", timeoutMs: 20000, done: async () => {
     // Gone when the sidebar lists again only what it listed before the take (a session renamed meanwhile is still one more).
     const left = await rows(page);
@@ -228,5 +269,6 @@ export async function cleanup({ page, log, state }) {
   } }).catch(() => false);
   if (!gone) throw new Error(`the session the take created (${fresh[0].id}, the newest of the sidebar) is STILL listed after Delete…: delete it by hand in consultant-02's assistant`);
   log(`session ${fresh[0].id} deleted through the Control UI's menu; what the assistant memorised of the question stays`);
+  if (state.dialogs.seen.length > strays) throw new Error(`${unexpected(state)}; the take's session was deleted all the same`);
   return true;
 }

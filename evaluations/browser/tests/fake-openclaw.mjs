@@ -45,9 +45,16 @@ $("connect").onclick = async () => {
 };
 let current = "";
 $("new").onclick = () => { current = "new"; };
-$("del").onclick = () => { $("menu").hidden = true; $("confirm").hidden = false; };
+// As the Control UI (the take of 2026-11-17): Delete… asks in a NATIVE confirm dialog; FAKE_INPAGE_CONFIRM=1 asks in
+// the page instead. FAKE_ALERT=1: the page opens a native alert when a message is sent (a dialog nobody expects).
+const remove = async () => { await fetch("/ws?do=delete&id=" + target + "${process.env.FAKE_REFUSE_DELETE === "1" ? "&refuse=1" : ""}"); draw(); };
+$("del").onclick = () => {
+  $("menu").hidden = true;
+  if (${process.env.FAKE_INPAGE_CONFIRM === "1"}) { $("confirm").hidden = false; return; }
+  setTimeout(() => { if (window.confirm("Delete session FAKE-TITLE-IN-THE-DIALOG? This cannot be undone.")) remove(); }, 50);
+};
 $("no").onclick = () => { $("confirm").hidden = true; };
-$("yes").onclick = async () => { $("confirm").hidden = true; await fetch("/ws?do=delete&id=" + target + "${process.env.FAKE_REFUSE_DELETE === "1" ? "&refuse=1" : ""}"); draw(); };
+$("yes").onclick = async () => { $("confirm").hidden = true; await remove(); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("menu").hidden = true; });
 document.querySelector("textarea").addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
@@ -55,6 +62,7 @@ document.querySelector("textarea").addEventListener("keydown", async (e) => {
   const text = e.target.value; e.target.value = "";
   const add = (line) => { const p = document.createElement("p"); p.textContent = line; $("thread").appendChild(p); };
   add(text);
+  if (${process.env.FAKE_ALERT === "1"}) setTimeout(() => window.alert("FAKE-TITLE-IN-THE-DIALOG"), 300);
   const said = await (await fetch("/ws?do=send&text=" + encodeURIComponent(text))).json();
   draw();
   setTimeout(async () => { for (const line of said.lines) add(line); await fetch("/ws?do=rename&id=" + said.id); draw(); }, 1200);
