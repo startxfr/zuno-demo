@@ -13,11 +13,13 @@ record_notice: >-
   (Delete…) and fails if it is still listed; what the assistant may have memorised from that one question stays in
   its own memory (a 10Gi volume): no take can undo that; each take is a new device to the assistant's gateway;
   traces and metrics of the answer remain, as for any use
-target_seconds: [35, 60]
+target_seconds: [40, 60]
 width: 960
 fps: 10
 moments:
   - {still: login, hold: 3, caption: "Sign in with the company account at the door"}
   - {still: ui, hold: 5, step: "0:00", caption: "0:00  My own assistant, in its own namespace"}
-  - {from: session, to: q-done, fit: 10, hold: 8, step: "0:45", caption: "0:45  It searches Confluence with my rights, and holds no key"}
-  - {still: end, hold: 6, step: "4:15", caption: "No key, no internet: the platform decides models and tools"}
+  - {from: session, to: q-sent, fit: 5, hold: 2, step: "0:45", caption: "0:45  I ask my assistant for the onboarding pages"}
+  - {from: q-sent, to: q-done, fit: 10, hold: 1, step: "0:45", caption: "0:45  It searches Confluence with my rights, without a key"}
+  - {still: q-done, hold: 9, step: "0:45", caption: "0:45  The pages it found, with their links"}
+  - {still: end, hold: 7, step: "4:15", caption: "No key, no internet: the platform decides models and tools"}
