@@ -74,7 +74,10 @@ class Chart(unittest.TestCase):
         cls.saas = render("image.digest=" + DIGEST, "saas.enabled=true")
 
     def test_no_image_no_deployment(self):
-        self.assertEqual(by_kind(render(), "Deployment"), [])
+        # The chart default pins the WP-291 fork build; an empty digest still renders no Deployment.
+        self.assertRegex(by_kind(render(), "Deployment")[0]["spec"]["template"]["spec"]["containers"][0]["image"],
+                         r"^quay\.io/zuno/praxis-ai@sha256:[0-9a-f]{64}$")
+        self.assertEqual(by_kind(render("image.digest="), "Deployment"), [])
         self.assertEqual(len(by_kind(self.local, "Deployment")), 1)
         with self.assertRaises(subprocess.CalledProcessError):
             render("image.digest=latest")

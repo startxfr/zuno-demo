@@ -490,8 +490,9 @@ zuno_ai_gateway_workstation_entry: true
 # WP-291), write its digest in zuno_praxis_image_digest, set this true, then `make d2 install models`, `make d1 install redis`
 # and `make d2 install praxis`. Claude and Codestral, the OpenTelemetry export and token_rate_limit (our build only) and the
 # workstation entry (WP-298) each have their own switch in ansible/roles/praxis/defaults/main.yml.
-zuno_praxis_enabled: false
-zuno_praxis_image_digest: ""
+zuno_praxis_enabled: true
+# fork 0c024efb, PipelineRun praxis-build-bzbvc (2026-11-17), image tag fork-0c024efba54f
+zuno_praxis_image_digest: "sha256:3daccf8ec4314b15a6fd2168d5d2bedb9c67ca77b3b15904180fb2585a1cf73e"
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

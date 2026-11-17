@@ -1,6 +1,6 @@
 # WP-291: Install OpenShift Pipelines and build Praxis AI from source
 
-- **State:** Repo work in review
+- **State:** Done (fork build live; the upstream build is deferred by the owner)
 - **ADRs:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
 - **Depends on:** none
 - **Related:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
@@ -71,3 +71,14 @@ The owner gave the go for the operator install. The run was `ansible-playbook ..
 - **Applications:** `zuno-openshift-pipelines-d0` is Synced/Healthy. `zuno-openshift-pipelines-d1` is Synced, with the Pipeline `source-image-build` created, but Degraded: the ExternalSecret `quay-io-zuno-push` reports `SecretSyncedError`, because the robot is not in Vault yet.
 - **Finding:** a worktree has no `ansible/confidential.yml` and devel has no `ansible/branch-pin.yml`. A local run from a worktree must therefore pass `-e zuno_gitops_target_revision=devel`, or the Applications would point at `main`. The first attempt was stopped before any apply.
 
+
+### The robot and the first build, 2026-11-17
+
+- **Push robot:** the owner put the token of `zuno+zuno_demo` in `ansible/confidential.yml`. The second install wrote it to Vault `zuno/quay-io/zuno-push`. The ExternalSecret still got `403 permission denied`, because the grant reaches Vault only through the vault role's configure Job. After `make d1 install vault`, the Secret `quay-io-zuno-push` was created and `zuno-openshift-pipelines-d1` turned Synced and Healthy.
+- **Fork build:** `make d2 build praxis` (owner's go) ran PipelineRun `praxis-build-bzbvc`, Succeeded in 25 minutes (14:58 to 15:22 UTC):
+  - source `https://github.com/redhat-et/praxis-ai` at `0c024efba54f359fb06c6e1dc56a36288da89360`;
+  - features `full,api-key-auth-filter,token-rate-limit-filter,opentelemetry`;
+  - image `quay.io/zuno/praxis-ai:fork-0c024efba54f`, digest `sha256:3daccf8ec4314b15a6fd2168d5d2bedb9c67ca77b3b15904180fb2585a1cf73e`, linux/amd64;
+  - the repository is public: the digest reads back from quay.io without credentials, so the cluster needs no pull secret.
+- **Pin:** the digest is in `gitops/charts/praxis/values.yaml` (the release record, ADR-0620) and in `zuno_praxis_image_digest` of `ansible/clusters/demo333.yml`, which the praxis role asserts.
+- **Upstream build:** deferred by the owner (2026-11-17). The switch is `-e zuno_praxis_build_source=upstream`.

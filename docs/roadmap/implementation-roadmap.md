@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-291, WP-292, WP-293, WP-294, WP-295, WP-296, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
+| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-292, WP-293, WP-294, WP-295, WP-296, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1210,7 +1210,7 @@ Blender and world-model.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-291 | [wp-291](work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) | 0620 | none | Repo work in review | owner's go: operator install; quay.io robot and Vault secret; first PipelineRun |
+| WP-291 | [wp-291](work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) | 0620 | none | Done | none (the upstream build is deferred by the owner) |
 | WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Not started | owner's go: allow-lists, then the Praxis deploy |
 | WP-293 | [wp-293](work-packages/wp-293-deploy-litellm-as-an-alternative-gateway.md) | 0621 | WP-292 | Not started | owner's decision on ADR-0621 clause 1 first |
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
