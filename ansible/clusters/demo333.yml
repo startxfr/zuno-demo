@@ -498,6 +498,10 @@ zuno_praxis_image_digest: "sha256:e319e228a64c0854ca5a20720b4dc830a9dda5d0340242
 zuno_praxis_saas_enabled: true
 zuno_praxis_token_rate_limit_enabled: true
 zuno_praxis_otel_enabled: true
+# WP-296 (owner's go 2026-11-17): Open WebUI lists Praxis's models next to "Zuno", prefixed `praxis.` and tagged
+# "Praxis", under the user's own token (system_oauth). The ai-gateway stays the first and default connection.
+open_webui_alt_gateways:
+  - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,
