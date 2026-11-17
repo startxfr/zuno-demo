@@ -80,6 +80,9 @@ web:
   # The ai-gateway, for prompt enhancement (ADR-0604 D8): empty turns it off, and the demo degrades to filtered prompts.
   aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
   promptModel: auto
+  # WP-303 (ADR-0619 clause 5): the gateway used when a request names none: `zuno`, or the name of an
+  # `altGateways` entry. Read only when altGateways is not empty.
+  promptGateway: zuno
   audience: zuno-admin-api
   allowedGroups: zuno-world-model-users,ocp-ai-ops,ocp-paas-ops
   opsGroups: ocp-ai-ops,ocp-paas-ops
@@ -131,3 +134,12 @@ egress:
       - 52.95.148.0/23
       - 52.95.150.0/24
       - 52.95.191.0/24
+
+# WP-303 (ADR-0619 clause 5): the alternative AI gateways the prompt enhancement may use instead of the Zuno
+# ai-gateway, {name, label, url, models}: the web tier sends the visitor's own token to the entry's url (ending
+# with /v1) with the same request and headers, for a request that names it (`gateway`, listed by /api/status).
+# `models[0]` is the model asked (default auto). Rendered as the ALT_GATEWAYS env of the web tier. zuno-world-model
+# has no egress policy (recon of 2026-11-17), so no NetworkPolicy is added. Empty (the default): nothing changes.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []

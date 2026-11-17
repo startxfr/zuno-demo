@@ -10,6 +10,10 @@
    down, slow or answers something unusable, the locally filtered prompt is used
    and the result says enhancement was off; the demo keeps working.
 
+WP-303 (ADR-0619 clause 5): the enhancement may go to an alternative gateway of ALT_GATEWAYS instead, named per
+request (`gateway`) or by PROMPT_GATEWAY; the Zuno ai-gateway is the default, and an unknown name is refused (422)
+before anything is sent. The same request, headers and token go to either.
+
 The user's text is never trusted as an instruction to the screening model: it is
 sent as a quoted block with a system message that says so, and the verdict can
 only contain text, which then goes through the same local checks.
@@ -28,7 +32,7 @@ from typing import List, Optional
 import httpx
 
 from app import metrics
-from app.config import Settings
+from app.config import ZUNO_GATEWAY, Settings
 
 logger = logging.getLogger("world_model_web.prompts")
 
@@ -105,19 +109,34 @@ class Screener:
                 raise PromptRefused("deny_list")
         return cleaned
 
-    async def screen(self, text: str, kind: str, token: str) -> Screened:
-        """`kind` is "scene" (first image) or "edit" (mid-session change); only the metric uses it."""
+    def target(self, gateway: Optional[str]) -> Optional[tuple]:
+        """(chat completions URL, model) of the gateway to use, None when the Zuno ai-gateway is it and is not
+        configured. An unknown name is PromptRefused("unknown_gateway")."""
+        name = gateway or self.settings.default_gateway
+        if name == ZUNO_GATEWAY:
+            if not self.settings.gateway_url:
+                return None
+            return f"{self.settings.gateway_url}/v1/chat/completions", self.settings.gateway_model
+        for alt in self.settings.alt_gateways:
+            if alt.name == name:
+                return f"{alt.url}/chat/completions", alt.model
+        raise PromptRefused("unknown_gateway")
+
+    async def screen(self, text: str, kind: str, token: str, gateway: Optional[str] = None) -> Screened:
+        """`kind` is "scene" (first image) or "edit" (mid-session change); only the metric uses it.
+        `gateway` names an alternative gateway for the enhancement (WP-303); None is the configured default."""
         try:
             cleaned = self.check_local(text)
+            target = self.target(gateway)
         except PromptRefused as exc:
             metrics.PROMPTS.labels(kind=kind, result=f"refused_{exc.reason}").inc()
             raise
-        if not self.settings.gateway_url:
+        if target is None:
             metrics.PROMPTS.labels(kind=kind, result="accepted_filter_only").inc()
             return Screened(cleaned, cleaned, "off:not_configured")
         started = time.perf_counter()
         try:
-            verdict = await self._ask_gateway(cleaned, kind, token)
+            verdict = await self._ask_gateway(cleaned, kind, token, target)
         except PromptRefused:
             metrics.ENHANCE.labels(result="refused").observe(time.perf_counter() - started)
             metrics.PROMPTS.labels(kind=kind, result="refused_by_model").inc()
@@ -138,16 +157,17 @@ class Screener:
         metrics.PROMPTS.labels(kind=kind, result="accepted_enhanced").inc()
         return Screened(enhanced, cleaned, "applied")
 
-    async def _ask_gateway(self, text: str, kind: str, token: str) -> str:
+    async def _ask_gateway(self, text: str, kind: str, token: str, target: tuple) -> str:
+        url, model = target
         response = await self.client.post(
-            f"{self.settings.gateway_url}/v1/chat/completions",
+            url,
             headers={
                 "Authorization": f"Bearer {token}",
                 "X-Zuno-Data-Classification": "C1",
                 "X-Zuno-Local-Only": "true",
             },
             json={
-                "model": self.settings.gateway_model,
+                "model": model,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": f"Kind: {kind}\n<prompt>{text}</prompt>"},

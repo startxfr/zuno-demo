@@ -35,7 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import metrics
 from app.auth import Authenticator, Caller
-from app.config import Settings
+from app.config import ZUNO_GATEWAY, Settings
 from app.prompts import PromptRefused, Screener
 from app.runtime_client import RuntimeBusy, RuntimeClient, RuntimeUnavailable
 from app.sessions import Busy, Lease, QuotaExceeded, Session
@@ -51,11 +51,14 @@ class WorldRequest(BaseModel):
     preset_id: Optional[str] = Field(default=None, max_length=64)
     prompt: Optional[str] = Field(default=None, max_length=2000)
     seed: Optional[int] = Field(default=None, ge=0, le=2**31 - 1)
+    # WP-303: an alternative gateway for the prompt enhancement (a name of /api/status `gateways`); None = default.
+    gateway: Optional[str] = Field(default=None, max_length=40)
 
 
 class PromptRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prompt: str = Field(max_length=2000)
+    gateway: Optional[str] = Field(default=None, max_length=40)
 
 
 class ClientStats(BaseModel):
@@ -171,7 +174,11 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
                 "you_hold": bool(lease.current and lease.current.owner_sub == caller.sub),
                 "limits": {"idle_seconds": settings.idle_seconds, "max_session_seconds": settings.max_session_seconds,
                            "max_prompt_chars": settings.max_prompt_chars},
-                "enhancement": "on" if settings.gateway_url else "off"}
+                "enhancement": "on" if settings.gateway_url or settings.default_gateway != ZUNO_GATEWAY else "off"}
+        if settings.alt_gateways:
+            # WP-303: the gateways a request may name, the Zuno ai-gateway first; absent without alternatives.
+            body["gateways"] = [{"id": ZUNO_GATEWAY, "label": "Zuno", "default": settings.default_gateway == ZUNO_GATEWAY}] + [
+                {"id": g.name, "label": g.label, "default": settings.default_gateway == g.name} for g in settings.alt_gateways]
         if lease.current is not None and caller.in_any(settings.ops_groups):
             body["holder"] = lease.current.owner_name
             body["holder_session_id"] = lease.current.session_id
@@ -198,7 +205,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
         screened = None
         if preset is None:
             try:
-                screened = await scr.screen(req.prompt, "scene", caller.token)
+                screened = await scr.screen(req.prompt, "scene", caller.token, req.gateway)
             except PromptRefused as exc:
                 metrics.WORLDS.labels(source=kind, result=f"refused_{exc.reason}").inc()
                 raise HTTPException(status_code=422, detail={"error": "prompt_refused", "reason": exc.reason})
@@ -255,7 +262,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
         if not session.streaming or session.runtime_ws is None:
             raise HTTPException(status_code=409, detail="open the stream first: a prompt edits the running world")
         try:
-            screened = await scr.screen(req.prompt, "edit", caller.token)
+            screened = await scr.screen(req.prompt, "edit", caller.token, req.gateway)
         except PromptRefused as exc:
             raise HTTPException(status_code=422, detail={"error": "prompt_refused", "reason": exc.reason})
         session.prompt_requested += 1
