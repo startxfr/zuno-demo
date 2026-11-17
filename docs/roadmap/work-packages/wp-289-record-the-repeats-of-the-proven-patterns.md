@@ -1,6 +1,6 @@
 # WP-289: Record the repeats of the proven patterns
 
-- **State:** Repo work merged (2026-11-17: 18 of 18 demos published)
+- **State:** Done (2026-11-17: 18 of 18 demos published; the limits are written below)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-288](wp-288-record-the-first-batch-of-browser-demos.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -52,6 +52,20 @@ answer (scan the frames of each answer span).
 
 Rows that carried "(untested command)" or "(untested prompt)" and were run by a published take have the mark lifted. The marks
 that remain belong to rows no take has run.
+
+## Closed on 2026-11-17: the limits, written
+
+The owner chose **"Clore, limites écrites"** (close, limits written) in `zuno-demo-reorg`'s session, answered at 12:03:21 CET on 2026-11-17 (read there in its log, as relayed), after being told: 18 GIFs published, each on a named go; the guard table rests on the takes' files at `0350cd2f`; the takes before the write guard have no measured absence of writes; `ai-gateway-sovereignty` makes two real model calls. Not chosen: close after converting the published walkthroughs to the guard; leave the brief open. The table is in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md), section "Guard summaries of the 18 demos of WP-289".
+
+**The limits of what this brief records:**
+
+- **No measured absence of writes for the takes before the write guard.** `model-catalog-registry`, `ai-gateway-routing`, `evaluation-trustyai-evalhub`, `quotas`, `unifai-agents`, `lora-pipeline-mlflow-kueue`, `lightspeed` and `mcp-tools-by-group` have no `writes` key in their `markers.json`; `aap-audited-operations` has none either. They are read-only or declared by their walkthrough and by the counts of created and owned objects, not by a measured guard. The published walkthroughs were not converted to the shared guard.
+- **`ai-gateway-sovereignty` is not read-only.** Its golden-path probe makes two real model calls from inside the gateway pod; they stay in the platform's records.
+- **Records.** The record log is absent from the cache for the six terminal takes (`gitops-day0-3`, `image-signing-admission`, `external-models`, `ai-gateway-sovereignty`, `okf-signed-agent-release`, `service-mesh-kiali`). `markers.json` has no `writes` key for `dify`, `guardrails` and `lora-pipeline-mlflow-kueue`; the writes of the first two are in their record logs.
+- **The guard sees HTTP only.** A WebSocket is not seen (the `openclaw` Control UI, of WP-290).
+- **Declared effects:** the Zuno Agent's edited date in Dify (`dify`, `guardrails`) and the run log that `dify` leaves.
+
+**Left open, each where it is recorded** (nothing is closed by this state): the deferred entries a to r (the sprint evidence); the Playwright pin on `main`; the AAP user `consultant-03`; the Grafana step of `observability-trace` row 5:00, not rehearsed; the Tempo and Grafana authorizations that stay on the cluster; the declared effects.
 
 ## Owner's order of 2026-11-16, 13:12 CET
 
