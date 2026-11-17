@@ -776,6 +776,20 @@ out="$(agents a-scout RECORD_SCOUT=1)"; rc=$?
 echo "$out" | sed 's/^/    /'
 expect "agents: a scout of both personas exits 0, SCOUT: done" bash -c "test $rc -eq 0 && grep -q '^SCOUT: done$' <<<\"\$0\"" "$out"
 expect "agents: a scout creates no session, opens no team setting" grep -q 'left: {"sessions":2,"touched":0}' <<<"$out"
+expect "agents: the scout.json of the whole run keeps each take's step details and the write guard's account, per take" python3 - "$work/a-scout" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); s = json.loads((d / "scout.json").read_text()); steps = {x["step"]: x for x in s["steps"]}
+for name in ("consultant-02", "ai-ops-01"):
+    one = json.loads((d / name / "scout.json").read_text())
+    for x in one["steps"]:
+        merged = steps[f"{name}/{x['step']}"]
+        assert {k: v for k, v in merged.items() if k not in ("step", "png")} == {k: v for k, v in x.items() if k not in ("step", "png")}, (merged, x)
+        assert merged["png"] == (f"{name}/{x['png']}" if x["png"] else None), merged
+    for kind in ("sent", "refused", "tolerated", "through"):
+        assert [l for l in s["writes"][kind] if l.startswith(name + ": ")] == [f"{name}: {l}" for l in one["writes"][kind]], (kind, s["writes"])
+    assert any(l.startswith(name + ": POST ") for l in s["writes"]["sent"]), s["writes"]
+assert steps["consultant-02/hub"]["team_id_read"] is True and s["private_addresses"]["flagged"] is False and s["status"] == "done", s
+PY
 expect "agents: each persona's scout.json reports its selector, the hub and the dialog" python3 - "$work/a-scout" <<'PY'
 import json, pathlib, sys
 d = pathlib.Path(sys.argv[1])

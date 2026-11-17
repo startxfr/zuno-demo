@@ -618,7 +618,9 @@ if (takes.length > 1 || takes[0].name) {
   writeJson(path.join(out, "takes.json"), { demo: id, takes: results, status: bad.length ? "fail" : results[0].status });
 }
 // A scout of several takes also leaves ONE scout.json at the top of OUT, shaped like a single scout's: the run's
-// status, the walkthrough's hash and `changes`, and every take's steps as `<take>/<step>` (ok, error, selector, png).
+// status, the walkthrough's hash and `changes`, and every take's steps as `<take>/<step>`, with all a single scout's step holds (what the step read, its count of
+// private addresses), the write guard's account of every take (`writes`, each line led by `<take>: `) and the
+// private-address summary over all steps.
 // What reads "the newest scout of this demo" (make demo record) then needs nothing more.
 if (scouting && (takes.length > 1 || takes[0].name)) {
   const parts = results.map((r) => {
@@ -627,9 +629,11 @@ if (scouting && (takes.length > 1 || takes[0].name)) {
   writeJson(path.join(out, "scout.json"), {
     demo: id, takes: results.map((r) => r.name), persona: results.map((r) => r.persona).join(", "), viewport: walk.viewport,
     started: (parts[0] || {}).started || "", when: new Date().toISOString(), walkthrough_sha256: walkthroughHash(id), changes: walk.changes,
-    steps: parts.flatMap((part) => (part.steps || []).map((s) => ({ step: `${part.name}/${s.step}`, ok: s.ok === true, ...(s.error ? { error: s.error } : {}),
-                                                                   ...(s.selector ? { selector: s.selector } : {}), png: s.png ? `${part.name}/${s.png}` : null }))),
+    steps: parts.flatMap((part) => (part.steps || []).map((s) => ({ ...s, step: `${part.name}/${s.step}`, ok: s.ok === true, png: s.png ? `${part.name}/${s.png}` : null }))),
     refused_requests: parts.flatMap((part) => part.refused_requests || []),
+    ...(parts.some((part) => part.writes) ? { writes: Object.fromEntries(["sent", "refused", "tolerated", "through"].map((kind) =>
+      [kind, parts.flatMap((part) => ((part.writes || {})[kind] || []).map((line) => `${part.name}: ${line}`))])) } : {}),
+    private_addresses: addressSummary(parts.flatMap((part) => (part.steps || []).filter((s) => typeof s.private_addresses === "number").map((s) => [`${part.name}/${s.step}`, s.private_addresses]))),
     status: bad.length ? "fail" : "done",
     detail: bad.length ? `failed: ${bad.map((r) => r.name).join(", ")}` : `${results.length} takes`,
   });
