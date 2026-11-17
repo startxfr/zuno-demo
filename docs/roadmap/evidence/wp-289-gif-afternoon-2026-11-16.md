@@ -314,7 +314,7 @@ Between about 00:20 and 00:35 CET the first load of UnifAI and of the Tempo sear
 
 ### Two failed takes at `feaf7d32` (WP-290, 2026-11-17)
 
-Each take ran on an owner's named go in demo333's session, as relayed. **The exact go times are not stated here**: they are in demo333's log, which the writer cannot read; the writer asked `zuno-demo-reorg` for them. The takes' own start times, read from `markers.json`: `maas-portal-api-keys` 01:29:12 UTC (02:29 CET), `openclaw` 01:31:32 UTC (02:31 CET). Neither take is retried yet. The writer read both directories and opened the images named below.
+The owner answered **one dialog holding both questions at 02:28:30 CET on 2026-11-17**, choosing "Take maas-portal-api-keys" and "Take openclaw" (time read by `zuno-demo-reorg` in demo333's session log, as relayed). So one time covers both gos, before the takes' own starts, read from `markers.json`: `maas-portal-api-keys` 01:29:12 UTC (02:29 CET), `openclaw` 01:31:32 UTC (02:31 CET). **Which commit the takes ran at:** demo333 reports `feaf7d32`; the text of the maas question named `devel` `6f836c28` and "scout 6/6 ok". Neither `markers.json` records a commit, and no other file of the two take directories names one, so the writer cannot confirm either from the files. Neither take is retried yet. The writer read both directories and opened the images named below.
 
 **`maas-portal-api-keys`**, take `maas-portal-api-keys-20261117-022910`, persona `ai-dev-01`.
 
