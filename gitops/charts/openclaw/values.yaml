@@ -82,6 +82,24 @@ lockdown:
     elevated:
       enabled: false
 
+# WP-301 (ADR-0619 clause 5): the alternative AI gateways, {name, label, url, models}. For each entry every
+# persona's Claw gets one more credential (zuno-alt-<name>, matched by the url's host, the same client and
+# headers as zuno-ai, so the operator's proxy injects the persona's own token) and one more custom provider
+# <name> (models: the entry's `models`, default [auto], aliased <name>, then <name>-<model>); `zuno` stays the
+# first provider. The operator derives the proxy's egress to zuno-ai-run from mcpServers only, so one more
+# NetworkPolicy per persona lets the proxy pods reach altGatewayNamespace:altGatewayPort. Empty (the
+# default): nothing more is rendered.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []
+altGatewayNamespace: zuno-ai-gateways
+altGatewayPort: 8080
+# The labels of the operator's proxy pods, which that NetworkPolicy selects. NOT read from a live pod yet (the
+# recon of 2026-11-17 names the pods claw-proxy only): check `oc -n zuno-claw-<persona> get pod --show-labels`
+# against the operator's own <name>-proxy-egress policy before the first roll.
+altGatewayProxySelector:
+  app: claw-proxy
+
 # Vault (KV zuno/): keycloak/openclaw-<persona> {client_secret} is seeded by the
 # vault role with the Keycloak client; openclaw/<persona> {ui_password,
 # cookie_secret} by the openclaw role.
