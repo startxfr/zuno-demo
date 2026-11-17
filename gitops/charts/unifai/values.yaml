@@ -209,6 +209,19 @@ egress:
   # Not listed: us.cloud.langfuse.com (multiagent LANGFUSE_BASE_URL, but
   # LANGFUSE_ENABLED=false live). Add it here when Langfuse is turned on.
 
+# WP-299 (ADR-0619 clause 5): the alternative AI gateways, {name, label, url, models}. Each entry is one more
+# shared UnifaiLLM, <gatewayLLM.name>-<name> (zuno-gateway-praxis), next to the one below and built in like it
+# (gatewayLLM.builtin): the entry's url, the user's own token (forward_user_token), model_name the entry's first
+# `models` item (default auto), and NO routing lookup (/routing-decisions exists on the Zuno ai-gateway only).
+# The agent bundles and the tasks keep the Zuno ai-gateway. With an entry, `.<altGatewayNamespace>.svc` is added
+# to the hosts multiagent may call (stack.outboundAllowedHosts). zuno-unifai has no egress NetworkPolicy to
+# extend. Empty (the default): nothing more is rendered.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []
+# The alternative gateways' namespace (ADR-0619 clause 2).
+altGatewayNamespace: zuno-ai-gateways
+
 # Shared LLM of the platform: the ai-gateway, called with the user's own token
 # (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.
 gatewayLLM:

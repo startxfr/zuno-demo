@@ -33,7 +33,12 @@ spec:
     ragClients:
       {{- toYaml . | nindent 6 }}
     {{- end }}
-  {{- with $s.outboundAllowedHosts }}
+  {{- $hosts := $s.outboundAllowedHosts | default list }}
+  {{- if .Values.altGateways }}
+  {{- /* WP-299 (ADR-0619 clause 5): multiagent may also call the alternative gateways' namespace. */}}
+  {{- $hosts = append $hosts (printf ".%s.svc" .Values.altGatewayNamespace) | uniq }}
+  {{- end }}
+  {{- with $hosts }}
   outboundAllowedHosts:
     {{- toYaml . | nindent 4 }}
   {{- end }}
