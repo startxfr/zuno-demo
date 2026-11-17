@@ -162,3 +162,18 @@ under the same Keycloak identity.**
   - [WP-302](../roadmap/work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) (Blender)
   - [WP-303](../roadmap/work-packages/wp-303-give-world-model-the-alternative-gateways.md) (world-model)
 - [WP-304](../roadmap/work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) (scenarios).
+
+## Update 2026-11-17 (WP-292 spike): JWKS over https, and the client token never reaches a backend
+
+The spike ([evidence](../roadmap/evidence/wp-292-praxis-spike.md)) ran upstream Praxis AI 0.11.0 on the workstation. It
+settles two points of clause 4.
+
+- **JWKS over https.** Praxis's JWT plugin refuses an `http://` JWKS URL. The alternative gateways therefore read the
+  JWKS from the https Keycloak route, `https://keycloak.<domain>/realms/zuno/protocol/openid-connect/certs`, which the
+  `zuno-ai-gateways` EgressFirewall allows, and not from the in-cluster `zuno-service.zuno-auth.svc` named in clause 4.
+- **The client token never reaches a backend.** Praxis forwards the client's `Authorization` header unless a `headers`
+  filter removes it. The Praxis configuration removes `authorization` and `x-api-key` at the start of every routing
+  step, before any provider credential is injected.
+
+The spike also counted many JWKS fetches. The fetch rate is measured in WP-292 before Praxis serves an audience.
+
