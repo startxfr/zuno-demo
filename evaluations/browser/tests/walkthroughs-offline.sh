@@ -932,6 +932,9 @@ for f in d.rglob("*"):
 assert not key.search(sys.argv[2].encode()), "a key in the recorder's output"
 assert "the portal received a masked value" in sys.argv[2]
 PY
+out="$(maas m-preselected FAKE_PRESELECTED=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "maas: a dialog that opens with the subscription already chosen (hidden first match, value held by a select) passes, key revoked" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"keys\":2,\"live\":1,\"checks\":0}' <<<\"\$0\"" "$out"
 out="$(maas m-refused FAKE_REFUSE_REVOKE=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "maas: a key that still answers after its revoke fails the take and names it, never its value" bash -c "test $rc -eq 1 && grep -q '^RESULT: FAIL the key k-[0-9a-f]* named zuno-demo-gif-[0-9]* was NOT revoked: its delete answered HTTP 403 and the gateway still answers 200 with it; revoke it by hand' <<<\"\$0\" && ! grep -q 'sk-oai-[A-Za-z0-9_-]\{8,\}' <<<\"\$0\"" "$out"

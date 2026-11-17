@@ -91,6 +91,28 @@ async function shows(scope, text) {
   for (let i = 0; i < Math.min(await hits.count(), 10); i += 1) if (await hits.nth(i).isVisible().catch(() => false)) return hits.nth(i);
   return null;
 }
+// What the open dialogs show as text or hold as a chosen value, hidden elements left out: the subscription is
+// "chosen" when one of them is its name. (The take of 2026-11-17 failed on a first match that was not the visible one.)
+async function dialogShows(page) {
+  return page.evaluate((sel) => {
+    const seen = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+    const out = [];
+    for (const box of document.querySelectorAll(sel)) {
+      if (!seen(box)) continue;
+      for (const el of box.querySelectorAll("*")) {
+        if (!seen(el)) continue;
+        let text = "";
+        if (el instanceof HTMLSelectElement) text = (el.selectedOptions[0] || {}).text || "";
+        else if (el instanceof HTMLInputElement && !["password", "hidden"].includes(el.type)) text = el.value;
+        else if (!el.children.length && !(el instanceof HTMLOptionElement) && !(el instanceof HTMLTextAreaElement)) text = el.textContent || "";
+        text = text.replace(/\s+/g, " ").trim();
+        if (text && text.length <= 80) out.push(text);
+      }
+    }
+    return out;
+  }, DIALOG).catch(() => []);
+}
+const chosen = async (page) => (await dialogShows(page)).includes(SUBSCRIPTION);
 const live = (row) => !/revok|expired|inactive|deleted/i.test(String(row.status || row.state || ""));
 
 // Open the API keys page and read the list the portal itself fetched: {path, rows}. The path is kept: the revoke
@@ -174,16 +196,17 @@ export async function run({ page, domain, mark, log, state, interceptSecret, fet
   const name = await firstVisible(page, NAME);
   if (name) { await name.click(); await page.keyboard.type(state.keyName, { delay: 20 }); }
   // The subscription: when the dialog does not already show it, its chooser is opened and the entry clicked.
-  if (!(await shows(dialog, SUBSCRIPTION))) {
+  if (!(await chosen(page))) {
     const chooser = await firstVisible(page, [`${DIALOG} button:has-text('Select a subscription')`, `${DIALOG} [role='combobox']`, `${DIALOG} select`, `${DIALOG} button[aria-haspopup]`]);   // the first seen live, 2026-11-16
     if (chooser) { await click(chooser, { changes }); await page.waitForTimeout(500); }
   }
   // The entry of the open list (its text may carry more than the name), else the name as a text of its own.
   const entry = page.locator("[role='option'], [role='menuitem'], [role='listbox'] li, [role='menu'] li").filter({ hasText: SUBSCRIPTION }).first();
   if (await entry.isVisible().catch(() => false)) await click(entry, { changes });
-  else if (!(await shows(page, SUBSCRIPTION))) throw new Error(`the create dialog does not offer the subscription ${SUBSCRIPTION}`);
+  else if (!(await chosen(page)) && !(await shows(page, SUBSCRIPTION))) throw new Error(`the create dialog does not offer the subscription ${SUBSCRIPTION}`);
+  const picked = await waitUntil(page, { what: `${SUBSCRIPTION} chosen in the dialog`, timeoutMs: 10000, everyMs: 500, done: async () => (await chosen(page)) || undefined }).catch(() => false);
+  if (!picked) throw new Error(`the create dialog does not show ${SUBSCRIPTION} as chosen; it shows: ${(await dialogShows(page)).slice(0, 20).join(" | ")}`);
   await page.waitForTimeout(600);
-  if (!(await dialog.getByText(SUBSCRIPTION).first().isVisible().catch(() => false))) throw new Error(`the create dialog does not show ${SUBSCRIPTION} as chosen`);
   await mark("create-form");
 
   // From here a key may exist. The recorder stands between the portal and the answer of the create call.

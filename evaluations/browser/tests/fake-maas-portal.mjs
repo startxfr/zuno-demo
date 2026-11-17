@@ -12,6 +12,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8092);
+const PRESELECTED = process.env.FAKE_PRESELECTED === "1";
 const keys = new Map([["k-earlier", { name: "an earlier key", status: "active", secret: "sk-oai-EARLIEREARLIEREARLIER" }]]);
 let checks = 0;   // FAKE_REREAD: how many times the portal sent a key back to the server
 
@@ -22,7 +23,8 @@ const PORTAL = page("Red Hat AI portal", `<nav><a href="#endpoints">AI asset end
 <main><div id="keys" hidden><h1>API keys</h1><button id="create">Create API key</button><ul id="list"></ul></div>
 <div role="dialog" id="dialog" hidden style="border:1px solid #888;padding:16px"><h2>Create API key</h2><label>Name <input type="text" id="name"></label>
 <label>Description <textarea id="desc"></textarea></label>
-<div>Subscription <button type="button" id="sub-toggle" aria-expanded="false">Select a subscription</button>
+<div>Subscription <span hidden>gpt-oss-20b-ocp-ai-dev</span><select id="sub-select" ${PRESELECTED ? "" : "hidden"}><option>gpt-oss-20b-ocp-ai-dev</option></select>
+<button type="button" id="sub-toggle" aria-expanded="false" ${PRESELECTED ? "hidden" : ""}>Select a subscription</button>
 <ul role="menu" id="sub-menu" hidden><li role="menuitem" data-v="gpt-oss-20b-ocp-ai-dev">gpt-oss-20b-ocp-ai-dev 5,000,000 tokens per hour</li></ul></div>
 <div>Expiration <button type="button">30 days</button></div>
 <button type="submit" id="submit" disabled>Create API key</button><button type="button" id="cancel">Cancel</button></div>
@@ -38,7 +40,8 @@ async function list() {
 $("nav-keys").onclick = (e) => { e.preventDefault(); $("keys").hidden = false; list(); };
 $("create").onclick = () => { $("dialog").hidden = false; };
 // As the portal's dialog on 2026-11-16: the subscription is chosen in a menu, and the button is disabled until then.
-let sub = "";
+// FAKE_PRESELECTED=1: as the take of 2026-11-17 met it, the only subscription is already chosen when the dialog opens.
+let sub = ${PRESELECTED ? '"gpt-oss-20b-ocp-ai-dev"' : '""'};
 $("sub-toggle").onclick = () => { $("sub-menu").hidden = false; };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sub-menu").hidden) { $("sub-menu").hidden = true; e.stopPropagation(); } });
 $("sub-menu").firstElementChild.onclick = (e) => { sub = e.currentTarget.dataset.v; $("sub-toggle").textContent = sub; $("sub-menu").hidden = true; $("submit").disabled = !$("name").value; };
