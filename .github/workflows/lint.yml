@@ -136,6 +136,10 @@ jobs:
         run: |
           python3 evaluations/tests/test_blender_addon.py
           python3 evaluations/tests/test_blender_measure.py
+      # ADR-0619 clause 8 (WP-298): Claude Code's apiKeyHelper, its refresh-token cache and device sign-in (no
+      # network).
+      - name: Claude Code token helper tests (ADR-0619)
+        run: python3 evaluations/tests/test_claude_code_token.py
       # ADR-0608 (WP-241): how each drift check judges what `oc get` returns.
       - name: Drift check judgement tests (ADR-0608)
         run: python3 platform/drift/tests/test_check_drift.py

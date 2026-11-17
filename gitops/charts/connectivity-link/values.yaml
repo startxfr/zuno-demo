@@ -101,6 +101,44 @@ workstationEntry:
   backendPort: 8080
   # Router and HTTPRoute timeout: a cold gpt-oss-20b answer can take minutes.
   timeout: 300s
+# ADR-0619 clause 8 (WP-298): Praxis's entry for workstation experience clients
+# (templates/praxis-workstation-entry.yaml): Claude Code, and the Blender
+# add-on's reuse (WP-302). Off by default; off renders nothing and leaves the
+# zuno-agent-gateway listener as it is. On, the listener also admits routes
+# from `namespace`, and Praxis's NetworkPolicy must admit the gateway pod
+# (WP-292 chart). It reuses quotaEnforcement.requiredAudience and the
+# zuno-agent-gateway, so that gateway must be on too.
+praxisWorkstationEntry:
+  enabled: false
+  # Empty = praxis.<clusterBaseDomain>.
+  hostname: ""
+  # Empty = https://keycloak.<clusterBaseDomain>/realms/zuno.
+  keycloakIssuerUrl: ""
+  # Must mirror gitops/apps/keycloak/application-d1.yaml ingress.acmeWildcardTLS (see the template).
+  keycloakAcmeWildcardTLS: false
+  # Keycloak clients (the token's azp) admitted at the edge. Praxis verifies the token again.
+  allowedClients:
+    - claude-code
+    - blender
+  # Keycloak groups (without the leading slash) whose members may use the entry. Empty = any user of an
+  # allowed client; set it, since a public device-grant client lets every realm user mint a token.
+  allowedGroups: []
+  # The only requests the entry passes (exact paths; the query string is not matched). Everything else is 404.
+  paths:
+    - {method: POST, path: /v1/messages}
+    - {method: POST, path: /v1/messages/count_tokens}
+    - {method: GET, path: /v1/models}
+    # The Blender add-on's reuse of this entry (WP-302).
+    - {method: POST, path: /v1/chat/completions}
+  # Requests per user (token sub) on the entry.
+  rateLimit:
+    limit: 120
+    window: 5m
+  namespace: zuno-ai-gateways
+  backendService: praxis
+  backendPort: 8080
+  # Router and HTTPRoute timeout: a long coding turn on a local model streams for minutes.
+  timeout: 600s
 quotaEnforcement:
   enabled: true
   gateway:
