@@ -633,6 +633,33 @@ The tree of `6b57720c` holds **27** GIF files in `docs/assets/img/demo`. Each co
 
 **WP-290 has 3 of 6** (`genai-playground`, `maas-portal-api-keys`, `openclaw`). Left: `a2a-delegation-approval` (a take, held), and `world-model` and `blender-3d` (assembled GIFs, offline, assist).
 
+### Guard summaries of the 18 demos of WP-289 (the writer's check, 2026-11-17)
+
+The coordinator asked, before deciding on WP-289: for each demo, where the evidence states what the take left on the server (or "nothing", with its basis), and a flag where that statement is missing or only relayed. The writer read the evidence files; it did not re-open any frame or take. "Sprint" is `wp-289-gif-sprint-2026-11-16.md`, "afternoon" this file. **Stated** means a sentence of the evidence says what stays. **Implied** means no such sentence, only a basis (the commands or the counts). Common to all: the gateway's model-call metrics and the traces of a demo's own calls cannot be deleted by a take (ADR-0618 clause 12; sprint, "What stays on the server").
+
+| # | Demo | What the take left | Where | Basis | Flag |
+|---|---|---|---|---|---|
+| 1 | `gitops-day0-3` | Nothing: two reads | Sprint, its section | Stated; `created` empty | none |
+| 2 | `image-signing-admission` | Nothing: four reads | Sprint, its section | Stated; `created` empty | none |
+| 3 | `external-models` | Nothing: reads. The published re-take has four read commands | Sprint, re-take section (the statement "three reads" is in the section of the replaced first take) | Stated for the first take; the re-take lists "four reads, all `rc` 0" but has no sentence of its own | **Implied** for the published take |
+| 4 | `ai-gateway-sovereignty` | Two real model calls of the probe (Arkos at C1 raised to C3, and the Tekos control) | Sprint, re-take section | Stated | none |
+| 5 | `okf-signed-agent-release` | Nothing: two commands, `git show` and `oc logs`, `rc` 0 | Sprint, its section | Commands and `created` empty, `cleaned` null | **Implied**: no sentence |
+| 6 | `service-mesh-kiali` | Nothing: three commands, `oc get`, `rc` 0 | Sprint, re-take section | Commands and `created` empty, `cleaned` null | **Implied**: no sentence |
+| 7 | `lightspeed` | The conversation was deleted; the model calls behind the answers stay in the platform's records | Sprint, its section | Stated | none |
+| 8 | `model-catalog-registry` | Nothing: read-only | Sprint, its section | `created` empty, `cleaned` null, owned 0 and 0 | **Implied**: no sentence |
+| 9 | `mcp-tools-by-group` | The chats were deleted; the Confluence search of `consultant-02` and the failed Drive call of `sale-01` stay in the tool records | Afternoon, re-take section | Stated | none |
+| 10 | `ai-gateway-routing` | `chat`: one chat created and deleted; `dashboard`: read-only | Sprint, its section | `chat` owned 1 and 1; no sentence on the model call or on the Grafana sign-in | **Implied**; the Grafana authorizations are in "What the cluster keeps" |
+| 11 | `evaluation-trustyai-evalhub` | Nothing from the take: read-only | Sprint, its section | Owned 0 and 0 | **Implied**; the Grafana authorizations are in "What the cluster keeps" |
+| 12 | `aap-audited-operations` | Nothing: a take under a default-deny guard | Afternoon, its section | `created` empty, owned 0 and 0 | **Implied**; the AAP user `consultant-03` is an open item ("What the cluster keeps": whether AAP created it is not confirmed) |
+| 13 | `quotas` | Nothing from the take: stills of Grafana panels | Afternoon, its section | `created` empty, owned 0 and 0; no take-time write guard (it watches writes and fails afterwards) | **Implied**; the Grafana authorizations are in "What the cluster keeps" |
+| 14 | `unifai-agents` | One session per persona, created and deleted | Afternoon, its section | Owned 21 and 21 for both takes; no sentence on what stays (traces, the model call) | **Implied**; taken before the write guard (the guard section above) |
+| 15 | `lora-pipeline-mlflow-kueue` | Nothing: stills of runs that had finished | Afternoon, its section | `created` empty, owned 0 and 0; "no write watched" is **relayed** | **Implied and partly relayed** |
+| 16 | `dify` | The workflow run stays in the run log; the Zuno Agent's edited date moved (declared) | Afternoon (take and publication), sprint ("What the cluster keeps"; the order table: the run log it leaves stays) | Stated; conversation created and deleted, owned 0 and 0; the writes list is **relayed** | The writes list is relayed |
+| 17 | `guardrails` | One conversation created and deleted; the Zuno Agent's edited date moved again (declared); the detections the probes and the take left on the dashboard | Afternoon, its section; sprint ("What the cluster keeps", the declared effect) | Stated; the writes list is **relayed**; the probes' part of the count is stated | The writes list is relayed |
+| 18 | `observability-trace` | The trace in Tempo; one Tekos answer of `consultant-02`'s budget; the Tempo OAuth authorization of `ai-ops-01`; one session created and deleted | Afternoon, its take section | Stated, but "What the cluster keeps" there is **relayed**; the session count (21 and 21) and the 18 writes are read from the file | The keeps line is relayed |
+
+**Summary.** Stated by a sentence, with a basis the writer read: 1, 2, 4, 7, 9. Stated and partly relayed: 16, 17, 18. Implied only (a basis but no sentence): 3 (for the published re-take), 5, 6, 8, 10, 11, 12, 13, 14, 15. **No demo has neither a basis nor a statement.** Open and recorded elsewhere, not closed here: the Grafana authorizations (rows 10, 11, 13), `consultant-03` (row 12), the declared edited-date effect (rows 16, 17), the deferred entries a to q.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
