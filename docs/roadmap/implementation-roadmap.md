@@ -1195,8 +1195,8 @@ ADR-0618 extends it to every scenario of the catalogue (terminal demos included,
 | WP-286 | [wp-286](work-packages/wp-286-improve-the-recording-chain-and-reprove-it-on-open-webui.md) | 0618 | WP-284 | Done | none |
 | WP-287 | [wp-287](work-packages/wp-287-record-terminal-demos-as-real-sessions-checked-as-text.md) | 0618 | WP-286 | Done | none |
 | WP-288 | [wp-288](work-packages/wp-288-record-the-first-batch-of-browser-demos.md) | 0618 | WP-286, WP-287 | Done | none |
-| WP-289 | [wp-289](work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) | 0618 | WP-288 | Repo work merged (16 of 18 demos published) | the owner's go for each remaining take; the owner's decision on `guardrails` |
-| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Repo work merged (1 of 6 demos published) | the owner's decision for each of the six demos, one by one |
+| WP-289 | [wp-289](work-packages/wp-289-record-the-repeats-of-the-proven-patterns.md) | 0618 | WP-288 | Repo work merged (17 of 18 demos published) | the owner's go for the remaining take (`observability-trace`) |
+| WP-290 | [wp-290](work-packages/wp-290-decide-and-record-the-six-delicate-demos.md) | 0618 | WP-289 | Repo work merged (2 of 6 demos published) | the owner's decision for each of the six demos, one by one |
 
 ### OKF stream phases
 
@@ -1342,6 +1342,7 @@ moving.
 
 ## Change log
 
+- 2026-11-17 — WP-289 (17 of 18) and WP-290 (2 of 6): `guardrails` (`e75b0ce8`) and `maas-portal-api-keys` (`f17dc35b`) are published on the owner's go of 05:18:40 CET; the catalogue has 25 GIFs of 30 demos. One of WP-289 remains (`observability-trace`); four of WP-290 (`openclaw`, `a2a-delegation-approval`, `blender-3d`, `world-model`). Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-16 — WP-289 (16 of 18): `dify` is published (`00a57123`) on the owner's go of 23:18 CET, with the Agent's edited-date effect declared; the catalogue has 23 GIFs of 30 demos. Two of WP-289 remain (`guardrails`, `observability-trace`). Facts are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-16 — WP-289 (15 of 18): `unifai-agents` (`84f41734`) and `lora-pipeline-mlflow-kueue` (`a4285b25`, stills only) are published on the owner's go of 21:30 CET; the catalogue has 22 GIFs of 30 demos. Three of WP-289 remain (`dify`, `guardrails`, `observability-trace`). Facts and reviews are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
 - 2026-11-16 — WP-290 Repo work merged (1 of 6): `genai-playground` is published (`1a4ff89b`) on the owner's go of 20:05 CET; the catalogue has 20 GIFs of 30 demos. The other five are not recorded. Facts and review are in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).

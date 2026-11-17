@@ -1,6 +1,6 @@
 # WP-290: Decide and record the six delicate demos
 
-- **State:** Repo work merged (2026-11-16: 1 of 6 demos published, `genai-playground`; the other five wait for scouts, the owner's choices and go)
+- **State:** Repo work merged (2026-11-17: 2 of 6 demos published, `genai-playground` and `maas-portal-api-keys`; the other four wait for takes, the owner's choices and go)
 - **ADRs:** [ADR-0618](../../adr/0618-give-every-catalogue-scenario-a-gif-with-real-terminal-sessions-checked-as-text-first.md)
 - **Depends on:** [WP-289](wp-289-record-the-repeats-of-the-proven-patterns.md)
 - **Related:** [ADR-0617](../../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md), [WP-284](wp-284-record-the-open-webui-demo-and-publish-it-as-a-gif.md)
@@ -51,7 +51,7 @@ Nothing is recorded yet for these four: each is a take to scout and review like 
 
 `genai-playground` is the first of the six with a GIF: `1a4ff89b` publishes take `genai-playground-20261116-183758` on the owner's go of 20:05:27 CET (coordinator's log), before the commit at 20:06:07. The file is 1 046 464 bytes and equal to the take's GIF (SHA-256 `df603fdf6cf0...`, compared by the writer). The take follows the owner's choice "skip the paste": it shows rows 0:00 and 0:45 and the MCP settings as found (`zuno-mcp-gateway` listed, "0 active", no token). Rows 1:45 and 3:00 stay words; the prompt of row 3:00 is untested in the playground. Facts and review: [afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
-The other five are not recorded. `maas-portal-api-keys` failed its scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
+**Update 2026-11-17:** `maas-portal-api-keys` is published (below). The other four are not published. `maas-portal-api-keys` had failed its first scout at `enter` (the guard refused the portal's key-list search; nothing was created). `openclaw` scouted 7 of 7 at `d80f25ef` (as relayed). `a2a-delegation-approval` is on `devel`, unscouted. `blender-3d` and `world-model` are not asked yet.
 
 ### Owner's decision on `openclaw`, session cleanup (2026-11-16, answered just before 21:01:38 CET)
 
@@ -68,9 +68,11 @@ Neither is retried. Details are in [the afternoon evidence](../evidence/wp-289-g
 - `maas-portal-api-keys` failed before any key was created: the check did not see the model chosen in the Create dialog, which the frame shows is chosen. A bug in the check. Fixed on `devel` as `723c5e24` (coder's `a8afb3a6`); a rescout comes before the next take. The shown-once dialog is still unseen.
 - `openclaw` failed after the question was answered: the take did not recognise its own session, which the assistant had retitled, so it did not delete it. Owned sessions went from 6 to 7. The owner decided "Leave it" (2026-11-17, 04:09:56 CET, as relayed): the session stays in `consultant-02`'s assistant. The answer frame holds real Confluence titles; the owner chose "comme guardrails".
 
-### `maas-portal-api-keys`: the take passed (2026-11-17, no GIF yet)
+### `maas-portal-api-keys`: published (2026-11-17)
 
-Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key created and cleaned, owned 0 to 0, private addresses 0 (the writer read `markers.json`). The shown-once dialog was seen for the first time, with the key masked after `sk-oai-`. The recorder drew the calls (401 without the key, 200 with it, one chat completion). The key was revoked and the gateway answered 403 with it (as relayed). Not published: the GIF waits for a re-cut and the owner's go. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+`f17dc35b` publishes take `maas-portal-api-keys-20261117-041246`, cut v2, on the owner's go "go de publication de guardrails et de maas-portal-api-keys." at 05:18:40 CET (the coordinator's log, as relayed), before the commit at 05:19:12 CET (git). The file is 614 271 bytes, 41.1 s, and equal to the take's GIF (SHA-256 `2bd2899a421e...`, compared by the writer). The revoke is in no frame. The take passed as below.
+
+Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key created and cleaned, owned 0 to 0, private addresses 0 (the writer read `markers.json`). The shown-once dialog was seen for the first time, with the key masked after `sk-oai-`. The recorder drew the calls (401 without the key, 200 with it, one chat completion). The key was revoked and the gateway answered 403 with it (as relayed). Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
 ### Scouts at `d80f25ef` (as relayed)
 

@@ -267,7 +267,7 @@ The take failed after the Agent turn: the workflow step went to the web-app page
 
 **Not proposed for publication yet**, because of the Zuno Agent finding above. All Dify takes are on hold; the coder is making the guard default-deny (as relayed).
 
-## Take: guardrails (passed, no GIF yet)
+## Take: guardrails (passed; published at 05:19 CET on 2026-11-17)
 
 Owner's named go in demo333, take at `df554323` (as relayed). Directory `guardrails-20261116-233501`; the writer read it. Both takes are `pass`.
 
@@ -360,7 +360,7 @@ The writer read the five `scout.json` files and the sub-scouts of `observability
 
 The coder's `bddb4d38` (commit time 03:09:04 CET) is on `devel` as `b1e7c538` (commit time 03:22:16 CET on 2026-11-17; both times read from git by the writer). As relayed: in a run of several takes, the top `scout.json` now keeps each take's step details, named `<take>/<step>`, and a `writes` key whose lines start with "<take>: ". It changes `record.mjs` and one offline case only; no walkthrough hash moves. Suites passed, as relayed. The rescouts above predate it: their top `scout.json` has no step details, which is why the writer read the sub-scout files. `fb79efc8` is on `devel` as `118e2ecc` (as relayed).
 
-### Take: maas-portal-api-keys (passed, no GIF yet; WP-290)
+### Take: maas-portal-api-keys (passed; published at 05:19 CET on 2026-11-17; WP-290)
 
 Take `maas-portal-api-keys-20261117-041246`, persona `ai-dev-01`, started 03:12:56 UTC (04:12 CET). The owner answered **one dialog at 04:09:56 CET on 2026-11-17** with three choices, "Take maas-portal-api-keys", "Take observability-trace" and "Leave it" (time read by `zuno-demo-reorg` in demo333's log, as relayed): the go is before the start at 04:12 CET. `observability-trace` has its go at the same time and was not run yet, as far as the coordinator knows. "Leave it" is the owner's decision on the failed `openclaw` take's session: it stays in `consultant-02`'s assistant. The writer read `markers.json` and opened 4 of the 8 marker images (`keys`, `created`, `calls`, `answer`) and no GIF frame.
 
@@ -381,7 +381,7 @@ The other frames: `keys.png` is the empty list ("No API keys") of `ai-dev-01`, n
 
 **What the cluster keeps (as relayed):** possibly one key listed as revoked in `ai-dev-01`'s portal, and the traces and metrics of the three calls.
 
-### maas-portal-api-keys: cut v2 (candidate, not published)
+### maas-portal-api-keys: cut v2 (published at 05:19 CET)
 
 The coordinator's `63ace45b` (commit time 04:27:23 CET, from git; `gif.yml` only) is the second re-cut of the same take. The first re-cut (`f6083840`) ended its motion on the pressed Create button, so the created-key dialog was in no frame while a caption named it; demo333 caught it and sent that cut to the owner with caveats, not recommended (as relayed).
 
@@ -424,10 +424,23 @@ The writer read `observability-trace-20261117-050600-scout` (top, `chat` and `tr
 
 - **The `tags` step** (read from the file): `caption_in_window` **false**, `proof_in_window` **true**, `run_id_shown` true. At marker `tags` the window holds `zuno.model`, `zuno.latency_ms` and `zuno.estimated_cost_usd` and none of the other nine named tags. At marker `tags-run` it holds `zuno.persona`, `zuno.task`, `zuno.model_kind`, `zuno.provider`, `zuno.model`, `zuno.latency_ms`, `zuno.outcome` and `zuno.run_id`. `zuno.client` and `zuno.agent` are in neither window; `zuno.classification` is in neither either. All 12 named tags exist on the span (the `tags` list of the step).
 - **Why:** the span's tag list is alphabetical, so `zuno.persona` cannot sit in one window with `zuno.agent` and `zuno.client`. The coordinator concludes that the framing of `5030c11a` is wrong and that a take would fail the same way (as relayed; the writer read the file, not the code). No take was asked.
-- **A new privacy finding.** `scout-tags.png` (opened): below the tags a span row `zuno.user_sub` is drawn as the last row, with a UUID value, and above `zuno.latency_ms` a list of group names ("consultant/..." entries). The coordinator says `zuno.user_sub` is the Keycloak subject of `consultant-02` and that its value is not in the repository (checked with `git grep`), and that the group names are already in the repository. **The writer copies neither the value nor the group names.** The frame also shows `zuno.request_id` and `zuno.run_id` values (not copied).
+- **A new privacy finding.** `scout-tags.png` (opened): below the tags a span row `zuno.user_sub` is drawn as the last row, with a UUID value, and above `zuno.latency_ms` a list of group names ("consultant/..." entries). The coordinator says `zuno.user_sub` is the Keycloak subject of `consultant-02` and that its value is not in the repository (checked with `git grep`), and that the group names are already in the repository. Carrying the subject on the span is the platform's stated design, not a defect: ADR-0593 says the raw token `sub` stays in the span attribute `zuno.user_sub` and in logs, for audit (the writer read the line), and ADR-0563 names the same span attribute; only the picture is the demo's matter. **The writer copies neither the value nor the group names.** The frame also shows `zuno.request_id` and `zuno.run_id` values (not copied).
 - **Requested of the coder (as relayed):** a framing that shows `agent`, `client`, cost and model in the first picture and `persona` and `run_id` in the second, and that fails the take if `user_sub` is drawn at either marker. Framing only; no page row hidden.
 
 **`openclaw`** (started 05:07:25 CET, walkthrough `dac2d8a2...`): `done`, 8 steps, **no write at all**, refused none, private addresses 0. The `sessions` step: **rows 7, told apart by link, distinct 7** (the 6 earlier ones plus the one the owner chose to leave). The session menu lists seven entries (Pin session, Mark as unread, Rename..., Fork, Move to group, Archive session and Delete...). So the fix `7dce084a` holds live for the scout: the rows have links. Demo333 asks the owner for the `openclaw` take go (as relayed). The scout did not type or open anything (`nothing_typed` true, `sessions_opened` 0).
+
+### Published at 05:19 CET on 2026-11-17: guardrails and maas-portal-api-keys
+
+On the owner's go "go de publication de guardrails et de maas-portal-api-keys." at **05:18:40 CET** (the coordinator's session log, as relayed), before both commits at **05:19:12 CET** (read from git by the writer). The writer compared each file in the commit with the GIF the take directory holds now.
+
+| Demo | Commit | Take | File | SHA-256 |
+|---|---|---|---|---|
+| `guardrails` | `e75b0ce8` | `guardrails-20261116-233501`, cut `0fb526ee` | 691 243 bytes, 43.0 s as in `guardrails.gif.json` | `331b0759959e...`, equal |
+| `maas-portal-api-keys` | `f17dc35b` | `maas-portal-api-keys-20261117-041246`, cut v2 (`63ace45b`) | 614 271 bytes, 41.1 s | `2bd2899a421e...`, equal |
+
+Each commit adds the GIF and its page caption: `guardrails.md` (the caption says the model declines, the gateway blocks nothing, and the panel's count includes the check's probes) and `maas-portal-api-keys.md` (the caption says the recorder kept the real key out, so the field shows a masked value, and that the key was revoked at the end of the take). The tree of `f17dc35b` holds **25** GIF files in `docs/assets/img/demo`. The caption of `guardrails` and the declared effect of its take (the Zuno Agent's edited date moved again) are in the section above. `maas-portal-api-keys.md` carries no "(untested ...)" mark on rows 0:00 to 4:15, so none was lifted. The writer did not open the frames of the final cuts of `guardrails`; of `maas-portal-api-keys` it saw the contact sheet of 13 frames above.
+
+WP-289 has 17 of 18 (`observability-trace` remains) and WP-290 has 2 of 6.
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
