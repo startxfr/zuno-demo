@@ -84,6 +84,19 @@
     - { src: "{{ role_path }}/files/apps", dest: /tmp/apps }
   changed_when: false
 
+# WP-300: one model per alternative gateway, on the token proxy's alternate route (see defaults/main.yml).
+- name: "dify | the models of the alternative gateways (WP-300)"
+  ansible.builtin.set_fact:
+    _dify_alt_models: >-
+      {{ (_dify_alt_models | default([])) + [{
+           'name': item.name ~ '-auto', 'mode': 'chat', 'context': item.context | default(dify_alt_model_context),
+           'endpoint': 'http://zuno-token-proxy:8080/alt/' ~ item.name ~ '/v1',
+           'endpoint_model': (item.models | default(['auto'])) | first
+         }] }}
+  loop: "{{ zuno_dify_alt_gateways }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: "dify | configure the administrator, the plugin, the models and the MCP tool"
   ansible.builtin.shell: |
     set -o pipefail
@@ -91,7 +104,7 @@
   environment:
     DIFY_CFG: >-
       {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
-          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'reimport': dify_reimport_apps, 'models': dify_models,
+          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'reimport': dify_reimport_apps, 'models': dify_models + (_dify_alt_models | default([])),
           'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout}),
           'proxy_key': ((_dify_proxy_key.stdout | default('')).splitlines() | first | default(''))
             if (dify_token_proxy_inbound_auth | bool) else ''} | to_json }}
