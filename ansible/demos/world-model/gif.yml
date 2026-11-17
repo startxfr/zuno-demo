@@ -1,0 +1,25 @@
+---
+# world-model: the cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py with `make demo gif world-model`.
+# No take is recorded for this demo (owner's decision of 2026-11-17, 11:14:24 CET: "Enregistrement de secours"): the GIF
+# is cut from the recorded fallback the page names, world-model-recorded-2026-11-08.mp4 (23.9 s, 1280x720, a real run
+# of the GPU runtime on 2026-11-08 with the "RECORDED ... not live" band burnt in at the top of every frame; kept at
+# ~/demo-fallback/ on the operator's workstation, never in git). The take is assembled by hand in the cache
+# (markers.json `kind: assembled`): a copy of the mp4 and three frames taken out of it, each listed in `source` with
+# its SHA-256, which gif.py checks before it cuts. Markers: first 0.1 s (frame 0 is black), walk-end 8.0 s, edit
+# 12.41 s, after 12.6 s.
+# The recording shows only the generated world: no page, notice, Technical view, persona or address (privacy review
+# of 2026-11-17: 1039 frames by machine, about 150 by eye). So rows 0:00 (the notice), 3:15 (the refused prompt) and
+# 4:00 are not in the GIF, and no caption speaks of the page.
+# The walk plays at real speed from 0.1 to 8.0 s only: from about 9 s the textures smear (the run predates the
+# re-anchor) and by about 16 s the village is gone. The red sky lasts 5 frames in the recording (12.368-12.454 s); the
+# 2:15 still is the edited frame, held, and its caption says what that frame shows, not that the red stays. The last
+# still (12.6 s) is the world just after the edit. 640 px and 6 fps keep it under the 5 MB aim: the generated frames
+# compress badly (the same walk at 960 px and 10 fps was 24 MB), and captions stay within 46 characters at 640 px.
+target_seconds: [40, 60]
+width: 640
+fps: 6
+moments:
+  - {still: first, hold: 11, step: "0:30", caption: "0:30  Snowy village, then a volcano"}
+  - {from: first, to: walk-end, speed: 1, hold: 3, step: "1:15", caption: "1:15  Walking: every frame is generated"}
+  - {still: edit, hold: 10, step: "2:15", caption: "2:15  A prompt edits the frame: red sky"}
+  - {still: after, hold: 10, caption: "Recorded on 2026-11-08 on the demo's GPU"}

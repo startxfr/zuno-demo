@@ -779,6 +779,28 @@ class Assembled(unittest.TestCase):
             self.assertIn("REFUSED: first.png: its SHA-256", err.getvalue())
 
 
+class WorldModel(unittest.TestCase):
+    def test_the_world_model_cut_list_fits_its_page_and_its_assembled_take(self):
+        """The take assembled on 2026-11-17 from the recorded fallback (markers as written in the cache)."""
+        cut_list = gif.load_cut_list(gif.cut_list_path("world-model"))
+        take = assembled(demo="world-model", video="world-model-recorded-2026-11-08.mp4",
+                         markers=[{"name": "first", "t": 0.1, "png": "first.png"}, {"name": "walk-end", "t": 8.0},
+                                  {"name": "edit", "t": 12.41, "png": "edit.png"},
+                                  {"name": "after", "t": 12.6, "png": "after.png"}])
+        original = "~/demo-fallback/world-model-recorded-2026-11-08.mp4"
+        take["source"] = [{"path": original, "sha256": sha(VIDEO_BYTES)}] + [
+            {"path": original, "sha256": sha(VIDEO_BYTES), "file": f"{n}.png",
+             "altered": {"sha256": sha(n.encode()), "how": "a frame"}} for n in ("first", "edit", "after")]
+        p = gif.plan("world-model", cut_list, take, gif.page_times("world-model"))
+        self.assertTrue(41 <= p.seconds <= 60, p.seconds)                  # a second of margin above 40 s
+        self.assertEqual([m.marker or m.kind for m in p.moments], ["first", "motion", "edit", "after"])
+        self.assertEqual((p.moments[1].start, p.moments[1].end, p.moments[1].speed), (0.1, 8.0, 1.0))  # real speed
+        self.assertEqual((p.width, p.height, p.fps), (640, 360, 6))
+        self.assertEqual([m.step for m in p.moments], ["0:30", "1:15", "2:15", ""])
+        manifest = presenter.load_manifest(gif.cut_list_path("world-model").parent)
+        self.assertEqual(presenter.take_kind(manifest), "assembled")
+
+
 class CaptionWidth(unittest.TestCase):
     """26 px captions: 60 characters fit 960 px and wider; a narrower GIF takes fewer, never cut off silently."""
 

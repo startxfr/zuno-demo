@@ -14,3 +14,7 @@ mutations: {}
 not_rehearsed:
   install: "it refuses while the demo is switched off, and the owner creates the GPU node by hand"
 steps: {}
+# The GIF (WP-290, owner's decision of 2026-11-17): no take, no GPU node. It is cut from a take assembled by hand from
+# the recorded fallback of 2026-11-08 (gif.yml says how); `make demo scout` and `make demo record` refuse it.
+record:
+  kind: assembled
