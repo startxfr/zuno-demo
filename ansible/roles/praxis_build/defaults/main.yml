@@ -19,9 +19,12 @@ zuno_praxis_build_sources:
     url: https://github.com/praxis-proxy/ai
     revision: main
     features: full,token-rate-limit-filter,opentelemetry
-# A Rust release build: several GiB of memory and tens of minutes.
+# A Rust release build: several GiB of memory and tens of minutes. The CPU request stays at 1:
+# the general workers of demo333 have under 2.1 CPU unrequested (WP-292 live recon,
+# docs/roadmap/evidence/wp-292-live-recon-2026-11-17.md, finding 5), so a 4-CPU request would not
+# schedule there. No CPU limit, so the build uses idle CPU; memory is bounded.
 zuno_praxis_build_resources:
-  requests: {cpu: "4", memory: 8Gi}
+  requests: {cpu: "1", memory: 6Gi}
   limits: {memory: 16Gi}
 zuno_praxis_build_timeout: 2h
 zuno_praxis_build_wait_retries: 120
