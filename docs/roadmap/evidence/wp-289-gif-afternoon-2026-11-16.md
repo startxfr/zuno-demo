@@ -581,6 +581,31 @@ Started 06:03:37 UTC (07:03 CET); walkthrough `5032b93b...`. The writer read `sc
 
 So the fold is **proven live, in a scout** (the coder said it had never seen the arrow's element; the scout's file and the image agree that the UI's own control folded the list). The writer saw the request id and the run id values on `tags-run` and copied none. As relayed, demo333 opened both images too and saw the same. demo333 asks the owner for the named take go (chat, then trace); the coordinator integrates `7c12f760` with its next commit.
 
+### Take: observability-trace (passed; GIF candidate, not published)
+
+**Go:** "Take observability-trace" at **07:08:22 CET on 2026-11-17** in demo333's session (read by `zuno-demo-reorg` in its log, as relayed), before the take. The take directory is `observability-trace-20261117-071006`. Demo333 says it ran at `cb2ebf0d`; the files record no commit, but the walkthrough hash of the rescout before it was `5032b93b...`. The writer read both `markers.json`, `takes.json` and `observability-trace.gif.json`, opened five images and a contact sheet of the GIF (below).
+
+| Item | `chat` take | `trace` take |
+|---|---|---|
+| Persona | `consultant-02` | `ai-ops-01` |
+| Started | 06:10:08 UTC (07:10:08 CET) | 06:12:06 UTC (07:12:06 CET) |
+| Result | `pass`, 5 markers (`login`, `hub`, `q-sent`, `q-done`, `end`) in 83.9 s | `pass`, 6 markers (`login`, `search`, `trace`, `tags`, `tags-run`, `end`) in 68.9 s |
+| Created and cleaned | One session created, `cleaned` true; owned 21 before and 21 after | none; owned 0 and 0 |
+| Writes | 18 sent, none refused, none tolerated (`blueprint.validate` x3, `session.join` x2, `edit_lock.statuses` x2, `user.session.create`, `session.typing` x6, `session.leave`, `user.session.submit`, `session.heartbeat` and one `DELETE` of the session) | none |
+| Private addresses | count 0 | count 0 |
+| Notes (the file) | | `traces_listed` 1; `run_id_is_the_chat_session` **true**; `groups_collapsed` true; `tags_in_window` 7; `tags_run_in_window` 12 |
+
+**The GIF** (`observability-trace.gif.json`, written 07:14 CET): 1 526 414 bytes (1.5 MB), 42.0 s planned and real, 960x656, 7 moments, 420 frames; SHA-256 `092005bb6030...`. As relayed by demo333, at `cb2ebf0d`.
+
+**Review.** The directory holds **11** PNGs (5 in `chat`, 6 in `trace`; the writer and the coordinator counted them). Demo333 says "N=11" and lists 10: it left `chat/end.png` as equal to `q-done.png`. **The two are not byte-equal**: `chat/end.png` is 467 483 bytes and `q-done.png` 467 163 (the writer opened `chat/end.png`: it shows the same state as the answered chat, the session "Just now", 22 sessions). The writer opened 3 PNGs (`chat/end.png`, `chat/hub.png`, `trace/tags.png`) and a contact sheet of 13 frames of the GIF; the coordinator opened `chat/q-done.png` and `trace/tags-run.png`. Demo333 samples 13 frames and says nothing private (as relayed).
+
+- **`trace/tags.png`:** the span `model_call` of service `ai-gateway`, its tags from `otel.scope.name` to `zuno.model_kind`, `zuno.groups` folded to one line, no `zuno.user_sub`, no group names, no hover buttons.
+- **The GIF's captions and what the frames show** (contact sheet): "Sign in with the company account" over the Keycloak sign-in; "0:45  A consultant asks our technical agent" over the Collaboration Hub with the question typed, sent and answered; "1:45  The operator finds that turn by who asked" over the Tempo search with the tags filter and one trace; "One trace: UnifAI's spans and the gateway's model calls" over the span list; "3:00  Which app, which agent, which model, what cost" over the span's tags; "Who asked, and the run: the consultant's own session" over the tags with `zuno.persona` and `zuno.run_id`; "Every call leaves a count and a trace" on the last still.
+- **Two captions the frames do not carry entirely.** (1) "the consultant's own session": the frames show the persona and a run id; that the run id **equals the chat session's id** is in the take's notes (`run_id_is_the_chat_session`) and log, not in a frame, because the chat frames do not show the session id (the coordinator's note; the writer agrees). (2) "Every call leaves a count and a trace" is the page's close (as for the other published GIFs: words, not a screen); the frames show a trace, no count.
+- **Privacy flags.** The Collaboration Hub frames show the persona's display name in the header and earlier sessions of that account listed by the first words of their prompts, with dates (the same finding as for `unifai-agents`). The writer copies neither. The trace frames show request and run id values and the trace id; none is copied. As relayed: no `zuno.user_sub`, no group names, no address, host, node, token or email.
+
+Sent to the owner; the coordinator proposes it for publication. **Not published**; no publication go. **What the cluster keeps (as relayed):** the trace in Tempo, one Tekos answer of `consultant-02`'s budget, and the Tempo OAuth authorization of `ai-ops-01` (already listed).
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
