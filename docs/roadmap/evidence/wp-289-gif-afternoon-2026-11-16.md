@@ -526,6 +526,27 @@ Demo333 scouted it direct through `record.sh --scout`: it found no freeze marker
 
 **What it proves.** The coder's diagnosis, a native confirm dismissed by the browser driver, is **confirmed live** by this run (as relayed; the writer saw two sessions gone and the count 8 to 6, not the dialogs). "What the cluster keeps" loses the two sessions. What stays is the assistant's possible memory of the two questions (declared effect). Next, as relayed: an `openclaw` rescout (rows 6), then the take on a new owner go.
 
+### openclaw: the third take passed (2026-11-17, WP-290; no GIF yet)
+
+**Go:** "Take openclaw" at **06:42:25 CET on 2026-11-17** in demo333's session (read by `zuno-demo-reorg` in its log, as relayed).
+
+**Rescout before** (newest `openclaw-*-scout`, `openclaw-20261117-064056-scout`, started 05:41:18 UTC = 06:41 CET, walkthrough `ab1b780c...`; the writer read `scout.json`): `done`, 8 steps; the `sessions` step reads rows 6, distinct 6, told apart by link; `owned` 6; the session menu lists seven entries including Delete...; nothing typed, no session opened, native dialogs 0; no write seen by the guard; private addresses 0.
+
+**The take** (`openclaw-20261117-064651`, persona `consultant-02`, started 05:46:53 UTC = 06:46 CET; the writer read `markers.json` and opened `session.png` and `q-done.png`):
+
+| Item | Value |
+|---|---|
+| Result | `pass`, 6 markers (`login`, `ui`, `session`, `q-sent`, `q-done`, `end`) in 66.1 s |
+| Created and cleaned | One session created; `cleaned` **true**; owned **6 before and 6 after**; private addresses 0 |
+| Writes | none seen by the guard (it does not see the Control UI's WebSocket, so this proves nothing) |
+| Commit | Not recorded in `markers.json`. Demo333 says `devel` `de906ef3`, as relayed. Its walkthrough hash is `ab1b780c...` in the rescout before |
+| Delete (as relayed) | The native confirm was accepted (66 characters, the text not logged) and the session deleted through the Control UI's menu |
+
+- **Frames the writer saw.** `session.png`: the Control UI with a new session "now" at the top of the sidebar under its default technical name, six other rows, an empty chat ready for a question. `q-done.png`: the answer to the question, a list of seven wiki pages with their addresses; the sidebar shows the take's session "now" under a title the assistant derived from the question, and the six other sessions (one with a French title, five with technical `agent:default:` names). `end.png` has the same size as `q-done.png` and was not opened. **No frame can show the delete:** it happens after the last marker.
+- **Review by demo333 (as relayed):** 6 PNGs opened; the question is a short French request to search the wiki for onboarding pages. The coordinator opened `q-done.png` too and saw the same, and the writer agrees: no person name, no email, and the answer shows the **real wiki page titles, page ids and addresses** of the company's Confluence, which this file does not copy. The owner accepted this kind of content with "comme guardrails" (as relayed). The assistant is called "Bob" on the frames.
+- **No GIF.** `gif.py` refused one caption of 61 characters, and the cut planned only 32 s. The coordinator's `24fa7d9e` (committed 06:50:29 CET, read from git by the writer; `gif.yml` only) uses the question, the answer arriving, then the answer as a still, with the target back to 40 to 60 s; dry-run 6 moments, 42.0 s (as relayed). Demo333 re-cuts. **Not published**; no publication go.
+- **What the cluster keeps:** the assistant's possible memory of this third question (declared); one more answer of `consultant-02`'s budget spent (as relayed).
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.

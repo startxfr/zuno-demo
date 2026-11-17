@@ -78,6 +78,10 @@ Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key create
 
 Take `openclaw-20261117-052046` (go 05:17:35 CET): the take found its own session (the row-id fix holds live) and the question was answered, but the session stayed listed after Delete... (owned 7 to 8; the writer read `markers.json`). The coder's diagnosis, about 80% sure and unverified live: the Control UI confirms in a native browser dialog that the driver dismissed. The write guard does not see the Control UI's WebSocket, so an empty `writes` list proves nothing for `openclaw`. Two sessions are now left in `consultant-02`'s assistant. Owner's decision at 05:30:42 CET: **"Suppression seule d'abord"**, a delete-only run by constant ids before any new take; each live run needs its own named go. **Update (2026-11-17, 06:36:37 CET, "Delete both"):** the delete-only run passed: 8 sessions listed, 2 deleted, 6 left, `owned` 6 to 6. The native-confirm diagnosis is confirmed live (as relayed). The next step is an `openclaw` rescout, then the take on a new owner go. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
 
+### `openclaw`: the third take passed (2026-11-17, no GIF yet)
+
+Take `openclaw-20261117-064651` (go 06:42:25 CET, as relayed): 6 markers in 66.1 s, one session created and **cleaned** (the native confirm accepted), owned 6 to 6, private addresses 0 (the writer read `markers.json`). The answer frame holds real wiki titles and addresses, accepted in kind by the owner ("comme guardrails"); the docs copy none. `gif.py` refused a 61-character caption; the coordinator's `24fa7d9e` re-plans the cut (42.0 s); demo333 re-cuts. Not published. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
 ### Scouts at `d80f25ef` (as relayed)
 
 - `openclaw`: 7 of 7. The session menu lists Pin session, Mark as unread, Rename…, Fork, Move to group, Archive session and Delete….
