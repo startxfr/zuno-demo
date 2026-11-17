@@ -55,6 +55,14 @@ spec:
           # the demonstration persona is ai-dev-01.
           allowedGroups:
             - ocp-ai-dev
+        # ADR-0619 (WP-298): praxis.<domain> for Claude Code (and the Blender add-on's reuse, WP-302); pairs with
+        # zuno_praxis_workstation_entry (Praxis's NetworkPolicy peer). Owner's go 2026-11-17; the same single group as
+        # above, since the public device-grant client lets any realm user mint a token.
+        praxisWorkstationEntry:
+          enabled: true
+          keycloakAcmeWildcardTLS: true
+          allowedGroups:
+            - ocp-ai-dev
         quotaEnforcement:
           keycloakAcmeWildcardTLS: true
           routes:
