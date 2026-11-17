@@ -18,7 +18,7 @@ width: 960
 fps: 10
 moments:
   - {still: login, hold: 3, caption: "Sign in with the company account"}
-  - {still: hub, hold: 4, step: "0:00", caption: "0:00  Arkos writes documents; it cannot touch the cluster"}
+  - {still: hub, hold: 4, step: "0:00", caption: "0:00  A new session with Arkos, the team's agent"}
   - {from: q-sent, to: card, fit: 8, hold: 7, step: "1:30", caption: "1:30  Tekos wants to launch a job: the platform asks me"}
   - {still: approved, hold: 4, step: "2:30", caption: "2:30  I approve: only now does anything run"}
   - {from: approved, to: q-done, fit: 8, hold: 7, caption: "Arkos returns the job Tekos launched in my name"}
