@@ -12,6 +12,8 @@ own password (see [Appendix B](#appendix-b---lld)).
 **The message:** "Everyone can have their own AI assistant. It holds no key, it cannot reach the internet, and the
 platform decides which models and tools it may use."
 
+![The 5-minute version of the OpenClaw demo, recorded live as consultant-02 on its own assistant: the assistant and its sessions, a question asking for the onboarding pages, the platform's Confluence search tool called, and the pages found with their links. The page titles and links are real pages of the company's Confluence. The session the recording created was deleted afterwards.](../../../assets/img/demo/openclaw.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
