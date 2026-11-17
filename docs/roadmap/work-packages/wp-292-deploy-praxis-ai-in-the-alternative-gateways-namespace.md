@@ -1,6 +1,6 @@
 # WP-292: Deploy Praxis AI in the alternative gateways namespace
 
-- **State:** Operator pending (2026-11-17): live on demo333 with the local models; left: the SaaS models, the per-subject limit, OpenTelemetry and a live fallback proof, each behind its own switch and the owner's go
+- **State:** Operator pending (2026-11-17): live on demo333 with the local models, Claude, Codestral, the per-subject limit and OpenTelemetry; left: a live fallback proof and the workstation entry (WP-298)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-291](wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md)
 - **Related:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
@@ -108,3 +108,24 @@ The owner gave the go for the deploy. The image is the WP-291 fork build, pinned
   - the Tempo spans (`zuno_praxis_otel_enabled`);
   - the fallback from MaaS to the direct KServe path, which needs MaaS to fail;
   - the workstation entry (WP-298).
+
+### The three switches, 2026-11-17 evening
+
+The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (`demo333.yml`). Each problem found was fixed in the chart or the build, pushed, and installed again.
+
+| Finding | Fix | Commit |
+|---|---|---|
+| `praxis-ai --validate` refused `redis://:${REDIS_PASSWORD}@…`: "backend.url supports one complete ${ENV_VAR} reference" | The `praxis-redis` ExternalSecret templates `REDIS_URL`, with the password percent-encoded | `0800ec74` |
+| Codestral 502 "TLSHandshakeFailure … reset by peer, SNI api.mistral.ai". RHOAI's rule `zuno-ai-run/mistral-large` (tls SIMPLE, exported to every namespace) made the sidecar add a second TLS layer | A DestinationRule per SaaS host in `zuno-ai-gateways`, selecting the praxis pod, tls DISABLE (as WP-124 did for the ai-gateway) | `6a6ac7ce` |
+| Claude 404: `claude-3-5-sonnet-latest` is retired | `claude` targets `claude-opus-5-5` | `6a6ac7ce` |
+| No OTLP export: "the `otel` feature is not enabled". The server's `opentelemetry` feature is empty | Both build sources add `praxis-core/otel,praxis-filter/otel,praxis-protocol/otel`; rebuilt as `praxis-build-nz69t` (25 min), pinned `sha256:e319e228…` | `6a6ac7ce`, `eb163524` |
+| After the 429 proof at capacity 2000, the install at 1000000 answered 503 to everyone, personas never counted included: "admission backend failed, failing closed error=configuration_mismatch" | The Redis namespace is `praxis-<8 hex of window/capacity/reservation>`, so a new rule starts on new keys | `65d6b63f` |
+
+- **Proofs:** with persona tokens, through a port-forward, on the final image.
+  - `/v1/models` lists the five local models, `claude` and `codestral-latest`.
+  - `auto`, `gpt-oss-20b`, `claude` and `codestral-latest` answer `pong`. `/v1/messages` answers, plain and streamed.
+  - An unlisted model gets 403.
+  - With `-e zuno_praxis_token_rate_limit_capacity=2000`, the second call of `ai-dev-01` got 429 with `x-ratelimit-limit-tokens: 2000`, `x-ratelimit-remaining-tokens: 0` and `retry-after: 3613`. The install was then run again at the default 1000000.
+  - Tempo (`zuno-monitoring/tempo-tempo`) holds traces of service `praxis`: 4 for 41 calls at the 0.1 sampling rate.
+- **Role finding:** twice, the role's wait passed before Argo CD had synced the new revision, because it read the Application's previous status. The checks above were made after the sync.
+- **Outside this WP:** the Zuno ai-gateway's `platform/ai-gateway/provider-routing.yaml` still names `claude-3-5-sonnet-latest` for its Anthropic fallback. It was left unchanged (ADR-0619: the default gateway is not touched); it is reported to the owner.
