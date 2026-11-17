@@ -252,3 +252,162 @@ Read by the writer. The logs hold the method, the path and `auth=yes` or `auth=n
 - Settle the MaaS credential and measure the JWKS fetch rate before the live step.
 - ADR-0619 clause 4 names the in-cluster JWKS address, which the plugin refuses. The owner of that ADR decides how to
   amend it; this file does not change it.
+
+## Second run, 2026-11-17 13:55-14:05 CET
+
+Run by `zuno-demo`, files read by the writer. Times and results are as relayed; the configuration and the stub logs were
+read directly. Same setup as the first run (workstation, `podman`, `--network host`, no cluster, upstream image 0.11.0,
+throwaway test key, stubs). The MaaS stub is now on port 3998 (it still prints `STUB3999` on its bearer lines); the direct
+KServe stub is on 3002. N=1 for each result below.
+
+Validated configuration (`praxis.v2-validated.yaml`; `policy.yaml` is unchanged except as noted in finding 5):
+
+```yaml
+listeners:
+  - name: gateway
+    address: "0.0.0.0:8080"
+    filter_chains: [main]
+filter_chains:
+  - name: main
+    filters:
+      - filter: policy
+        config_path: /spike/policy.yaml
+        allow_private_idp: true
+        require_protocol_metadata: false
+        llm:
+          require_model: true
+          provider: openai
+      - filter: anthropic_messages_request
+        on_invalid: continue
+      - filter: anthropic_messages_to_chat_completions
+        allow_lossy_features: [prompt_caching, extended_thinking]
+        conditions:
+          - when:
+              path: "/v1/messages"
+      - filter: anthropic_messages_to_chat_completions_stream
+        response_conditions:
+          - when:
+              headers:
+                content-type: "text/event-stream"
+      # Alias: auto -> qwen3.6-27b-instruct, body rewritten once, before the routing steps.
+      - filter: model_to_provider
+        models:
+          - {model: auto, upstream: maas, target_model: qwen3.6-27b-instruct, paths: [/v1/chat/completions, /v1/messages]}
+      - filter: model_to_header
+        header: X-Model
+      - filter: iterative_request_router
+        initial_step: maas
+        steps:
+          - name: maas
+            filters:
+              - filter: headers
+                request_remove: [authorization, x-api-key]
+              - filter: path_rewrite
+                replace:
+                  pattern: "^/v1/(chat/completions|messages)$"
+                  replacement: "/zuno-ai-run/qwen36-27b-instruct/v1/chat/completions"
+                conditions:
+                  - when:
+                      headers:
+                        x-model: "qwen3.6-27b-instruct"
+              - filter: intelligent_route
+                local_site: zuno
+                model_header: X-Model
+                clusters: [maas]
+                candidates:
+                  - kind: inference_model
+                    name: qwen3.6-27b-instruct
+                    site: zuno
+                    cluster: maas
+                    fresh: true
+                    credential:
+                      strategy: bearer_token
+                      secretRef: {name: maas-sa-token, namespace: zuno-ai-gateways, key: token}
+              - filter: credential_inject
+                credentials:
+                  - {name: maas-sa-token, namespace: zuno-ai-gateways, key: token, strategy: bearer_token, file: /spike/satoken}
+              - filter: load_balancer
+                clusters:
+                  - name: maas
+                    endpoints: ["127.0.0.1:3998"]
+            on_result:
+              - status: [429, 502, 503, 504]
+                next: direct
+              - default: true
+                done: true
+          - name: direct
+            filters:
+              - filter: headers
+                request_remove: [authorization, x-api-key]
+              - filter: path_rewrite
+                replace:
+                  pattern: "^/v1/messages$"
+                  replacement: "/v1/chat/completions"
+                conditions:
+                  - when:
+                      path: "/v1/messages"
+              - filter: model_to_provider
+                models:
+                  - {model: qwen3.6-27b-instruct, upstream: direct-qwen36, target_model: qwen3.6-27b-instruct, paths: [/v1/chat/completions, /v1/messages]}
+              - filter: load_balancer
+                clusters:
+                  - name: direct-qwen36
+                    endpoints: ["127.0.0.1:3002"]
+            on_result:
+              - default: true
+                done: true
+insecure_options:
+  allow_private_endpoints: true
+```
+
+### Results
+
+1. **The MaaS credential can follow a rotating file.** In the step `maas`, `intelligent_route` (one candidate per model,
+   with a credential `secretRef`) followed by `credential_inject` with `file:` sends `Authorization: Bearer <content of
+   the file>`. The file was changed from `rotating-token-v1` to `rotating-token-v2` between two requests, without a
+   restart. The MaaS stub logged the bearer `rotating-token-v1`, then `rotating-token-v2`.
+   - Read by the writer in `stub3998.log`: 6 requests, each with a bearer; the first carries `rotating-token-v1`, the
+     other five `rotating-token-v2`.
+   - The token values are test strings. The file is not a real ServiceAccount token.
+   - Consequence for WP-292: the hourly projected ServiceAccount token can be given through a file. This settles the
+     open point of the first run. The real file path, its permissions and the real MaaS call are still to be tested live.
+2. **Limits of the configuration found.**
+   - `intelligent_route` and `model_to_provider` in the same step are refused at validation ("multiple cluster-selecting
+     filters before load_balancer"). So the alias `auto` to `qwen3.6-27b-instruct` moved to one outer `model_to_provider`
+     before the router. The step `direct` keeps its own `model_to_provider`.
+   - A `headers` match on `x-model` in the router returned 404 inside a step (log: `request rejected by filter
+     filter=router status=404`). The path rewrite of the step `maas` therefore matches the already aliased value
+     `qwen3.6-27b-instruct`.
+   - `model_to_provider` matches the path of the client's request, so each mapping lists `/v1/messages` as well as
+     `/v1/chat/completions`.
+3. **Routing results.** Chat with the model `auto`: the step `maas` got 503, the step `direct` got 200 from stub 3002, with
+   the path `/v1/chat/completions` and the model `qwen3.6-27b-instruct`. `/v1/messages` with the model `auto`: 200, an
+   Anthropic message, and the upstream path `/v1/chat/completions`.
+   - **A line to reconcile.** `stub3002.log` of this run has 6 lines: `POST /v1/chat/completions` five times and
+     `POST /v1/messages` once, all `auth=no`. The `/v1/messages` line is not the upstream path that result 3 reports for
+     the translated call. The log does not say which request produced it, and may come from an earlier attempt with an
+     older configuration (`praxis.v1.yaml` is in the directory). Not resolved here.
+4. **Cause of the many JWKS fetches (the first run's observation).**
+   - As relayed: the gateway's logs repeat `praxis_ai::reload: building new pipelines from reloaded config` about every
+     0.5 s. Praxis watches the configuration directory, and the stubs wrote their logs into the same directory, so every
+     log line triggered a reload and a JWKS fetch.
+   - Read by the writer: the stub logs (`stub3002.log`, `stub3100.log`, `stub3998.log`, `stub3999.log`) sit in the same
+     directory as `praxis.yaml` and `policy.yaml`. `stub3100.log` now holds 3330 `GET /jwks.json` lines (the first run's
+     file held 365, and it was overwritten by this run). The gateway's own logs with the reload lines are not in the
+     directory, so the reload rate itself was not read by the writer.
+   - In the cluster the configuration is a ConfigMap in a directory of its own, so this should not apply. WP-292 still
+     measures the fetch rate live.
+5. **Deprecation.** The JWT plugin's `header:` setting is deprecated in favour of
+   `credential: {kind: header, name: Authorization}`. `policy.yaml` in this directory still has `header: Authorization`
+   (line 8). Use the new form in the chart.
+
+### What changes for WP-292
+
+- The MaaS credential is settled in the spike: `intelligent_route` plus `credential_inject` with `file:`.
+- One outer `model_to_provider` for the alias, and no second cluster-selecting filter in the step that has
+  `intelligent_route`.
+- List `/v1/messages` in every mapping's paths.
+- Use the `credential:` form of the JWT plugin.
+- Keep the configuration in a directory of its own, with nothing else written into it.
+- Still open after both runs: Claude and Codestral, NeMo guardrails, the OpenTelemetry export, the `token_rate_limit`
+  filter (own build), real Keycloak tokens over `https`, the fork's image, and the live MaaS call.
