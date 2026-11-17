@@ -15,6 +15,8 @@ models on the platform's own GPUs may answer: `gpt-oss-20b` first. The entry, th
 **The message:** "A 3D artist gets editable objects from a sentence. The prompt, the code and the scene never leave the
 company, and the call is governed like every other experience."
 
+![The 5-minute version of the Blender add-on demo, stills taken on 2026-11-07 of the Zuno 3D add-on in Blender: the panel after Generate and Check, a table with its legs and a lamp as real Blender objects, their render, and a second sentence that gives a small house.](../assets/img/demo/blender-3d.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password,
