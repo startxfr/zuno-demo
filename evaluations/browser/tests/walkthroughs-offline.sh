@@ -30,7 +30,7 @@ take() {   # take <demo> <fake> <port> <name> [VAR=1 ...]: one recorder run; pri
   for attempt in 1 2; do
     output="$(podman run --rm --label "$label" -e DEMO="$demo" -e APPS_DOMAIN=fake.invalid -e PERSONA_PASSWORD=offline-test -e OUT=/out \
     -e RECORD_BASE_URL="http://127.0.0.1:$port" -e FAKE="$fake" -e PORT="$port" "${knobs[@]+"${knobs[@]}"}" \
-    -v "$here:/work:Z" -v "$work/$name:/out:Z" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
+    -v "$here:/work:Z" -v "$work/$name:/out:Z" "${mounts[@]+"${mounts[@]}"}" -w /work mcr.microsoft.com/playwright:v1.48.0-jammy \
     sh -c 'npm install --no-audit --no-fund --silent >/dev/null 2>&1; for f in $FAKE; do node "tests/$f" >/dev/null & done; sleep 1; timeout -k 10 "${OFFLINE_TIMEOUT_S:-900}" node record.mjs; rc=$?; echo "left: $(curl -s "http://127.0.0.1:$PORT/fake/count")$([ -n "${RECORD_BASE_URL_OWUI:-}" ] && curl -s "$RECORD_BASE_URL_OWUI/fake/count")$([ -n "${RECORD_BASE_URL_GRAFANA:-}" ] && [ "$PORT" != 8095 ] && curl -s "$RECORD_BASE_URL_GRAFANA/fake/count")$([ -n "${RECORD_BASE_URL_TEMPO:-}" ] && curl -s "$RECORD_BASE_URL_TEMPO/fake/count")"; exit $rc' 2>"$work/.stderr")"; rc=$?
     grep -q "pasta failed" "$work/.stderr" && [[ $attempt -eq 1 ]] && { echo "podman's network helper failed: running $name once more" >&2; sleep 2; continue; }
     break
@@ -56,6 +56,7 @@ guardrails() { local name="$1"; shift; take guardrails "fake-dify.mjs fake-grafa
 agents() { take unifai-agents fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1; }
 trace() { take observability-trace "fake-unifai.mjs fake-jaeger.mjs" 8097 "$@" FAKE_TEAM_MODE=1 RECORD_BASE_URL_TEMPO=http://127.0.0.1:8093; }
 maas() { take maas-portal-api-keys fake-maas-portal.mjs 8092 "$@" RECORD_BASE_URL=http://127.0.0.1:8092/maas-consumer-portal RECORD_BASE_URL_MAAS=http://127.0.0.1:8092/zuno-ai-run/gpt-oss-20b; }
+mounts=()   # more volumes for the next take() calls (a file mounted over one of /work)
 claw() { local name="$1"; shift; take openclaw fake-openclaw.mjs 8091 "$name" OPENCLAW_UI_PASSWORD=offline-claw-secret FAKE_UI_PASSWORD=offline-claw-secret "$@"; }
 a2a() { take a2a-delegation-approval fake-unifai.mjs 8097 "$@" FAKE_TEAM_MODE=1 FAKE_APPROVALS=1; }
 wanted() { [[ -z "${ONLY:-}" || "$ONLY" == "$1" ]]; }
@@ -1031,6 +1032,51 @@ import json, pathlib, sys
 s = json.loads((pathlib.Path(sys.argv[1]) / "scout.json").read_text())
 assert "could not connect to its gateway" in s["steps"][0]["error"], s["steps"][0]
 PY
+fi
+if wanted openclaw-delete-left; then
+echo "== openclaw-delete-left (no question: deletes the listed sessions two failed takes left, and nothing else)"
+left() { local name="$1"; shift; take openclaw-delete-left fake-openclaw.mjs 8091 "$name" OPENCLAW_UI_PASSWORD=offline-claw-secret FAKE_UI_PASSWORD=offline-claw-secret "$@"; }
+out="$(left l-scout RECORD_SCOUT=1 FAKE_LEFT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "delete-left: a scout runs with the placeholder, deletes nothing, lists the rows by id, age and rank without a title" python3 - "$work/l-scout" "$out" "$rc" <<'PY'
+import hashlib, json, pathlib, sys
+raw = (pathlib.Path(sys.argv[1]) / "scout.json").read_text(); s = json.loads(raw); steps = {x["step"]: x for x in s["steps"]}
+assert sys.argv[3] == "0" and s["status"] == "done" and 'left: {"sent":0,"sessions":4}' in sys.argv[2], (sys.argv[3], s["status"])
+ids = [hashlib.sha256(t.encode()).hexdigest()[:16] for t in ("FAKE-LEFT-ONE", "FAKE-LEFT-TWO", "FAKE-EARLIER-SESSION-TITLE", "FAKE-OLDER-SESSION-TITLE")]
+assert steps["sessions"]["list"] == [{"id": i, "age": "3h", "rank": n + 1, "in_left": False} for n, i in enumerate(ids)], steps["sessions"]["list"]
+assert steps["sessions"]["placeholders"] == 1 and steps["sessions"]["left"] == {"3d799c91782010a2": False, "placeholder": None}, steps["sessions"]
+assert "FAKE-" not in raw and "FAKE-" not in sys.argv[2]
+PY
+out="$(left l-placeholder FAKE_LEFT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "delete-left: with its placeholder the run refuses to start, before any sign-in, and deletes nothing" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL refuses to start: LEFT holds 1 entry(ies) that are not a session id' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":4}' <<<\"\$0\" && ! test -e $work/l-placeholder/login.png" "$out"
+# The same file with the stand-in's two ids in place of LEFT's entries, mounted over it: only the constants differ.
+python3 - "$here/walkthroughs/openclaw-delete-left.mjs" "$work/openclaw-delete-left.mjs" <<'PY'
+import hashlib, re, sys
+src = open(sys.argv[1]).read()
+ids = [hashlib.sha256(t.encode()).hexdigest()[:16] for t in ("FAKE-LEFT-ONE", "FAKE-LEFT-TWO")]
+out, n = re.subn(r'(?m)^export const LEFT = \[.*\];$', 'export const LEFT = ["%s", "%s"];' % tuple(ids), src)
+assert n == 1, n
+open(sys.argv[2], "w").write(out)
+PY
+mounts=(-v "$work/openclaw-delete-left.mjs:/work/walkthroughs/openclaw-delete-left.mjs:ro,Z")
+out="$(left l-pass FAKE_LEFT=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /'
+expect "delete-left: the two listed sessions are deleted, the two others kept, nothing sent; one native confirm accepted for each" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":2}' <<<\"\$0\" && test \$(grep -c 'native confirm dialog ([0-9]* chars): accepted' <<<\"\$0\") -eq 2 && ! grep -q 'FAKE-' <<<\"\$0\"" "$out"
+expect "delete-left: markers.json: login, ui, end; nothing created; the other sessions the same; its notes" markers l-pass '
+assert names == ["login", "ui", "end"] and m["status"] == "pass" and m["created"] == [] and m["cleaned"] is None, m
+assert m["owned"] == {"before": 2, "after": 2, "same": True} and m["notes"] == {"listed_before": 4, "deleted": 2, "listed_after": 2} and m["writes"]["refused"] == [], m
+'
+out="$(left l-absent FAKE_LEFT=one 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "delete-left: a listed id that is not in the sidebar fails the run, nothing deleted" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the sidebar does not list [0-9a-f]\{16\} (of .*): nothing is deleted' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":3}' <<<\"\$0\"" "$out"
+out="$(left l-refused FAKE_LEFT=1 FAKE_REFUSE_DELETE=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "delete-left: a session still listed after Delete… stops the run at the first one" bash -c "test $rc -eq 1 && grep -q 'RESULT: FAIL the session [0-9a-f]\{16\} is STILL listed after Delete…: stopped, 0 deleted so far' <<<\"\$0\" && grep -q 'left: {\"sent\":0,\"sessions\":4}' <<<\"\$0\"" "$out"
+out="$(left l-more FAKE_LEFT=1 FAKE_DELETE_TAKES_TWO=1 2>&1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -3
+expect "delete-left: a delete that takes other sessions with it stops the run and fails it (the others are not the same)" bash -c "test $rc -eq 1 && grep -q 'the sidebar does not list what it should' <<<\"\$0\" && grep -q 'does not own the same items after the take' <<<\"\$0\"" "$out"
+mounts=()
 fi
 if wanted a2a-delegation-approval; then
 echo "== a2a-delegation-approval (the take clicks Approve)"

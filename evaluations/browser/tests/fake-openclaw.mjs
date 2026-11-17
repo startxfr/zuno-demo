@@ -11,7 +11,10 @@ import http from "node:http";
 
 const port = Number(process.env.FAKE_PORT || 8091);
 let sent = 0;
-const sessions = [{ id: "s2", title: "FAKE-EARLIER-SESSION-TITLE" }, { id: "s1", title: "FAKE-OLDER-SESSION-TITLE" }];   // the assistant's sessions, newest first
+const sessions = [{ id: "s2", title: "FAKE-EARLIER-SESSION-TITLE" }, { id: "s1", title: "FAKE-OLDER-SESSION-TITLE" }];
+// FAKE_LEFT=1: two more sessions on top, as two failed takes left them (for walkthroughs/openclaw-delete-left.mjs);
+// FAKE_LEFT=one: only the first of them. FAKE_DELETE_TAKES_TWO=1: a delete removes the session below too.
+if (process.env.FAKE_LEFT) sessions.unshift(...[{ id: "l1", title: "FAKE-LEFT-ONE" }, { id: "l2", title: "FAKE-LEFT-TWO" }].slice(0, process.env.FAKE_LEFT === "one" ? 1 : 2));   // the assistant's sessions, newest first
 const LOGIN = `<!doctype html><title>Sign in</title><form method="get" action="/cb"><input id="username" name="u">
 <input id="password" name="p" type="password"><button id="kc-login">Sign In</button></form>`;
 const UI = `<!doctype html><title>OpenClaw Control UI</title><body style="font:16px sans-serif;margin:24px">
@@ -88,7 +91,7 @@ http.createServer((req, res) => {
       return json(200, { id, lines: process.env.FAKE_NO_TOOL === "1" ? ["Voici ce que je sais."] : ["Zuno Confluence-page-search onboarding", "MNGD2-AP001 Onboarding Chef de projet (SXSI)"] });
     }
     if (act === "rename") { const one = sessions.find((x) => x.id === u.searchParams.get("id")); if (one) one.title = "FAKE-RENAMED-BY-THE-ASSISTANT"; return json(200, {}); }
-    if (act === "delete") { if (!u.searchParams.get("refuse")) { const i = sessions.findIndex((s) => s.id === u.searchParams.get("id")); if (i >= 0) sessions.splice(i, 1); } return json(200, {}); }
+    if (act === "delete") { if (!u.searchParams.get("refuse")) { const i = sessions.findIndex((s) => s.id === u.searchParams.get("id")); if (i >= 0) sessions.splice(i, process.env.FAKE_DELETE_TAKES_TWO === "1" ? 3 : 1); } return json(200, {}); }
   }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   return res.end(UI);
