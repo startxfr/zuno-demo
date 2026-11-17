@@ -4,8 +4,9 @@
 # `make demo record observability-trace` films TWO takes in one run (evaluations/browser/walkthroughs/
 # observability-trace.mjs): `chat`, consultant-02 on UnifAI (team workspace agent-tekos), then `trace`, ai-ops-01 on
 # the Tempo search UI. Every moment names its take.
-# Markers of `chat`: login, hub, q-sent, q-done, end. Of `trace`: login, search, trace, tags (zuno.agent first: app, agent,
-# model, cost), tags-run (zuno.run_id last: who asked, and the run, which is the chat's session id), end. The span's
+# Markers of `chat`: login, hub, q-sent, q-done, end. Of `trace`: login, search, trace, tags (framed down to zuno.model:
+# app, agent, model, cost), tags-run (framed down to zuno.run_id: who asked, and the run, which is the chat's session
+# id), end. The take folds the zuno.groups list with the UI's own arrow before both. The span's
 # last row, zuno.user_sub, is in neither picture (the take fails otherwise): the trace take is cut in STILLS only, no
 # motion between its markers, so nothing the take scrolls past is in the GIF. The trace take
 # searches again until the trace shows, up to three minutes: none of that wait is in the cut (stills only there).

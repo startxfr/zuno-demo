@@ -4,8 +4,8 @@
 // address, a trace page with its spans, and a span's detail with a Tags accordion and a Process line.
 // The search lists a trace from its second load on, as a real export does (FAKE_NO_TRACE=1: never; FAKE_TRACE_NOW=1:
 // at once). Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" for the Tempo UI's own client (=other: for another client);
-// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; the span carries zuno.user_sub as its last row and a list of groups on several lines; FAKE_TALL_LIST=1: that list has
-// thirty lines (zuno.model falls out of the first picture); FAKE_NO_GROUPS=1: no list (zuno.user_sub then fits in the first picture);
+// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; the span carries zuno.user_sub as its last row and a list of groups on several lines; FAKE_NO_ARROW=1: that list has
+// no arrow to fold it; FAKE_TALL_LIST=1: no arrow and thirty lines (zuno.agent falls out of the first picture); FAKE_NO_GROUPS=1: no list (zuno.user_sub then fits in the first picture);
 // FAKE_NO_TAGS=1 the span has no
 // zuno.* tag.
 import http from "node:http";
@@ -29,7 +29,13 @@ const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [...
   ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"],
   // As the take of 2026-11-17 met the span: more rows than the window holds under the UI's fixed header, in alphabetical order.
   ["zuno.prompt_tokens", "7537"], ["zuno.user_sub", "FAKE-SUBJECT-0000"],
-  ...(process.env.FAKE_NO_GROUPS === "1" ? [] : [["zuno.groups", "[<br>" + Array(process.env.FAKE_TALL_LIST === "1" ? 30 : 8).fill("consultant/group").join(",<br>") + "<br>]"]]), ["zuno.request_id", "30c7c899"], ...Array.from({ length: 24 }, (_, i) => ["http.filler_" + String(i).padStart(2, "0"), "x"])].sort(([a], [b]) => a.localeCompare(b));
+  ["zuno.completion_tokens", "73"],
+  // the groups: a JSON list drawn open on twelve lines, with an arrow that folds it (FAKE_NO_ARROW=1: no arrow)
+  ...(process.env.FAKE_NO_GROUPS === "1" ? [] : [["zuno.groups", (process.env.FAKE_NO_ARROW === "1" || process.env.FAKE_TALL_LIST === "1" ? "" : "<span role='button' aria-expanded='true' class='json-arrow' onclick=\"this.setAttribute('aria-expanded','false');this.nextElementSibling.hidden=true\">&#9660;</span>")
+    + "<span>[<br>" + Array(process.env.FAKE_TALL_LIST === "1" ? 30 : 12).fill("consultant/group").join(",<br>") + "<br>]</span>"]]),
+  ["zuno.request_id", "30c7c899"], ...Array.from({ length: 24 }, (_, i) => ["http.filler_" + String(i).padStart(2, "0"), "x"])].sort(([a], [b]) => a.localeCompare(b));
+// FAKE_SUB_BEFORE_RUN=1: zuno.user_sub sits just above zuno.run_id (not the live order: for the guard on that row).
+if (process.env.FAKE_SUB_BEFORE_RUN === "1") { const sub = TAGS.splice(TAGS.findIndex(([k]) => k === "zuno.user_sub"), 1)[0]; TAGS.splice(TAGS.findIndex(([k]) => k === "zuno.run_id"), 0, sub); }
 const PROCESS = process.env.FAKE_ADDRESSES === "1" ? "Process: ip = 10.131.2.14 k8s.node.name = ip-10-18-3-7.eu-west-3.compute.internal" : "Process: service.name = ai-gateway";
 
 http.createServer((req, res) => {

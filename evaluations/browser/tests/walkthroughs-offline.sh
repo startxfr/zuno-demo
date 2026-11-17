@@ -842,8 +842,9 @@ assert tr["search"]["results"] == 1 and "service=ai-gateway" in tr["search"]["ur
 assert tr["trace"]["model_call_spans"] == 2 and tr["trace"]["url"].endswith("/trace/<id>"), tr["trace"]
 assert len(tr["tags"]["tags"]) == 12 and tr["tags"]["caption_in_window"] is True and tr["tags"]["user_sub_in_window"] is False and tr["tags"]["private_addresses"] == 0, tr["tags"]
 first, last = tr["tags"]["in_window"], tr["tags-run"]["in_window"]
-assert all(first[t] for t in ("zuno.agent", "zuno.client", "zuno.estimated_cost_usd", "zuno.model")) and not first["zuno.run_id"], first
-assert tr["tags-run"]["proof_in_window"] is True and tr["tags-run"]["user_sub_in_window"] is False and last["zuno.persona"] and last["zuno.run_id"] and not last["zuno.task"] and not last["zuno.agent"], tr["tags-run"]
+assert all(first[t] for t in ("zuno.agent", "zuno.client", "zuno.estimated_cost_usd", "zuno.model")) and not first["zuno.run_id"] and not first["zuno.persona"], first
+assert tr["tags-run"]["proof_in_window"] is True and tr["tags-run"]["user_sub_in_window"] is False and last["zuno.persona"] and last["zuno.run_id"] and last["zuno.task"], tr["tags-run"]
+assert tr["tags"]["groups"]["collapsed"] is True and tr["tags"]["groups"]["high_after"] < 60 < tr["tags"]["groups"]["high_before"], tr["tags"]["groups"]
 assert tr["tags"]["run_id_shown"] is True and "run_id" not in tr["tags"] and "FAKE-SUBJECT" not in json.dumps(tr), tr["tags"]
 PY
 out="$(trace t-pass)"; rc=$?
@@ -851,7 +852,7 @@ echo "$out" | sed 's/^/    /'
 expect "trace: a good run of both takes exits 0, RESULT: PASS" bash -c "test $rc -eq 0 && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
 expect "trace: the session is gone, nothing approved, nothing written" grep -q 'left: {"sessions":2,"touched":0}{"approved":0,"writes":0}' <<<"$out"
 expect "trace: the trace take searched again until a trace showed" bash -c "grep -q 'the search finds no trace yet: searching again' <<<\"\$0\" && grep -q 'the search lists 1 trace' <<<\"\$0\" && grep -q 'page shows no question text' <<<\"\$0\"" "$out"
-expect "trace: the log says which tags are drawn, and compares the span's run with the chat take's session" bash -c "grep -q 'tags-run: tags drawn in the window: .*zuno.persona.*zuno.run_id; zuno.user_sub is not in the window' <<<\"\$0\" && grep -q 'tags: tags drawn in the window: .*zuno.client.*zuno.agent.*; zuno.user_sub is not in the window' <<<\"\$0\" && grep -q 'is NOT the chat take.s session' <<<\"\$0\"" "$out"
+expect "trace: the log says which tags are drawn, and compares the span's run with the chat take's session" bash -c "grep -q 'tags-run: tags drawn in the window: .*zuno.persona.*zuno.run_id; zuno.user_sub is not in the window' <<<\"\$0\" && grep -q 'zuno.groups folded with the UI.s own arrow' <<<\"\$0\" && grep -q 'tags: tags drawn in the window: .*zuno.client.*zuno.agent.*; zuno.user_sub is not in the window' <<<\"\$0\" && grep -q 'is NOT the chat take.s session' <<<\"\$0\"" "$out"
 expect "trace: each take has its own markers; the session is cleaned" python3 - "$work/t-pass" <<'PY'
 import json, pathlib, sys
 d = pathlib.Path(sys.argv[1])
@@ -860,7 +861,7 @@ assert [x["name"] for x in chat["markers"]] == ["login", "hub", "q-sent", "q-don
 assert [x["name"] for x in tr["markers"]] == ["login", "search", "trace", "tags", "tags-run", "end"] and tr["motion_from"] == "search", tr
 assert chat["persona"] == "consultant-02" and len(chat["created"]) == 1 and chat["cleaned"] is True and chat["owned"]["same"] is True, chat
 assert tr["persona"] == "ai-ops-01" and tr["created"] == [] and tr["cleaned"] is None, tr
-assert tr["notes"] == {"traces_listed": 1, "run_id_is_the_chat_session": False, "tags_in_window": tr["notes"]["tags_in_window"], "tags_run_in_window": tr["notes"]["tags_run_in_window"]} and tr["notes"]["tags_in_window"] >= 8 and "notes" not in chat, (tr.get("notes"), chat.get("notes"))   # a walkthrough's own notes
+assert tr["notes"] == {"traces_listed": 1, "run_id_is_the_chat_session": False, "groups_collapsed": True, "tags_in_window": tr["notes"]["tags_in_window"], "tags_run_in_window": tr["notes"]["tags_run_in_window"]} and tr["notes"]["tags_in_window"] >= 6 and tr["notes"]["tags_run_in_window"] >= 6 and "notes" not in chat, (tr.get("notes"), chat.get("notes"))   # a walkthrough's own notes
 PY
 out="$(trace t-authorize FAKE_AUTHORIZE=1 RECORD_SCOUT=1 FAKE_TRACE_NOW=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
@@ -877,12 +878,15 @@ expect "trace: an Authorize Access page of another client stops the scout, nothi
 out="$(trace t-addresses FAKE_ADDRESSES=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a span whose Process line holds an address fails the trace take (the recorder's guard)" bash -c "test $rc -eq 1 && grep -q 'trace: .*the page showed node names or private IP addresses' <<<\"\$0\"" "$out"
+out="$(trace t-noarrow FAKE_TRACE_NOW=1 FAKE_NO_ARROW=1)"; rc=$?
+echo "$out" | sed 's/^/    /' | tail -4
+expect "trace: a groups list that cannot be folded: the take says so and still frames both pictures" bash -c "test $rc -eq 0 && grep -q 'zuno.groups could NOT be folded' <<<\"\$0\" && grep -q '^RESULT: PASS$' <<<\"\$0\"" "$out"
 out="$(trace t-tall FAKE_TRACE_NOW=1 FAKE_TALL_LIST=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -4
-expect "trace: a tag the caption names that is outside the window at its marker fails the take, and names it" bash -c "test $rc -eq 1 && grep -q 'trace: .*the span.s tags are not all drawn inside the window (zuno.model is not drawn at tags)' <<<\"\$0\"" "$out"
-out="$(trace t-sub FAKE_TRACE_NOW=1 FAKE_NO_GROUPS=1)"; rc=$?
+expect "trace: a named tag whose whole row is not in the window at its marker fails the take, by name" bash -c "test $rc -eq 1 && grep -q 'trace: .*the span.s tags are not all drawn inside the window (zuno.agent is not drawn at tags' <<<\"\$0\"" "$out"
+out="$(trace t-sub FAKE_TRACE_NOW=1 FAKE_SUB_BEFORE_RUN=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -4
-expect "trace: the persona's subject in the window stops the take before that picture is made" bash -c "test $rc -eq 1 && grep -q 'trace: .*zuno.user_sub (the persona.s Keycloak subject) is in the window at tags: that picture is not made' <<<\"\$0\" && ! test -e $work/t-sub/trace/tags.png" "$out"
+expect "trace: the persona's subject in the window stops the take before that picture is made" bash -c "test $rc -eq 1 && grep -q 'trace: .*zuno.user_sub (the persona.s Keycloak subject) is in the window at tags-run: that picture is not made' <<<\"\$0\" && ! test -e $work/t-sub/trace/tags-run.png" "$out"
 out="$(trace t-error FAKE_ERROR_SPAN=1)"; rc=$?
 echo "$out" | sed 's/^/    /' | tail -3
 expect "trace: a newest span that is a failed call fails the take: not the picture of a traced answer" bash -c "test $rc -eq 1 && grep -q 'trace: .*is a FAILED call' <<<\"\$0\"" "$out"

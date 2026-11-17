@@ -64,16 +64,23 @@ const SPAN = "model_call";
 // model_kind, outcome, persona, prompt_tokens, provider, request_id, run_id, task, user_sub): more than the window
 // holds under the Jaeger UI's fixed header, so the take makes TWO pictures, by framing only (no row is hidden or
 // changed):
-//  - `tags`: zuno.agent as the first row under the fixed header; FIRST_NAMED must be drawn in the window (which app,
-//    which agent, which model, what cost).
-//  - `tags-run`: zuno.run_id as the LAST visible row; LAST_NAMED must be drawn (who asked, and the run, which is the
-//    chat take's own session id).
+//  - `tags`: zuno.model with the one row after it as the last of the window; FIRST_NAMED must be drawn in the window
+//    (which app, which agent, which model, what cost).
+//  - `tags-run`: zuno.run_id with the one row after it (zuno.task) as the last of the window; LAST_NAMED must be drawn
+//    (who asked, and the run, which is the chat take's own session id).
+// Both are framed from the BOTTOM: once zuno.groups is folded the seventeen zuno.* rows are about 460 px high and fit
+// under the header, so zuno.agent as the first row would bring zuno.user_sub into the window (the stand-in showed
+// it; on the live picture of 05:44 the rows are 27 px and the visible area about 480).
+// Before them the take folds zuno.groups, a JSON list the UI draws open on about ten lines, with the UI's own arrow
+// beside it, as a reader would (a fold of the page, kept nowhere; said in the notes: groups_collapsed).
+// DRAWN means the WHOLE row, label and value, at its full height inside the visible area: a row cut by an edge of the
+// window or under the fixed header is not drawn (the rescout of 05:44 counted a row whose top alone showed).
 // zuno.user_sub (the persona's Keycloak subject, the list's last row) must be in NEITHER picture: any part of it in
 // the window at a marker fails the take. A named tag the span shows and that is outside the window at its marker
 // fails the take too. A tag of the page's row the span does not carry at all is logged (a matter for the page).
 const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.classification", "zuno.model_kind", "zuno.provider", "zuno.model",
               "zuno.latency_ms", "zuno.estimated_cost_usd", "zuno.outcome", "zuno.run_id"];
-const FIRST_ROW = "zuno.agent";
+const FIRST_ROW = "zuno.model";
 const FIRST_NAMED = ["zuno.agent", "zuno.client", "zuno.estimated_cost_usd", "zuno.model"];
 const LAST_ROW = "zuno.run_id";
 const LAST_NAMED = ["zuno.persona", "zuno.run_id"];
@@ -170,10 +177,12 @@ async function openTrace(page, found) {
 const FOLDS = {
   span: (el) => Boolean(el.closest(".span-row, [data-testid='span-view']")) && !el.closest(".detail-row"),
   tags: (el) => /^\s*Tags\b/.test(el.innerText || "") && Boolean(el.closest(".AccordianKeyValues, .detail-row, [data-testid='span-detail']")) && !el.matches("input, [type='checkbox']"),
+  // the arrow that folds the JSON value of zuno.groups: inside that tag's row of a span's detail, and nowhere else
+  groups: (el) => { const row = el.closest("tr"); return Boolean(row && row.closest(".detail-row, .SpanDetail, [data-testid='span-detail']") && ((row.cells[0] || {}).innerText || "").trim() === "zuno.groups") && !el.matches("input, [type='checkbox'], a[href]") && !/copy|json/i.test(el.innerText || ""); },
 };
 async function fold(target, kind) {
   const allowed = await read(target, FOLDS[kind]);
-  if (!allowed) throw new Error(`refused to click: not the ${kind === "span" ? "name of a span in its row" : "Tags accordion of a span's detail"} of the Jaeger UI`);
+  if (!allowed) throw new Error(`refused to click: not the ${{ span: "name of a span in its row", tags: "Tags accordion of a span's detail", groups: "fold of zuno.groups in a span's detail" }[kind]} of the Jaeger UI`);
   await target.click({ timeout: 15000 });
 }
 
@@ -192,43 +201,63 @@ async function openSpan(page) {
            error: /\berror\s*=?\s*true\b|otel\.status_code\s*=?\s*ERROR/i.test(text.replace(/\s+/g, " ")) };
 }
 
-// Frame the span's tag list, by scrolling only: `row` just under whatever the UI keeps fixed at the top ("first"),
-// or `row` as the last visible row, its bottom on the window's ("last"). Then what is DRAWN: for each of TAGS, whether
-// the tag's own text is what is at its place in the window (not under the fixed header, not scrolled out); and
-// whether ANY part of NEVER is in the window. {drawn: {tag: boolean}, never: boolean}.
-async function placeTags(page, detail, where) {
+// Fold the JSON list of zuno.groups with the UI's own arrow (guess: the arrow's element was never seen, only its
+// picture, a "▼" before the "["): the candidates of the value's cell are tried one by one until the row gets shorter.
+// {collapsed, rows_high_before, rows_high_after}; nothing is thrown when it cannot: the pictures' checks decide.
+async function collapseGroups(page, detail) {
+  const row = page.locator(detail).first().locator("tr").filter({ has: page.getByText("zuno.groups", { exact: true }) }).first();
+  if (!(await row.count())) return { collapsed: false, absent: true };
+  const high = async () => Math.round(((await row.boundingBox().catch(() => null)) || { height: 0 }).height);
+  const before = await high();
+  if (before < 60) return { collapsed: false, already_short: true, high_before: before, high_after: before };
+  const cell = row.locator("td").nth(1);
+  for (const selector of ["[aria-expanded='true']", "[role='button']", "[class*='collapse' i]", "[class*='expand' i]", "[class*='toggle' i]", "[class*='icon' i]"]) {
+    const arrow = cell.locator(selector).first();
+    if (!(await arrow.count()) || !(await arrow.isVisible().catch(() => false))) continue;
+    const done = await fold(arrow, "groups").then(() => true).catch(() => false);
+    await page.waitForTimeout(500);
+    const after = await high();
+    if (done && after < before - 40) return { collapsed: true, by: selector, high_before: before, high_after: after };
+  }
+  return { collapsed: false, high_before: before, high_after: await high() };
+}
+
+// Frame the span's tag list, by scrolling only: the row AFTER `tag`'s becomes the last of the window, its bottom on
+// the window's, so `tag`'s row is whole, one row above the edge. When there is no next row, `tag`'s own row is the
+// last, eight pixels above the edge; when the next row is NEVER's, `tag`'s row ends exactly on the edge. Then what is DRAWN, for each of TAGS (see the header),
+// and whether ANY part of NEVER is in the window. {drawn: {tag: boolean}, never: boolean}.
+async function placeTags(page, detail, tag) {
   const box = page.locator(detail).first();
-  const row = box.getByText(where === "first" ? FIRST_ROW : LAST_ROW, { exact: true }).first();
-  if (await row.count()) {
-    await read(row, (el, [first, selector]) => {
+  const cell = box.getByText(tag, { exact: true }).first();
+  if (await cell.count()) {
+    await read(cell, (el, never) => {
       const move = (dy) => {
         const before = window.scrollY;
         window.scrollBy(0, dy);
         if (window.scrollY !== before) return;
         for (let up = el.parentElement; up; up = up.parentElement) if (up.scrollHeight > up.clientHeight + 4) { const was = up.scrollTop; up.scrollTop += dy; if (up.scrollTop !== was) return; }
       };
-      if (!first) { el.scrollIntoView({ block: "end" }); return; }
-      el.scrollIntoView({ block: "start" });
-      const list = el.closest(selector) || el.parentElement;
-      for (let i = 0; i < 3; i += 1) {
-        // Where the list starts to be what is drawn, from the top of the window down: under the fixed header.
-        const at = el.getBoundingClientRect();
-        let top = 0;
-        while (top < window.innerHeight && !list.contains(document.elementFromPoint(at.left + 10, top))) top += 2;
-        if (Math.abs(at.top - top - 6) < 3) break;
-        move(at.top - top - 6);
-      }
-    }, [where === "first", detail]);
+      const row = el.closest("tr") || el;
+      let next = row.nextElementSibling;
+      const forbidden = Boolean(next && ((next.cells && next.cells[0] ? next.cells[0].innerText : next.innerText) || "").trim().startsWith(never));
+      if (forbidden) next = null;
+      (next || row).scrollIntoView({ block: "end" });
+      move((next || row).getBoundingClientRect().bottom - window.innerHeight + (next ? 2 : forbidden ? 0 : 8));
+    }, NEVER);
   }
+  await page.mouse.move(640, 60);   // away from the rows: a row under the pointer draws its Copy and JSON buttons over its value
   await page.waitForTimeout(500);
   const drawn = {};
   for (const tag of TAGS) {
     const cell = box.getByText(tag, { exact: true }).first();
+    // The WHOLE row: inside the window from its top to its bottom, and at three places of it (the top and the bottom
+    // of its label, the middle of its value) the row itself is what is drawn there.
     drawn[tag] = (await cell.count()) > 0 && (await read(cell, (el) => {
-      const at = el.getBoundingClientRect();
-      if (!at.width || at.top < 0 || at.bottom > window.innerHeight) return false;
-      const seen = document.elementFromPoint(at.left + Math.min(at.width / 2, 20), at.top + at.height / 2);
-      return Boolean(seen && (seen === el || el.contains(seen) || seen.contains(el)));
+      const row = el.closest("tr") || el.parentElement || el;
+      const at = row.getBoundingClientRect();
+      if (!at.width || at.height < 4 || at.top < 0 || at.bottom > window.innerHeight + 0.5) return false;
+      return [[at.left + 12, at.top + 2], [at.left + 12, at.bottom - 2], [at.left + at.width * 0.4, at.top + at.height / 2]]
+        .every(([x, y]) => { const seen = document.elementFromPoint(x, y); return Boolean(seen && row.contains(seen)); });
     }).catch(() => false));
   }
   // Any part of the row counts: its key cell and what follows it on the same line, a pixel inside the window is enough.
@@ -270,8 +299,12 @@ async function runTrace({ page, domain, mark, log, state }) {
   log(!span.run_id ? "the span shows no zuno.run_id" : !chatSession ? "the span shows a zuno.run_id; the chat take of this run gave no session id to compare it with"
     : state.notes.run_id_is_the_chat_session ? `the span's zuno.run_id is the chat take's session ${chatSession}` : `the span's zuno.run_id (${span.run_id.slice(0, 40)}) is NOT the chat take's session ${chatSession}: check which turn the trace is`);
   log(`the gateway's span ${(await page.locator("body").innerText()).includes(prompts["0:45"]) ? "page SHOWS the question's text somewhere: check tags.png" : "page shows no question text"}`);
+  const groups = await collapseGroups(page, span.detail);
+  state.notes.groups_collapsed = groups.collapsed;
+  log(groups.absent ? "the span carries no zuno.groups" : groups.collapsed ? `zuno.groups folded with the UI's own arrow (${groups.high_before} px high, then ${groups.high_after})`
+    : groups.already_short ? "zuno.groups is one line: nothing to fold" : `zuno.groups could NOT be folded (${groups.high_before} px high): the pictures are framed around it`);
   const wrong = [];
-  for (const [marker, where, named] of [["tags", "first", FIRST_NAMED], ["tags-run", "last", LAST_NAMED]]) {
+  for (const [marker, where, named] of [["tags", FIRST_ROW, FIRST_NAMED], ["tags-run", LAST_ROW, LAST_NAMED]]) {
     const { drawn, never } = await placeTags(page, span.detail, where);
     const shown = TAGS.filter((tag) => drawn[tag]);
     log(`${marker}: tags drawn in the window: ${shown.join(", ") || "none"}; ${NEVER} ${never ? "IS in the window" : "is not in the window"}`);
@@ -320,13 +353,14 @@ export async function scout({ page, domain, step, state, take }) {
       if (!found.count) return { skipped: "no trace" };
       span = await openSpan(page);
       const { run_id, ...seen } = span;   // the run's id is not kept by a scout
-      const first = await placeTags(page, span.detail, "first");
-      return { ...seen, run_id_shown: Boolean(run_id), span_is_an_error: span.error, in_window: first.drawn,
+      const groups = await collapseGroups(page, span.detail);
+      const first = await placeTags(page, span.detail, FIRST_ROW);
+      return { ...seen, groups, run_id_shown: Boolean(run_id), span_is_an_error: span.error, in_window: first.drawn,
                caption_in_window: FIRST_NAMED.filter((tag) => span.tags.includes(tag)).every((tag) => first.drawn[tag]), user_sub_in_window: first.never };
     });
     await step("tags-run", async () => {
       if (!span) return { skipped: "no span opened" };
-      const last = await placeTags(page, span.detail, "last");
+      const last = await placeTags(page, span.detail, LAST_ROW);
       return { in_window: last.drawn, proof_in_window: LAST_NAMED.every((tag) => last.drawn[tag]), user_sub_in_window: last.never,
                process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
     });
