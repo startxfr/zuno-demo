@@ -570,6 +570,17 @@ The coordinator proposes cut v2 for publication; it is sent to the owner. **Not 
 
 On `devel` as `cb2ebf0d`, committed 07:02:30 CET (the original `51a80b6f` at 06:43:03 CET; both read from git by the writer; as relayed for the rest): the whole-row meaning of "drawn"; both pictures framed from the bottom; the pointer moved off the rows; `zuno.groups` folded with the UI's own arrow, reported in the scout. **The coder states it never saw the arrow's element, so the fold is unproven live.** Walkthrough hash `5032b93b...`. `ONLY=observability-trace` PASS, `test_gif` OK and consistency 0 problems on the coordinator's side. A rescout is asked of demo333 before the trace leaves the six-hour search at about 09:19 CET. No take is asked.
 
+### observability-trace: rescout at `cb2ebf0d`, clean (directory `observability-trace-20261117-070325-scout`)
+
+Started 06:03:37 UTC (07:03 CET); walkthrough `5032b93b...`. The writer read `scout.json` of the top and of `trace/` and opened `trace/scout-tags.png` and `trace/scout-tags-run.png`. Status `done`; `chat` writes: the 404 `blueprint.validate` and `session.join`; `trace` writes none; refused none; private addresses 0. The search found 1 trace (61 spans, 1 `model_call` span). The scout declares the Tempo OAuth authorization of `ai-ops-01` again.
+
+| Check | `tags` picture | `tags-run` picture |
+|---|---|---|
+| Read from the file | `groups` collapsed true "by" a `[role='button']` control, row height 274 to 35; `caption_in_window` true; `user_sub_in_window` false | all 12 named tags in the window; `proof_in_window` true; `user_sub_in_window` false |
+| Seen on the image (the writer) | The span header; two rows above `zuno.agent` (`otel.scope.name`, `span.kind`); agent, classification, client, completion_tokens, estimated cost, **`zuno.groups` folded to a one-line arrow with three dots**, latency, model and model_kind, the last row on the bottom edge but whole; no `zuno.user_sub`, no group names | The tags from `zuno.agent` to `zuno.task`, `zuno.groups` folded, `zuno.persona`, `zuno.run_id` and `zuno.task` (the last row) whole; no `zuno.user_sub`, no group names, no Copy or JSON buttons |
+
+So the fold is **proven live, in a scout** (the coder said it had never seen the arrow's element; the scout's file and the image agree that the UI's own control folded the list). The writer saw the request id and the run id values on `tags-run` and copied none. As relayed, demo333 opened both images too and saw the same. demo333 asks the owner for the named take go (chat, then trace); the coordinator integrates `7c12f760` with its next commit.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
