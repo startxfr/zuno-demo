@@ -4,7 +4,8 @@
 // address, a trace page with its spans, and a span's detail with a Tags accordion and a Process line.
 // The search lists a trace from its second load on, as a real export does (FAKE_NO_TRACE=1: never; FAKE_TRACE_NOW=1:
 // at once). Knobs: FAKE_AUTHORIZE=1 OpenShift shows "Authorize Access" for the Tempo UI's own client (=other: for another client);
-// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; FAKE_NO_TAGS=1 the span has no
+// FAKE_ADDRESSES=1 the span's Process line holds the pod's address and its node; FAKE_TALL_LIST=1 a list tag of thirty lines sits among the zuno.* rows (the caption's tags cannot share a window);
+// FAKE_NO_TAGS=1 the span has no
 // zuno.* tag.
 import http from "node:http";
 
@@ -24,7 +25,9 @@ const AUTHORIZE = page("Authorize", `<h1>Authorize Access</h1><p>Service account
 // FAKE_ERROR_SPAN=1: the newest span is a failed call, as the one the rescout of 2026-11-16 opened.
 const TAGS = process.env.FAKE_NO_TAGS === "1" ? [["http.method", "POST"]] : [...(process.env.FAKE_ERROR_SPAN === "1" ? [["error", "true"], ["otel.status_code", "ERROR"]] : []), ["zuno.persona", "consultant-02"], ["zuno.client", "unifai"], ["zuno.agent", "tekos"], ["zuno.task", "answer-technical-question"],
   ["zuno.classification", "C2"], ["zuno.model_kind", "local"], ["zuno.provider", "local-gpt-oss-maas"], ["zuno.model", "gpt-oss-20b"], ["zuno.latency_ms", "912"],
-  ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"]];
+  ["zuno.estimated_cost_usd", "0.0004"], ["zuno.outcome", "success"], ["zuno.run_id", "run-1"],
+  // As the take of 2026-11-17 met the span: more rows than the window holds under the UI's fixed header, in alphabetical order.
+  ["zuno.prompt_tokens", "7537"], ...(process.env.FAKE_TALL_LIST === "1" ? [["zuno.groups", Array(30).fill("consultant").join("<br>")]] : []), ["zuno.request_id", "30c7c899"], ...Array.from({ length: 24 }, (_, i) => ["http.filler_" + String(i).padStart(2, "0"), "x"])].sort(([a], [b]) => a.localeCompare(b));
 const PROCESS = process.env.FAKE_ADDRESSES === "1" ? "Process: ip = 10.131.2.14 k8s.node.name = ip-10-18-3-7.eu-west-3.compute.internal" : "Process: service.name = ai-gateway";
 
 http.createServer((req, res) => {
@@ -43,9 +46,9 @@ http.createServer((req, res) => {
   if (u.pathname === "/" ) return to("/search");
   if (u.pathname === "/search") {
     const asked = u.searchParams.get("service") === "ai-gateway" && u.searchParams.get("operation") === "model_call"
-      && (u.searchParams.get("tags") || "") === JSON.stringify({ "zuno.persona": "consultant-02", "zuno.agent": "tekos" }) && u.searchParams.get("lookback") === "15m"
+      && (u.searchParams.get("tags") || "") === JSON.stringify({ "zuno.persona": "consultant-02", "zuno.agent": "tekos" }) && ["15m", "6h"].includes(u.searchParams.get("lookback"))
       // the 15 minutes as two instants in microseconds, or the search is not bounded (as on 2026-11-16)
-      && Math.abs(Number(u.searchParams.get("end")) / 1000 - Date.now()) < 120000 && Math.abs(Number(u.searchParams.get("end")) - Number(u.searchParams.get("start")) - 15 * 60e6) < 5e6;
+      && Math.abs(Number(u.searchParams.get("end")) / 1000 - Date.now()) < 120000 && Math.abs(Number(u.searchParams.get("end")) - Number(u.searchParams.get("start")) - (u.searchParams.get("lookback") === "6h" ? 360 : 15) * 60e6) < 5e6;
     if (u.searchParams.has("service")) searches += 1;
     const listed = asked && process.env.FAKE_NO_TRACE !== "1" && (searches >= 2 || process.env.FAKE_TRACE_NOW === "1");
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><form class="SearchForm"><label>Service <input value="${u.searchParams.get("service") || ""}"></label>
@@ -59,7 +62,7 @@ ${listed ? `<div class="ResultItem"><a class="ResultItemTitle--item" href="/trac
     return html(page("Jaeger UI", `<div id="jaeger-ui-root"><h1>A Select a Trace... vs B Select a Trace...</h1></div>`));
   }
   if (u.pathname === `/trace/${TRACE}`) {
-    return html(page("Jaeger UI", `<div id="jaeger-ui-root"><h1 class="TracePageHeader">unifai: workflow.run</h1>
+    return html(page("Jaeger UI", `<div id="jaeger-ui-root" style="padding-top:312px"><h1 class="TracePageHeader" style="position:fixed;top:0;left:0;right:0;height:312px;margin:0;background:#eee;z-index:5">unifai: workflow.run</h1>
 <div class="span-row"><a class="span-name">unifai workflow.run</a></div>
 <div class="span-row"><a class="span-name" id="mc" role="switch" aria-checked="false">ai-gateway model_call</a></div><div id="detail"></div>
 <div class="span-row"><a class="span-name">ai-gateway model_call</a></div></div>
@@ -70,7 +73,7 @@ document.getElementById("mc").onclick = () => {
     + '<a class="AccordianKeyValues--header">${PROCESS}</a></div>';
   document.getElementById("th").onclick = () => {
     const t = document.getElementById("tt"); t.hidden = false;
-    t.innerHTML = tags.map(([k, v]) => "<tr><td>" + k + "</td><td>" + v + "</td></tr>").join("");
+    t.innerHTML = tags.map(([k, v]) => "<tr style='height:27px'><td>" + k + "</td><td>" + v + "</td></tr>").join("");
   };
 };
 </script>`));

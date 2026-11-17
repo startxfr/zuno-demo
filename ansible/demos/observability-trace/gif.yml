@@ -4,7 +4,8 @@
 # `make demo record observability-trace` films TWO takes in one run (evaluations/browser/walkthroughs/
 # observability-trace.mjs): `chat`, consultant-02 on UnifAI (team workspace agent-tekos), then `trace`, ai-ops-01 on
 # the Tempo search UI. Every moment names its take.
-# Markers of `chat`: login, hub, q-sent, q-done, end. Of `trace`: login, search, trace, tags, end. The trace take
+# Markers of `chat`: login, hub, q-sent, q-done, end. Of `trace`: login, search, trace, tags (the top of the span's zuno.*
+# rows: who, app, agent, model, cost), tags-run (their end: the run, which is the chat's session id), end. The trace take
 # searches again until the trace shows, up to three minutes: none of that wait is in the cut (stills only there).
 # Rows 0:00 and 4:15 are words: the close is a caption on the span's tags.
 record_notice: >-
@@ -22,5 +23,6 @@ moments:
   - {take: chat, from: q-sent, to: q-done, fit: 6, hold: 4, step: "0:45", caption: "0:45  A consultant asks our technical agent"}
   - {take: trace, still: search, hold: 6, step: "1:45", caption: "1:45  The operator finds that turn by who asked"}
   - {take: trace, still: trace, hold: 5, caption: "One trace: UnifAI's spans and the gateway's model calls"}
-  - {take: trace, still: tags, hold: 10, step: "3:00", caption: "3:00  Who, which app, which agent, which model, what cost"}
+  - {take: trace, still: tags, hold: 8, step: "3:00", caption: "3:00  Who, which app, which agent, which model, what cost"}
+  - {take: trace, still: tags-run, hold: 5, caption: "The run it names is the consultant's own session"}
   - {take: trace, still: end, hold: 5, step: "4:15", caption: "Every call leaves a count and a trace"}

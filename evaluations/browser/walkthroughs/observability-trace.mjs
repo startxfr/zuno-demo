@@ -26,12 +26,12 @@
 //    existing trace (read only) so that this is known for the price of a sign-in.
 import { click, firstVisible, read, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
 import { ADD, newSession, openHub, openSelector, teamAllows, teamSessions, warm, toBottom } from "./_unifai_team.mjs";
-import { grafanaInWindow, proxySignIn } from "./_grafana.mjs";
+import { proxySignIn } from "./_grafana.mjs";
 
 const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
 export const takes = [
   { name: "chat", persona: "consultant-02", markers: ["login", "hub", "q-sent", "q-done", "end"], motion_from: "hub" },
-  { name: "trace", persona: "ai-ops-01", markers: ["login", "search", "trace", "tags", "end"], motion_from: "search" },
+  { name: "trace", persona: "ai-ops-01", markers: ["login", "search", "trace", "tags", "tags-run", "end"], motion_from: "search" },
 ];
 export const page = "docs/demo/scenarios/foundation/observability-trace.md";
 export const viewport = { width: 1280, height: 800 };
@@ -59,9 +59,19 @@ const TEAMS = ["agent-arkos", "agent-tekos", "consultant"];   // consultant-02's
 // first take asked (the page's own recovery row narrows the search the same way, by tags).
 const SEARCH = { service: "ai-gateway", operation: "model_call", tags: { "zuno.persona": "consultant-02", "zuno.agent": "tekos" }, lookback: "15m" };
 const SPAN = "model_call";
-// The tags the page's row 3:00 names; the first three must be drawn inside the window at the `tags` marker.
+// The tags the page's row 3:00 names. The span's detail lists more zuno.* rows than the window holds under the Jaeger
+// UI's fixed header (the take of 2026-11-17), in alphabetical order, so the take makes TWO pictures of them:
+//  - `tags`: the list's first zuno.* row at the top of the visible area. The tags the GIF's caption names (CAPTION:
+//    who, which app, which agent, which model, what cost) must all be drawn in the window there.
+//  - `tags-run`: the list's last zuno.* row at the bottom. The rows of PROOF must be drawn there: who asked, and the
+//    run, which is the chat take's own session id (seen on 2026-11-17).
+// A named tag the span shows in its detail and that is outside the window at its marker FAILS the take. A tag of the
+// page's row that the span does not carry at all is logged (a matter for the page, not for the picture).
 const TAGS = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.task", "zuno.classification", "zuno.model_kind", "zuno.provider", "zuno.model",
               "zuno.latency_ms", "zuno.estimated_cost_usd", "zuno.outcome", "zuno.run_id"];
+const CAPTION = ["zuno.persona", "zuno.client", "zuno.agent", "zuno.model", "zuno.estimated_cost_usd"];
+const PROOF = ["zuno.persona", "zuno.run_id"];
+let chatSession = "";   // the chat take's session id, for the trace take of the same run (one process plays both)
 const WAIT_FOR_TRACE_MS = 180000;
 const READY = [".SearchForm", ".SearchTracePage", "[data-testid='SearchForm']", "#jaeger-ui-root", "main"];       // guess (Jaeger UI)
 // A result's title link. Never a bare a[href*='/trace/']: the page's own "Compare" link holds /trace/ too, and the
@@ -74,8 +84,10 @@ const TAGS_HEADER = [".detail-row .AccordianKeyValues--header:has-text('Tags')",
 
 // The 15 minutes are given as two instants too (microseconds, as the form's "Find Traces" writes them): with
 // `lookback` alone the search answered traces hours old (the take of 2026-11-16 opened one from 3 h 30 before).
-const searchAddress = (base) => `${base}/search?service=${SEARCH.service}&operation=${SEARCH.operation}`
-  + `&tags=${encodeURIComponent(JSON.stringify(SEARCH.tags))}&lookback=${SEARCH.lookback}&start=${(Date.now() - 15 * 60000) * 1000}&end=${Date.now() * 1000}&limit=20`;
+// A scout asks nothing, so it has no turn of its own to find: it looks back six hours instead (read only), which
+// lets it open the trace of an earlier Tekos answer and tell what a take's `tags` pictures will hold.
+const searchAddress = (base, scout = false) => `${base}/search?service=${SEARCH.service}&operation=${SEARCH.operation}`
+  + `&tags=${encodeURIComponent(JSON.stringify(SEARCH.tags))}&lookback=${scout ? "6h" : SEARCH.lookback}&start=${(Date.now() - (scout ? 360 : 15) * 60000) * 1000}&end=${Date.now() * 1000}&limit=20`;
 
 export async function enter(ctx) {
   const { page, domain, take, state } = ctx;
@@ -104,6 +116,7 @@ async function runChat({ page, mark, log, state }) {
   // The hub opens the workspace's most recent session by itself: the take's own is created first, then shown.
   const id = await newSession(page, state, WORKFLOW, { changes });
   log(`session ${id} created (${WORKFLOW}, workspace ${WORKSPACE})`);
+  chatSession = String(id || "");
   await page.waitForTimeout(1000);
   await mark("hub");
   await unifaiAsk(page, prompts["0:45"], state);
@@ -121,9 +134,9 @@ async function runChat({ page, mark, log, state }) {
 }
 
 // Load the search and return its results (locators' count), waiting for the page to settle.
-async function search(page, base) {
+async function search(page, base, scout = false) {
   // The Tempo UI is slow to load (a goto past 30 s on 2026-11-16): 90 s, and once more if it did not come.
-  await page.goto(searchAddress(base), { timeout: 90000 }).catch(() => page.goto(searchAddress(base), { timeout: 90000 }));
+  await page.goto(searchAddress(base, scout), { timeout: 90000 }).catch(() => page.goto(searchAddress(base, scout), { timeout: 90000 }));
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   // The results are drawn after the page: a result, or the page's own "no result" words, is waited for (20 s).
   await waitUntil(page, { what: "the search's results", timeoutMs: 20000,
@@ -166,13 +179,47 @@ async function openSpan(page) {
   const header = await firstVisible(page, TAGS_HEADER);
   if (header) { await fold(page.locator(header.matched).first(), "tags"); await page.waitForTimeout(800); }
   await page.mouse.move(640, 790);
-  // The tags are a long list, in alphabetical order: it is scrolled so that its zuno.* rows are in the window.
-  const middle = page.locator(detail.matched).first().getByText("zuno.model", { exact: true }).first();
-  if (await middle.count()) await read(middle, (el) => el.scrollIntoView({ block: "center" }));
-  await page.waitForTimeout(500);
   const text = await page.locator(detail.matched).first().innerText().catch(() => "");
-  return { detail: detail.matched, tags_header: header ? header.matched : "", tags: TAGS.filter((tag) => text.includes(tag)),
+  const run = (text.replace(/\s+/g, " ").match(/zuno\.run_id\s*=?\s*(\S+)/) || [])[1] || "";
+  return { detail: detail.matched, tags_header: header ? header.matched : "", tags: TAGS.filter((tag) => text.includes(tag)), run_id: run,
            error: /\berror\s*=?\s*true\b|otel\.status_code\s*=?\s*ERROR/i.test(text.replace(/\s+/g, " ")) };
+}
+
+// Scroll the span's tag list: its first zuno.* row to the top of the visible area (under whatever the UI keeps fixed
+// there), or its last zuno.* row to the bottom of the window. Then which of TAGS are DRAWN: the tag's own text is what
+// is at its place in the window (not under the fixed header, not scrolled out). {tag: boolean}.
+async function placeTags(page, detail, where) {
+  const rows = page.locator(detail).first().getByText(/^zuno\.[a-z_]+$/);
+  if (await rows.count()) {
+    await read(where === "first" ? rows.first() : rows.last(), (el, first) => {
+      const move = (dy) => {
+        const before = window.scrollY;
+        window.scrollBy(0, dy);
+        if (window.scrollY !== before) return;
+        for (let up = el.parentElement; up; up = up.parentElement) if (up.scrollHeight > up.clientHeight + 4) { const was = up.scrollTop; up.scrollTop += dy; if (up.scrollTop !== was) return; }
+      };
+      if (!first) { el.scrollIntoView({ block: "end" }); move(40); return; }
+      el.scrollIntoView({ block: "start" });
+      for (let i = 0; i < 4; i += 1) {
+        const box = el.getBoundingClientRect();
+        const at = document.elementFromPoint(box.left + Math.min(box.width / 2, 20), box.top + box.height / 2);
+        if (!at || at === el || el.contains(at) || at.contains(el)) break;
+        move(box.top - at.getBoundingClientRect().bottom - 8);   // what covers it: the row goes just under it
+      }
+    }, where === "first");
+  }
+  await page.waitForTimeout(500);
+  const drawn = {};
+  for (const tag of TAGS) {
+    const row = page.locator(detail).first().getByText(tag, { exact: true }).first();
+    drawn[tag] = (await row.count()) > 0 && (await read(row, (el) => {
+      const box = el.getBoundingClientRect();
+      if (!box.width || box.top < 0 || box.bottom > window.innerHeight) return false;
+      const at = document.elementFromPoint(box.left + Math.min(box.width / 2, 20), box.top + box.height / 2);
+      return Boolean(at && (at === el || el.contains(at) || at.contains(el)));
+    }).catch(() => false));
+  }
+  return drawn;
 }
 
 async function runTrace({ page, domain, mark, log, state }) {
@@ -195,12 +242,22 @@ async function runTrace({ page, domain, mark, log, state }) {
   const missing = TAGS.filter((tag) => !span.tags.includes(tag));
   if (span.tags.length < 3 || !span.tags.includes("zuno.persona")) throw new Error(`the ${SPAN} span does not show its tags (seen: ${span.tags.join(", ") || "none"})`);
   if (missing.length) log(`tags of the page's row 3:00 NOT in the span's detail: ${missing.join(", ")}`);
-  const out = [];
-  for (const tag of ["zuno.persona", "zuno.client", "zuno.agent"]) if (span.tags.includes(tag) && !(await grafanaInWindow(page, tag))) out.push(tag);
-  if (out.length) throw new Error(`the span's tags ${out.join(", ")} are not drawn inside the window: the picture would not hold the row's proof`);
+  // The run of the span against the session the chat take asked in: the proof that the trace is that turn's.
+  state.notes.run_id_is_the_chat_session = Boolean(chatSession && span.run_id === chatSession);
+  log(!span.run_id ? "the span shows no zuno.run_id" : !chatSession ? "the span shows a zuno.run_id; the chat take of this run gave no session id to compare it with"
+    : state.notes.run_id_is_the_chat_session ? `the span's zuno.run_id is the chat take's session ${chatSession}` : `the span's zuno.run_id (${span.run_id.slice(0, 40)}) is NOT the chat take's session ${chatSession}: check which turn the trace is`);
   log(`the gateway's span ${(await page.locator("body").innerText()).includes(prompts["0:45"]) ? "page SHOWS the question's text somewhere: check tags.png" : "page shows no question text"}`);
-  await page.waitForTimeout(800);
-  await mark("tags");
+  const outside = [];
+  for (const [marker, where, named] of [["tags", "first", CAPTION], ["tags-run", "last", PROOF]]) {
+    const drawn = await placeTags(page, span.detail, where);
+    const shown = TAGS.filter((tag) => drawn[tag]);
+    log(`${marker}: tags drawn in the window: ${shown.join(", ") || "none"}`);
+    state.notes[marker === "tags" ? "tags_in_window" : "tags_run_in_window"] = shown.length;
+    outside.push(...named.filter((tag) => span.tags.includes(tag) && !drawn[tag]).map((tag) => `${tag} at ${marker}`));
+    await page.waitForTimeout(800);
+    await mark(marker);
+  }
+  if (outside.length) throw new Error(`the span's tags are not all drawn inside the window (${outside.join(", ")}): the picture would not hold the row's proof`);
   await page.waitForTimeout(800);
   await mark("end");
   if (state.writes.length) throw new Error(`the take sent ${[...new Set(state.writes)].join(", ")} to the Tempo search UI: it must change nothing there`);
@@ -220,12 +277,12 @@ export async function scout({ page, domain, step, state, take }) {
     await step("chain", async () => ({ ...state.grafana, url: page.url().replace(/[?#].*/, "") }));
     let found = { count: 0 };
     await step("search", async () => {
-      found = await search(page, base);
+      found = await search(page, base, true);
       return { url: page.url().replace(/[#].*/, ""), results: found.count, selector: found.matched,
                words: await wordsOnScreen(page, [/ai-gateway/, /model_call/, /zuno\.persona/, /Find Traces/, /Last 15 Minutes|15m/]) };
     });
     await step("trace", async () => {
-      if (!found.count) return { skipped: "the search lists no trace now: ask Tekos as consultant-02, then scout again" };
+      if (!found.count) return { skipped: "the search lists no trace of the last six hours: ask Tekos as consultant-02, then scout again" };
       await openTrace(page, found);
       const name = await firstVisible(page, SPAN_NAME);
       return { url: page.url().replace(/\/trace\/.*/, "/trace/<id>"), span_selector: name.matched, spans: await page.locator(name.matched).count(),
@@ -234,9 +291,11 @@ export async function scout({ page, domain, step, state, take }) {
     await step("tags", async () => {
       if (!found.count) return { skipped: "no trace" };
       const span = await openSpan(page);
-      const inside = {};
-      for (const tag of ["zuno.persona", "zuno.client", "zuno.agent"]) inside[tag] = await grafanaInWindow(page, tag);
-      return { ...span, span_is_an_error: span.error, in_window: inside, process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
+      const { run_id, ...seen } = span;   // the run's id is not kept by a scout
+      const first = await placeTags(page, span.detail, "first");
+      const last = await placeTags(page, span.detail, "last");
+      return { ...seen, run_id_shown: Boolean(run_id), in_window: { tags: first, "tags-run": last },
+               caption_in_window: CAPTION.filter((tag) => span.tags.includes(tag)).every((tag) => first[tag]), proof_in_window: PROOF.every((tag) => last[tag]), span_is_an_error: span.error, process_line_on_screen: await page.getByText(/^Process/).first().isVisible().catch(() => false) };
     });
     await step("closed", async () => {
       if (state.writes.length) throw new Error(`the scout sent ${[...new Set(state.writes)].join(", ")} to the Tempo search UI`);
