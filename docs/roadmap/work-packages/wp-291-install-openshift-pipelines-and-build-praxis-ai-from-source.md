@@ -24,7 +24,7 @@ Build `quay.io/zuno/praxis-ai` from the fork `https://github.com/redhat-et/praxi
    - upstream: the same minus fork-only features. Check each name in `server/Cargo.toml` before the first run.
 4. Vault and secrets: grant the key in `platform/vault/secret-access.yaml` and `gitops/charts/external-secrets/values.yaml`. The owner creates the quay.io robot and writes the token.
 5. Role `ansible/roles/praxis_build`: it creates a `PipelineRun`, waits, and prints the digest. Wire it into `day2_build.yml` and `DAY2_BUILD_COMPONENTS`.
-6. Build resources: about 8 GiB of memory. Allow egress from `zuno-ai-build` to github.com, crates.io, static.rust-lang.org, docker.io and quay.io, after checking what exists.
+6. Build resources: 6 GiB of memory requested, 1 CPU. Allow egress from `zuno-ai-build` to github.com, crates.io, static.rust-lang.org, docker.io and quay.io, after checking what exists.
 7. Live, each step with the owner's go:
    - check that demo333 is up;
    - install the operator;
@@ -51,7 +51,7 @@ Repo work done; nothing is applied to the cluster.
 - **Build:** component `praxis` (Day 2 build), role `ansible/roles/praxis_build`.
   - The source switch lives in the role defaults, not in chart values, because the role creates the run.
   - Revision resolved to a full SHA by `git ls-remote`; image tag `<source>-<sha12>`.
-  - The run carries `sidecar.istio.io/inject: "false"`; the build task gets 4 CPU and 8 Gi.
+  - The run carries `sidecar.istio.io/inject: "false"`; the build task requests 1 CPU and 6 Gi (no CPU limit; the general workers have under 2.1 CPU free, live recon finding 5).
   - The role prints the digest. Feature names were checked in both `server/Cargo.toml` files: `api-key-auth-filter` is fork-only.
   - Wired into `day2_build.yml`, the AAP day-2 build DAG and its survey, and `DAY2_BUILD_COMPONENTS`.
 - **Checks:** `check_docs.py`, `check_app_projects.py`, `check_secret_access.py`, `check_mesh_mtls.py`, `helm lint` and the ansible syntax check pass.
