@@ -122,7 +122,7 @@ export async function proxySignIn({ page, base, mark, keycloak, state }, persona
   const chain = [];
   state.grafana = { chain, authorize_shown: false, authorized: false };
   const here = () => page.url().replace(/[?#].*/, "");
-  await page.goto(`${base}/`);
+  await page.goto(`${base}/`, { timeout: 90000 }).catch(() => page.goto(`${base}/`, { timeout: 90000 }));   // a slow first load: once more
   const wanted = [...grafana.PROXY_BUTTON, ...provider(grafana.PROVIDER), "#username"];
   for (let hop = 0; hop < 4; hop += 1) {
     const found = await waitUntil(page, { what: `the sign-in chain of ${what}`, timeoutMs: 60000, done: async () => (await firstVisible(page, wanted)) || undefined });

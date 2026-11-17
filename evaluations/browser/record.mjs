@@ -421,6 +421,9 @@ async function scoutOne(take, out) {
   const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: "en-US", viewport: walk.viewport });
   const guarded = await guardWrites(context);
   const page = await context.newPage();
+  // A first load on the cluster can take more than Playwright's 30 s (rescouts of 2026-11-16: four of seven attempts
+  // lost on that alone): every navigation is given 90 s.
+  page.setDefaultNavigationTimeout(90000);
   const t0 = Date.now();
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
   // A scout never sends a chat message: the calls that would are refused before they leave the browser.
@@ -493,6 +496,9 @@ async function takeOne(take, out) {
   });
   const guarded = await guardWrites(context);
   const page = await context.newPage();
+  // A first load on the cluster can take more than Playwright's 30 s (rescouts of 2026-11-16: four of seven attempts
+  // lost on that alone): every navigation is given 90 s.
+  page.setDefaultNavigationTimeout(90000);
   const t0 = Date.now();
   const log = (text) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${text}`);
 

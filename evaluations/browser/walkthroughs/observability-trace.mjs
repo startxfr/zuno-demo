@@ -25,7 +25,7 @@
 //    addresses on the page at each step; if it finds some at `tags`, a take would fail there. scout() opens the newest
 //    existing trace (read only) so that this is known for the price of a sign-in.
 import { click, firstVisible, read, unifai, unifaiAnswered, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { ADD, newSession, openHub, openSelector, teamAllows, teamSessions, toBottom } from "./_unifai_team.mjs";
+import { ADD, newSession, openHub, openSelector, teamAllows, teamSessions, warm, toBottom } from "./_unifai_team.mjs";
 import { grafanaInWindow, proxySignIn } from "./_grafana.mjs";
 
 const tempo = (domain) => process.env.RECORD_BASE_URL_TEMPO || `https://tempo-jaegerui-zuno-monitoring.${domain}`;
@@ -86,6 +86,7 @@ export async function enter(ctx) {
     await proxySignIn({ ...ctx, base: tempo(domain) }, take.persona, { changes, what: "the Tempo search UI", ready: READY, authorize: TEMPO_AUTHORIZE });
     return;
   }
+  await warm(page, ctx.base);
   await unifaiSignIn(ctx, take.persona);
   const seen = await openSelector(page, TEAMS, { changes, state });
   if (!seen.listed[WORKSPACE]) throw new Error(`the workspace selector of ${take.persona} does not list ${WORKSPACE}`);
@@ -121,7 +122,8 @@ async function runChat({ page, mark, log, state }) {
 
 // Load the search and return its results (locators' count), waiting for the page to settle.
 async function search(page, base) {
-  await page.goto(searchAddress(base));
+  // The Tempo UI is slow to load (a goto past 30 s on 2026-11-16): 90 s, and once more if it did not come.
+  await page.goto(searchAddress(base), { timeout: 90000 }).catch(() => page.goto(searchAddress(base), { timeout: 90000 }));
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   // The results are drawn after the page: a result, or the page's own "no result" words, is waited for (20 s).
   await waitUntil(page, { what: "the search's results", timeoutMs: 20000,

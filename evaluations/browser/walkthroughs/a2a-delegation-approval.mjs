@@ -20,7 +20,7 @@
 // Team mode is _unifai_team.mjs's (seen by the scouts of 2026-11-16). The approval card was never seen by a scout
 // (a scout sends nothing): its selectors are guesses from the page's words, marked `guess`.
 import { click, firstVisible, pageApi, read, unifai, unifaiAsk, unifaiDeleteSession, unifaiSignIn, waitUntil, wordsOnScreen } from "./_helpers.mjs";
-import { ADD, START, newSession, openHub, openSelector, teamAllows, teamSessions, toBottom } from "./_unifai_team.mjs";
+import { ADD, START, newSession, openHub, openSelector, teamAllows, teamSessions, warm, toBottom } from "./_unifai_team.mjs";
 
 export const persona = "consultant-02";
 export const page = "docs/demo/scenarios/governance/a2a-delegation-approval.md";
@@ -48,6 +48,7 @@ const CARD_TIMEOUT_MS = 180000;      // the page: about 10 s through the API
 const ANSWER_TIMEOUT_MS = 300000;    // the approval expires after 300 s
 
 export async function enter(ctx) {
+  await warm(ctx.page, ctx.base);
   await unifaiSignIn(ctx, persona);
   const seen = await openSelector(ctx.page, TEAMS, { changes, state: ctx.state });
   if (!seen.listed[WORKSPACE]) throw new Error(`the workspace selector of ${persona} does not list ${WORKSPACE}`);

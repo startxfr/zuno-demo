@@ -43,6 +43,18 @@ export const teamAllows = [
   // it stores nothing. Refused, the hub says "Workflow Unavailable" and disables the message box.
   { method: "POST", path: /^\/api2\/blueprints\/blueprint\.validate\/?$/, what: "the workflow's validation (a read)" },
 ];
+// UnifAI's first load can outlast every wait of the sign-in helper (rescouts of 2026-11-16: a goto past 30 s, and
+// once a black page with a spinner that never left). The entry page is opened HERE first, given 90 s to show its
+// sign-in button, and loaded once more if it is still on its loading screen; the sign-in helper then finds it warm.
+// Nothing is signed in to, nothing is sent.
+export async function warm(page, base) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await page.goto(`${base}/`, { timeout: 90000, waitUntil: "domcontentloaded" }).catch(() => {});
+    const ready = await waitUntil(page, { what: "UnifAI's entry page", timeoutMs: 90000, done: async () => (await firstVisible(page, [...unifai.SSO, ...unifai.NAV.chats])) || undefined }).catch(() => null);
+    if (ready) return attempt;
+  }
+  throw new Error("UnifAI's entry page was still on its loading screen after two loads of 90 s");
+}
 export const TEAM = ["button:text-is('Team')"];                                                             // guess (Sidebar.tsx)
 export const SELECTOR = ["button:has(svg.lucide-chevron-down)", "button:has-text('Select team')"];          // guess (Sidebar.tsx)
 export const HUB = ["a[href='/agentic-chats']"];                                                            // the same route as Agentic Chats
