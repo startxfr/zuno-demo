@@ -16,6 +16,8 @@ a detection is logged and counted, and the answer is not changed. How the mode i
 **The message:** "Every experience gets the same guardrails, in one place. Today they watch and record; blocking is a
 policy switch, turned on with evidence."
 
+![The 5-minute version of the guardrails demo, recorded live: as consultant-02 with Dify's administrator account, a classic jailbreak prompt sent to the Zuno Agent, which the model declines while the gateway blocks nothing; then, as ai-ops-01 on Grafana, the detection the gateway recorded for Dify. The panel's count includes the probes of the demo's own check.](../../../assets/img/demo/guardrails.gif)
+
 ## Personas
 
 The personas are fictional role accounts of the Keycloak realm `zuno`. They share one
