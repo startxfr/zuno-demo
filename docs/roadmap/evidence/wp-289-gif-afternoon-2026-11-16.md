@@ -356,6 +356,31 @@ The writer read the five `scout.json` files and the sub-scouts of `observability
 - **`maas-portal-api-keys`:** the walkthrough hash `54e88fcc...` is the one the coordinator named for `723c5e24`. Nothing was created.
 - Demo333 asks the owner for new named take gos: `maas-portal-api-keys` first, then `observability-trace`; `openclaw` and `a2a-delegation-approval` are held (as relayed).
 
+### Recorder change: multi-take scouts keep their details (`bddb4d38`)
+
+The coder's `bddb4d38` (commit time 03:09:04 CET) is on `devel` as `b1e7c538` (commit time 03:22:16 CET on 2026-11-17; both times read from git by the writer). As relayed: in a run of several takes, the top `scout.json` now keeps each take's step details, named `<take>/<step>`, and a `writes` key whose lines start with "<take>: ". It changes `record.mjs` and one offline case only; no walkthrough hash moves. Suites passed, as relayed. The rescouts above predate it: their top `scout.json` has no step details, which is why the writer read the sub-scout files. `fb79efc8` is on `devel` as `118e2ecc` (as relayed).
+
+### Take: maas-portal-api-keys (passed, no GIF yet; WP-290)
+
+Take `maas-portal-api-keys-20261117-041246`, persona `ai-dev-01`, started 03:12:56 UTC (04:12 CET). The owner's go time is in demo333's log; the coordinator will give it (not yet read by the writer). The writer read `markers.json` and opened 4 of the 8 marker images (`keys`, `created`, `calls`, `answer`) and no GIF frame.
+
+| Item | Value |
+|---|---|
+| Result | `pass`, 8 markers in 38.5 s: `login`, `portal`, `keys`, `create-form`, `created`, `calls`, `answer`, `end` |
+| Created and cleaned | One API key, named `zuno-demo-gif-` plus a timestamp; `cleaned` true; owned 0 before and 0 after; `private_addresses` count 0 |
+| Writes (read) | 2 key-list searches (200, reads) and 1 `POST` of `api-keys` (201, "create the take's key"); refused none, tolerated none |
+| Commit | Not recorded in `markers.json`. The coordinator says `devel` `7dce084a` (commit time 03:01:06 CET, read from git by the writer), as relayed |
+
+As relayed: the key was revoked (the delete answered 200) and the gateway then answered 403 with it; the recorder drew three calls: 401 without the key, 200 with it, then one chat completion on `gpt-oss-20b` (118 tokens, on `ai-dev-01`'s subscription). The writer saw the first two calls on `calls.png` and the third, with `"total_tokens":118`, on `answer.png`. The writer saw no frame of the revoke or of the 403 (`end.png` has the same size as `answer.png`; not opened).
+
+**The shown-once dialog is seen for the first time.** `created.png`: "API key created", the warning "This is the only time you will see this key", a field that reads `sk-oai-` followed by dots (masked), an eye button and a copy button, then the name, the subscription (`gpt-oss-20b-ocp-ai-dev`) and "30 days". The key's value is not on the frame. The recorder's own line that says the portal does not show the masked key is wrong, per this frame (as the coordinator says). The writer copies no key id; the name's timestamp is not copied either.
+
+The other frames: `keys.png` is the empty list ("No API keys") of `ai-dev-01`, no node name, no address. `calls.png` and `answer.png` are the recorder's own page ("Calls made by the recorder with the key just created", "The key is not shown"), which names the gateway as `$MAAS`, not by address. The `portal` marker is a loading spinner (relayed; not opened). Demo333 opened 9 PNGs and saw nothing private (as relayed; the take has 8 markers, the ninth image is unknown to the writer).
+
+**No GIF yet.** `gif.py` refused three captions over 60 characters. The coordinator's `f6083840` (`gif.yml` only) shortens three captions and shows row 0:00 on `keys` instead of the spinner; dry-run 6 moments, 43.0 s planned (as relayed). Demo333 re-cuts. Not published; no owner publication go.
+
+**What the cluster keeps (as relayed):** possibly one key listed as revoked in `ai-dev-01`'s portal, and the traces and metrics of the three calls.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.

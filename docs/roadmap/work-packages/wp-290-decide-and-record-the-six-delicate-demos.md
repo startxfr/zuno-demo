@@ -68,6 +68,10 @@ Neither is retried. Details are in [the afternoon evidence](../evidence/wp-289-g
 - `maas-portal-api-keys` failed before any key was created: the check did not see the model chosen in the Create dialog, which the frame shows is chosen. A bug in the check. Fixed on `devel` as `723c5e24` (coder's `a8afb3a6`); a rescout comes before the next take. The shown-once dialog is still unseen.
 - `openclaw` failed after the question was answered: the take did not recognise its own session, which the assistant had retitled, so it did not delete it. Owned sessions went from 6 to 7. The session stays until the owner decides (delete by hand, or leave for a later take). The answer frame holds real Confluence titles; the owner chose "comme guardrails".
 
+### `maas-portal-api-keys`: the take passed (2026-11-17, no GIF yet)
+
+Take `maas-portal-api-keys-20261117-041246`: 8 markers in 38.5 s, one key created and cleaned, owned 0 to 0, private addresses 0 (the writer read `markers.json`). The shown-once dialog was seen for the first time, with the key masked after `sk-oai-`. The recorder drew the calls (401 without the key, 200 with it, one chat completion). The key was revoked and the gateway answered 403 with it (as relayed). Not published: the GIF waits for a re-cut and the owner's go. Details in [the afternoon evidence](../evidence/wp-289-gif-afternoon-2026-11-16.md).
+
 ### Scouts at `d80f25ef` (as relayed)
 
 - `openclaw`: 7 of 7. The session menu lists Pin session, Mark as unread, Rename…, Fork, Move to group, Archive session and Delete….
