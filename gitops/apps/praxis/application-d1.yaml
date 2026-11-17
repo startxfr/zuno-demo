@@ -1,0 +1,44 @@
+---
+# ADR-0619 (WP-292): Praxis AI, the alternative AI gateway, in zuno-ai-gateways (the namespace, its mesh labels, its
+# baseline and its egress firewall come from gitops/charts/namespaces). Applied and deleted ONLY by ansible/roles/praxis,
+# which follows zuno_praxis_enabled and passes the image digest, the cluster domain and the switches: a dict passed that
+# way REPLACES spec.source.helm.values, so every key below must also be written by the role.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-praxis-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-56"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/praxis
+    helm:
+      releaseName: zuno-praxis-d1
+      # The checks (check_secret_access, check_workload_hardening, check_app_projects) render THIS manifest, so it shows
+      # the whole deployment: every Vault read (saas, tokenRateLimit) and the Deployment (a digest that is shaped like
+      # one and pulls nothing). The role replaces all of it with the cluster's switches and the real digest.
+      values: |
+        clusterBaseDomain: apps.mycluster.example.com
+        image:
+          digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        saas:
+          enabled: true
+        tokenRateLimit:
+          enabled: true
+        opentelemetry:
+          enabled: true
+        networkPolicy:
+          workstationEntry: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-gateways
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

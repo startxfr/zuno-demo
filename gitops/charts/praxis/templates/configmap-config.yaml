@@ -1,0 +1,296 @@
+# The Praxis gateway configuration (praxis.yaml), rendered from values. It lives in a ConfigMap of its own, mounted in
+# a directory of its own: Praxis watches its configuration directory, and a directory that other files are written
+# into reloads in a loop (WP-292 spike). The policy file is the ConfigMap next door, mounted elsewhere.
+#
+# The chain, in order:
+#   policy (verifies the zuno JWT, authorizes the model)
+#   -> /v1/models answered here
+#   -> [token_rate_limit per subject, when on]
+#   -> Anthropic Messages to Chat Completions (the /v1/messages callers: Claude Code)
+#   -> alias `auto`, then X-Model
+#   -> local models: MaaS first, direct KServe on 429/502/503/504 (a rewrite outside the router is not seen by its
+#      sub-requests, so each step rewrites for itself; ONE path_rewrite per model, conditioned on X-Model)
+#   -> Claude / Codestral, each in a router of its own, only when the model is that one (saas.enabled).
+{{- $v := .Values }}
+{{- $ns := $v.maas.modelsNamespace }}
+{{- $saas := $v.saas }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: praxis-config
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+data:
+  praxis.yaml: |
+    listeners:
+      - name: gateway
+        address: "0.0.0.0:8080"
+        filter_chains: [main, local{{ if $saas.enabled }}, claude, codestral{{ end }}]
+    # The admin API must be loopback; the metrics have an address of their own (scraped by the ServiceMonitor).
+    admin:
+      address: "127.0.0.1:9901"
+      metrics_address: "0.0.0.0:{{ $v.metrics.port }}"
+    {{- if $v.opentelemetry.enabled }}
+    telemetry:
+      otlp_endpoint: {{ $v.opentelemetry.endpoint | quote }}
+      service_name: {{ $v.opentelemetry.serviceName | quote }}
+      sampling_rate: {{ $v.opentelemetry.samplingRate }}
+    {{- end }}
+    filter_chains:
+      - name: main
+        filters:
+          - filter: policy
+            config_path: /etc/praxis/policy/policy.yaml
+            # The JWKS is read through the public Route, which resolves to the router's private address in the cluster.
+            trusted_private_endpoints: [{{ include "praxis.issuerHost" . | quote }}]
+            require_protocol_metadata: false
+            llm:
+              require_model: true
+              provider: openai
+          # GET /v1/models: the models this gateway serves, after the policy has authenticated the caller.
+          - filter: static_response
+            status: 200
+            headers:
+              - {name: Content-Type, value: application/json}
+            body: {{ dict "object" "list" "data" (include "praxis.modelNames" . | fromJsonArray | include "praxis.modelList" | fromJsonArray) | toJson | quote }}
+            conditions:
+              - when:
+                  path: "/v1/models"
+          {{- if $v.tokenRateLimit.enabled }}
+          # Declared before token_count: response hooks run in reverse order, so token_count writes token.total
+          # before token_rate_limit reads it back to settle the reservation.
+          - filter: token_rate_limit
+            backend:
+              kind: redis
+              url: "redis://:${REDIS_PASSWORD}@{{ $v.tokenRateLimit.redis.host }}:{{ $v.tokenRateLimit.redis.port }}"
+              namespace: {{ $v.tokenRateLimit.redis.namespace | quote }}
+            key: authenticated_subject
+            rules:
+              - name: per-user
+                algorithm: sliding_window
+                window: {{ $v.tokenRateLimit.window }}
+                capacity: {{ $v.tokenRateLimit.capacity | int64 }}
+                reserved_tokens: {{ $v.tokenRateLimit.reservedTokens | int64 }}
+          {{- end }}
+          - filter: anthropic_messages_request
+            on_invalid: continue
+          - filter: anthropic_messages_to_chat_completions
+            allow_lossy_features: [prompt_caching, extended_thinking]
+            conditions:
+              - when:
+                  path: "/v1/messages"
+          - filter: anthropic_messages_to_chat_completions_stream
+            response_conditions:
+              - when:
+                  headers:
+                    content-type: "text/event-stream"
+          {{- if $v.tokenRateLimit.enabled }}
+          # After the translation filters, so the response it counts is the Chat Completions one.
+          - filter: token_count
+            provider: openai
+          {{- end }}
+          # The alias: `{{ $v.alias.name }}` becomes {{ $v.alias.target }}, the body rewritten once, before the routing steps.
+          - filter: model_to_provider
+            models:
+              - {model: {{ $v.alias.name }}, upstream: maas, target_model: {{ $v.alias.target }}, paths: [/v1/chat/completions, /v1/messages]}
+          - filter: model_to_header
+            header: X-Model
+      # The local models. Not for Claude or Codestral, which have their own chains below. A router must end its chain:
+      # each of the three is the last filter of a chain of its own, and a condition skips it for the other models.
+      - name: local
+        filters:
+          - filter: iterative_request_router
+            {{- if $saas.enabled }}
+            conditions:
+              - unless:
+                  headers:
+                    x-model: {{ $saas.claude.name | quote }}
+              - unless:
+                  headers:
+                    x-model: {{ $saas.codestral.name | quote }}
+            {{- end }}
+            initial_step: maas
+            timeout_ms: {{ $v.limits.timeoutMs | int64 }}
+            steps:
+              - name: maas
+                filters:
+                  - filter: headers
+                    request_remove: [authorization, x-api-key]
+                  {{- range $i, $m := $v.models }}
+                  - filter: path_rewrite
+                    {{- if $i }}
+                    # Several rewrites in one step: the one whose X-Model condition holds is the only one that runs.
+                    allow_rewrite_override: true
+                    {{- end }}
+                    replace:
+                      pattern: "^/v1/(chat/completions|messages)$"
+                      replacement: "/{{ $ns }}/{{ $m.service }}/v1/chat/completions"
+                    conditions:
+                      - when:
+                          headers:
+                            x-model: {{ $m.name | quote }}
+                  {{- end }}
+                  - filter: intelligent_route
+                    local_site: zuno
+                    model_header: X-Model
+                    clusters: [maas]
+                    candidates:
+                      {{- range $v.models }}
+                      - kind: inference_model
+                        name: {{ .name }}
+                        site: zuno
+                        cluster: maas
+                        fresh: true
+                        credential:
+                          strategy: bearer_token
+                          secretRef: {name: maas-sa-token, namespace: {{ $v.namespace }}, key: token}
+                      {{- end }}
+                  - filter: credential_inject
+                    credentials:
+                      - {name: maas-sa-token, namespace: {{ $v.namespace }}, key: token, strategy: bearer_token, file: {{ $v.maas.tokenPath }}}
+                  - filter: load_balancer
+                    clusters:
+                      - name: maas
+                        endpoints: ["{{ $v.maas.host }}.:{{ $v.maas.port }}"]
+                        trusted_private_endpoints: [{{ $v.maas.host | quote }}]
+                        tls:
+                          sni: {{ $v.maas.host | quote }}
+                          ca: {ca_path: {{ $v.serviceCA.mountPath }}/{{ $v.serviceCA.file }}}
+                        http:
+                          authority: {{ $v.maas.host | quote }}
+                on_result:
+                  - status: [429, 502, 503, 504]
+                    next: direct
+                  - default: true
+                    done: true
+              - name: direct
+                filters:
+                  - filter: headers
+                    request_remove: [authorization, x-api-key]
+                  - filter: path_rewrite
+                    replace:
+                      pattern: "^/v1/messages$"
+                      replacement: "/v1/chat/completions"
+                    conditions:
+                      - when:
+                          path: "/v1/messages"
+                  - filter: model_to_provider
+                    models:
+                      {{- range $v.models }}
+                      - {model: {{ .name }}, upstream: direct-{{ .service }}, target_model: {{ .name }}, paths: [/v1/chat/completions, /v1/messages]}
+                      {{- end }}
+                  - filter: load_balancer
+                    clusters:
+                      {{- range $v.models }}
+                      {{- $host := include "praxis.directHost" (dict "service" .service "ns" $ns) }}
+                      # A fully qualified name with a trailing dot, so the resolver's search domains cannot substitute
+                      # another one; the certificate (service CA) names <service>.<namespace>.svc.
+                      - name: direct-{{ .service }}
+                        endpoints: ["{{ $host }}.cluster.local.:{{ $v.direct.port }}"]
+                        trusted_private_endpoints: ["{{ $host }}.cluster.local"]
+                        tls:
+                          sni: {{ $host | quote }}
+                          ca: {ca_path: {{ $v.serviceCA.mountPath }}/{{ $v.serviceCA.file }}}
+                        http:
+                          authority: {{ $host | quote }}
+                      {{- end }}
+                on_result:
+                  - default: true
+                    done: true
+          {{- if $saas.enabled }}
+      # Claude: Chat Completions in, Anthropic Messages out, the key from Vault (env), the answer converted back.
+      - name: claude
+        filters:
+          - filter: iterative_request_router
+            conditions:
+              - when:
+                  headers:
+                    x-model: {{ $saas.claude.name | quote }}
+            initial_step: anthropic
+            timeout_ms: {{ $v.limits.timeoutMs | int64 }}
+            steps:
+              - name: anthropic
+                filters:
+                  - filter: openai_chat_completions_streaming_selector
+                  - filter: intelligent_route
+                    overlay_file: /etc/praxis/routing/routing-overlay.json
+                    model_header: X-Model
+                    clusters: [anthropic]
+                    expected_overlay_scope:
+                      network: zuno
+                      gateway: praxis
+                      namespace: {{ $v.namespace }}
+                      local_site: zuno
+                    reload: {enabled: false}
+                  - filter: openai_chat_completions_to_anthropic_stream
+                    max_partial_event_bytes: 1048576
+                    max_tool_blocks: 256
+                  - filter: openai_chat_completions_to_anthropic
+                    # The platform administrator's switch: without it the filter answers 503 api_translation_disabled.
+                    api_translation_enabled: true
+                    api_version: {{ $saas.claude.apiVersion | quote }}
+                    max_body_bytes: {{ $v.limits.maxBodyBytes | int64 }}
+                  - filter: credential_inject
+                    credentials:
+                      - {name: {{ $saas.claude.secretName }}, namespace: {{ $v.namespace }}, key: api_key, strategy: apikey, header: x-api-key, env_var: ANTHROPIC_API_KEY}
+                  - filter: load_balancer
+                    clusters:
+                      - name: anthropic
+                        endpoints: ["{{ $saas.claude.host }}:{{ $saas.claude.port }}"]
+                        tls:
+                          sni: {{ $saas.claude.host | quote }}
+                        http:
+                          authority: {{ $saas.claude.host | quote }}
+                on_result:
+                  - default: true
+                    done: true
+      # Codestral: Mistral's API is OpenAI-compatible, so the body goes through unchanged but for the key.
+      - name: codestral
+        filters:
+          - filter: iterative_request_router
+            conditions:
+              - when:
+                  headers:
+                    x-model: {{ $saas.codestral.name | quote }}
+            initial_step: mistral
+            timeout_ms: {{ $v.limits.timeoutMs | int64 }}
+            steps:
+              - name: mistral
+                filters:
+                  - filter: headers
+                    request_remove: [authorization, x-api-key]
+                  - filter: path_rewrite
+                    replace:
+                      pattern: "^/v1/messages$"
+                      replacement: "/v1/chat/completions"
+                    conditions:
+                      - when:
+                          path: "/v1/messages"
+                  - filter: model_to_provider
+                    models:
+                      - {model: {{ $saas.codestral.name }}, upstream: mistral, target_model: {{ $saas.codestral.targetModel }}, paths: [/v1/chat/completions, /v1/messages]}
+                  - filter: credential_injection
+                    clusters:
+                      - name: mistral
+                        header: Authorization
+                        header_prefix: "Bearer "
+                        env_var: MISTRAL_CODESTRAL_API_KEY
+                        strip_client_credential: true
+                  - filter: load_balancer
+                    clusters:
+                      - name: mistral
+                        endpoints: ["{{ $saas.codestral.host }}:{{ $saas.codestral.port }}"]
+                        tls:
+                          sni: {{ $saas.codestral.host | quote }}
+                        http:
+                          authority: {{ $saas.codestral.host | quote }}
+                on_result:
+                  - default: true
+                    done: true
+          {{- end }}
+    # The model fleet is on the cluster network (private addresses): the clusters above list their own hosts in
+    # trusted_private_endpoints, so nothing broader is allowed.

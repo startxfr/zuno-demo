@@ -1,0 +1,68 @@
+# The policy of the gateway (identity and authorization), in a ConfigMap of its own, mounted away from praxis.yaml.
+#
+# Identity: the `zuno` Keycloak realm, the same JWT as the Zuno ai-gateway (ADR-0619 clause 4): issuer, audience
+# zuno-admin-api, signature through the JWKS over https. A route tells which experience is calling by the token's azp
+# claim (claim.azp: the keycloak preset's client_id mapping fills `client.*` only for a client-role resolver, and
+# `client.client_id` did not match in the spike of 2026-11-17, whereas claim.azp did).
+# Authorization: only the models listed here are served; an unlisted model is refused, so a SaaS name is refused when
+# saas.enabled is off. A client listed in saas.deniedClients may not use a SaaS model (the workstation Claude Code
+# client keeps to the sovereign models, "nothing leaves the cluster").
+{{- $v := .Values }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: praxis-policy
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+data:
+  policy.yaml: |
+    plugins:
+      - name: keycloak
+        kind: identity/jwt
+        hooks: [identity.resolve]
+        on_error: fail
+        capabilities: [perform_http]
+        config:
+          credential: {kind: header, name: Authorization}
+          trusted_issuers:
+            - issuer: {{ include "praxis.issuer" $ | quote }}
+              audiences: [{{ $v.keycloak.audience | quote }}]
+              algorithms: [{{ join ", " $v.keycloak.algorithms }}]
+              decoding_key:
+                kind: jwks_url
+                url: {{ include "praxis.jwksUrl" $ | quote }}
+              leeway_seconds: {{ $v.keycloak.leewaySeconds }}
+          claim_mapper: keycloak
+    global:
+      authentication:
+        - keycloak
+      authorization:
+        pre_invocation:
+          - "require(authenticated)"
+    routes:
+      - http:
+          path_prefix: /v1/models
+        authorization:
+          pre_invocation:
+            - "require(authenticated)"
+      - llm: {{ include "praxis.sovereignModels" . }}
+        authorization:
+          pre_invocation:
+            - "require(authenticated)"
+      {{- if $v.saas.enabled }}
+      - llm: [{{ $v.saas.claude.name | quote }}, {{ $v.saas.codestral.name | quote }}]
+        authorization:
+          pre_invocation:
+            - "require(authenticated)"
+            {{- range $v.saas.deniedClients }}
+            - "claim.azp == '{{ . }}': deny('this client may use the sovereign models only', 'model_not_allowed_for_client')"
+            {{- end }}
+      {{- end }}
+      - llm: "*"
+        authorization:
+          pre_invocation:
+            - "deny('model is not permitted', 'model_not_allowed')"

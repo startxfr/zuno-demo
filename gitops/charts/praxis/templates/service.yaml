@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: praxis
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "65"
+spec:
+  selector:
+    app.kubernetes.io/name: praxis
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    # /metrics, /ready and /healthy (admin.metrics_address). The admin API itself is on loopback and has no port here.
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics

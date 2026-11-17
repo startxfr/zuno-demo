@@ -1,0 +1,80 @@
+---
+# `make d2 check praxis`: state detection first (never fails), then, when installed, the Deployment and the answers that
+# prove the gateway is what it should be: a call without a token is refused (401) and the metrics port is ready. The
+# calls run inside the pod (busybox wget), because a TCP probe lies behind NetworkPolicies and the namespace has no
+# route of its own.
+- name: "praxis | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "praxis | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _praxis_confidential_file
+
+- name: "praxis | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _praxis_confidential_file.stat.exists
+
+- name: "praxis | check the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "{{ praxis_app_name }}"
+
+- name: "praxis | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "praxis | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "praxis | report the application against the switch"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_praxis_enabled={{ zuno_praxis_enabled | bool }}; installed={{ _state_is_installed | bool }}.
+      {{ 'Matches the switch.' if (zuno_praxis_enabled | bool) == (_state_is_installed | bool)
+         else 'MISMATCH: run make d2 install praxis to converge.' }}
+
+- name: "praxis | probe the gateway"
+  when: _state_is_installed | bool
+  block:
+    - name: "praxis | look up the Deployment"
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ praxis_namespace }}"
+        name: praxis
+      register: _praxis_deploy
+
+    - name: "praxis | the Deployment is available"
+      ansible.builtin.assert:
+        that:
+          - (_praxis_deploy.resources | default([]) | length) == 1
+          - (_praxis_deploy.resources[0].status.availableReplicas | default(0)) >= 1
+        fail_msg: "Deployment/praxis in {{ praxis_namespace }} has no available replica."
+        success_msg: "Deployment/praxis is available."
+
+    - name: "praxis | the metrics port is ready, and a call without a token is refused"
+      ansible.builtin.command:
+        argv:
+          - oc
+          - exec
+          - -n
+          - "{{ praxis_namespace }}"
+          - deploy/praxis
+          - --
+          - sh
+          - -c
+          - >-
+            wget -q -O /dev/null http://127.0.0.1:9902/ready && echo ready;
+            wget -S -O /dev/null http://127.0.0.1:8080/v1/models 2>&1 | grep -m1 -o 'HTTP/[0-9.]* [0-9]*'
+      register: _praxis_probe
+      changed_when: false
+      failed_when: false
+
+    - name: "praxis | judge the probe"
+      ansible.builtin.assert:
+        that:
+          - "'ready' in _praxis_probe.stdout"
+          - "'401' in _praxis_probe.stdout"
+        fail_msg: "Praxis answered {{ _praxis_probe.stdout | default('') | replace('\n', ' ') }} (expected ready, then 401 without a token): {{ _praxis_probe.stderr | default('') }}"
+        success_msg: "metrics port ready, a call without a token is refused (401)."

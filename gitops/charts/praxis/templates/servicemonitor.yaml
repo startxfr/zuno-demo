@@ -1,0 +1,19 @@
+{{- if .Values.serviceMonitor.enabled }}
+# monitoring.coreos.com/v1: the platform Prometheus scrapes zuno-ai-gateways (the namespace carries
+# openshift.io/cluster-monitoring=true). Praxis serves /metrics on its own port (admin.metrics_address).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: praxis
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: praxis
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

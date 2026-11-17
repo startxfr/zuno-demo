@@ -140,6 +140,9 @@ jobs:
       # network).
       - name: Claude Code token helper tests (ADR-0619)
         run: python3 evaluations/tests/test_claude_code_token.py
+      # ADR-0619 (WP-292): the Praxis chart's rendered gateway configuration and policy (helm template, no cluster).
+      - name: Praxis chart tests (ADR-0619)
+        run: python3 platform/praxis/tests/test_praxis_chart.py
       # ADR-0608 (WP-241): how each drift check judges what `oc get` returns.
       - name: Drift check judgement tests (ADR-0608)
         run: python3 platform/drift/tests/test_check_drift.py

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: praxis
+description: >-
+  Praxis AI as an alternative AI gateway next to the Zuno ai-gateway (ADR-0619): the same Keycloak identity, the
+  sovereign models first through MaaS then direct, Claude and Codestral as the only SaaS models.
+type: application
+version: 0.1.0
+appVersion: "0.11.0"

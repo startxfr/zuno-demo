@@ -1,0 +1,140 @@
+{{- /* No image, no Deployment: the digest is written when WP-291's build has produced one (ansible/roles/praxis). */}}
+{{- if .Values.image.digest }}
+{{- $v := .Values }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: praxis
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "60"
+spec:
+  replicas: {{ $v.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: praxis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: praxis
+      annotations:
+        # The models' vLLM pods terminate TLS themselves on 8000 and the LLMInferenceService controller adds a
+        # DestinationRule that Envoy cannot build here (automountServiceAccountToken is off): the sidecar stays out of
+        # the outbound path of that port, as for the ai-gateway.
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ $v.direct.port }}"
+        # A change of the rendered configuration rolls the pod.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-config.yaml") . | sha256sum }}
+        checksum/policy: {{ include (print $.Template.BasePath "/configmap-policy.yaml") . | sha256sum }}
+        {{- if $v.saas.enabled }}
+        checksum/routing: {{ include (print $.Template.BasePath "/configmap-routing.yaml") . | sha256sum }}
+        {{- end }}
+    spec:
+      serviceAccountName: praxis
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: praxis
+          image: {{ include "praxis.imageRef" $v.image | quote }}
+          imagePullPolicy: {{ $v.image.pullPolicy }}
+          args: ["-c", "/etc/praxis/config/praxis.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: {{ $v.metrics.port }}
+          env:
+            {{- if $v.saas.enabled }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $v.saas.claude.secretName }}
+                  key: api_key
+            - name: MISTRAL_CODESTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $v.saas.codestral.secretName }}
+                  key: api_key
+            {{- end }}
+            {{- if $v.tokenRateLimit.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $v.tokenRateLimit.redis.secretName }}
+                  key: REDIS_PASSWORD
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/praxis/config
+              readOnly: true
+            - name: policy
+              mountPath: /etc/praxis/policy
+              readOnly: true
+            {{- if $v.saas.enabled }}
+            - name: routing
+              mountPath: /etc/praxis/routing
+              readOnly: true
+            {{- end }}
+            - name: openshift-service-ca
+              mountPath: {{ $v.serviceCA.mountPath }}
+              readOnly: true
+            - name: maas-sa-token
+              mountPath: {{ dir $v.maas.tokenPath }}
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          # `/` goes through the policy and answers 401, so the probes use the metrics port, which serves them
+          # without authentication (admin.metrics_address): /ready and /healthy.
+          livenessProbe:
+            httpGet:
+              path: /healthy
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+      volumes:
+        # Three ConfigMaps in three directories: a watched directory that other files are written into reloads in a loop.
+        - name: config
+          configMap:
+            name: praxis-config
+        - name: policy
+          configMap:
+            name: praxis-policy
+        {{- if $v.saas.enabled }}
+        - name: routing
+          configMap:
+            name: praxis-routing
+        {{- end }}
+        - name: openshift-service-ca
+          configMap:
+            name: {{ $v.serviceCA.configMap }}
+        # A purpose-scoped token, not the default mount: only this audience (maas-gateway-auth's
+        # kubernetesTokenReview), kubelet-rotated in place; credential_inject follows the file.
+        - name: maas-sa-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: {{ base $v.maas.tokenPath }}
+                  audience: {{ $v.maas.tokenAudience }}
+                  expirationSeconds: 3600
+        - name: tmp
+          emptyDir: {}
+{{- end }}

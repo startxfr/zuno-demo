@@ -17,3 +17,10 @@
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
+    # ADR-0619 clause 2 / WP-292: admit the Praxis pod on 6379 (its token_rate_limit store) while zuno_praxis_enabled;
+    # the Application declares no values of its own, so nothing is replaced. Same switch as the models role.
+    gitops_app_extra_helm_values:
+      altGatewayPeers:
+        praxis:
+          enabled: "{{ zuno_praxis_enabled | default(false) | bool }}"
+

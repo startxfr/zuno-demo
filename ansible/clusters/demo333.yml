@@ -485,6 +485,13 @@ zuno_ai_gateway_classification_client_floors:
 # ADR-0610 (WP-244): admit zuno-agent-gateway in the ai-gateway's NetworkPolicy; pairs with
 # zuno_connectivity_link_workstation_entry below.
 zuno_ai_gateway_workstation_entry: true
+# ADR-0619 (WP-292): Praxis AI, the alternative AI gateway in zuno-ai-gateways. false = not installed (the role removes what is
+# left), and the models and redis charts keep their allow-lists as before. To run it: build the image (`make d2 build praxis`,
+# WP-291), write its digest in zuno_praxis_image_digest, set this true, then `make d2 install models`, `make d1 install redis`
+# and `make d2 install praxis`. Claude and Codestral, the OpenTelemetry export and token_rate_limit (our build only) and the
+# workstation entry (WP-298) each have their own switch in ansible/roles/praxis/defaults/main.yml.
+zuno_praxis_enabled: false
+zuno_praxis_image_digest: ""
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

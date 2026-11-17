@@ -1,0 +1,65 @@
+# Ingress to Praxis: the clients on 8080, the monitoring namespaces on the metrics port. The namespace baseline
+# (gitops/charts/namespaces, zuno-ai-gateways) admits those namespaces; this policy says which pods and ports. Not a
+# namespace-wide allow: same shape as the ai-gateway's (gitops/charts/ai-gateway/templates/networkpolicy.yaml).
+{{- $v := .Values }}
+{{- $np := $v.networkPolicy }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: praxis
+  namespace: {{ $v.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "70"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: praxis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- if $np.experienceClients }}
+        # User experiences (Open WebUI, Dify and kagent through their token proxies, world-model, the OpenClaw
+        # personas): admitted by namespace LABEL, as the ai-gateway does (ADR-0587), so a new experience adds no line.
+        - namespaceSelector:
+            matchLabels:
+              zuno.io/experience-client: "true"
+        {{- end }}
+        {{- with $np.unifaiNamespace }}
+        # UnifAI's multi-agent pods (backend and Temporal worker): one peer = namespace AND pod labels.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: multiagent
+        {{- end }}
+        {{- range $np.sameNamespacePods }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+        {{- end }}
+        {{- if $np.workstationEntry }}
+        # The workstation clients (Claude Code, the Blender add-on) arrive through the Kuadrant gateway
+        # zuno-agent-gateway (connectivity-link, praxisWorkstationEntry), which checks issuer, audience and azp first.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: zuno-agent-gateway
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        {{- range $np.monitoringNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $v.metrics.port }}
