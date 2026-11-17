@@ -381,6 +381,37 @@ The other frames: `keys.png` is the empty list ("No API keys") of `ai-dev-01`, n
 
 **What the cluster keeps (as relayed):** possibly one key listed as revoked in `ai-dev-01`'s portal, and the traces and metrics of the three calls.
 
+### maas-portal-api-keys: cut v2 (candidate, not published)
+
+The coordinator's `63ace45b` (commit time 04:27:23 CET, from git; `gif.yml` only) is the second re-cut of the same take. The first re-cut (`f6083840`) ended its motion on the pressed Create button, so the created-key dialog was in no frame while a caption named it; demo333 caught it and sent that cut to the owner with caveats, not recommended (as relayed).
+
+| Item | Value (read from `maas-portal-api-keys.gif.json`, written 04:29 CET) |
+|---|---|
+| GIF | 614 271 bytes (0.6 MB), 41.1 s, 960x656, 7 moments, 411 frames at 100 ms; SHA-256 `2bd2899a421e...` |
+| Review by demo333 (as relayed) | A scan of 13 frames: no spinner, every caption true to its frame |
+| Review by the writer | A contact sheet of 13 frames (every 35th, plus the last), not a full scan. Seen: the Keycloak sign-in; the empty key list; the Create form with the Subscription chooser open and then closed; the created-key dialog with the key masked, twice; the recorder's calls page growing from 2 calls to 3. The last caption, "The platform keeps the models, the budget and the revoke", is over the recorder's calls page |
+| The revoke | In **no frame**: it is in the log only (as relayed). The last caption is the page's close, as the coordinator says |
+
+**One flag, confirmed.** In the frames where the chooser is open, the Subscription list shows five names (the coordinator names them: `gpt-oss-20b-ocp-ai-dev`, `gpt-oss-20b-agents`, `qwen35-9b-agents`, `qwen35-9b-wesh-agents` and `qwen36-27b-instruct-agents`; the writer read them at sheet size, not at full size). The coordinator checked with `git grep` that all five are already in this public repository, so the GIF discloses nothing new. It is the same matter as the deferred entry on the agents' subscriptions offered to a developer persona (entry n). The key's own name, a generated test name with a timestamp, is readable in the Create form and the created dialog; the key's value is masked after `sk-oai-` (see the take section above).
+
+The coordinator proposes it for publication; it is sent to the owner as v2. **Not published**; no owner go yet.
+
+### observability-trace: take at 04:17 CET (chat passed, trace failed)
+
+Take `observability-trace-20261117-041737`. The owner's go is the 04:09:56 CET dialog (above, as relayed); the coordinator and demo333 say it ran at `7dce084a`; the take's files record no commit. The writer read both `markers.json` and `takes.json` and opened `chat/q-done.png`, `trace/search.png` and `trace/failed.png`.
+
+| Take | Persona | Result | Detail |
+|---|---|---|---|
+| `chat` | `consultant-02` | `pass`, 5 markers in 120.1 s | One session created and deleted; owned 21 before and 21 after; private addresses 0 |
+| `trace` | `ai-ops-01` | `fail`, 3 markers (`login`, `search`, `trace`) | "the span's tags zuno.client, zuno.agent are not drawn inside the window: the picture would not hold the row's proof"; created none; writes none; private addresses 0; `traces_listed` 1 |
+
+- **Slow loads.** In the `chat` take the markers are late: `login` at 28.4 s, `hub` at 83.4 s. The writer does not know why; it fits entry p (slow first loads), not proven.
+- **Writes of `chat`** (read; 16 sent): `blueprint.validate` answered 404, `session.join`, `edit_lock.statuses`, two `blueprint.validate` answered 200, `user.session.create`, `session.typing`, `session.leave`, `session.join`, four `session.typing`, `user.session.submit`, `session.heartbeat` and one `DELETE` of the session. None refused. As the coordinator says, the take's own session ran, so case 2 of deferred entry q (Tekos not visible to the persona) did **not** happen. Whether the first 404 is case 1 stays unknown.
+- **`q-done.png`** (`chat`): the Collaboration Hub as `consultant-02`, team `agent-tekos`, the take's session "Just now", the answer drawn and the live workflow "Execution Complete". Privacy flags: the persona's display name shows in the header, and the sidebar lists earlier sessions with their titles (prompts of earlier users). The writer copies none of them; a GIF of this take would need the sidebar and the name judged.
+- **`search.png`** (`trace`): the Tempo search UI, service `ai-gateway`, operation `model_call`, tags set, last 15 minutes, **one trace**, 61 spans, 7 services, "2 minutes ago". The trace is the take's own, found by search.
+- **`failed.png`** (`trace`): the opened trace, a span's tags window. In view: `zuno.latency_ms`, `zuno.model`, `zuno.model_kind`, `zuno.outcome`, `zuno.persona` (`consultant-02`), `zuno.prompt_tokens`, `zuno.provider`, `zuno.request_id`, `zuno.run_id`, `zuno.task`. `zuno.client` and `zuno.agent` are above the window (scrolled out), as the check says. So the result link works and the proof tags are on the page. The writer notes that `zuno.run_id` is on this `ai-gateway` span and equals the id of the session the `chat` take created (compared against `markers.json`; not copied here). That bears on page row 5:00 (the run id on a Tekos span); the page has not been changed.
+- **A walkthrough matter** (scrolling), with the coder, as relayed. The go is spent; a new take needs the fix and a new named go. Nothing published.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
