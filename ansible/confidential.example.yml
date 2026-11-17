@@ -225,6 +225,16 @@ zuno_cert_manager_mode: internal
 zuno_quay_username: "xxxxxx"
 zuno_quay_password: "xxxxxx"
 
+# --- quay.io push robot (ADR-0620, WP-291) ----------------------------------
+# The zuno organisation's robot, with write on quay.io/zuno/praxis-ai (granted
+# by the owner on quay.io). `make d1 install openshift-pipelines` writes it to
+# Vault zuno/quay-io/zuno-push; the source-image-build Pipeline in zuno-ai-build
+# pushes with it (ExternalSecret quay-io-zuno-push). To rotate: change the token
+# here, then re-run that install. Left at xxxxxx, nothing is written and builds
+# cannot push.
+zuno_quay_io_push_username: "zuno+zuno_demo"
+zuno_quay_io_push_token: "xxxxxx"
+
 # --- Jira (no consumer in this repo yet - slot reserved for a future
 # integration, same "stored ahead of time" status as Confluence originally
 # had) ------------------------------------------------------------------

@@ -14,5 +14,5 @@ ADR-0620 (WP-291). `make d2 build praxis` builds Praxis AI from source with the
 
 Prerequisites:
 - `make d1 install openshift-pipelines`;
-- the owner's quay.io robot token in Vault at `quay-io/zuno-praxis-ai-push`, with properties
+- the owner's quay.io robot token in Vault at `quay-io/zuno-push`, with properties
   `username` and `token`.

@@ -7,7 +7,7 @@ operator, then the generic `source-image-build` Pipeline in `zuno-ai-build`.
   `openshift-pipelines-operator-rh` in `openshift-operators`. Its channel and catalog are
   discovered from the PackageManifest (ADR-0048).
 - **d1** (`zuno-openshift-pipelines-d1`, project `zuno-apps`): the Pipeline and the quay.io
-  push Secret (an ExternalSecret reading `quay-io/zuno-praxis-ai-push`, granted in
+  push Secret (an ExternalSecret reading `quay-io/zuno-push`, granted in
   `platform/vault/secret-access.yaml`).
 
 The install waits for the operator's `TektonConfig/config` to be Ready before it applies d1,

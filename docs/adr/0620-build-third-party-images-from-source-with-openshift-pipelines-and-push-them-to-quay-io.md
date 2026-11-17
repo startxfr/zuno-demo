@@ -88,3 +88,19 @@ images keep `BuildConfig`.**
 ## Work packages
 
 [WP-291](../roadmap/work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) (operator, pipeline, push, first build).
+
+## Update 2026-11-17 (WP-291): the push robot is zuno+zuno_demo, kept in confidential.yml
+
+The owner chose on 2026-11-17 to reuse the zuno organisation's robot `zuno+zuno_demo` rather than create a new one, and
+gave it write on `quay.io/zuno/praxis-ai`. This replaces the owner's Vault write described in clause 4. The robot's name
+and token live in `ansible/confidential.yml` (`zuno_quay_io_push_username`, `zuno_quay_io_push_token`; template in
+`ansible/confidential.example.yml`). `make d1 install openshift-pipelines` writes them to Vault `zuno/quay-io/zuno-push`
+through `ansible/tasks/vault_cli.yml`, so no secret appears on a command line.
+
+The first install on demo333 (2026-11-17) brought:
+- OpenShift Pipelines 1.24.3 (channel `latest`), with `TektonConfig/config` Ready;
+- the catalog tasks `git-clone` and `buildah` in `openshift-pipelines`;
+- the `source-image-build` Pipeline in `zuno-ai-build`.
+
+The d1 Application stays Degraded until the robot is in Vault, because its ExternalSecret has nothing to read.
+

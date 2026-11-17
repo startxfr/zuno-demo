@@ -32,10 +32,11 @@ sourceBuilds:
   catalogNamespace: openshift-pipelines
   gitCloneTask: git-clone
   buildahTask: buildah
-  # quay.io push credential. The owner creates the robot account and writes its username and
-  # token to Vault (zuno/quay-io/zuno-praxis-ai-push); no session handles it. Granted to this
-  # namespace's SecretStore in platform/vault/secret-access.yaml.
+  # quay.io push credential: the zuno organisation's robot (zuno+zuno_demo), given write on
+  # quay.io/zuno/praxis-ai by the owner. ansible/roles/openshift_pipelines writes it to Vault
+  # zuno/quay-io/zuno-push from ansible/confidential.yml (zuno_quay_io_push_username/_token).
+  # Granted to this namespace's SecretStore in platform/vault/secret-access.yaml.
   pushSecret:
     name: quay-io-zuno-push
     registry: quay.io
-    vaultKey: quay-io/zuno-praxis-ai-push
+    vaultKey: quay-io/zuno-push
