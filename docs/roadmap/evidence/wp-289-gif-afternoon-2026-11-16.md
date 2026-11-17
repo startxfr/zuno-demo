@@ -314,7 +314,7 @@ Between about 00:20 and 00:35 CET the first load of UnifAI and of the Tempo sear
 
 ### Two failed takes at `feaf7d32` (WP-290, 2026-11-17)
 
-The owner answered **one dialog holding both questions at 02:28:30 CET on 2026-11-17**, choosing "Take maas-portal-api-keys" and "Take openclaw" (time read by `zuno-demo-reorg` in demo333's session log, as relayed). So one time covers both gos, before the takes' own starts, read from `markers.json`: `maas-portal-api-keys` 01:29:12 UTC (02:29 CET), `openclaw` 01:31:32 UTC (02:31 CET). **Which commit the takes ran at:** demo333 reports `feaf7d32`; the text of the maas question named `devel` `6f836c28` and "scout 6/6 ok". Neither `markers.json` records a commit, and no other file of the two take directories names one, so the writer cannot confirm either from the files. Neither take is retried yet. The writer read both directories and opened the images named below.
+The owner answered **one dialog holding both questions at 02:28:30 CET on 2026-11-17**, choosing "Take maas-portal-api-keys" and "Take openclaw" (time read by `zuno-demo-reorg` in demo333's session log, as relayed). So one time covers both gos, before the takes' own starts, read from `markers.json`: `maas-portal-api-keys` 01:29:12 UTC (02:29 CET), `openclaw` 01:31:32 UTC (02:31 CET). **Which commit the takes ran at:** demo333 reports `feaf7d32`; the text of the maas question named `devel` `6f836c28` and "scout 6/6 ok". Neither `markers.json` records a commit, and no other file of the two take directories names one, so the writer cannot confirm either from the files. What git shows (measured by the coordinator, and the writer compared the SHA-256 of the blobs): `walkthroughs/maas-portal-api-keys.mjs` and `walkthroughs/_helpers.mjs` are byte-identical at `6f836c28` and `feaf7d32`, and of these three files only `record.mjs` differs (the 90 s navigation timeout), so the scout named in the question covered the same walkthrough as a take at `feaf7d32`. Neither take is retried yet. The writer read both directories and opened the images named below.
 
 **`maas-portal-api-keys`**, take `maas-portal-api-keys-20261117-022910`, persona `ai-dev-01`.
 
@@ -337,6 +337,24 @@ The owner answered **one dialog holding both questions at 02:28:30 CET on 2026-1
 What the frames show (opened `session.png`, `q-done.png`): in `session.png` the sidebar lists 7 sessions, the first marked "now" with a default `agent:default:dashboard:` name; in `q-done.png` the sidebar lists 7 sessions again, the first marked "now" under a title the assistant derived from the question, and the other six unchanged. So the take's new session was probably the first entry, **renamed by the assistant**, which the take did not recognise. That is the writer's reading of two frames, not a measurement. The question was answered (relayed and visible). The session was not deleted: it stays in `consultant-02`'s assistant, with the assistant's possible memory of the question (declared effect). As relayed: demo333 asks the owner whether to delete it by hand or leave it for a later take. One Confluence answer of `consultant-02`'s budget was spent.
 
 **Privacy.** `q-done.png` shows an answer listing real Confluence page titles, page ids and addresses of the company's wiki. This file copies none of them. As relayed, the owner chose "comme guardrails" for `openclaw` (the real titles may be shown); the next take goes through the privacy review. The earlier sessions' names in the sidebar are not copied either.
+
+### Rescouts of 2026-11-17, 02:34 to 02:38 CET (standing go in demo333, as relayed)
+
+The writer read the five `scout.json` files and the sub-scouts of `observability-trace`; it opened no image. Times are the scouts' `started` stamps (UTC) plus one hour.
+
+| Scout directory | Started (CET) | Result read | Writes (read from `scout.json`) | Walkthrough SHA-256 |
+|---|---|---|---|---|
+| `observability-trace-20261117-023434-scout` | 02:34:36 | `done`: `chat` 5 of 5, `trace` 7 of 7 | `chat`: `blueprint.validate` (404, a read) and `session.join` (200); `trace`: none; refused none | `a3479e6a...` |
+| `observability-trace-20261117-023608-scout` | 02:36:10 | same | same | `a3479e6a...` |
+| `a2a-delegation-approval-20261117-023526-scout` | 02:35:28 | `done`, 6 steps | 4 sent (`session.join`, two `blueprint.validate`, `edit_lock.statuses`, all 200); refused none | `e746dd49...` |
+| `a2a-delegation-approval-20261117-023659-scout` | 02:37:02 | `done`, 6 steps | same 4 sent; refused none | `e746dd49...` |
+| `maas-portal-api-keys-20261117-023832-scout` | 02:38:34 | `done`, 6 steps; `changes` 0 | 4 sent, all the key-list search (200, reads); refused none | `54e88fcc...` |
+
+- **The earlier scouts of the night failed on first loads** (the 00:xx CET scouts of both `observability-trace` and `a2a-delegation-approval` read `fail`, at `chat`, `trace` or `enter`). Of these five scouts, all five read `done`. Demo333 attributes this to the 90 s waits (as relayed: "4 of 4 enters hold against 4 of 7 failing"); the writer does not count it that way and does not know the cause. Workstation load 3.4 to 4.9 during the scouts (as relayed).
+- **`observability-trace` trace step:** both `trace` sub-scouts skip the trace and the tags: "the search lists no trace now: ask Tekos as consultant-02, then scout again". So the result link stays **untested** until a take that asks Tekos first (as relayed).
+- **`observability-trace` `chat`:** `blueprint.validate` returned 404 here, 200 on the `a2a` scouts. It is listed as a read and nothing was refused. The writer does not know why. The `chat` scout declares a change: the OpenShift Authorize Access page for the Tempo search UI's proxy as `ai-ops-01` (the OAuth authorization already listed in "What the cluster keeps" of the sprint evidence).
+- **`maas-portal-api-keys`:** the walkthrough hash `54e88fcc...` is the one the coordinator named for `723c5e24`. Nothing was created.
+- Demo333 asks the owner for new named take gos: `maas-portal-api-keys` first, then `observability-trace`; `openclaw` and `a2a-delegation-approval` are held (as relayed).
 
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
