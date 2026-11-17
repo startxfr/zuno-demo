@@ -480,11 +480,39 @@ class Verbs(unittest.TestCase):
             self.assertIn("No kubeconfig", err)                          # still refused before anything runs
         self.assertEqual([p.name for p in gif.recordings_dir().iterdir() if not p.name.endswith("-scout")], [])
 
+    def without_cut_list(self, demo_id: str):
+        """`demo_id` as a scenario with no cut list, whatever the repository holds today."""
+        real = gif.cut_list_path
+        return mock.patch.object(gif, "cut_list_path", side_effect=lambda i, root=None: (
+            pathlib.Path(self.home, "no-such-gif.yml") if i == demo_id else real(i, root)))
+
+    def assembled_demo(self, demo_id: str):
+        """`demo_id` as a demo whose demo.yml says `record: {kind: assembled}`."""
+        real = presenter.load_manifest
+        return mock.patch.object(presenter, "load_manifest", side_effect=lambda d: (
+            dict(real(d), record={"kind": "assembled"}) if pathlib.Path(d).name == demo_id else real(d)))
+
     def test_record_and_gif_take_a_scenario_with_a_cut_list(self):
         rc, _, err = self.run_main("record", "three-experiences")
         self.assertEqual((rc, "is a workshop" in err), (2, True))
-        rc, _, err = self.run_main("gif", "world-model")
+        with self.without_cut_list("dify"):
+            rc, _, err = self.run_main("gif", "dify")
         self.assertEqual((rc, "has no cut list" in err), (2, True))
+
+    def test_an_assembled_take_is_neither_scouted_nor_recorded(self):
+        with self.assembled_demo("open-webui"):
+            for verb in ("scout", "record"):
+                rc, _, err = self.run_main(verb, "open-webui")
+                self.assertEqual(rc, 2, verb)
+                self.assertIn(f"assembled by hand from media that already exist (ansible/demos/open-webui/gif.yml "
+                              f"says which): there is nothing to {verb}", err)
+                rc, out, _ = self.run_main("--complete", verb)
+                self.assertNotIn("open-webui", out.split(), verb)
+                self.assertIn("dify", out.split(), verb)
+            rc, out, _ = self.run_main("--complete", "gif")
+            self.assertIn("open-webui", out.split())                      # it is cut again with `make demo gif`
+            rc, out, _ = self.run_main("gif", "open-webui")
+            self.assertIn("No recording of open-webui", out)              # gif runs as for any demo
 
     def test_gif_without_a_recording(self):
         rc, out, _ = self.run_main("gif", "open-webui")
@@ -500,9 +528,10 @@ class Verbs(unittest.TestCase):
 
     def test_completion_offers_only_demos_with_a_cut_list(self):
         for verb in ("scout", "record", "gif"):
-            rc, out, _ = self.run_main("--complete", verb)
+            with self.without_cut_list("dify"):
+                rc, out, _ = self.run_main("--complete", verb)
             self.assertIn("open-webui", out.split(), verb)
-            self.assertNotIn("world-model", out.split(), verb)            # no cut list
+            self.assertNotIn("dify", out.split(), verb)                   # no cut list
         rc, out, _ = self.run_main("--complete", "scout")
         self.assertNotIn("vault-pki", out.split())                         # a terminal demo is not scouted
         rc, _, err = self.run_main("scout", "vault-pki")

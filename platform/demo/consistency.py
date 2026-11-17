@@ -21,7 +21,8 @@ problems() lists every disagreement; platform/demo/tests/test_demo_catalogue.py 
   contract's order (a workshop: Introduction, Personas, Agenda, Presenter lifecycle first, References and Page status
   last), no ADR or WP reference and no link into docs/adr/ or docs/roadmap/ in the Introduction, Personas or Presenter
   lifecycle, and the `> **Status:**` banner under `## Page status` only;
-- demo.yml `record: {kind, allow, cols, rows}` (ADR-0618): kind browser (a walkthrough) or terminal; each `allow`
+- demo.yml `record: {kind, allow, cols, rows}` (ADR-0618): kind browser (a walkthrough), terminal, or assembled (made
+  by hand from media that exist, with its cut list); each `allow`
   entry is a Do command of the 5-minute version, never a command the capture never types; `allow`, `cols` and `rows`
   only on a terminal take, the size within capture.window()'s bounds;
 - a published GIF `docs/assets/img/demo/<id>.gif` belongs to a catalogue demo, is at most 8 MB, and is embedded as the
@@ -192,7 +193,7 @@ def lifecycle_problems(page: catalogue.Page, rel: str) -> List[str]:
     return problems
 
 
-TAKE_KINDS = ("browser", "terminal")
+TAKE_KINDS = ("browser", "terminal", "assembled")   # assembled: made by hand from media that exist (gif.py)
 TERMINAL_SIZE = ("cols", "rows")       # the capture's window; capture.window() holds the one rule (bounds, defaults)
 
 
@@ -243,6 +244,13 @@ def record_problems(entry: catalogue.Entry, page: catalogue.Page, manifest: dict
                              "viewport")
         if "skip" in record:
             found.append(f"{rel}: `record.skip` is for a terminal take; a browser take plays its walkthrough")
+    elif kind == "assembled":
+        for key in ("allow", "skip") + TERMINAL_SIZE:
+            if key in record:
+                found.append(f"{rel}: `record.{key}` is for a terminal take; an assembled take is cut from media "
+                             "that already exist")
+        if not gif.cut_list_path(entry.id, root).is_file():
+            found.append(f"{rel}: an assembled take needs its cut list, ansible/demos/{entry.id}/gif.yml")
     capture = _capture() if kind == "terminal" else None
     if capture is not None:
         found += [f"{rel}: {problem}" for problem in capture.window(record)[2]]

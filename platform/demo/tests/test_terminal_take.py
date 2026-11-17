@@ -241,6 +241,20 @@ class RecordKey(FixtureRoot):
         self.edit('record:\n  kind: terminal\n  colour: red\n')
         self.assertIn("unknown key(s) colour", self.record_problems()[0])
 
+    def test_an_assembled_take(self):
+        """A take made by hand from media that exist (gif.py): no walkthrough, nothing typed, a cut list."""
+        self.edit('record:\n  kind: assembled\n')
+        self.assertEqual(self.record_problems(), [])
+        self.edit('record:\n  kind: assembled\n  allow: ["oc delete pod fixture -n fixture"]\n  cols: 140\n')
+        found = self.record_problems()
+        self.assertTrue(any("`record.allow` is for a terminal take; an assembled take" in p for p in found), found)
+        self.assertTrue(any("`record.cols` is for a terminal take; an assembled take" in p for p in found), found)
+        self.edit('record:\n  kind: assembled\n')
+        (self.demo / "gif.yml").unlink()
+        self.assertEqual(self.record_problems(),
+                         ["ansible/demos/fixture-demo/demo.yml: an assembled take needs its cut list, "
+                          "ansible/demos/fixture-demo/gif.yml"])
+
     def test_the_terminal_size(self):
         self.edit('record:\n  kind: terminal\n  cols: 140\n  rows: 40\n')
         self.assertEqual(self.record_problems(), [])

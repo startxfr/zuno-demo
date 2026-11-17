@@ -677,7 +677,10 @@ def cmd_scout(args: List[str]) -> int:
     `record` needs first, for the current version of the walkthrough. Local, never AAP."""
     entry = scenario_for_gif(args, "scout")
     root = catalogue.repo_root()
-    if take_kind(load_manifest(catalogue.demo_dir(entry.id))) != "browser":
+    kind = take_kind(load_manifest(catalogue.demo_dir(entry.id)))
+    if kind == "assembled":
+        raise assembled_refusal(entry.id, "scout")
+    if kind != "browser":
         raise UsageError(f"{entry.id} is a terminal demo: its take guesses no selector and needs no scout "
                          f"(make demo record {entry.id}).")
     guard.check_freeze("scout")
@@ -725,9 +728,17 @@ def record_size(manifest: dict) -> str:
 
 
 def take_kind(manifest: dict) -> str:
-    """demo.yml `record.kind`: browser (a walkthrough) or terminal (a captured session); browser when absent."""
+    """demo.yml `record.kind`: browser (a walkthrough), terminal (a captured session) or assembled (a take made by
+    hand from media that exist, see gif.py); browser when absent."""
     record = manifest.get("record") if isinstance(manifest.get("record"), dict) else {}
     return str(record.get("kind") or "browser")
+
+
+def assembled_refusal(demo_id: str, verb: str) -> UsageError:
+    """`scout` and `record` of a demo whose GIF is cut from an assembled take: nothing runs, nothing to film."""
+    return UsageError(f"{demo_id}'s GIF is cut from a take assembled by hand from media that already exist "
+                      f"(ansible/demos/{demo_id}/gif.yml says which): there is nothing to {verb}. "
+                      f"make demo gif {demo_id} cuts it again.")
 
 
 def require_check_today(demo_id: str) -> None:
@@ -867,6 +878,8 @@ def cmd_record(args: List[str]) -> int:
     root = catalogue.repo_root()
     manifest = load_manifest(catalogue.demo_dir(entry.id))
     kind = take_kind(manifest)
+    if kind == "assembled":
+        raise assembled_refusal(entry.id, "record")
     if kind == "terminal":
         return render_terminal(entry, root) if render_call else record_terminal(entry, root, manifest)
     if render_call:
@@ -942,6 +955,8 @@ def complete(args: List[str]) -> int:
             with_cut = [e.id for e in catalogue.discover() if gif.cut_list_path(e.id).is_file()]
             if verb == "scout":         # a terminal take is not scouted: it guesses no selector
                 with_cut = [i for i in with_cut if take_kind(load_manifest(catalogue.demo_dir(i))) == "browser"]
+            elif verb == "record":      # an assembled take is made by hand: nothing to record
+                with_cut = [i for i in with_cut if take_kind(load_manifest(catalogue.demo_dir(i))) != "assembled"]
             out(" ".join(with_cut))
         elif verb == "step":
             current = session.load_session()
