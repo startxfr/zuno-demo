@@ -486,6 +486,24 @@ The writer read `scout.json` of the top and of `trace/`, and opened `trace/scout
 - **`zuno.groups`** is drawn **open** as a list of about ten group names in both pictures (the writer saw it in both; the names are not copied; the coordinator says they are already in the repository).
 - **Asked of the coder (as relayed):** "drawn" means the whole row inside the window with room under `zuno.run_id`, and `zuno.groups` collapsed with the UI's own arrow, said in the take's notes. No take is asked. The trace stays searchable by the scout until about 09:19 CET, six hours after the take's 03:19 UTC (as relayed).
 
+### openclaw-delete-left: scout at `5852fa69` (directory `openclaw-delete-left-20261117-061001-scout`)
+
+Demo333 scouted it direct through `record.sh --scout`: it found no freeze marker, and the coordinator ran `guard.check_freeze('scout')` read only and found no freeze (as relayed). The writer read `scout.json` and opened no image (all five scout images have the same size: nothing was clicked, as the file says).
+
+| Item | Value (read from `scout.json`) |
+|---|---|
+| Started | 05:10:13 UTC (06:10 CET); walkthrough `e259cdb2...` |
+| Result | `done`, 5 steps; refused none; writes none seen by the guard (and the guard does not see this UI's WebSocket); private addresses 0 |
+| Closed step | `nothing_typed` true, `nothing_clicked` true, `native_dialogs` 0 |
+| `sessions` step | rows **8**, told apart by link, **distinct 8**; each row listed as id, age and rank only (no title) |
+| Left sessions | One constant is matched: the session at rank 1, age 49 minutes, `in_left` true. The second constant is a **placeholder** (null): no row is marked for it |
+| Declared change | The file's `changes` line says a real run clicks Delete... in the menu of each of the 2 sessions the two failed takes left and accepts the native confirmation each opens |
+
+- **Which row is which (as relayed).** Demo333 says the second take's session is rank 1 (the file agrees: it is the one listed as left), and the **first** failed take's session is rank 2, age 4 hours, matched by demo333 by title prefix, age and neighbours, "about 95% sure" in its words. The file does not mark rank 2 as left, because the second constant is still a placeholder. The writer did not look at titles and does not confirm the match.
+- **One number the writer cannot explain.** The `owned` step counts **7** sessions, while the `sessions` step lists **8** rows. The earlier take counted 7 before and 8 after its own session, and the rescout of 05:07 counted 7 rows, so an owned count of 7 now, with 8 rows, is odd. The writer does not know why and does not guess.
+- **No session ids in this file.** The coordinator says they are not secrets but need not be in the docs: the text says "the two ids named in the walkthrough file".
+- **Next (as relayed).** The coder fills the second constant in one commit; then a new scout must read both listed; then demo333 asks the owner for the named go. Not run live.
+
 ## Limit of every GIF published so far: write guards (assist's survey, as relayed)
 
 In a take, only `aap-audited-operations` and `genai-playground` refuse writes by default. The Grafana, lora and Tempo walkthroughs watch writes and fail after the fact. `open-webui`, `identity-personas`, `mcp-tools-by-group`, `unifai-live-rag`, `kagent`, `lightspeed` and `model-catalog-registry` had no take-time write guard: their own created chats and sessions were deleted and counted, but what else their pages may have sent was not blocked or listed. Decision of the coordinator: one shared default-deny guard in the recorder, the walkthroughs not yet taken first.
