@@ -10,15 +10,20 @@ zuno_praxis_build_namespace: zuno-ai-build
 # branch, a tag or a full SHA; it is resolved to a full SHA before the run, and the image tag
 # carries it. Feature names were checked in each server/Cargo.toml on 2026-11-17:
 # api-key-auth-filter exists only in the fork.
+# The server's `opentelemetry` feature is empty (praxis-ai-filters declares `opentelemetry = []`): the OTLP export is
+# the `otel` feature of the Praxis core crates, which the server does not re-export. The first build without it logged
+# "telemetry OTel settings are configured but the `otel` feature is not enabled" (live, 2026-11-17), so the three core
+# crates' feature is named directly (cargo's dependency/feature syntax: each is a direct dependency of the server).
+zuno_praxis_build_core_otel: praxis-core/otel,praxis-filter/otel,praxis-protocol/otel
 zuno_praxis_build_sources:
   fork:
     url: https://github.com/redhat-et/praxis-ai
     revision: main
-    features: full,api-key-auth-filter,token-rate-limit-filter,opentelemetry
+    features: "full,api-key-auth-filter,token-rate-limit-filter,opentelemetry,{{ zuno_praxis_build_core_otel }}"
   upstream:
     url: https://github.com/praxis-proxy/ai
     revision: main
-    features: full,token-rate-limit-filter,opentelemetry
+    features: "full,token-rate-limit-filter,opentelemetry,{{ zuno_praxis_build_core_otel }}"
 # A Rust release build: several GiB of memory and tens of minutes. The CPU request stays at 1:
 # the general workers of demo333 have under 2.1 CPU unrequested (WP-292 live recon,
 # docs/roadmap/evidence/wp-292-live-recon-2026-11-17.md, finding 5), so a 4-CPU request would not

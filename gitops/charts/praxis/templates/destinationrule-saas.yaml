@@ -1,0 +1,35 @@
+{{- /*
+ADR-0619 (WP-292): Praxis speaks TLS end to end to the SaaS providers (its clusters set tls with the provider's SNI).
+RHOAI's external-provider reconciler creates, for each ExternalModel of gitops/charts/models (today mistral-large on
+api.mistral.ai), a ServiceEntry and a DestinationRule with tls.mode SIMPLE in zuno-ai-run, exported to every namespace.
+Praxis's sidecar then wraps a second TLS layer around Praxis's own, and the provider resets the connection: found live
+on demo333 on 2026-11-17, Codestral answered 502 "TLSHandshakeFailure ... Connection reset by peer, SNI: api.mistral.ai"
+while Anthropic, which has no such rule, answered. Same defect and same fix as the ai-gateway's rule in
+gitops/charts/models/templates/destinationrule-external-model-plaintext.yaml (WP-124): mode DISABLE, so Envoy passes the
+application's TLS through untouched. A rule in the client's own namespace with a workloadSelector wins for that client.
+One rule per host; the Anthropic one is inert until a ServiceEntry names that host, and then keeps the same behaviour.
+*/}}
+{{- $v := .Values }}
+{{- if $v.saas.enabled }}
+{{- $hosts := list $v.saas.claude.host $v.saas.codestral.host | uniq }}
+{{- range $host := $hosts }}
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: praxis-{{ $host | replace "." "-" }}-passthrough
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+spec:
+  workloadSelector:
+    matchLabels:
+      app.kubernetes.io/name: praxis
+  exportTo: ["."]
+  host: {{ $host }}
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+{{- end }}
+{{- end }}

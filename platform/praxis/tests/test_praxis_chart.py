@@ -172,6 +172,17 @@ class Chart(unittest.TestCase):
         translate = next(f for f in claude["steps"][0]["filters"] if f["filter"] == "openai_chat_completions_to_anthropic")
         self.assertTrue(translate["api_translation_enabled"])
 
+    def test_saas_hosts_bypass_the_controller_tls_origination(self):
+        # RHOAI's ExternalModel rule for api.mistral.ai originates TLS (mode SIMPLE) for every namespace; Praxis already
+        # speaks TLS, so its own rules pass the bytes through. None without SaaS.
+        self.assertEqual(by_kind(self.local, "DestinationRule"), [])
+        rules = {d["spec"]["host"]: d["spec"] for d in by_kind(self.saas, "DestinationRule")}
+        self.assertEqual(set(rules), {"api.anthropic.com", "api.mistral.ai"})
+        for spec in rules.values():
+            self.assertEqual(spec["trafficPolicy"]["tls"]["mode"], "DISABLE")
+            self.assertEqual(spec["workloadSelector"]["matchLabels"], {"app.kubernetes.io/name": "praxis"})
+            self.assertEqual(spec["exportTo"], ["."])
+
     def test_the_two_switches_of_our_build(self):
         docs = render("image.digest=" + DIGEST, "tokenRateLimit.enabled=true", "opentelemetry.enabled=true")
         cfg = config(docs)
