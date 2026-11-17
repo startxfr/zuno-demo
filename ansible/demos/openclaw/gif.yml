@@ -18,8 +18,8 @@ width: 960
 fps: 10
 moments:
   - {still: login, hold: 3, caption: "Sign in with the company account at the door"}
-  - {still: ui, hold: 5, step: "0:00", caption: "0:00  My own assistant, in its own namespace"}
+  - {still: ui, hold: 5, step: "0:00", caption: "0:00  My own assistant, with its own sessions"}
   - {from: session, to: q-sent, fit: 5, hold: 2, step: "0:45", caption: "0:45  I ask my assistant for the onboarding pages"}
-  - {from: q-sent, to: q-done, fit: 10, hold: 1, step: "0:45", caption: "0:45  It searches Confluence with my rights, without a key"}
+  - {from: q-sent, to: q-done, fit: 10, hold: 1, step: "0:45", caption: "0:45  It calls the platform's Confluence search tool"}
   - {still: q-done, hold: 9, step: "0:45", caption: "0:45  The pages it found, with their links"}
   - {still: end, hold: 7, step: "4:15", caption: "No key, no internet: the platform decides models and tools"}
