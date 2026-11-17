@@ -24,6 +24,15 @@ its take, `take: <name>`, and is cut from that take's video and PNGs; the takes 
 When markers.json names `motion_from`, no motion moment may start before that marker: the take holds the sign-in
 before it, which a public GIF never shows in motion.
 
+An assembled take (markers.json `kind: assembled`) is made by hand from media that already exist, such as a recorded
+fallback or screenshots, with no recorder run: it creates nothing (`created` [], `cleaned` null) and has no persona
+(no `owned`). Its `source` lists the originals, [{path, sha256, file, altered}]: `file` is the copy's name in the
+take's directory (the original's file name when absent); `altered: {sha256, how}` marks a file made from its
+original (a frame taken out of a video, a crop), whose own SHA-256 is then the one checked. Every file a moment reads
+must be one of the sources, and every source's SHA-256 is checked before anything is cut. `video` names the file
+motion moments play (a plain name; `recording.webm` when absent). A caption fits the GIF's width: 60 characters at
+960 px and wider, fewer on a narrower GIF.
+
 ffmpeg runs in the Playwright image by podman (the workstation has no ffmpeg). The GIF is written next to the
 recording, `<id>.gif`, never in the repository: it is published only after the owner's "go <id>" (ADR-0617).
 Exit codes: 0 built, 1 the cut list, the recording or the result is wrong, 2 usage.
@@ -65,7 +74,12 @@ WIDTH_RANGE = (480, 1280)
 STAMP = re.compile(r"^\d{8}-\d{6}$")   # <YYYYmmdd-HHMMSS>, the suffix of a recording directory
 TAKE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 CAPTION_MAX = 60           # about 780 px at 26 px Liberation Sans: inside 960 with a margin
+CAPTION_PX = 13            # pixels per character of a caption at 26 px Liberation Sans, a wide average
+CAPTION_MARGIN = 40        # pixels kept free across the band
 FFMPEG_TIMEOUT = 900
+TAKE_KINDS = ("browser", "terminal", "assembled")
+VIDEO = "recording.webm"   # the file motion moments play, unless markers.json names another (`video`)
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class CutError(ValueError):
@@ -222,12 +236,18 @@ def _take_facts(demo_id: str, markers: dict, reasons: List[str]) -> dict:
     # ADR-0618 clause 9: a browser take says what it created and whether it cleaned it, and what the persona owns
     # before and after (cleaned null: nothing was created). A terminal take replays a captured session: it creates
     # nothing and reads no persona's list (owned null). `kind` absent: a browser take of the first chain.
+    # An assembled take is made by hand from media that already exist: like a terminal take it creates nothing and
+    # reads no persona's list; its `source` says where every file came from.
     kind = markers.get("kind", "browser")
-    if kind not in ("browser", "terminal"):
+    sources: Dict[str, dict] = {}
+    if kind not in TAKE_KINDS:
         reasons.append(f"markers.json: unknown take kind {kind!r}")
-    elif kind == "terminal":
+    elif kind in ("terminal", "assembled"):
         if markers.get("created") or markers.get("cleaned") is not None:
-            reasons.append("a terminal take creates nothing: its `created` must be [] and its `cleaned` null")
+            reasons.append(f"{'an' if kind == 'assembled' else 'a'} {kind} take creates nothing: its `created` must "
+                           "be [] and its `cleaned` null")
+        if kind == "assembled":
+            sources = _sources(markers, reasons)
     else:
         if markers.get("cleaned") is False:
             created = ", ".join(f"{c.get('kind')} {c.get('id')}" for c in markers.get("created") or []
@@ -278,7 +298,87 @@ def _take_facts(demo_id: str, markers: dict, reasons: List[str]) -> dict:
     if not (isinstance(vw, int) and isinstance(vh, int) and vw > 0 and vh > 0):
         reasons.append("markers.json: `viewport` needs integer width and height")
         vw, vh = 16, 10
-    return {"at": at, "png": png, "floor": floor, "motion_from": motion_from, "vw": vw, "vh": vh}
+    video = markers.get("video", VIDEO)
+    if not plain_name(video):
+        reasons.append(f"markers.json: `video` {video!r} must be a plain file name in the take's directory, no path")
+        video = VIDEO
+    return {"at": at, "png": png, "floor": floor, "motion_from": motion_from, "vw": vw, "vh": vh, "kind": kind,
+            "sources": sources, "video": video}
+
+
+def plain_name(name) -> bool:
+    """A file name in the take's directory: no path separator, not `.` or `..`."""
+    return isinstance(name, str) and bool(name) and "/" not in name and "\\" not in name and name not in (".", "..")
+
+
+def _sources(markers: dict, reasons: List[str]) -> Dict[str, dict]:
+    """An assembled take's `source`: file name in the take's directory -> its entry {path, sha256, file, altered}.
+    Malformed entries are reasons (appended) and left out."""
+    listed = markers.get("source")
+    if not isinstance(listed, list) or not listed:
+        reasons.append("an assembled take needs `source`: the originals it was made from, [{path, sha256}]")
+        return {}
+    files: Dict[str, dict] = {}
+    for item in listed:
+        if not isinstance(item, dict) or set(item) - {"path", "sha256", "file", "altered"}:
+            reasons.append(f"markers.json: source {item!r} takes only path, sha256, file and altered")
+            continue
+        path, digest, altered = item.get("path"), item.get("sha256"), item.get("altered")
+        name = item.get("file", pathlib.PurePosixPath(path).name if isinstance(path, str) else None)
+        problems = []
+        if not isinstance(path, str) or not path.strip():
+            problems.append("`path` names the original")
+        if not isinstance(digest, str) or not SHA256.match(digest):
+            problems.append("`sha256` is the original's, 64 lower-case hex digits")
+        if not plain_name(name):
+            problems.append("`file` is a plain file name in the take's directory")
+        if altered is not None and not (isinstance(altered, dict) and set(altered) == {"sha256", "how"}
+                                         and isinstance(altered["sha256"], str) and SHA256.match(altered["sha256"])
+                                         and isinstance(altered["how"], str) and altered["how"].strip()
+                                         and "\n" not in altered["how"]):
+            problems.append("`altered` is {sha256, how}: the file's own SHA-256 and one line on how it was made")
+        if not problems and name in files:
+            problems.append(f"{name} is listed twice")
+        if problems:
+            reasons.append(f"markers.json: source {path!r}: " + "; ".join(problems))
+            continue
+        files[name] = item
+    return files
+
+
+def _sha256(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def verify_sources(directory: pathlib.Path, markers: dict, takes: Optional[Dict[str, dict]] = None) -> None:
+    """Every source of an assembled take is in the take's directory with the SHA-256 recorded for it (`altered.sha256`
+    for a file made from its original, else the original's): otherwise the take does not hold what it says it was
+    made from, and nothing is cut. Takes of other kinds have no sources."""
+    reasons: List[str] = []
+    for prefix, m in ([(f"{name}/", m) for name, m in takes.items()] if takes else [("", markers)]):
+        if m.get("kind") != "assembled":
+            continue
+        for name, item in _sources(m, []).items():
+            want = (item.get("altered") or {}).get("sha256") or item["sha256"]
+            try:
+                got = _sha256(directory / f"{prefix}{name}")
+            except OSError:
+                reasons.append(f"{directory}: missing {prefix}{name}, a source of the take")
+                continue
+            if got != want:
+                reasons.append(f"{prefix}{name}: its SHA-256 {got[:16]}... is not the recorded {want[:16]}...: the "
+                               "take does not hold the file its `source` names")
+    if reasons:
+        raise CutError(reasons)
+
+
+def caption_max(width: int) -> int:
+    """The longest caption a GIF of this width shows whole: 60 characters at 960 px and wider, fewer below."""
+    return min(CAPTION_MAX, (width - CAPTION_MARGIN) // CAPTION_PX)
 
 
 def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] = None,
@@ -351,8 +451,9 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
         if not isinstance(caption, str) or not caption.strip():
             reasons.append(f"{where}: `caption` is required")
             caption = ""
-        elif len(caption) > CAPTION_MAX or "\n" in caption:
-            reasons.append(f"{where}: the caption must be one line of at most {CAPTION_MAX} characters")
+        elif len(caption) > caption_max(width) or "\n" in caption:
+            narrow = f" on a {width} px GIF" if caption_max(width) < CAPTION_MAX else ""
+            reasons.append(f"{where}: the caption must be one line of at most {caption_max(width)} characters{narrow}")
         step = item.get("step")
         if step is not None:
             step = guard_time(step)
@@ -403,6 +504,12 @@ def plan(demo_id: str, cut: dict, markers: dict, times: Optional[Sequence[str]] 
         if moment.seconds < MIN_MOMENT - 1e-9:
             reasons.append(f"{where}: lasts {moment.seconds:.1f} s in the GIF; every moment needs at least "
                            f"{MIN_MOMENT:g} s (raise `hold` or `fit`)")
+        # An assembled take is cut only from files its `source` names (verify_sources checks their SHA-256).
+        own = facts[take]
+        if own["kind"] == "assembled" and own["sources"]:
+            reads = own["png"].get(moment.marker, "") if moment.kind == "still" else own["video"]
+            if reads and reads not in own["sources"]:
+                reasons.append(f"{where}: {reads} is not a source of the assembled take: list it in `source`")
         moment.take = take
         moments.append(moment)
     result = Plan(demo_id, moments, width, height, fps, target, {"width": vw, "height": vh})
@@ -439,11 +546,18 @@ def _png_names(markers: dict) -> Dict[str, str]:
             if isinstance(m, dict)}
 
 
+def _video(markers: dict) -> str:
+    """The file a take's motion moments play (plan() has refused anything but a plain name)."""
+    video = markers.get("video", VIDEO)
+    return video if plain_name(video) else VIDEO
+
+
 def ffmpeg_argv(p: Plan, markers: dict, output: str, takes: Optional[Dict[str, dict]] = None) -> List[str]:
     """One ffmpeg command for the whole GIF, paths as seen inside the container (the recording at /rec; a take of
     several is at /rec/<take>/)."""
     files = caption_files(p)
     names = {name: _png_names(m) for name, m in (takes or {"": markers}).items()}
+    videos = {name: _video(m) for name, m in (takes or {"": markers}).items()}
     argv = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
     graph: List[str] = []
     size = f"scale={p.width}:{p.height}:flags=lanczos,setsar=1,pad={p.width}:{p.out_height}:0:0:color=black"
@@ -456,7 +570,7 @@ def ffmpeg_argv(p: Plan, markers: dict, output: str, takes: Optional[Dict[str, d
                      "-i", f"{MOUNT}/{m.prefix}{names[m.take].get(m.marker, m.marker + '.png')}"]
             graph.append(f"[{number}:v]fps={p.fps},{size},{text},format=rgb24[v{m.index}]")
         else:
-            argv += ["-ss", f"{m.start:.3f}", "-t", f"{m.span:.3f}", "-i", f"{MOUNT}/{m.prefix}recording.webm"]
+            argv += ["-ss", f"{m.start:.3f}", "-t", f"{m.span:.3f}", "-i", f"{MOUNT}/{m.prefix}{videos[m.take]}"]
             chain = f"[{number}:v]setpts=(PTS-STARTPTS)/{m.speed:.4f},fps={p.fps},{size}"
             if m.hold > 0:
                 chain += f",tpad=stop_mode=clone:stop_duration={m.hold:.3f}"
@@ -529,12 +643,14 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
     p = plan(demo_id, cut, markers, times, takes=takes)
     missing = []
     names = {name: _png_names(m) for name, m in (takes or {"": markers}).items()}
+    videos = {name: _video(m) for name, m in (takes or {"": markers}).items()}
     for m in p.moments:
-        needed = f"{m.prefix}recording.webm" if m.kind == "motion" else f"{m.prefix}{names[m.take][m.marker]}"
+        needed = f"{m.prefix}{videos[m.take]}" if m.kind == "motion" else f"{m.prefix}{names[m.take][m.marker]}"
         if needed not in missing and not (directory / needed).is_file():
             missing.append(needed)
     if missing:
         raise CutError([f"{directory}: missing {', '.join(missing)}"])
+    verify_sources(directory, markers, takes)
     if shutil.which("podman") is None:
         raise CutError(["podman is not on PATH: ffmpeg runs in the Playwright image (see evaluations/browser/)"])
     captions = directory / CAPTIONS
@@ -557,6 +673,9 @@ def build(demo_id: str, directory: pathlib.Path, cut: dict, *, times: Optional[S
     (directory / f"{demo_id}.gif.json").write_text(json.dumps({
         "demo": demo_id, "gif": output, "bytes": built.size, "seconds": built.seconds, "planned": p.seconds,
         "take": directory.name, "started": markers.get("started"), "created": created, "cleaned": cleaned,
+        # An assembled take: what it was made from (the originals' paths and SHA-256, as markers.json lists them).
+        "kind": markers.get("kind", "browser"),
+        "source": [s for m in (takes or {"": markers}).values() for s in m.get("source") or []] or None,
         # A recording of several takes: each with its persona, its start and what it created. `created` and
         # `cleaned` above are then the whole recording's (everything the takes created; cleaned only if every take
         # that created something cleaned it), and `started` is the first take's.
@@ -596,6 +715,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             takes = load_takes(directory)
             markers = next(iter(takes.values())) if takes else load_markers(directory)
             p = plan(args.demo, cut, markers, times, takes=takes)
+            verify_sources(directory, markers, takes)
             print(" ".join(podman(directory, ffmpeg_argv(p, markers, f"{args.demo}.gif", takes))))
             print(f"{len(p.moments)} moments, {p.seconds:.1f} s planned")
             return 0

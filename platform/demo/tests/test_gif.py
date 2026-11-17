@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import hashlib
 import io
 import json
 import os
@@ -602,6 +603,166 @@ class SeveralTakes(unittest.TestCase):
     def test_a_single_take_recording_has_no_takes(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIsNone(gif.load_takes(pathlib.Path(tmp)))
+
+
+VIDEO_BYTES, FIRST_BYTES, EDIT_BYTES = b"mp4 of the fallback", b"png of the frame at 0.1 s", b"png of the edit"
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def assembled(**changes) -> dict:
+    """A take assembled by hand from a recorded fallback (world-model, WP-290): no recorder run, no persona; the
+    video is a copy of the original, the stills are frames taken out of it."""
+    original = "~/demo-fallback/fallback.mp4"
+    data = {"demo": "open-webui", "kind": "assembled", "viewport": {"width": 1280, "height": 720},
+            "started": "2026-11-08", "status": "pass", "detail": "", "created": [], "cleaned": None,
+            "video": "fallback.mp4",
+            "markers": [{"name": "first", "t": 0.1, "png": "first.png"}, {"name": "walk-end", "t": 8.0},
+                        {"name": "edit", "t": 12.41, "png": "edit.png"}],
+            "source": [{"path": original, "sha256": sha(VIDEO_BYTES)},
+                       {"path": original, "sha256": sha(VIDEO_BYTES), "file": "first.png",
+                        "altered": {"sha256": sha(FIRST_BYTES), "how": "frame at 0.100 s, taken out by ffmpeg"}},
+                       {"path": original, "sha256": sha(VIDEO_BYTES), "file": "edit.png",
+                        "altered": {"sha256": sha(EDIT_BYTES), "how": "frame at 12.410 s, taken out by ffmpeg"}}]}
+    data.update(changes)
+    return data
+
+
+WALK = [{"still": "first", "hold": 3, "caption": "x"},
+        {"from": "first", "to": "walk-end", "speed": 1, "caption": "x"},
+        {"still": "edit", "hold": 3, "caption": "x"}]
+
+
+class Assembled(unittest.TestCase):
+    """A take made by hand from media that already exist (WP-290): it says what it was made from, and is cut only
+    from those files, checked by SHA-256."""
+
+    def setUp(self):
+        self.dir = pathlib.Path(tempfile.mkdtemp(prefix="zuno-gif-assembled-"))
+        self.take = assembled()
+        (self.dir / "markers.json").write_text(json.dumps(self.take))
+        for name, data in (("fallback.mp4", VIDEO_BYTES), ("first.png", FIRST_BYTES), ("edit.png", EDIT_BYTES)):
+            (self.dir / name).write_bytes(data)
+        self.cut = cut(*WALK)
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def build(self, ran: list):
+        def run(argv, **kwargs):
+            ran.append(argv)
+            (self.dir / "open-webui.gif").write_bytes(b"gif")
+            return subprocess.CompletedProcess(argv, 0, stdout="")
+        with mock.patch.object(gif.shutil, "which", return_value="/usr/bin/podman"), \
+                mock.patch.object(gif, "_duration", return_value=14.0):
+            return gif.build("open-webui", self.dir, self.cut, times=TIMES, runner=run)
+
+    def test_no_persona_nothing_created(self):
+        p = gif.plan("open-webui", self.cut, self.take, TIMES)
+        self.assertEqual([m.kind for m in p.moments], ["still", "motion", "still"])
+        refused(self, self.cut, assembled(created=[{"kind": "chat", "id": "1"}]), "an assembled take creates nothing")
+        refused(self, self.cut, assembled(cleaned=True), "an assembled take creates nothing")
+        refused(self, self.cut, assembled(kind="pasted"), "unknown take kind 'pasted'")
+
+    def test_without_source_it_is_refused(self):
+        for source in (None, [], "~/demo-fallback/fallback.mp4"):
+            take = assembled(source=source)
+            if source is None:
+                del take["source"]
+            refused(self, self.cut, take, "an assembled take needs `source`")
+
+    def test_malformed_sources_are_refused(self):
+        def source(**item):
+            entry = {"path": "~/demo-fallback/fallback.mp4", "sha256": sha(VIDEO_BYTES)}
+            entry.update(item)
+            return assembled(source=[{k: v for k, v in entry.items() if v is not None}])
+        refused(self, self.cut, source(sha256="abc"), "64 lower-case hex")
+        refused(self, self.cut, source(sha256=sha(VIDEO_BYTES).upper()), "64 lower-case hex")
+        refused(self, self.cut, source(path=None), "`path` names the original")
+        refused(self, self.cut, source(file="../fallback.mp4"), "`file` is a plain file name")
+        refused(self, self.cut, source(altered={"sha256": sha(FIRST_BYTES)}), "`altered` is {sha256, how}")
+        refused(self, self.cut, source(altered={"sha256": "x", "how": "crop"}), "`altered` is {sha256, how}")
+        refused(self, self.cut, source(note="hand-made"), "takes only path, sha256, file and altered")
+        twice = assembled()
+        twice["source"].append(dict(twice["source"][0]))
+        refused(self, self.cut, twice, "fallback.mp4 is listed twice")
+
+    def test_every_file_a_moment_reads_is_a_source(self):
+        refused(self, self.cut, assembled(source=assembled()["source"][:1]), "first.png is not a source")
+        refused(self, cut(WALK[1]), assembled(source=assembled()["source"][1:]), "fallback.mp4 is not a source")
+
+    def test_the_video_is_a_plain_name_played_by_motion_moments(self):
+        argv = gif.ffmpeg_argv(gif.plan("open-webui", self.cut, self.take, TIMES), self.take, "open-webui.gif")
+        inputs = [argv[i + 1] for i, a in enumerate(argv) if a == "-i"]
+        self.assertEqual(inputs, ["/rec/first.png", "/rec/fallback.mp4", "/rec/edit.png"])
+        for video in ("../fallback.mp4", "sub/fallback.mp4", "", "..", 3):
+            refused(self, self.cut, assembled(video=video), "must be a plain file name")
+        browser = gif.ffmpeg_argv(gif.plan("open-webui", cut({"from": "q1-sent", "to": "q1-done", "fit": 3,
+                                                              "caption": "x"}), markers(), TIMES), markers(), "x.gif")
+        self.assertIn("/rec/recording.webm", browser)                           # a recorder take: unchanged
+
+    def test_built_from_its_sources_and_recorded_with_them(self):
+        ran = []
+        self.build(ran)
+        self.assertEqual(len(ran), 1)
+        record = json.loads((self.dir / "open-webui.gif.json").read_text())
+        self.assertEqual(record["kind"], "assembled")
+        self.assertEqual(record["source"], self.take["source"])
+        self.assertEqual(record["source"][0]["path"], "~/demo-fallback/fallback.mp4")
+        self.assertEqual((record["created"], record["cleaned"]), ([], None))
+
+    def test_a_file_that_is_not_its_source_is_refused_before_ffmpeg(self):
+        (self.dir / "edit.png").write_bytes(b"another picture")
+        ran = []
+        with self.assertRaises(gif.CutError) as ctx:
+            self.build(ran)
+        self.assertEqual(ran, [])
+        self.assertIn("edit.png: its SHA-256", ctx.exception.reasons[0])
+        self.assertIn("is not the recorded " + sha(EDIT_BYTES)[:16], ctx.exception.reasons[0])
+        # The copy of the video is checked against the original's SHA-256 (a copy is not altered).
+        (self.dir / "edit.png").write_bytes(EDIT_BYTES)
+        (self.dir / "fallback.mp4").write_bytes(b"re-encoded")
+        with self.assertRaises(gif.CutError) as ctx:
+            self.build(ran)
+        self.assertIn("fallback.mp4: its SHA-256", ctx.exception.reasons[0])
+        self.assertEqual(ran, [])
+
+    def test_a_source_missing_from_the_take_is_refused(self):
+        self.cut = cut(WALK[0], {"still": "edit", "hold": 3, "caption": "x"})       # the video is not cut...
+        (self.dir / "fallback.mp4").unlink()
+        with self.assertRaises(gif.CutError) as ctx:                               # ...but every source is checked
+            self.build([])
+        self.assertIn("missing fallback.mp4, a source of the take", ctx.exception.reasons[0])
+
+    def test_the_dry_run_checks_the_sources_too(self):
+        cut_path = self.dir / "gif.yml"
+        cut_path.write_text(json.dumps(self.cut))
+        with mock.patch.object(gif, "cut_list_path", return_value=cut_path), \
+                mock.patch.object(gif, "page_times", return_value=TIMES):
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(gif.main(["open-webui", str(self.dir), "--dry-run"]), 0)
+            self.assertIn("/rec/fallback.mp4", out.getvalue())
+            (self.dir / "first.png").write_bytes(b"another picture")
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(gif.main(["open-webui", str(self.dir), "--dry-run"]), 1)
+            self.assertIn("REFUSED: first.png: its SHA-256", err.getvalue())
+
+
+class CaptionWidth(unittest.TestCase):
+    """26 px captions: 60 characters fit 960 px and wider; a narrower GIF takes fewer, never cut off silently."""
+
+    def test_the_limit_follows_the_width(self):
+        self.assertEqual([gif.caption_max(w) for w in (1280, 960, 800, 720, 640, 480)], [60, 60, 58, 52, 46, 33])
+
+    def test_a_narrow_gif_refuses_a_caption_it_would_cut(self):
+        still = {"still": "home", "hold": 3}
+        gif.plan("open-webui", cut(dict(still, caption="x" * 46), width=640), markers(), TIMES)
+        refused(self, cut(dict(still, caption="x" * 47), width=640), markers(),
+                "at most 46 characters on a 640 px GIF")
+        gif.plan("open-webui", cut(dict(still, caption="x" * 60), width=1280), markers(), TIMES)
+        refused(self, cut(dict(still, caption="x" * 61), width=960), markers(), "at most 60 characters")
 
 
 if __name__ == "__main__":
