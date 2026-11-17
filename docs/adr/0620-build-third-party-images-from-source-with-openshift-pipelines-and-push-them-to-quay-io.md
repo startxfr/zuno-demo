@@ -104,3 +104,9 @@ The first install on demo333 (2026-11-17) brought:
 
 The d1 Application stays Degraded until the robot is in Vault, because its ExternalSecret has nothing to read.
 
+The second install the same day wrote the robot to Vault, but the ExternalSecret still failed with `403 permission
+denied`. The grant in `platform/vault/secret-access.yaml` reaches Vault only through the vault role's configure Job, so
+a cluster installed before the grant needs `make d1 install vault` once. The role README says so. After that run on
+demo333, the ExternalSecret synced, the `dockerconfigjson` Secret `quay-io-zuno-push` was created, and
+`zuno-openshift-pipelines-d1` turned Synced and Healthy.
+
