@@ -67,7 +67,10 @@ data:
             backend:
               kind: redis
               url: "${REDIS_URL}"
-              namespace: {{ $v.tokenRateLimit.redis.namespace | quote }}
+              # The filter stores the rule's settings under this namespace and fails closed for EVERY subject
+              # (503 configuration_mismatch) once window, capacity or reservation change (live, 2026-11-17). The
+              # namespace carries a hash of the three, so a change starts on new keys; the old ones expire with their window.
+              namespace: {{ printf "%s-%s" $v.tokenRateLimit.redis.namespace (printf "%v/%v/%v" $v.tokenRateLimit.window ($v.tokenRateLimit.capacity | int64) ($v.tokenRateLimit.reservedTokens | int64) | sha256sum | trunc 8) | quote }}
             key: authenticated_subject
             rules:
               - name: per-user

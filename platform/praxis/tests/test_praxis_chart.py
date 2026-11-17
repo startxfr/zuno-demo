@@ -191,6 +191,12 @@ class Chart(unittest.TestCase):
         self.assertEqual(limit["backend"]["kind"], "redis")
         # The filter takes the whole URL from one variable; the ExternalSecret builds it, the password percent-encoded.
         self.assertEqual(limit["backend"]["url"], "${REDIS_URL}")
+        # A change of the rule moves it to new Redis keys: the filter refuses stored state written under other settings.
+        lowered = next(f for f in chain(config(render("image.digest=" + DIGEST, "tokenRateLimit.enabled=true",
+                                                      "tokenRateLimit.capacity=2000")), "main")["filters"]
+                       if f["filter"] == "token_rate_limit")
+        self.assertRegex(limit["backend"]["namespace"], r"^praxis-[0-9a-f]{8}$")
+        self.assertNotEqual(limit["backend"]["namespace"], lowered["backend"]["namespace"])
         redis = next(d for d in by_kind(docs, "ExternalSecret") if d["metadata"]["name"] == "praxis-redis")
         self.assertEqual(redis["spec"]["target"]["template"]["data"]["REDIS_URL"],
                          "redis://:{{ .password | urlquery }}@zuno-redis-master.zuno-auth.svc:6379")
