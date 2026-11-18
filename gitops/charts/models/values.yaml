@@ -956,6 +956,14 @@ qwen35Model:
   # model. Revisit if their answer quality drops.
   defaultChatTemplateKwargs:
     enable_thinking: false
+  # Sampling defaults (vLLM --override-generation-config): the weights ship no
+  # generation_config.json. Measured 2026-11-18 on vLLM raw, 32 requests, no
+  # client parameters: 4/32 answers with foreign-script tokens; 0/32 with these
+  # values. Request parameters still win. Empty map = no flag.
+  generationConfig:
+    temperature: 0.7
+    top_k: 20
+    top_p: 0.95
   llmInferenceService:
     routerGateway:
       name: maas-default-gateway

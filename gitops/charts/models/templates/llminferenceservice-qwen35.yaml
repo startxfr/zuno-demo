@@ -172,6 +172,15 @@ spec:
           - --default-chat-template-kwargs
           - {{ printf "'%s'" (toJson .) | quote }}
           {{- end }}
+          {{- with .Values.qwen35Model.generationConfig }}
+          # 2026-11-18: the base weights ship no generation_config.json either, so a
+          # client that sends no sampling parameters (Open WebUI) sampled at T=1.0 over
+          # the whole vocabulary: 4/32 answers with foreign-script tokens on vLLM raw,
+          # 0/32 with these values (same defect as wesh, 2026-11-17). Request
+          # parameters still win. Same single-quoting reason as above.
+          - --override-generation-config
+          - {{ printf "'%s'" (toJson .) | quote }}
+          {{- end }}
           - --enforce-eager
           - --enable-auto-tool-choice
           - --tool-call-parser=qwen3_xml
