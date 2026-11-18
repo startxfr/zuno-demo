@@ -9,5 +9,5 @@ version: 0.2.0
 appVersion: "0.2.0"
 dependencies:
   - name: cluster-gpu
-    version: "21.3.277"
+    version: "21.3.370"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
