@@ -113,6 +113,10 @@ tokenRateLimit:
     secretName: praxis-redis
     vault: {key: redis/session-store, property: password}
     namespace: praxis
+    # The sidecar's idle timeout on the Redis connection (DestinationRule tcp.idleTimeout; "0s" disables it). Envoy's
+    # default, 1 h, closed the idle connection, and the next call failed closed with 503 (WP-292, 2026-11-18). The
+    # Redis side has the same setting in gitops/charts/redis (istio.inboundIdleTimeout).
+    idleTimeout: 0s
 
 # OpenTelemetry spans to the platform collector. Off by default: it needs our own build (feature `opentelemetry`).
 opentelemetry:

@@ -1,0 +1,23 @@
+{{- /*
+WP-292 (2026-11-18): Redis keeps its clients' connections open (timeout 0), but its sidecar's inbound TCP proxy closed
+a connection after Envoy's default idle hour. A client that keeps one connection for long (Praxis's token limit) then
+failed its next call. This Sidecar sets the inbound idle timeout of the Redis pods only. It names no egress, so the
+pods keep the mesh's default outbound configuration.
+*/}}
+{{- if and (.Values.redis.enabled | default true) .Values.istio.inboundIdleTimeout }}
+apiVersion: networking.istio.io/v1
+kind: Sidecar
+metadata:
+  name: zuno-redis-inbound-idle
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  inboundConnectionPool:
+    tcp:
+      idleTimeout: {{ .Values.istio.inboundIdleTimeout | quote }}
+{{- end }}
