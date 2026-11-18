@@ -1217,7 +1217,7 @@ Blender and world-model.
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
 | WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
 | WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Not started | owner's go: token-proxy rebuild and roll, kagent |
-| WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Repo work in review | owner's go: Keycloak realm, workstation entry |
+| WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Operator pending | step 4 (the claude-code client in an agents release), the workstation coding task |
 | WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
 | WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
 | WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: OpenClaw personas |

@@ -211,3 +211,30 @@ release digests. Live proofs, persona `eval-consultant-01`, Arkos to Tekos `aap.
 Not checked: that the AAP job of the approved run started on the AAP side. The script now runs the two stale probes after an
 approve and prints the expiry event and the event types seen after a silence. A first silent run (2026-11-07) had not logged
 the stream; the replay did.
+
+## Progress (2026-11-18): the third delegation of a work item is refused (cap of 2)
+
+unifai-main read 19 Arkos to Tekos traces in Tempo, from 2026-11-14 to 11-18. In 8 of them, Arkos called
+`iem.delegate_task` up to 9 times in one session and sent up to 7 A2A `send_message` instead of 2. The fork's guard
+(`delegate_task.py`, `MAS_MAX_DELEGATIONS_PER_ITEM`, default 3) already refuses before sending, but only at the fourth call
+on the same work item.
+
+The owner chose configuration over a fork change. `016f0313` sets the cap to 2 for multiagent and its worker on
+demo333 (`stack.extraEnv`), so the third call on a work item is refused. It was applied by the unifai day2 install at
+15:56Z; both pods rolled and read the value.
+
+Live test: two Arkos sessions at 16:03Z, persona `eval-consultant-01`, on the agents v1.1.0 prompt. The prompt asked
+for a delegation and two follow-ups on the same work item. Evidence is in the worker log and Tempo:
+
+| Session (trace) | Refused at the third call, before sending | A2A `send_message` |
+|---|---|---|
+| `b16cfacc` (`bea47c72…`) | `ask_scaling`, 16:03:31Z | 3 |
+| `07c82676` (`44b31d9c…`) | `ask_openshift_ai_serving`, 16:04:16Z; `followup_autoscaling`, 16:04:34Z | 5 |
+
+Each refusal read "Work item … was already delegated 2 times and is marked done with the answers received. Do NOT
+delegate it again".
+
+**Limit:** the cap is per work item. Arkos got around it by opening a new work item for a follow-up, so a session
+can still send more than 2 messages. The agents release v1.1.1 (arkos 1.0.2) tells Arkos not to re-delegate an
+answered item and not to invent a work item. Its roll on demo333 is coordinated by zuno-demo-reorg. A per-session cap
+in the fork was not chosen; it stays possible after the 2026-11-24 demo.

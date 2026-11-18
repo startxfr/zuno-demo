@@ -1,6 +1,6 @@
 # WP-298: Run Claude Code on sovereign models through Praxis
 
-- **State:** Repo work in review
+- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant); left: step 4 (the `claude-code` experience-client declaration in an agents release) and the workstation coding task of the acceptance
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
