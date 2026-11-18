@@ -176,7 +176,7 @@ def chat_model_for(
         from langchain_anthropic import ChatAnthropic
 
         return ChatAnthropic(
-            model=cfg.get("model", "claude-3-5-sonnet-latest"),
+            model=cfg.get("model", "claude-sonnet-5-5"),
             api_key=os.getenv(cfg.get("api_key_env", "ANTHROPIC_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
             # ADR-0544: ChatAnthropic supplies its own default when this is

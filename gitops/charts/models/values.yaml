@@ -1542,7 +1542,7 @@ externalModels:
     enabled: false
     endpoint: api.anthropic.com
     provider: openai-compatible
-    targetModel: claude-3-5-sonnet-latest
+    targetModel: claude-sonnet-5-5
     secretName: llm-provider-anthropic-maas
     vault:
       path: providers/anthropic
