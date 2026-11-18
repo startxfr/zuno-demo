@@ -270,6 +270,20 @@ preferences:
   - mistral
   - mistral-codestral
   - ovhcloud-gpt-oss-120b
+- agent: claude-code
+  task: code
+  prefer:
+  - local-maas
+  - local
+  - local-gpt-oss-maas
+  - local-gpt-oss
+  exclude:
+  - openai
+  - gemini
+  - anthropic
+  - mistral
+  - mistral-codestral
+  - ovhcloud-gpt-oss-120b
 - agent: dify
   task: chat
   prefer:
@@ -293,6 +307,11 @@ preferences:
   task: code
   prefer:
   - mistral-codestral
+- agent: open-webui
+  task: wesh
+  prefer:
+  - local-wesh-maas
+  - local-wesh
 - agent: openclaw
   task: chat
   prefer:
