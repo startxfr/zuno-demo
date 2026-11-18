@@ -499,7 +499,8 @@ zuno_praxis_saas_enabled: true
 zuno_praxis_token_rate_limit_enabled: true
 zuno_praxis_otel_enabled: true
 # WP-298 (owner's go 2026-11-17): admit the zuno-agent-gateway pod in Praxis's NetworkPolicy; pairs with
-# praxisWorkstationEntry in gitops/apps/connectivity-link/application-d1.yaml (praxis.<domain>, group ocp-ai-dev).
+# praxisWorkstationEntry in gitops/apps/connectivity-link/application-d1.yaml (praxis.<domain>; groups ocp-ai-dev,
+# ocp-ai-ops and consultant since the owner's decision of 2026-11-18).
 zuno_praxis_workstation_entry: true
 # WP-296 (owner's go 2026-11-17): Open WebUI lists Praxis's models next to "Zuno", prefixed `praxis.` and tagged
 # "Praxis", under the user's own token (system_oauth). The ai-gateway stays the first and default connection.
