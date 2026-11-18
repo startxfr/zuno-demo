@@ -146,6 +146,9 @@ jobs:
       # ADR-0619 (WP-292): the Praxis chart's rendered gateway configuration and policy (helm template, no cluster).
       - name: Praxis chart tests (ADR-0619)
         run: python3 platform/praxis/tests/test_praxis_chart.py
+      # ADR-0619 (update of 2026-11-19): the Open WebUI entries that keep the Zuno tools off Praxis's SaaS models.
+      - name: Open WebUI no-tools entries tests (ADR-0619)
+        run: python3 platform/praxis/tests/test_open_webui_no_tools.py
       # ADR-0608 (WP-241): how each drift check judges what `oc get` returns.
       - name: Drift check judgement tests (ADR-0608)
         run: python3 platform/drift/tests/test_check_drift.py

@@ -41,3 +41,13 @@ The repo work (the `altGateways` list, the `OPENAI_API_CONFIGS` index, the egres
 - **Zuno default unchanged:** `golden_path_probe.py --only open-webui,zuno-code` passes (`auto` and `zuno-code` through the ai-gateway).
 - **Trace:** Tempo holds Praxis traces of `/v1/chat/completions` calls with `user_agent.original` "Python/3.12 aiohttp/3.14.5", the HTTP client Open WebUI uses; 20 in 10 minutes. `client.address` is the sidecar's `127.0.0.6`, not the Open WebUI pod.
 - **Not done:** a scout of the live model picker for the GIF walkthrough. Its selector matches "Zuno Code" exactly, and no Praxis entry has that name. A scout is the owner's decision in demo333's session.
+
+## 2026-11-19: no Zuno tools on the SaaS models of Praxis
+
+`praxis.claude` and `praxis.codestral-latest` got a 403 `saas_tools_not_allowed` until the user turned the tools off
+in the chat, because the chart's `DEFAULT_MODEL_METADATA` attaches the Zuno tools to every model (ADR-0619, update of
+2026-11-18). The role now writes a per-model entry with no tools for these two models
+(`ansible/roles/open_webui/files/model_overrides.py`, ids from the Praxis chart's SaaS names, tested by
+`platform/praxis/tests/test_open_webui_no_tools.py`). The local `praxis.*` models keep the tools. Applied by `make
+d2 install open-webui` (ADR-0619, update of 2026-11-19).
+

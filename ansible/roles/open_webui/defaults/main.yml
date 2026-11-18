@@ -11,3 +11,6 @@ open_webui_namespace: zuno-openwebui
 # {name, label, url, models}. Empty: the Application's values are the ones of before. The role writes the list
 # to the three chart values that need it (gitops/charts/open-webui/values.yaml explains why there are three).
 open_webui_alt_gateways: []
+# Models that get a per-model entry without the Zuno tools (files/model_overrides.py), full Open WebUI ids
+# (<prefix>.<model>). The SaaS models of Praxis are added by the role when zuno_praxis_saas_enabled is true.
+open_webui_no_tools_models: []

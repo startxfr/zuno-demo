@@ -70,6 +70,47 @@
   retries: 60
   delay: 15
 
+# ADR-0619 (update of 2026-11-19): the global defaults attach the Zuno tools to every model, and Praxis refuses a
+# SaaS call that carries tools (403 saas_tools_not_allowed, the owner's decision of 2026-11-18). The SaaS models of
+# Praxis therefore get a per-model entry without tools (files/model_overrides.py). Their ids are the prefix of the
+# connection plus the SaaS names of the Praxis chart, read here, never written twice.
+- name: "open-webui | the models that run without the Zuno tools"
+  ansible.builtin.set_fact:
+    _open_webui_no_tools: >-
+      {{ open_webui_no_tools_models + ((
+           ['claude', 'codestral'] | map('extract',
+             (lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/charts/praxis/values.yaml') | from_yaml).saas)
+           | map(attribute='name') | map('regex_replace', '^', 'praxis.') | list)
+         if (zuno_praxis_saas_enabled | default(false) | bool)
+            and ('praxis' in (open_webui_alt_gateways | map(attribute='name') | list)) else []) }}
+
+- name: "open-webui | find the Open WebUI pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ open_webui_namespace }}"
+    label_selectors: ["app.kubernetes.io/component=open-webui"]
+    field_selectors: ["status.phase=Running"]
+  register: _open_webui_pods
+  when: _open_webui_no_tools | length > 0
+
+- name: "open-webui | turn the Zuno tools off for those models"
+  ansible.builtin.shell: |
+    set -o pipefail
+    oc -n {{ open_webui_namespace }} exec -i -c open-webui {{ _open_webui_pods.resources[0].metadata.name }} -- \
+      sh -c 'cd /app/backend && python3 - "$1"' _ {{ {'no_tools': _open_webui_no_tools} | to_json | quote }} \
+      < {{ (role_path ~ '/files/model_overrides.py') | quote }}
+  args:
+    executable: /bin/bash
+  register: _open_webui_overrides
+  changed_when: "'created' in _open_webui_overrides.stdout or 'updated' in _open_webui_overrides.stdout"
+  when:
+    - _open_webui_no_tools | length > 0
+    - not ansible_check_mode
+
+- name: "open-webui | report the models without tools"
+  ansible.builtin.debug:
+    msg: "models without the Zuno tools: {{ (_open_webui_overrides.stdout | default('{}')) if _open_webui_no_tools else 'none' }}"
+
 - name: "open-webui | installed"
   ansible.builtin.debug:
     msg: >-
