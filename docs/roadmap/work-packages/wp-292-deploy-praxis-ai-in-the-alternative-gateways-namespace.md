@@ -1,6 +1,6 @@
 # WP-292: Deploy Praxis AI in the alternative gateways namespace
 
-- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry and the fallback (proven live 2026-11-18); left: the SaaS tools rule live, and the first-call 503 after an idle night
+- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry, the fallback (proven live 2026-11-18) and the SaaS tools rule (live 2026-11-18); left: the first-call 503 after an idle night
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-291](wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md)
 - **Related:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
@@ -161,4 +161,12 @@ The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (
   | streamed `claude` call with tools | 403 `saas_tools_not_allowed` |
   | an unlisted model | 403 `model_not_allowed` |
 
-  The rule reaches demo333 with the next Praxis install, on the owner's go.
+  **Live on demo333, 2026-11-18** (owner's go; pushed as `3d5320f0`, Argo CD synced it and the pod rolled at
+  08:11:30Z). Through a port-forward, persona `consultant-01`:
+
+  | Call | Result |
+  |---|---|
+  | `claude`, no tools | 200 `pong`, 1.2 s |
+  | `claude` with a Zuno-style tool (`confluence.page.search`); `claude` with a tool result in the history | 403 `saas_tools_not_allowed` |
+  | `codestral-latest` with a tool; `/v1/messages` `claude` with a tool | 403 `saas_tools_not_allowed` |
+  | `gpt-oss-20b` with a tool; with a tool result in the history | 200 `pong` |
