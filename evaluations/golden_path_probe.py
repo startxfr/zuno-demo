@@ -770,13 +770,14 @@ def judge_blender(s: Dict) -> Result:
 def probe_blender(ctx: Context) -> Result:
     import ssl
 
-    import httpx
-
     installed, why = _workstation_entry_installed()
     if installed is None:
         return Result("blender", SKIPPED, f"{why}: not judged", required=False)
     if installed is False:
         return Result("blender", ROADMAP, why, required=False)
+    # After the two early returns above: the judgement tests exercise them in CI, where httpx is not installed.
+    import httpx
+
     sys.path.insert(0, str(HERE / "blender"))
     from bpy_stub import load_addon
     from device_login import DeviceLoginError, PersonaRefused, device_token, revoke
