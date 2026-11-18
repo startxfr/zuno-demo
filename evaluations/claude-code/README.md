@@ -101,6 +101,8 @@ refresh token.
 | `skipWebFetchPreflight` | The WebFetch tool's domain check calls `api.anthropic.com` otherwise. |
 | `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` | Strips pre-release `anthropic-beta` headers and fields that a translating gateway may refuse. |
 | `CLAUDE_CODE_MODEL_CAPABILITIES` | `-mid_conv_system`. Claude Code 2.1.325 sends its environment block as a second `system` message after the first user turn. The chat templates of the Qwen models accept a system message only at the start: `400 System message must be at the beginning`, live 2026-11-18. With this setting, Claude Code puts the block in the user turn as a `<system-reminder>`. |
+| `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `8192` and `32768`, the window of `qwen3.6-27b-instruct`. Unset, Claude Code asks 32000 output tokens for a model it does not know, and vLLM refuses: `maximum context length is 32768 tokens`, live 2026-11-18. The context setting lets auto-compact act before the window is full. |
+| `permissions.deny` | Every tool but `Bash`, `Read`, `Edit` and `Write`. With all 21 tools, Claude Code's base prompt is about 20k tokens, most of the 32k window; with these four it is about 4k, and each turn is faster on a 27B model. |
 
 Model discovery (`GET /v1/models`) is off by default in Claude Code; `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`
 turns it on, and the entry passes it.

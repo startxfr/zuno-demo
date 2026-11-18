@@ -144,3 +144,12 @@ credential file watcher was removed, because the workstation's inotify limit was
   and to the README table. Claude Code then puts the block in the user turn as a `<system-reminder>`.
 - **Checked locally:** through the same Praxis rig, the request reaches the model as `system`, then `user`, with the
   21 tools in `function` form.
+
+**Third error (23:05):** vLLM answered `maximum context length is 32768 tokens. However, you requested 32000 output
+tokens`.
+- **Cause:** Claude Code does not know the model, so it asks 32000 output tokens. Its base prompt with all 21 tools
+  is about 20k tokens (73 KB).
+- **Fix:** the settings now set `CLAUDE_CODE_MAX_OUTPUT_TOKENS=8192` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=32768`, the
+  model's window. They also deny every tool but `Bash`, `Read`, `Edit` and `Write`.
+- **Checked:** a request captured with these settings carries four tools, `max_tokens` 8192 and 15 KB, about 4k
+  tokens.

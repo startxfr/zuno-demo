@@ -204,6 +204,12 @@ class Settings(unittest.TestCase):
         self.assertLess(int(env["CLAUDE_CODE_API_KEY_HELPER_TTL_MS"]), 900 * 1000)   # under the 900 s access token
         # No system message after the first turn: the Qwen chat templates refuse it (400, live 2026-11-18).
         self.assertEqual(env["CLAUDE_CODE_MODEL_CAPABILITIES"], "-mid_conv_system")
+        # qwen3.6-27b-instruct has a 32768-token window: Claude Code asks 32000 output tokens unless told, and its
+        # base prompt is about 20k tokens with every tool; four coding tools bring it to about 4k (live 2026-11-18).
+        self.assertEqual((env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"], env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"]), ("8192", "32768"))
+        for tool in ("Bash", "Read", "Edit", "Write"):
+            self.assertNotIn(tool, example["permissions"]["deny"])
+        self.assertIn("Agent", example["permissions"]["deny"])
 
 
 if __name__ == "__main__":
