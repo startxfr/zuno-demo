@@ -42,7 +42,7 @@
   ansible.builtin.pip:
     requirements: "{{ zuno_repo_root }}/components/mlops/tooling/requirements.txt"
     virtualenv: "{{ zuno_repo_root }}/components/mlops/tooling/.venv"
-    virtualenv_command: "python3 -m venv"
+    virtualenv_command: "python3.11 -m venv"
 
 - name: "mlops | trigger the pipeline run for agent '{{ agent | default('comage') }}'"
   ansible.builtin.command:

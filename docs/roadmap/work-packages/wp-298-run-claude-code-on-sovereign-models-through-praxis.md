@@ -83,3 +83,26 @@ Repo work done; nothing is applied to the cluster.
   3. `praxisWorkstationEntry.enabled: true` with `keycloakAcmeWildcardTLS: true` and, preferably, `allowedGroups`
      in `gitops/apps/connectivity-link/application-d1.yaml`;
   4. step 4 of this brief (the agents release).
+
+## 2026-11-18: the entry admits the AI operators and the consultants
+
+- **Owner's decision (2026-11-18).** On demo333, `praxisWorkstationEntry.allowedGroups` is `ocp-ai-dev`, `ocp-ai-ops`
+  and `consultant`, in `gitops/apps/connectivity-link/application-d1.yaml`. The other groups (sales, ADV, finance,
+  board, recruitment, PaaS) stay out. The client check (azp `claude-code` or `blender`) and Praxis's sovereign-only
+  rule for `claude-code` are unchanged.
+- **Why it came up.** The first workstation test signed in as `ai-ops-01`, whose Keycloak session was still open in
+  the browser. The entry answered 403 with no body. Claude Code retried ten times over about 4 minutes without a
+  message, then showed "Failed to authenticate. API Error: 403".
+- **Live, 2026-11-18.** Applied by the connectivity-link d1 install, 12:09Z to 12:11Z (an Application change, so
+  the role re-applies it; no pod rolled). The AuthPolicy `praxis-workstation-jwt` is Accepted and Enforced with the
+  three groups. With a `claude-code` device token, `POST /v1/messages` on `qwen3.6-27b-instruct` through
+  `praxis.apps.demo333.startx.fr`:
+
+  | Persona | Result |
+  |---|---|
+  | `ai-dev-01`, `ai-ops-01`, `consultant-01` | 200 |
+  | `sale-01` (none of the three groups) | 403 |
+
+- **Seen on the way.** With `max_tokens: 20` the answer has no text block: the model's reasoning uses the whole
+  budget, and the translation drops the reasoning. With 400 the answer is `pong`, in 6 s and 108 output tokens.
+  Claude Code asks for far more, so it does not meet this.

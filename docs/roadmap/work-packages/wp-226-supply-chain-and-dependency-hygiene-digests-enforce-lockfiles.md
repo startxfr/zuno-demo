@@ -113,7 +113,10 @@ ADR-0603 clause 4.
     `platform/python/check_python_locks.py` (in `lint.yml`) fails on an unhashed or stale lock, a drift from the
     constraints, a lock resolved for the wrong interpreter, or a library at two versions. One exception:
     `components/mlops/tooling` (kfp, the pipeline compiler on the control host) needs kubernetes below 31 and is resolved
-    for Python 3.9, the control host's `python3`; it is compiled as its own environment.
+    for Python 3.9, the control host's `python3`; it is compiled as its own environment. Moved to Python 3.11
+    on 2026-11-18 (`python3.11 -m venv` in ansible/roles/mlops): GitHub's dependency-graph job refuses a lock whose
+    header says 3.9 (`tool_version_not_supported`) and went red on every push to main. kfp stays 2.18.0, a pipeline
+    compiled with the old and the new venv differs only by the venv's own `sdkVersion`.
 12. `ansible/requirements.yml` pins `kubernetes.core` 3.3.1, `community.hashi_vault` 7.1.0 and `community.general`
     13.2.0, the versions the playbooks run with today. The `lint.yml` ansible job installs from it, with `ansible`
     12.3.0.

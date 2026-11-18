@@ -1,6 +1,6 @@
 # WP-292: Deploy Praxis AI in the alternative gateways namespace
 
-- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry, the fallback (proven live 2026-11-18) and the SaaS tools rule (live 2026-11-18); left: the Redis idle-timeout fix live (the first call after an idle hour got 503)
+- **State:** Done (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry, the fallback (proven live 2026-11-18), the SaaS tools rule (live 2026-11-18) and the Redis idle-timeout fix (proven live 2026-11-18 after 65 idle minutes)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-291](wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md)
 - **Related:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
@@ -167,6 +167,15 @@ The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (
     Both were validated by a server-side dry run before the push. The other options were `backend.on_failure: open`,
     which would turn the limit off silently during a real Redis outage, and a retry in Praxis itself (upstream, after
     the demo).
+  - **Proven live, 2026-11-18.** Both sidecars' `config_dump` show `idle_timeout: 0s`: the praxis sidecar's outbound
+    TCP proxy to `zuno-redis-master` and the Redis sidecar's `inbound|6379||` TCP proxy. The praxis pod's sidecar counters
+    to Redis then stayed unchanged from 10:28:04Z at the latest (they were read every 5 minutes) to 11:33:26Z, more than
+    the 62 minutes of the morning failure. The two calls at 11:33:26Z, persona `consultant-01`, model `gpt-oss-20b`, got
+    200 in 0.5 s and 0.3 s, and Praxis logged no token-limit failure.
+
+    One more 503 came from Open WebUI at 09:51:53Z, 27 idle minutes after the EnvoyFilter was applied. Its most likely
+    cause is the change itself, not proven: the warm-up call at 09:24:52Z reused the connection opened before the
+    change, and the Redis sidecar closed it when it drained its old inbound listener. No 503 followed.
 - **Workstation entry.** `praxis.<domain>` on `zuno-agent-gateway` is live (`e4d18370`, WP-298 step 0).
 - **Tools on SaaS models** ([ADR-0619 update of 2026-11-18](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
   The SaaS route ends with an OPA step, `files/saas-no-tools.rego`. Proven on the pinned image

@@ -31,7 +31,7 @@
   ansible.builtin.pip:
     requirements: "{{ zuno_repo_root }}/components/mlops/tooling/requirements.txt"
     virtualenv: "{{ zuno_repo_root }}/components/mlops/tooling/.venv"
-    virtualenv_command: "python3 -m venv"
+    virtualenv_command: "python3.11 -m venv"
 
 - name: "mlops | read the rendered pipeline source ConfigMap"
   # zuno-mlops, NOT zuno-ai-build - the mlops chart deploys into its own
