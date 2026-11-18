@@ -106,3 +106,33 @@ Repo work done; nothing is applied to the cluster.
 - **Seen on the way.** With `max_tokens: 20` the answer has no text block: the model's reasoning uses the whole
   budget, and the translation drops the reasoning. With 400 the answer is `pong`, in 6 s and 108 output tokens.
   Claude Code asks for far more, so it does not meet this.
+
+## 2026-11-18: Claude Code's first real request reached vLLM untranslated
+
+The owner's dry run on the workstation, as ai-dev-01, went through sign-in and `/status`. The `/status` screen showed
+the Praxis base URL, `apiKeyHelper` and `qwen3.6-27b-instruct`. Then the first prompt failed with `API Error: 400
+25 validation errors`, `body.tools[0].function: Field required`: vLLM had received Claude Code's tools in the
+Anthropic shape. The Praxis log shows the request on the `maas` step, which answered 400.
+
+**Cause.** `anthropic_messages_to_chat_completions` rewrites the request body only once an upstream is selected
+(`on_selected_upstream_request_body`). In our chart it sat in the main chain, but the upstreams are selected inside the
+router steps (`maas`, then `direct`), so it never rewrote a body. Plain prompts still passed, because vLLM reads a
+text-only Messages body as a Chat Completions one. The tests of 2026-11-17 and 11-18 used only such prompts, so they
+did not catch it. The spike of WP-292 had no router, and there the translation worked.
+
+**Reproduced and fixed locally:**
+- **Setup:** the deployed image (`e319e228…`), the live configuration with only the cluster-specific filters
+  replaced, and a real Claude Code 2.1.325 request (21 tools, `stream: true`, `thinking: adaptive`) captured against
+  a local stub.
+- **Before:** the body reached the stub unchanged.
+- **After:** the filter sits in each step, just before the step's `load_balancer` (`praxis.messagesToChat`). The
+  request arrives in Chat Completions form, with `tools[].function`, `max_completion_tokens`, `reasoning_effort` and
+  `stream_options`. This holds on the `maas` step and on the `direct` step after a MaaS 503.
+- **Streamed answers:** text and tool calls are translated back to Anthropic events (`text_delta`, `tool_use`,
+  `input_json_delta`, `stop_reason: tool_use`).
+- **OpenAI requests** on `/v1/chat/completions` are untouched on both steps.
+
+`praxis-ai --validate` accepts the rendered configuration, as it accepts the live one. For this check, the
+credential file watcher was removed, because the workstation's inotify limit was reached.
+
+**Not yet proven:** the live sign-in and the coding task after the roll.

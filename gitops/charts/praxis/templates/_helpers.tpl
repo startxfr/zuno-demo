@@ -47,3 +47,16 @@ ADR-0603 M16: the image reference, always by digest (ADR-0619 clause 7). Fails w
 {{- range .Values.models }}{{ $names = append $names .name }}{{ end -}}
 {{- toJson $names -}}
 {{- end -}}
+
+{{/*
+The request half of the Anthropic Messages translation, for a router step. It must sit inside the step, before the
+step's load_balancer: Praxis rewrites the body only once an upstream is selected, and only steps select upstreams.
+The condition keeps the OpenAI requests (Open WebUI and the other clients on /v1/chat/completions) untouched.
+*/}}
+{{- define "praxis.messagesToChat" -}}
+- filter: anthropic_messages_to_chat_completions
+  allow_lossy_features: [prompt_caching, extended_thinking]
+  conditions:
+    - when:
+        path: "/v1/messages"
+{{- end }}

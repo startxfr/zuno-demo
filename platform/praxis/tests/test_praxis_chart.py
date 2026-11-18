@@ -180,6 +180,23 @@ class Chart(unittest.TestCase):
                          ["direct-qwen36-27b-instruct", "direct-gpt-oss-20b", "direct-qwen35-9b", "direct-qwen35-9b-wesh"])
         self.assertTrue(clusters[0]["endpoints"][0].endswith("-kserve-workload-svc.zuno-ai-run.svc.cluster.local.:8000"))
 
+    def test_messages_are_translated_inside_each_local_step(self):
+        # Praxis rewrites a Messages body only once an upstream is selected, and only the router steps select one. In
+        # the main chain the filter never touched the body: Claude Code's tools reached vLLM in the Anthropic shape and
+        # got a 400 (live 2026-11-18). The response halves stay in the main chain.
+        for cfg in (config(self.local), config(self.saas)):
+            main = [f["filter"] for f in chain(cfg, "main")["filters"]]
+            self.assertNotIn("anthropic_messages_to_chat_completions", main)
+            self.assertIn("anthropic_messages_to_chat_completions_stream", main)
+            for step in chain(cfg, "local")["filters"][0]["steps"]:
+                names = [f["filter"] for f in step["filters"]]
+                self.assertEqual(names.index("anthropic_messages_to_chat_completions"), names.index("load_balancer") - 1,
+                                 step["name"])
+                translate = step["filters"][names.index("anthropic_messages_to_chat_completions")]
+                # Only Messages requests: the OpenAI clients on /v1/chat/completions pass untouched.
+                self.assertEqual(translate["conditions"], [{"when": {"path": "/v1/messages"}}])
+                self.assertEqual(translate["allow_lossy_features"], ["prompt_caching", "extended_thinking"])
+
     def test_the_alias_models_and_the_metrics_port(self):
         cfg = config(self.local)
         main = chain(cfg, "main")["filters"]
@@ -256,8 +273,9 @@ class Chart(unittest.TestCase):
                          "redis://:{{ .password | urlquery }}@zuno-redis-master.zuno-auth.svc:6379")
         self.assertEqual(cfg["telemetry"]["otlp_endpoint"], "http://zuno-otel-collector-collector.zuno-monitoring.svc:4317")
         names = [f["filter"] for f in chain(cfg, "main")["filters"]]
-        # Declared before token_count (response hooks run in reverse), and token_count after the translation filters.
-        self.assertLess(names.index("token_rate_limit"), names.index("anthropic_messages_to_chat_completions"))
+        # Declared before token_count (response hooks run in reverse), and token_count after the translation filters
+        # (the request half of the Messages translation sits in the router steps, see the test below).
+        self.assertLess(names.index("token_rate_limit"), names.index("anthropic_messages_request"))
         self.assertLess(names.index("anthropic_messages_to_chat_completions_stream"), names.index("token_count"))
         self.assertEqual({d["spec"]["data"][0]["remoteRef"]["key"] for d in by_kind(docs, "ExternalSecret")},
                          {"redis/session-store"})

@@ -81,11 +81,10 @@ data:
           {{- end }}
           - filter: anthropic_messages_request
             on_invalid: continue
-          - filter: anthropic_messages_to_chat_completions
-            allow_lossy_features: [prompt_caching, extended_thinking]
-            conditions:
-              - when:
-                  path: "/v1/messages"
+          # The request half of the Messages translation (anthropic_messages_to_chat_completions) is not here: it
+          # rewrites the body only once an upstream is selected, and the upstreams are selected inside the router
+          # steps below. Here, the request went out untranslated: plain prompts passed, but Claude Code's tools got
+          # a 400 from vLLM (live 2026-11-18). Each step of the local chain carries it before its load_balancer.
           - filter: anthropic_messages_to_chat_completions_stream
             response_conditions:
               - when:
@@ -155,6 +154,7 @@ data:
                   - filter: credential_inject
                     credentials:
                       - {name: maas-sa-token, namespace: {{ $v.namespace }}, key: token, strategy: bearer_token, file: {{ $v.maas.tokenPath }}}
+                  {{- include "praxis.messagesToChat" . | nindent 18 }}
                   - filter: load_balancer
                     clusters:
                       - name: maas
@@ -198,6 +198,7 @@ data:
                       {{- range $v.models }}
                       - {model: {{ .name }}, upstream: direct-{{ .service }}, target_model: {{ .name }}, paths: [/v1/chat/completions, /v1/messages]}
                       {{- end }}
+                  {{- include "praxis.messagesToChat" . | nindent 18 }}
                   - filter: load_balancer
                     clusters:
                       {{- range $v.models }}
