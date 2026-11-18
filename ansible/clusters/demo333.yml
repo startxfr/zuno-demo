@@ -431,6 +431,19 @@ zuno_unifai_values:
       # the multilingual mmarco-mMiniLMv2 got 0.67/0.86/0.75 (2.9 s for 10 candidates, no score threshold separates the
       # unanswerable questions). To retry: reranker: {mode: deploy, model: <model>, candidates: <n>}; the image and
       # resources keys stay, unused while rag.reranker is unset.
+    # R-528 / WP-174 (owner's decision 2026-11-18): a work item is delegated at most twice, so the third
+    # iem.delegate_task call on the same item is refused before anything is sent; the item is closed with the answers
+    # received and the model is told to answer (fork delegate_task.py; default 3 refuses only the fourth). Tempo,
+    # 2026-11-14 to 11-18: arkos called delegate_task up to 9 times on one item, up to 7 A2A send_message instead of
+    # 2. The approval answer is sent by the A2A client, not by delegate_task, so it does not count. The cap of 1
+    # (bf128167, 2026-11-03) made acceptance scenario 10 flaky and was reverted (550fa857).
+    extraEnv:
+      multiagent:
+      - name: MAS_MAX_DELEGATIONS_PER_ITEM
+        value: '2'
+      multiagentWorker:
+      - name: MAS_MAX_DELEGATIONS_PER_ITEM
+        value: '2'
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
