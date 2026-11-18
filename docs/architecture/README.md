@@ -2,7 +2,7 @@
 
 The high-level design below is the platform map used by every demo scenario (Appendix A of each page), without a highlighted
 brick. Plain arrows carry requests, dotted arrows carry identity, policy or telemetry. Each page of this section drills into
-one slice of the map. It replaces the hand-drawn `zuno-hld.png`, drawn before UnifAI, the experiences and the OKF release chain.
+one slice of the map. It replaces the earlier hand-drawn image, which predated UnifAI, the experiences and the OKF release chain. The other hand-drawn low-level images are replaced by Mermaid in the domain pages.
 
 ```mermaid
 flowchart TB
