@@ -118,11 +118,15 @@ class Chart(unittest.TestCase):
         self.assertEqual(rule["spec"]["trafficPolicy"], {"connectionPool": {"tcp": {"idleTimeout": "0s"}}})
         redis_chart = CHART.parent / "redis"
         self.assertEqual(yaml.safe_load((redis_chart / "values.yaml").read_text())["istio"]["inboundIdleTimeout"], "0s")
-        sidecar = (redis_chart / "templates" / "sidecar-idle.yaml").read_text()
-        for needle in ("kind: Sidecar", "inboundConnectionPool:", "idleTimeout: {{ .Values.istio.inboundIdleTimeout | quote }}",
-                       "app.kubernetes.io/name: redis"):
-            self.assertIn(needle, sidecar)
-        self.assertNotIn("egress", sidecar.split("*/}}")[1])
+        # The Redis side is an EnvoyFilter on its inbound TCP proxy: a Sidecar's inboundConnectionPool.tcp.idleTimeout
+        # only reached the inbound cluster's HTTP idle timeout on Istio 1.30 (found live, 12669efb).
+        self.assertFalse((redis_chart / "templates" / "sidecar-idle.yaml").exists())
+        patch = (redis_chart / "templates" / "envoyfilter-inbound-idle.yaml").read_text().split("*/}}")[1]
+        for needle in ("kind: EnvoyFilter", "app.kubernetes.io/name: redis", "context: SIDECAR_INBOUND", "portNumber: 6379",
+                       "name: envoy.filters.network.tcp_proxy", "operation: MERGE",
+                       "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
+                       "idle_timeout: {{ .Values.istio.inboundIdleTimeout | quote }}"):
+            self.assertIn(needle, patch)
 
     def test_saas_models_get_no_tools_and_no_tool_results(self):
         # ADR-0619 amendment of 2026-11-18: the Zuno tools can carry C2 data and Praxis has no classification floor, so

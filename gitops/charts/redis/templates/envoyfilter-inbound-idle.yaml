@@ -1,0 +1,41 @@
+{{- /*
+WP-292 (2026-11-18): Redis keeps its clients' connections open (timeout 0), but its sidecar's inbound TCP proxy closed
+a connection after Envoy's default idle hour. A client that keeps one connection for long (Praxis's token limit) then
+failed its next call with 503. This patch sets idle_timeout on that TCP proxy, for the Redis pods and port 6379 only.
+
+Why an EnvoyFilter: the supported knob, the proxy metadata IDLE_TIMEOUT, needs a pod annotation and so a Redis restart;
+a Sidecar's inboundConnectionPool.tcp.idleTimeout was tried first (12669efb) and Istio 1.30 put it on the inbound
+cluster's HTTP idle timeout, leaving the TCP proxy at 1 h. Owner's choice, 2026-11-18. Check it after every Istio
+upgrade: an EnvoyFilter whose match no longer applies is silently ignored. The live check is the Redis sidecar's
+config_dump, where the TCP proxy of cluster inbound|6379|| must show this idle_timeout.
+*/}}
+{{- if and (.Values.redis.enabled | default true) .Values.istio.inboundIdleTimeout }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: zuno-redis-inbound-idle
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          portNumber: 6379
+          filterChain:
+            filter:
+              name: envoy.filters.network.tcp_proxy
+      patch:
+        operation: MERGE
+        value:
+          name: envoy.filters.network.tcp_proxy
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+            idle_timeout: {{ .Values.istio.inboundIdleTimeout | quote }}
+{{- end }}

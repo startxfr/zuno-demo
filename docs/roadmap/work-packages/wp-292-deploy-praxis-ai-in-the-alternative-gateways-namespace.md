@@ -156,8 +156,13 @@ The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (
   - **Fix.** The idle timeout is off on both sides, and the fail-closed rule is kept.
     - `praxis-redis-idle`, a DestinationRule of the praxis chart, applies to the praxis pod only: `tcp.idleTimeout: 0s`,
       no tls, so the mesh's automatic mutual TLS is unchanged.
-    - `zuno-redis-inbound-idle`, a Sidecar of the redis chart in `zuno-auth`, applies to the Redis pods only:
-      `inboundConnectionPool.tcp.idleTimeout: 0s`. It names no egress.
+    - `zuno-redis-inbound-idle`, an EnvoyFilter of the redis chart in `zuno-auth`, applies to the Redis pods and port
+      6379 only: it merges `idle_timeout: 0s` into the inbound TCP proxy. A Sidecar with
+      `inboundConnectionPool.tcp.idleTimeout: 0s` was tried first (`12669efb`). Istio 1.30 put that value on the
+      inbound cluster's HTTP idle timeout and left the TCP proxy at 1 h, seen in the Redis sidecar's `config_dump`. The
+      supported knob, the proxy metadata `IDLE_TIMEOUT`, needs a pod annotation and so a Redis restart. The owner chose
+      the EnvoyFilter, which needs no restart. It must be checked after every Istio upgrade, because Istio ignores an
+      EnvoyFilter whose match no longer applies.
 
     Both were validated by a server-side dry run before the push. The other options were `backend.on_failure: open`,
     which would turn the limit off silently during a real Redis outage, and a retry in Praxis itself (upstream, after
