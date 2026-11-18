@@ -12,5 +12,12 @@ mutations: {}
 # Step metadata, keyed by the quoted time stamp: `optional` rows, `mutating` rows (never run by `step`, SKIPPED by
 # `rehearse`), `manual` rows (a command the presenter runs by hand).
 steps:
+  "3:45": {"optional": true}
   "7:30": {"manual": true}
   "13:15": {"optional": true}
+# The GIF (owner's request and "go claude-code-sovereign", 2026-11-19): no take. Claude Code runs on the presenter's
+# workstation, outside the recorder; the GIF is cut from a take assembled by hand from the owner's screen recording
+# of 2026-11-18 (gif.yml says which frames, and how each was cropped and masked); `make demo scout` and `make demo
+# record` refuse it.
+record:
+  kind: assembled
