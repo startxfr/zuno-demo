@@ -54,7 +54,7 @@ Per-brick diagrams are in the domain pages: [agent-platform](agent-platform-arch
 | a2a-gateway | Agent-to-agent delegation under the caller's identity, with human approval of writes | UnifAI agents |
 | Keycloak | Personas, groups, token issuing | Every service |
 | Vault, External Secrets, cert-manager | Secrets and certificates | Every service |
-| Redis | The ai-gateway's controlled semantic cache ([ADR-0104](../adr/0104-introduce-controlled-semantic-caching.md)) | ai-gateway |
+| Redis | The ai-gateway's optional controlled semantic cache, quota ledger and routing side channel ([ADR-0104](../adr/0104-introduce-controlled-semantic-caching.md)) | ai-gateway |
 | Argo CD | Applies Git as the only source of cluster state ([ADR-0608](../adr/0608-keep-the-repository-the-only-source-of-cluster-state.md)) | Every chart |
 
 Dedicated agent frontends and BFFs (ADR-0042) were retired with the move to UnifAI, which keeps its own server-side
