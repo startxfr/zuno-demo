@@ -1,0 +1,31 @@
+{{- /*
+WP-292 (2026-11-18): the per-subject token limit keeps one Redis connection open. With Envoy's default TCP idle timeout
+(1 h), the praxis sidecar and the Redis sidecar closed it after an idle hour; Praxis saw the closed connection only on
+the next call, whose reservation failed ("shared_kv ... unavailable"), and the filter failed closed with 503. The
+filter then reconnected, so only the first call after each idle hour failed. Redis itself never closes an idle client
+(timeout 0). This rule sets the praxis sidecar's idle timeout on that connection; gitops/charts/redis sets the Redis
+sidecar's inbound one. No tls setting here, so the mesh's automatic mutual TLS is unchanged.
+*/}}
+{{- $v := .Values }}
+{{- if $v.tokenRateLimit.enabled }}
+{{- $host := $v.tokenRateLimit.redis.host }}
+{{- if hasSuffix ".svc" $host }}{{ $host = printf "%s.cluster.local" $host }}{{ end }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: praxis-redis-idle
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+spec:
+  workloadSelector:
+    matchLabels:
+      app.kubernetes.io/name: praxis
+  exportTo: ["."]
+  host: {{ $host }}
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        idleTimeout: {{ $v.tokenRateLimit.redis.idleTimeout | quote }}
+{{- end }}

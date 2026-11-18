@@ -104,6 +104,26 @@ class Chart(unittest.TestCase):
         self.assertEqual(rules[0], "require(authenticated)")
         self.assertIn("claim.azp == 'claude-code': deny(", rules[1])
 
+    def test_the_redis_connection_of_the_token_limit_never_idles_out(self):
+        # WP-292 2026-11-18: Envoy's default 1 h TCP idle timeout, on both sidecars, made the first call after an idle
+        # hour fail closed with 503. Both sides set it: this chart for the praxis sidecar, the redis chart for Redis's.
+        self.assertEqual([d for d in self.saas if d["metadata"]["name"] == "praxis-redis-idle"], [])
+        rule = next(d for d in render("image.digest=" + DIGEST, "tokenRateLimit.enabled=true")
+                    if d["metadata"]["name"] == "praxis-redis-idle")
+        self.assertEqual(rule["kind"], "DestinationRule")
+        self.assertEqual(rule["spec"]["host"], "zuno-redis-master.zuno-auth.svc.cluster.local")
+        self.assertEqual(rule["spec"]["workloadSelector"], {"matchLabels": {"app.kubernetes.io/name": "praxis"}})
+        self.assertEqual(rule["spec"]["exportTo"], ["."])
+        # Only the idle timeout: no tls, so the mesh's automatic mutual TLS stays.
+        self.assertEqual(rule["spec"]["trafficPolicy"], {"connectionPool": {"tcp": {"idleTimeout": "0s"}}})
+        redis_chart = CHART.parent / "redis"
+        self.assertEqual(yaml.safe_load((redis_chart / "values.yaml").read_text())["istio"]["inboundIdleTimeout"], "0s")
+        sidecar = (redis_chart / "templates" / "sidecar-idle.yaml").read_text()
+        for needle in ("kind: Sidecar", "inboundConnectionPool:", "idleTimeout: {{ .Values.istio.inboundIdleTimeout | quote }}",
+                       "app.kubernetes.io/name: redis"):
+            self.assertIn(needle, sidecar)
+        self.assertNotIn("egress", sidecar.split("*/}}")[1])
+
     def test_saas_models_get_no_tools_and_no_tool_results(self):
         # ADR-0619 amendment of 2026-11-18: the Zuno tools can carry C2 data and Praxis has no classification floor, so
         # the SaaS route ends with the OPA step of files/saas-no-tools.rego (proven on the pinned image, WP-292).
