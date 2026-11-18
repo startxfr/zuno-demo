@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -616,6 +617,11 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
             # A run cut by the deadline has an empty reply: say so, it is not "no citation".
             if web.get("timed_out"):
                 detail += " web_timed_out=True"
+            if not cites_docs:
+                # What the answer cited instead (public documentation URLs, no internal content), so a failure
+                # says which side missed: the retriever's sources or the model's citation (#11, 2026-11-18).
+                urls = sorted(set(re.findall(r"https?://[^\s)\]>\"'`]+", web["reply"])))[:5]
+                detail += f" web_tool_calls={web['tools']} web_reply_chars={len(web['reply'])} web_urls={urls}"
         except Exception as exc:  # noqa: BLE001
             cites_docs = False
             detail += f" web_error={exc}"
