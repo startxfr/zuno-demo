@@ -7,6 +7,9 @@
 # Authorization: only the models listed here are served; an unlisted model is refused, so a SaaS name is refused when
 # saas.enabled is off. A client listed in saas.deniedClients may not use a SaaS model (the workstation Claude Code
 # client keeps to the sovereign models, "nothing leaves the cluster").
+# Tools: a SaaS model gets no tools and no tool result (ADR-0619 amendment of 2026-11-18). The Zuno tools can carry C2
+# data and this gateway has no classification floor, so the SaaS route ends with an OPA step, files/saas-no-tools.rego,
+# that refuses such a call with saas_tools_not_allowed and a reason the client shows.
 {{- $v := .Values }}
 apiVersion: v1
 kind: ConfigMap
@@ -43,6 +46,13 @@ data:
       authorization:
         pre_invocation:
           - "require(authenticated)"
+      {{- if $v.saas.enabled }}
+      pdp:
+        - kind: opa
+          modules:
+            - |
+{{ .Files.Get "files/saas-no-tools.rego" | trim | indent 14 }}
+      {{- end }}
     routes:
       - http:
           path_prefix: /v1/models
@@ -61,6 +71,8 @@ data:
             {{- range $v.saas.deniedClients }}
             - "claim.azp == '{{ . }}': deny('this client may use the sovereign models only', 'model_not_allowed_for_client')"
             {{- end }}
+            - opa:
+                query: data.zuno.saas.decision
       {{- end }}
       - llm: "*"
         authorization:

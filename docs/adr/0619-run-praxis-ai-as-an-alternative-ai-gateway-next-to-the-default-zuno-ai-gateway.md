@@ -177,3 +177,23 @@ settles two points of clause 4.
 
 The spike also counted many JWKS fetches. The fetch rate is measured in WP-292 before Praxis serves an audience.
 
+
+## Update 2026-11-18 (WP-292): a SaaS model gets no tools and no tool results through Praxis
+
+The Consequences keep the C3 rule by sending only C1 content through an alternative gateway. Open WebUI turns the Zuno
+tools on in every chat (`DEFAULT_MODEL_METADATA`), on its `praxis.*` models too, and that tool connection is C2
+(ADR-0594): Confluence and the technical docs. Through the default gateway, a turn that used a C2 tool stays on local
+models (signed markers and floors). Praxis has neither. On 2026-11-17 Anthropic happened to refuse such calls, because
+it rejects tool names that contain a dot (`confluence.page.search`). Renaming the tools in Praxis would have sent C2
+tool results to Anthropic, so the owner chose a refusal (2026-11-18).
+
+- Praxis refuses, on its SaaS route (`claude`, `codestral-latest`), a call that offers tools (`tools`, or the legacy
+  `functions`), or whose messages carry a tool call or a tool result, in Chat Completions or Anthropic Messages form.
+  The answer is a 403 with code `saas_tools_not_allowed` and a message that tells the user to turn the tools off for
+  the chat or to pick a local model. A call without tools passes, and the sovereign models keep their tools.
+- The rule is an OPA step of Praxis's own policy (`gitops/charts/praxis/files/saas-no-tools.rego`), so it holds for
+  every client of the gateway. A request whose body the policy did not receive is refused too
+  (`saas_request_unreadable`).
+- In Open WebUI, `praxis.claude` and `praxis.codestral-latest` answer once the Zuno tools are off for the chat.
+  Removing the tools from these two models in Open WebUI, so that the refusal never shows, needs a per-model setting
+  that the chart does not have yet. It is left for after the 2026-11-24 demo.

@@ -1211,7 +1211,7 @@ Blender and world-model.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-291 | [wp-291](work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) | 0620 | none | Done | none (the upstream build is deferred by the owner) |
-| WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Operator pending | a live fallback proof; the workstation entry (WP-298) |
+| WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Operator pending | the SaaS tools rule live; the first-call 503 after an idle night |
 | WP-293 | [wp-293](work-packages/wp-293-deploy-litellm-as-an-alternative-gateway.md) | 0621 | WP-292 | Not started | owner's decision on ADR-0621 clause 1 first |
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |

@@ -1,6 +1,6 @@
 # WP-292: Deploy Praxis AI in the alternative gateways namespace
 
-- **State:** Operator pending (2026-11-17): live on demo333 with the local models, Claude, Codestral, the per-subject limit and OpenTelemetry; left: a live fallback proof and the workstation entry (WP-298)
+- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry and the fallback (proven live 2026-11-18); left: the SaaS tools rule live, and the first-call 503 after an idle night
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-291](wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md)
 - **Related:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
@@ -129,3 +129,36 @@ The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (
   - Tempo (`zuno-monitoring/tempo-tempo`) holds traces of service `praxis`: 4 for 41 calls at the 0.1 sampling rate.
 - **Role finding:** twice, the role's wait passed before Argo CD had synced the new revision, because it read the Application's previous status. The checks above were made after the sync.
 - **Outside this WP:** the Zuno ai-gateway's `platform/ai-gateway/provider-routing.yaml` still names `claude-3-5-sonnet-latest` for its Anthropic fallback. It was left unchanged (ADR-0619: the default gateway is not touched); it is reported to the owner.
+
+## 2026-11-18: the fallback, the workstation entry and tools on SaaS models
+
+- **Fallback.** The proof of 2026-11-17 failed twice ([evidence](../evidence/wp-292-fallback-live-2026-11-17.md)). Both
+  defects were reproduced on a local bench and fixed in `318e65e2`.
+  - Praxis's router drops `Content-Type` on the second step's sub-request, and vLLM answered 400. The direct step now
+    sets `content-type: application/json`.
+  - A silently dropped MaaS connection waited the 600 s deadline. The MaaS cluster now has a 5 s connect and a 180 s
+    read timeout. `step_timeout_ms` is not used, because it also cuts the direct step and a streamed answer.
+
+  The re-run on demo333 ([evidence](../evidence/wp-292-fallback-live-2026-11-18.md), `26b7b2ec`) answered every blocked
+  call through the direct step, in 14 s at most.
+- **First call after an idle night.** The re-run's baseline call got 503 with an empty body in 1.1 s. Praxis logged
+  `token_rate_limit` "reserve" on `shared_kv` failing with "unavailable", then "admission backend failed, failing
+  closed". It is the only such failure in 12 h of logs, on the first call after about eight idle hours, and the next
+  calls passed. A dropped idle Redis connection is the likely cause, not yet confirmed. Open.
+- **Workstation entry.** `praxis.<domain>` on `zuno-agent-gateway` is live (`e4d18370`, WP-298 step 0).
+- **Tools on SaaS models** ([ADR-0619 update of 2026-11-18](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
+  The SaaS route ends with an OPA step, `files/saas-no-tools.rego`. Proven on the pinned image
+  (`sha256:e319e228…`) with the rendered policy, on a local bench with a stub backend:
+
+  | Call | Result |
+  |---|---|
+  | local model, with or without tools | 200 |
+  | `claude`: no tools, `tools: []`, `tools: null` | 200 |
+  | `claude`: tools; legacy `functions`; a `tool` message in the history | 403 `saas_tools_not_allowed` |
+  | `codestral-latest` with tools | 403 `saas_tools_not_allowed` |
+  | `/v1/messages` `claude`: no tools; text blocks only | 200 |
+  | `/v1/messages` `claude`: tools; `tool_use` and `tool_result` blocks in the history | 403 `saas_tools_not_allowed` |
+  | streamed `claude` call with tools | 403 `saas_tools_not_allowed` |
+  | an unlisted model | 403 `model_not_allowed` |
+
+  The rule reaches demo333 with the next Praxis install, on the owner's go.

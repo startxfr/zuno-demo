@@ -104,6 +104,24 @@ class Chart(unittest.TestCase):
         self.assertEqual(rules[0], "require(authenticated)")
         self.assertIn("claim.azp == 'claude-code': deny(", rules[1])
 
+    def test_saas_models_get_no_tools_and_no_tool_results(self):
+        # ADR-0619 amendment of 2026-11-18: the Zuno tools can carry C2 data and Praxis has no classification floor, so
+        # the SaaS route ends with the OPA step of files/saas-no-tools.rego (proven on the pinned image, WP-292).
+        pol = policy(self.saas)
+        route = next(r for r in pol["routes"] if r.get("llm") == ["claude", "codestral-latest"])
+        self.assertEqual(route["authorization"]["pre_invocation"][-1], {"opa": {"query": "data.zuno.saas.decision"}})
+        self.assertEqual([p["kind"] for p in pol["global"]["pdp"]], ["opa"])
+        rego = pol["global"]["pdp"][0]["modules"][0]
+        self.assertTrue(rego.startswith("# ADR-0619"))
+        for needle in ("package zuno.saas", '"rule_source": "saas_tools_not_allowed"',
+                       '"rule_source": "saas_request_unreadable"', 'some key in ["tools", "functions"]',
+                       'object.get(m, "role", "") == "tool"', '"tool_calls"', '{"tool_use", "tool_result"}'):
+            self.assertIn(needle, rego)
+        # The sovereign models keep their tools, and a gateway without SaaS models carries no PDP at all.
+        sovereign = next(r for r in pol["routes"] if r.get("llm") and "auto" in r["llm"])
+        self.assertNotIn("opa", json.dumps(sovereign))
+        self.assertNotIn("pdp", policy(self.local)["global"])
+
     def test_each_router_ends_a_chain_of_its_own(self):
         for docs, names in ((self.local, ["main", "local"]), (self.saas, ["main", "local", "claude", "codestral"])):
             cfg = config(docs)
