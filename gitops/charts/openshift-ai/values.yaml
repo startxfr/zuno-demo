@@ -513,6 +513,15 @@ prometheusK8s:
       memory: 6Gi
     limits:
       memory: 8Gi
+  # 2026-11-19 (dashboard audit): without a volumeClaimTemplate the platform
+  # Prometheus kept its TSDB in an emptyDir, so every pod restart wiped ALL
+  # metrics (measured: prometheus_tsdb_lowest_timestamp was 3 h old with
+  # `retention: 15d`; the 30Gi prometheus-k8s-db-* PVCs of 2026-11-10 were
+  # orphaned). `storage.size` empty = keep the emptyDir (old behaviour).
+  retention: 15d
+  storage:
+    size: 30Gi          # same size as the existing PVCs, so they are reused
+    storageClassName: ""   # empty = the cluster default class (gp3-csi on demo333)
 
 # ADR-0614: put every platform monitoring component on the infra nodes
 # (nodeSelector + toleration of the infra NoSchedule taint). false until the

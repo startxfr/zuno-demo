@@ -39,6 +39,19 @@ data:
     prometheusK8s:
       resources:
         {{- toYaml .Values.prometheusK8s.resources | nindent 8 }}
+      {{- if .Values.prometheusK8s.retention }}
+      retention: {{ .Values.prometheusK8s.retention | quote }}
+      {{- end }}
+      {{- if and .Values.prometheusK8s.storage .Values.prometheusK8s.storage.size }}
+      volumeClaimTemplate:
+        spec:
+          {{- if .Values.prometheusK8s.storage.storageClassName }}
+          storageClassName: {{ .Values.prometheusK8s.storage.storageClassName | quote }}
+          {{- end }}
+          resources:
+            requests:
+              storage: {{ .Values.prometheusK8s.storage.size | quote }}
+      {{- end }}
       {{- if $infra }}
       nodeSelector:
         node-role.kubernetes.io/infra: ""
