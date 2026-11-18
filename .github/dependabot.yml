@@ -29,7 +29,10 @@ updates:
       - "/components/mcp-gateway"
       - "/components/mcp-servers/*"
       - "/components/mlops"
-      - "/components/mlops/tooling"
+      # Not here on purpose (2026-11-18): components/mlops/tooling is locked with Python 3.9, the kfp venv of the
+      # RHEL 9 control host (compile_locks.py PYTHON_FOR). Dependabot refuses a 3.9 requirement ("detected-version
+      # 3.9.*", job error) and one failing directory failed the whole pip group. Refresh that lock by hand with the
+      # pip-tools of Python 3.9, as compile_locks.py documents.
       - "/components/trustyai-eval"
       - "/components/zuno-dify-knowledge"
       - "/components/zuno-token-proxy"
