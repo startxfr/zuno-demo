@@ -26,7 +26,7 @@ flowchart LR
 
 ## Knowledge and vectors
 
-SXA is the company's commercial record from before 2021. [ADR-0219](../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md) (listed as Deprecated in the ADR index) settled how it is served: as a read-only historical RAG corpus (`knowledge.sxa-legacy`), with no live SXA database and no structured-query path. The structured MariaDB import of [ADR-0216](../adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) is Superseded by ADR-0219.
+SXA is the company's commercial record from before 2021. [ADR-0219](../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md) (Deprecated) and the MariaDB import of [ADR-0216](../adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) (Superseded) are no longer the design to follow. The raw SXA dump stays in the shared source bucket (below); what an agent may read of it is declared by the agents release (`knowledge.sxa-legacy` in the knowledge policy), not by this page.
 
 RAG now runs on UnifAI's RAG service with Qdrant ([ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), Implemented): one collection per logical knowledge domain (`knowledge.tech`, `knowledge.sxa-legacy`), dense and sparse vectors fused at query time, and a fail-closed `acl_groups` filter taken from the caller's identity. Embeddings stay on OpenShift AI: `qwen3-embedding-0.6b`, 1024 dimensions, behind the `embeddings-predictor` service in `zuno-ai-run` (`gitops/charts/unifai/values.yaml`). The agent memory tool reads the same Qdrant. The earlier `rag-service`, `rag-ingestion` and `pgvector` RAG schema were to be retired at cutover under ADR-0568; no chart for them remains in `gitops/charts`.
 
@@ -81,7 +81,7 @@ flowchart TB
 
 ## S3 buckets and backups
 
-[ADR-0546](../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) (Implemented) splits object storage in two. `zuno-demo-sources` is shared by all clusters and holds model weights (`models/`), the raw SXA dump and training corpora. Each cluster has its own `zuno-<cluster>-<purpose>` buckets; the cluster variables in `ansible/clusters/` name `mlops` (MLflow artifacts, pipeline objects), `registry` (Quay) and `backups`. A normalized RAG corpus is not shared: each cluster re-ingests from the raw sources.
+[ADR-0546](../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) (Implemented) splits object storage in two. `zuno-demo-sources` is shared by all clusters and holds model weights (`models/`), the raw SXA dump and training corpora. Each cluster has its own `zuno-<cluster>-<purpose>` buckets; the cluster variables in `ansible/clusters/` name `mlops` (MLflow artifacts, pipeline objects), `registry` (Quay) and `backups`. The buckets of demo333 are in `eu-central-1` (`ansible/clusters/demo333.yml`). A normalized RAG corpus is not shared: each cluster re-ingests from the raw sources.
 
 The `backups` bucket carries three prefixes, each written by its own job: `postgresql/` (pgBackRest, repo2, on-demand and scheduled), `mariadb/` (PhysicalBackup, schedule `0 */6 * * *`, retention `168h`) and `unifai/` (Qdrant snapshots and a Mongo dump, `UnifaiStack` `spec.backup`, default schedule `0 2 * * *`, retention 7). In the chart defaults all three S3 backups are disabled; clusters switch them on with Ansible variables. `make d3 backup|restore|check` drives the Day-3 runs ([ADR-0112](../adr/0112-implement-production-grade-backup-and-recovery.md)).
 
