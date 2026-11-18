@@ -241,7 +241,7 @@ flowchart LR
     TEAMWF["team agent-tekos<br/>workflows tekos, tekos-find-relevant-docs,<br/>tekos-check-my-drive-docs, tekos-write-code"]
     DECL["declared in Git<br/>11 teams, built-ins zuno-gateway and mcp-gateway,<br/>3 templates, team examples,<br/>personal starters"]
   end
-  REL[("agents release v0.14.3<br/>quay.io/zuno/okf-tekos@sha256<br/>signed by the agents repo workflow")] -.->|"pulled and verified"| OPR
+  REL[("agents release pinned in agents.lock<br/>quay.io/zuno/okf-tekos@sha256<br/>signed by the agents repo workflow")] -.->|"pulled and verified"| OPR
   ARGO["Argo CD<br/>zuno-unifai-d0, -d1"] -.->|"renders"| BUN & DECL
   OPR -->|"reconciles the stack,<br/>pushes objects by REST"| MAS
   BUN --> TEAMWF
