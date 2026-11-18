@@ -1,6 +1,6 @@
 # WP-298: Run Claude Code on sovereign models through Praxis
 
-- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant); left: step 4 (the `claude-code` experience-client declaration in an agents release) and the workstation coding task of the acceptance
+- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant), and the workstation coding task of the acceptance passed live on 2026-11-18; left: step 4 (the `claude-code` experience-client declaration in an agents release)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
@@ -168,3 +168,15 @@ tokens`.
     Claude Code asks the presenter before it runs a command.
   - Limit: any failed tool still ends the turn. Fixing that needs a change in Praxis's translator and a rebuild of
     the image, after the 2026-11-24 demo.
+
+**Acceptance coding task: PASS (2026-11-18, 23:33–23:35 local, 22:33–22:35Z).**
+- **Setup:** owner's workstation, VSCodium with the Claude Code extension 2.1.325, persona ai-dev-01, model
+  `qwen3.6-27b-instruct`, permission mode `default`.
+- **`/status`:** the Praxis base URL, `apiKeyHelper` for the auth token and the API key, "Auto mode server:
+  Disabled".
+- **The task:** Claude Code wrote `fib.py` (an iterative `fibonacci(n)`, `ValueError` for a negative input) and
+  `test_fib.py`, ran `python3 -m unittest` (`Ran 3 tests`, all passing) and summarised.
+- **Praxis log:** every sub-request of the run is on the `maas` step with status 200, and there is no translation
+  error. No SaaS host was called.
+- **Fixes this needed:** 8e209a9d (the translation inside the router steps, rolled on demo333), 2efc90e4,
+  ae27952a and 54b545ee (client settings).
