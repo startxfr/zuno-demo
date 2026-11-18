@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-292, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
+| v0.17 | 13 | 10 | 41 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1211,7 +1211,7 @@ Blender and world-model.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-291 | [wp-291](work-packages/wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md) | 0620 | none | Done | none (the upstream build is deferred by the owner) |
-| WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Operator pending | the Redis idle-timeout fix live |
+| WP-292 | [wp-292](work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md) | 0619 | WP-291 | Done | none |
 | WP-293 | [wp-293](work-packages/wp-293-deploy-litellm-as-an-alternative-gateway.md) | 0621 | WP-292 | Not started | owner's decision on ADR-0621 clause 1 first |
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
@@ -1369,6 +1369,7 @@ moving.
 
 ## Change log
 
+- 2026-11-18 — WP-292 Done: Praxis runs on demo333 with every acceptance item met. The last open item, the first call after an idle hour getting 503, is fixed by turning off Envoy's 1 h TCP idle timeout between Praxis and Redis on both sidecars (`12669efb`, `73c45b07`), and proven live: after 65 minutes without Redis traffic, both calls got 200. The fallback was re-proven live (`26b7b2ec`), and the SaaS route refuses tools and tool results (`3d5320f0`, [ADR-0619 update of 2026-11-18](../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
 - 2026-11-17 — ADR-0619 to ADR-0623 and WP-291 to WP-304 added (Phase 58, v0.17) by the owner's decisions of the day. Alternative AI gateways run next to the Zuno ai-gateway, which stays the default and unchanged: Praxis AI first, then LiteLLM, Agent Router and Bifrost, in one shared namespace `zuno-ai-gateways`. There is one work package per gateway and one per client, each client wired once through a generic `altGateways` list. The alternatives serve sovereign models plus Claude and Codestral with the existing Vault keys. Praxis is built by an OpenShift Pipelines pipeline from the fork or the upstream source and pushed to `quay.io/zuno/praxis-ai` (ADR-0620, which amends ADR-0056 for third-party source builds only). Claude Code becomes the band's second experience, signing in by Keycloak device flow. ADR-0619 amends ADR-0587 clause 1 by a dated note. Three scenarios are planned: multi-gateway, claude-code-sovereign and agents-alt-gateway.
 - 2026-11-17 — WP-290 Done: the owner chose "Clore WP-290 et lever le gel" (12:50:28 CET, as relayed). Six of six demos are published, each on a named go; the limits and declared effects are written in the brief; every open item stays open where it is recorded (the sprint's close-out, in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md)). The freeze is lifted as the sprint's operating rule only.
 - 2026-11-17 — WP-290 (6 of 6): `a2a-delegation-approval` (`5598eb44`), `world-model` (`3421934d`) and `blender-3d` (`f0c57126`) are published on the owner's go of 12:30:26 CET; the last two are assembled from existing media (ADR-0618, update of 2026-11-17). The catalogue has 30 GIFs of 30 demos. WP-288 is Done (2026-11-16) and WP-289 Done (2026-11-17); WP-290 awaits the decision to close. The sprint's close-out, with every open item and where it is recorded, is in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md).
