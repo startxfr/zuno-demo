@@ -4,5 +4,5 @@
 # ragas_eval.py uses. langchain-openai provides the OpenAI-compatible
 # judge wrapper pointed at the in-cluster qwen predictor.
 ragas==0.2.15
-langchain-openai==0.3.35
+langchain-openai==0.2.14
 httpx==0.28.1
