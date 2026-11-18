@@ -238,3 +238,35 @@ delegate it again".
 can still send more than 2 messages. The agents release v1.1.1 (arkos 1.0.2) tells Arkos not to re-delegate an
 answered item and not to invent a work item. Its roll on demo333 is coordinated by zuno-demo-reorg. A per-session cap
 in the fork was not chosen; it stays possible after the 2026-11-24 demo.
+
+### Measured after v1.1.1 (2026-11-18): the prompt alone does not reach one delegation per item
+
+v1.1.1 was rolled on demo333 by zuno-demo-reorg-demo333 with the owner's go: the mirror, `make d2 install unifai`,
+then `make d2 install mcp`, because the gateways still served the old corp bundle and `make d2 check agents` failed
+until they rolled. Arkos then ran Ready on `c5de0a18`, and the check passed 18 of 19. The failure, #11, is the RAG
+citation of a technical question, a path the release does not touch.
+
+Five sessions of acceptance scenario 21 followed, with persona `eval-consultant-01`, about 4.5 minutes apart. The
+counts come from the saved Tempo traces:
+
+| Trace | `delegate_task` calls (sent / refused by the cap) | A2A `send_message` | Scenario 21 |
+|---|---|---|---|
+| `1eab2bf9` | 3 (2 / 1) | 2 | PASS |
+| `4a03ac7a` | 4 (2 / 2) | 2 | PASS |
+| `38021eeb` | 0 | 0 | FAIL: Arkos answered alone, without delegating |
+| `879b3edc` | 4 (3 / 1) | 2 | PASS |
+| `03d237a1` | 2 (2 / 0) | 2 | PASS |
+
+The "sent" counts read the span status. In the fork, a call that returns `success: false` (for example a LOCAL item)
+still ends its span as ok, so they are upper bounds. In `1eab2bf9`, each of the two calls that went through is
+followed by its own `send_message` about 2 s later, so Arkos really asked Tekos twice.
+
+Every session that delegated called `delegate_task` 2 to 4 times, never once. The cap of 2 is what bounds the traffic
+to Tekos, at 2 messages per session, and it refused a call in 3 of the 4 sessions. The owner's decision, 2026-11-18:
+- the cap stays at 2;
+- no rollback and no v1.1.2 before the 2026-11-24 demo.
+
+Left for after the demo:
+- the session that did not delegate at all;
+- a stricter prompt or a cap of 1. The cap of 1 made acceptance scenario 10 flaky in November and was reverted
+  (`550fa857`).
