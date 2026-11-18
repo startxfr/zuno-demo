@@ -1,6 +1,6 @@
 # WP-292: Deploy Praxis AI in the alternative gateways namespace
 
-- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry, the fallback (proven live 2026-11-18) and the SaaS tools rule (live 2026-11-18); left: the first-call 503 after an idle night
+- **State:** Operator pending (2026-11-18): live on demo333 with the local models, Claude, Codestral, the per-subject limit, OpenTelemetry, the fallback (proven live 2026-11-18) and the SaaS tools rule (live 2026-11-18); left: the Redis idle-timeout fix live (the first call after an idle hour got 503)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-291](wp-291-install-openshift-pipelines-and-build-praxis-ai-from-source.md)
 - **Related:** [ADR-0620](../../adr/0620-build-third-party-images-from-source-with-openshift-pipelines-and-push-them-to-quay-io.md)
@@ -141,10 +141,32 @@ The owner gave the go to turn on SaaS, the per-subject limit and OpenTelemetry (
 
   The re-run on demo333 ([evidence](../evidence/wp-292-fallback-live-2026-11-18.md), `26b7b2ec`) answered every blocked
   call through the direct step, in 14 s at most.
-- **First call after an idle night.** The re-run's baseline call got 503 with an empty body in 1.1 s. Praxis logged
+- **First call after an idle hour.** The re-run's baseline call got 503 with an empty body in 1.1 s. Praxis logged
   `token_rate_limit` "reserve" on `shared_kv` failing with "unavailable", then "admission backend failed, failing
-  closed". It is the only such failure in 12 h of logs, on the first call after about eight idle hours, and the next
-  calls passed. A dropped idle Redis connection is the likely cause, not yet confirmed. Open.
+  closed". It was the only such failure in 12 h of logs, on the first call after about eight idle hours, and the next
+  calls passed.
+  - **Cause.** Envoy's default TCP idle timeout, 1 h, on both sidecars. The praxis sidecar's TCP proxy to
+    `zuno-redis-master` had no `idle_timeout`, and neither had the Redis sidecar's inbound one. Redis itself never
+    closes an idle client (`timeout 0`). Praxis's token limit keeps one multiplexed Redis connection (fork source,
+    `filters/src/token_rate_limit/valkey/connection.rs`). It finds the connection closed only on the next call: that
+    reservation fails, the filter fails closed, then drops the connection, and the call after reconnects. So every pause
+    of more than an hour cost the next call, not only a night.
+  - **Confirmed live, 2026-11-18.** No Praxis-to-Redis bytes from 08:13:20Z to 09:15:31Z (sidecar counters unchanged).
+    The first call at 09:15:39Z got 503, empty body, 1.1 s, with the same two log lines. The second call got 200.
+  - **Fix.** The idle timeout is off on both sides, and the fail-closed rule is kept.
+    - `praxis-redis-idle`, a DestinationRule of the praxis chart, applies to the praxis pod only: `tcp.idleTimeout: 0s`,
+      no tls, so the mesh's automatic mutual TLS is unchanged.
+    - `zuno-redis-inbound-idle`, an EnvoyFilter of the redis chart in `zuno-auth`, applies to the Redis pods and port
+      6379 only: it merges `idle_timeout: 0s` into the inbound TCP proxy. A Sidecar with
+      `inboundConnectionPool.tcp.idleTimeout: 0s` was tried first (`12669efb`). Istio 1.30 put that value on the
+      inbound cluster's HTTP idle timeout and left the TCP proxy at 1 h, seen in the Redis sidecar's `config_dump`. The
+      supported knob, the proxy metadata `IDLE_TIMEOUT`, needs a pod annotation and so a Redis restart. The owner chose
+      the EnvoyFilter, which needs no restart. It must be checked after every Istio upgrade, because Istio ignores an
+      EnvoyFilter whose match no longer applies.
+
+    Both were validated by a server-side dry run before the push. The other options were `backend.on_failure: open`,
+    which would turn the limit off silently during a real Redis outage, and a retry in Praxis itself (upstream, after
+    the demo).
 - **Workstation entry.** `praxis.<domain>` on `zuno-agent-gateway` is live (`e4d18370`, WP-298 step 0).
 - **Tools on SaaS models** ([ADR-0619 update of 2026-11-18](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
   The SaaS route ends with an OPA step, `files/saas-no-tools.rego`. Proven on the pinned image

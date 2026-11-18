@@ -95,3 +95,9 @@ altGatewayPeers:
     enabled: false
     namespace: zuno-ai-gateways
     podName: praxis
+
+# WP-292 (2026-11-18): the Redis sidecar's inbound TCP idle timeout (EnvoyFilter on its TCP proxy; "0s" disables it).
+# Envoy's default, 1 h, closed a client's idle connection although Redis itself never does (timeout 0): Praxis's token
+# limit then failed its next call closed with 503. Its own sidecar has the same setting (gitops/charts/praxis).
+istio:
+  inboundIdleTimeout: 0s

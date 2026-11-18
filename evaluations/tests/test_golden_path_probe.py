@@ -74,6 +74,12 @@ class Models(unittest.TestCase):
         self.assertEqual(g.pick_model(ids, "chat"), "zuno.auto")
         self.assertEqual(g.pick_model(ids, "code"), "zuno.zuno-code")
 
+    def test_pick_wesh_never_taken_for_the_default(self):
+        ids = ["auto", "zuno-code", "zuno-wesh"]
+        self.assertEqual(g.pick_model(ids, "wesh"), "zuno-wesh")
+        self.assertEqual(g.pick_model(["zuno-wesh", "zuno-code"], "chat"), None)
+        self.assertIsNone(g.pick_model(["auto", "zuno-code"], "wesh"))
+
     def test_missing_code_model(self):
         self.assertIsNone(g.pick_model(["auto"], "code"))
 
@@ -311,7 +317,7 @@ class Aggregate(unittest.TestCase):
         self.assertIn("FAIL (dify)", g.render(results))
 
     def test_every_moment_has_a_probe(self):
-        self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "dify", "kagent",
+        self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "zuno-wesh", "dify", "kagent",
                                          "openclaw", "lightspeed", "tools", "guardrails", "trace", "delegation-approval",
                                          "world-model", "blender"})
         self.assertLess(list(g.PROBES).index("unifai-tekos"), list(g.PROBES).index("trace"))

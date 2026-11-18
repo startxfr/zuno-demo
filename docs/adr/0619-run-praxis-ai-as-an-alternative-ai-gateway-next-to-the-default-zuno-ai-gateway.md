@@ -178,6 +178,24 @@ settles two points of clause 4.
 The spike also counted many JWKS fetches. The fetch rate is measured in WP-292 before Praxis serves an audience.
 
 
+## Update 2026-11-17 (owner request): one model, "Zuno wesh", on the default gateway, to compare with Praxis
+
+Clause 1 (Zuno stays the default, its routing is not changed) is lifted by the owner's request for **one** change, and
+only this one. Open WebUI lists the model `praxis.qwen3.5-9b-wesh` through Praxis, and the owner wants the same model
+through the default path, next to "Zuno Code", to compare the two side by side.
+
+- The ai-gateway declares a second model alias, `zuno-wesh=wesh:Zuno wesh`
+  (`toolMarker.modelTaskAliases`, ADR-0596). It selects the task `wesh` of the client `open-webui`, whose
+  `models.preferred` is the role `specialized` (the wesh fine-tune). The routing itself is generated from the agents
+  release, as for `zuno-code`. Nothing else of the default gateway changes: quotas, floors, guardrails and the other
+  models are as they were.
+- The comparison found the cause of the odd symbols the owner saw on `praxis.qwen3.5-9b-wesh`, and it is not Praxis.
+  The wesh export carries no sampling defaults, so a client that sends none (Open WebUI) sampled at temperature 1.0
+  over the whole vocabulary: 6 answers of 32 held CJK tokens on vLLM itself, 0 of 32 with temperature 0.7, `top_k` 20
+  and `top_p` 0.95. The fine-tune also never closes the template's `<think>`, so the reasoning parser filed the answer
+  under `reasoning`. The models chart now sets `--override-generation-config` and
+  `--default-chat-template-kwargs '{"enable_thinking":false}'` on this model, as it already did for `qwen3.5-9b`.
+
 ## Update 2026-11-18 (WP-292): a SaaS model gets no tools and no tool results through Praxis
 
 The Consequences keep the C3 rule by sending only C1 content through an alternative gateway. Open WebUI turns the Zuno
