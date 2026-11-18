@@ -202,6 +202,8 @@ class Settings(unittest.TestCase):
         self.assertEqual(env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1")
         self.assertTrue(example["skipWebFetchPreflight"])
         self.assertLess(int(env["CLAUDE_CODE_API_KEY_HELPER_TTL_MS"]), 900 * 1000)   # under the 900 s access token
+        # No system message after the first turn: the Qwen chat templates refuse it (400, live 2026-11-18).
+        self.assertEqual(env["CLAUDE_CODE_MODEL_CAPABILITIES"], "-mid_conv_system")
 
 
 if __name__ == "__main__":

@@ -100,6 +100,7 @@ refresh token.
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | No auto-update, telemetry, error reporting, feedback or release notes: no call outside the gateway. |
 | `skipWebFetchPreflight` | The WebFetch tool's domain check calls `api.anthropic.com` otherwise. |
 | `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` | Strips pre-release `anthropic-beta` headers and fields that a translating gateway may refuse. |
+| `CLAUDE_CODE_MODEL_CAPABILITIES` | `-mid_conv_system`. Claude Code 2.1.325 sends its environment block as a second `system` message after the first user turn. The chat templates of the Qwen models accept a system message only at the start: `400 System message must be at the beginning`, live 2026-11-18. With this setting, Claude Code puts the block in the user turn as a `<system-reminder>`. |
 
 Model discovery (`GET /v1/models`) is off by default in Claude Code; `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`
 turns it on, and the entry passes it.

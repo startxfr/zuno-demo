@@ -136,3 +136,11 @@ did not catch it. The spike of WP-292 had no router, and there the translation w
 credential file watcher was removed, because the workstation's inotify limit was reached.
 
 **Not yet proven:** the live sign-in and the coding task after the roll.
+
+**Second error after the fix (22:53):** `API Error: 400 System message must be at the beginning`.
+- **Cause:** Claude Code 2.1.325 sends its environment block as a second `system` message, placed after the first
+  user turn, and the Qwen chat template refuses a system message anywhere but first.
+- **Fix:** the client setting `CLAUDE_CODE_MODEL_CAPABILITIES=-mid_conv_system`, added to `settings.example.json`
+  and to the README table. Claude Code then puts the block in the user turn as a `<system-reminder>`.
+- **Checked locally:** through the same Praxis rig, the request reaches the model as `system`, then `user`, with the
+  21 tools in `function` form.
