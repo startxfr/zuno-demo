@@ -103,12 +103,14 @@ refresh token.
 | `CLAUDE_CODE_MODEL_CAPABILITIES` | `-mid_conv_system`. Claude Code 2.1.325 sends its environment block as a second `system` message after the first user turn. The chat templates of the Qwen models accept a system message only at the start: `400 System message must be at the beginning`, live 2026-11-18. With this setting, Claude Code puts the block in the user turn as a `<system-reminder>`. |
 | `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `8192` and `32768`, the window of `qwen3.6-27b-instruct`. Unset, Claude Code asks 32000 output tokens for a model it does not know, and vLLM refuses: `maximum context length is 32768 tokens`, live 2026-11-18. The context setting lets auto-compact act before the window is full. |
 | `permissions.deny` | Every tool but `Bash`, `Read`, `Edit` and `Write`. With all 21 tools, Claude Code's base prompt is about 20k tokens, most of the 32k window; with these four it is about 4k, and each turn is faster on a 27B model. |
+| `permissions.defaultMode` | `default`: Claude Code asks before it runs a command. Its "Auto" mode asks the model to judge each command first, and that request got a 400 from vLLM (live 2026-11-18), so the command was refused. In the VS Code extension, `claudeCode.initialPermissionMode` is `default` too. |
 
 Model discovery (`GET /v1/models`) is off by default in Claude Code; `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`
 turns it on, and the entry passes it.
 
 ## Limits
 
+- **A failed tool ends the turn.** Praxis refuses to translate a `tool_result` with `is_error: true` (a command that exits non-zero, a refused permission, a missing file): `400 tool_result requires string tool_use_id and text content`. The conversation is then stuck on that 400: start a new one. In front of an audience, accept every permission and use a task whose commands succeed. The fix belongs in Praxis's translator (an error text instead of a refusal).
 - Pinning every alias to a local model keeps the default choices local. It does not stop a person from typing a
   SaaS model's full name in `/model`. Praxis holds the Anthropic key (ADR-0619 clause 3), so only Praxis can refuse
   SaaS models for the `claude-code` client. That rule belongs to Praxis's configuration (WP-292), not to this client.

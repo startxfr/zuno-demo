@@ -153,3 +153,18 @@ tokens`.
   model's window. They also deny every tool but `Bash`, `Read`, `Edit` and `Write`.
 - **Checked:** a request captured with these settings carries four tools, `max_tokens` 8192 and 15 KB, about 4k
   tokens.
+
+**After these fixes (23:17–23:19):**
+- **What works:** `pong`, a short conversation, and the coding task up to the two `Write` calls. `fib.py` and
+  `test_fib.py` were written through Praxis to `qwen3.6-27b-instruct`.
+- **What failed:** the `Bash` call that runs the test.
+  - Claude Code was in its "Auto" permission mode, which first asks the model whether the command is safe. That
+    request got 400 from vLLM, so Claude Code refused the command.
+  - It then sent the refusal as a `tool_result` with `is_error: true`. Praxis refuses to translate such a result, by
+    design (its test `tool_result_error_is_rejected`), and answered 400 `tool_result requires string tool_use_id and
+    text content`.
+- **Settings now:**
+  - `permissions.defaultMode: default`, and `claudeCode.initialPermissionMode: default` in the extension, so
+    Claude Code asks the presenter before it runs a command.
+  - Limit: any failed tool still ends the turn. Fixing that needs a change in Praxis's translator and a rebuild of
+    the image, after the 2026-11-24 demo.

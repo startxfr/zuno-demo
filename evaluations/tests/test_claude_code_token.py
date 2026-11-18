@@ -210,6 +210,8 @@ class Settings(unittest.TestCase):
         for tool in ("Bash", "Read", "Edit", "Write"):
             self.assertNotIn(tool, example["permissions"]["deny"])
         self.assertIn("Agent", example["permissions"]["deny"])
+        # Not the "Auto" mode: its safety check is a model request that vLLM refused (live 2026-11-18).
+        self.assertEqual(example["permissions"]["defaultMode"], "default")
 
 
 if __name__ == "__main__":
