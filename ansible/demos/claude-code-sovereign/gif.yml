@@ -1,0 +1,32 @@
+---
+# claude-code-sovereign: the cut list of its GIF (ADR-0618, WP-304), read by platform/demo/gif.py with
+# `make demo gif claude-code-sovereign`. No recorder take: Claude Code runs on the presenter's workstation, outside
+# any browser or cluster terminal. The owner recorded the whole 5-minute flow with GNOME's screen recorder on
+# 2026-11-18 at 23:54:32 (3 min 34 s, 1920x1080) and asked for the GIF to be cut from it (2026-11-19).
+# original ~/Videos/Capture d’écran vidéo de 18-11-2026 23:54:32.webm
+#          a599bbe1cd508acee9353d87f8cab586e39a70252d1faca07a74660c51e3f826
+# The take is assembled by hand in the cache (markers.json `kind: assembled`), never in git: each still is listed in
+# `source` with the original's SHA-256 and its own, which gif.py checks before it cuts.
+# Review: one frame every 3 s, then the chosen frames at full size. Left out:
+#   0:15        Chrome's password manager opens its list of saved accounts on the Keycloak page;
+#   1:21        a file dialog shows the owner's home folders;
+#   1:51-2:12   a first attempt, interrupted when the model menu was opened.
+# Masked (grey boxes): the user and host of the shell prompt, the home-directory paths (editor breadcrumbs, the helper
+# path in settings.json, the working folder in /status), the password field, and the window behind VSCodium. The
+# device code (FKZI-HRZC) is shown: it was single-use and expired minutes later. Each still is 1600x900 (the
+# Keycloak ones cropped closer, then scaled up, so their text stays readable); `how` in markers.json says which.
+# Each moment carries the time of its row in the page's 5-minute table (rewritten after the rehearsal, 2026-11-19).
+target_seconds: [40, 60]
+width: 1280
+fps: 10
+moments:
+  - {still: login, hold: 4, step: "0:00", caption: "0:00  Sign in: the helper asks Keycloak for a one-time code"}
+  - {still: signin, hold: 3.5, step: "0:15", caption: "0:15  The presenter signs in as ai-dev-01"}
+  - {still: grant, hold: 3.5, step: "0:15", caption: "0:15  Keycloak asks consent for the claude-code client"}
+  - {still: success, hold: 2.5, step: "0:15", caption: "0:15  Signed in: no API key is stored on the laptop"}
+  - {still: signedin, hold: 3, step: "0:15", caption: "0:15  The helper keeps the sign-in and mints access tokens"}
+  - {still: settings, hold: 6, step: "0:45", caption: "0:45  Claude Code points at Praxis, with local models only"}
+  - {still: status, hold: 5, step: "1:15", caption: "1:15  /status: Praxis, apiKeyHelper, qwen3.6-27b-instruct"}
+  - {still: write, hold: 5, step: "2:30", caption: "2:30  qwen3.6-27b writes fib.py; each write is approved"}
+  - {still: bash, hold: 4, step: "2:30", caption: "2:30  The test runs on the laptop, once approved"}
+  - {still: result, hold: 7, step: "2:30", caption: "2:30  All 4 tests pass: a coding agent on our own model"}

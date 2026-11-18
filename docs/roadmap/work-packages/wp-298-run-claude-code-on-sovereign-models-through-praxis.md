@@ -1,6 +1,6 @@
 # WP-298: Run Claude Code on sovereign models through Praxis
 
-- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant); left: step 4 (the `claude-code` experience-client declaration in an agents release) and the workstation coding task of the acceptance
+- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant), and the workstation coding task of the acceptance passed live on 2026-11-18; left: step 4 (the `claude-code` experience-client declaration in an agents release)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
@@ -106,3 +106,77 @@ Repo work done; nothing is applied to the cluster.
 - **Seen on the way.** With `max_tokens: 20` the answer has no text block: the model's reasoning uses the whole
   budget, and the translation drops the reasoning. With 400 the answer is `pong`, in 6 s and 108 output tokens.
   Claude Code asks for far more, so it does not meet this.
+
+## 2026-11-18: Claude Code's first real request reached vLLM untranslated
+
+The owner's dry run on the workstation, as ai-dev-01, went through sign-in and `/status`. The `/status` screen showed
+the Praxis base URL, `apiKeyHelper` and `qwen3.6-27b-instruct`. Then the first prompt failed with `API Error: 400
+25 validation errors`, `body.tools[0].function: Field required`: vLLM had received Claude Code's tools in the
+Anthropic shape. The Praxis log shows the request on the `maas` step, which answered 400.
+
+**Cause.** `anthropic_messages_to_chat_completions` rewrites the request body only once an upstream is selected
+(`on_selected_upstream_request_body`). In our chart it sat in the main chain, but the upstreams are selected inside the
+router steps (`maas`, then `direct`), so it never rewrote a body. Plain prompts still passed, because vLLM reads a
+text-only Messages body as a Chat Completions one. The tests of 2026-11-17 and 11-18 used only such prompts, so they
+did not catch it. The spike of WP-292 had no router, and there the translation worked.
+
+**Reproduced and fixed locally:**
+- **Setup:** the deployed image (`e319e228…`), the live configuration with only the cluster-specific filters
+  replaced, and a real Claude Code 2.1.325 request (21 tools, `stream: true`, `thinking: adaptive`) captured against
+  a local stub.
+- **Before:** the body reached the stub unchanged.
+- **After:** the filter sits in each step, just before the step's `load_balancer` (`praxis.messagesToChat`). The
+  request arrives in Chat Completions form, with `tools[].function`, `max_completion_tokens`, `reasoning_effort` and
+  `stream_options`. This holds on the `maas` step and on the `direct` step after a MaaS 503.
+- **Streamed answers:** text and tool calls are translated back to Anthropic events (`text_delta`, `tool_use`,
+  `input_json_delta`, `stop_reason: tool_use`).
+- **OpenAI requests** on `/v1/chat/completions` are untouched on both steps.
+
+`praxis-ai --validate` accepts the rendered configuration, as it accepts the live one. For this check, the
+credential file watcher was removed, because the workstation's inotify limit was reached.
+
+**Not yet proven:** the live sign-in and the coding task after the roll.
+
+**Second error after the fix (22:53):** `API Error: 400 System message must be at the beginning`.
+- **Cause:** Claude Code 2.1.325 sends its environment block as a second `system` message, placed after the first
+  user turn, and the Qwen chat template refuses a system message anywhere but first.
+- **Fix:** the client setting `CLAUDE_CODE_MODEL_CAPABILITIES=-mid_conv_system`, added to `settings.example.json`
+  and to the README table. Claude Code then puts the block in the user turn as a `<system-reminder>`.
+- **Checked locally:** through the same Praxis rig, the request reaches the model as `system`, then `user`, with the
+  21 tools in `function` form.
+
+**Third error (23:05):** vLLM answered `maximum context length is 32768 tokens. However, you requested 32000 output
+tokens`.
+- **Cause:** Claude Code does not know the model, so it asks 32000 output tokens. Its base prompt with all 21 tools
+  is about 20k tokens (73 KB).
+- **Fix:** the settings now set `CLAUDE_CODE_MAX_OUTPUT_TOKENS=8192` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=32768`, the
+  model's window. They also deny every tool but `Bash`, `Read`, `Edit` and `Write`.
+- **Checked:** a request captured with these settings carries four tools, `max_tokens` 8192 and 15 KB, about 4k
+  tokens.
+
+**After these fixes (23:17–23:19):**
+- **What works:** `pong`, a short conversation, and the coding task up to the two `Write` calls. `fib.py` and
+  `test_fib.py` were written through Praxis to `qwen3.6-27b-instruct`.
+- **What failed:** the `Bash` call that runs the test.
+  - Claude Code was in its "Auto" permission mode, which first asks the model whether the command is safe. That
+    request got 400 from vLLM, so Claude Code refused the command.
+  - It then sent the refusal as a `tool_result` with `is_error: true`. Praxis refuses to translate such a result, by
+    design (its test `tool_result_error_is_rejected`), and answered 400 `tool_result requires string tool_use_id and
+    text content`.
+- **Settings now:**
+  - `permissions.defaultMode: default`, and `claudeCode.initialPermissionMode: default` in the extension, so
+    Claude Code asks the presenter before it runs a command.
+  - Limit: any failed tool still ends the turn. Fixing that needs a change in Praxis's translator and a rebuild of
+    the image, after the 2026-11-24 demo.
+
+**Acceptance coding task: PASS (2026-11-18, 23:33–23:35 local, 22:33–22:35Z).**
+- **Setup:** owner's workstation, VSCodium with the Claude Code extension 2.1.325, persona ai-dev-01, model
+  `qwen3.6-27b-instruct`, permission mode `default`.
+- **`/status`:** the Praxis base URL, `apiKeyHelper` for the auth token and the API key, "Auto mode server:
+  Disabled".
+- **The task:** Claude Code wrote `fib.py` (an iterative `fibonacci(n)`, `ValueError` for a negative input) and
+  `test_fib.py`, ran `python3 -m unittest` (`Ran 3 tests`, all passing) and summarised.
+- **Praxis log:** every sub-request of the run is on the `maas` step with status 200, and there is no translation
+  error. No SaaS host was called.
+- **Fixes this needed:** 8e209a9d (the translation inside the router steps, rolled on demo333), 2efc90e4,
+  ae27952a and 54b545ee (client settings).

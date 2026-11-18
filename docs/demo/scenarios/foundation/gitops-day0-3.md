@@ -179,8 +179,9 @@ Run the 5-minute version, then:
   golden-path run.
 - **Argo CD is not paused during a freeze** (ADR-0605, rejected alternative): self-heal keeps repairing drift. The
   freeze is a no-push rule.
-- A `recovery` check component was added on `devel` on 2026-11-13 (`24da7de3`), after the base of this page. It is not
-  described here.
+- A `recovery` check component (`make d3 check recovery`, `platform/recovery/check_recovery.py`) was added on
+  2026-11-12, after the base of this page. It is read-only and asks whether the cluster is back after a node drain or a
+  reboot. It is not one of this demo's steps.
 
 ## Appendix A - HLD
 

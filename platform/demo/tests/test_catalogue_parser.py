@@ -81,7 +81,7 @@ class RealPages(unittest.TestCase):
     def test_step_counts(self):
         k5 = sum(len(p.steps("5")) for p in self.pages.values())
         k15_own = sum(len(p.steps15_own) for p in self.pages.values())
-        self.assertEqual(k5, 177)
+        self.assertEqual(k5, 179)   # claude-code-sovereign: 8 rows after its rehearsal (2026-11-19), was 6
         self.assertEqual(k15_own, 304)
 
     def test_fifteen_minute_version_is_cumulative(self):
