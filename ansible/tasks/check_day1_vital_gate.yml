@@ -1,0 +1,96 @@
+---
+# ADR-0352 clause 10: the Day-0 Tier-A components are vital. Day 1 does not start until each one passes its functional
+# assertion, whatever its mode: argocd, vault, external_secrets, cert_manager, postgresql, keycloak, and aap with
+# aap_config.
+#
+# The assertion is each role's own precheck (record-state, never-fail). In internal mode that means the Applications are
+# Synced/Healthy plus the CR readiness. In external mode it means the clause-7 assertions that the external-capable
+# prechecks run (keycloak, external_secrets, cert_manager today). The prechecks keep recording; this task is what blocks.
+# It is a hard gate on the Day-1 entry point, distinct from `make d0 check`, which reports and never fails.
+#
+# Included by ansible/playbooks/day1_install.yml before any component, for `all` and for a single component alike.
+# Break-glass: `-e zuno_day1_vital_gate=false` skips it with a warning. Use it only for a rehearsal on a cluster whose
+# Day 0 is knowingly partial; the skip is printed in the run.
+#
+# Each vital component's state lands in `<role>_state_installed` (ansible/tasks/record_state.yml). The prechecks'
+# findings go to this task's own list, so a Day-0 advisory finding is shown once here and never reported as a Day-1
+# finding.
+- name: "day1-gate | break-glass: the vital-component gate is skipped (ADR-0352 clause 10)"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_day1_vital_gate=false: Day 1 starts WITHOUT checking that argocd, vault, external_secrets, cert_manager,
+      postgresql, keycloak and aap are functional. A Day-1 component that needs one of them will fail later and
+      less clearly.
+  when: not (zuno_day1_vital_gate | default(true) | bool)
+
+- name: "day1-gate | check the vital Day-0 components before Day 1 (ADR-0352 clause 10)"
+  when: zuno_day1_vital_gate | default(true) | bool
+  block:
+    - name: "day1-gate | the vital components and a clean finding list"
+      ansible.builtin.set_fact:
+        _day1_gate_components: >-
+          {{ zuno_day1_vital_components
+             | default(['argocd', 'vault', 'external_secrets', 'cert_manager', 'postgresql', 'keycloak', 'aap',
+                        'aap_config']) }}
+        _day1_gate_saved_findings: "{{ blocked_findings | default([]) }}"
+        blocked_findings: []
+        _day1_gate_failed: []
+
+    - name: "day1-gate | a state report for the prechecks to write into"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
+
+    - name: "day1-gate | run the precheck of each vital component"
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: precheck
+      loop: "{{ _day1_gate_components }}"
+      loop_control:
+        label: "{{ item }}"
+      vars:
+        # Findings recorded here point at the Day-0 verbs (make d0 ...), where the fix belongs.
+        zuno_day: d0
+
+    - name: "day1-gate | list the vital components that are not functional"
+      ansible.builtin.set_fact:
+        _day1_gate_failed: "{{ _day1_gate_failed + [item] }}"
+      loop: "{{ _day1_gate_components }}"
+      loop_control:
+        label: "{{ item }}"
+      when: not (lookup('ansible.builtin.vars', item ~ '_state_installed', default=false) | bool)
+
+    - name: "day1-gate | keep the prechecks' findings out of the Day-1 run"
+      ansible.builtin.set_fact:
+        _day1_gate_findings: "{{ blocked_findings }}"
+        blocked_findings: "{{ _day1_gate_saved_findings }}"
+
+    - name: "day1-gate | advisory findings on vital components (they do not block)"
+      ansible.builtin.debug:
+        msg: "{{ ['Day-0 advisory findings (' ~ (_day1_gate_findings | length) ~ '), Day 1 continues:'] + _day1_gate_lines }}"
+      vars:
+        _day1_gate_lines: >-
+          {%- set lines = [] -%}
+          {%- for f in _day1_gate_findings -%}
+          {%- set _ = lines.append('[' ~ (f.component | default('?')) ~ '] ' ~ (f.resource | default('?')) ~ ': '
+                                   ~ (f.state | default('?')) ~ ' - ' ~ (f.solution | default(''))) -%}
+          {%- endfor -%}
+          {{ lines }}
+      when:
+        - _day1_gate_failed | length == 0
+        - _day1_gate_findings | length > 0
+
+    - name: "day1-gate | refuse to start Day 1: a vital Day-0 component is not functional"
+      ansible.builtin.fail:
+        msg: |-
+          Day 1 is refused (ADR-0352 clause 10): {{ _day1_gate_failed | map('replace', '_', '-') | join(', ') }}
+          {{ 'is' if _day1_gate_failed | length == 1 else 'are' }} not functional. Nothing of Day 1 has been applied.
+
+          {% for f in _day1_gate_findings | selectattr('component', 'in', _day1_gate_failed | map('replace', '_', '-') | list) %}
+          [{{ f.component }}] {{ f.resource }}
+            STATE:    {{ f.state }}
+            CAUSE:    {{ f.cause | default('no message reported') }}
+            SOLUTION: {{ f.solution | default('inspect the resource') }}
+            AUTO-FIX: {{ f.auto_fix | default('make d0 reconcile ' ~ f.component) }}
+          {% endfor %}
+          Run make d0 check all for the full report, fix the component (make d0 reconcile <component>), then re-run.
+          Break-glass for a rehearsal on a knowingly partial Day 0: EXTRA_VARS='-e zuno_day1_vital_gate=false'.
+      when: _day1_gate_failed | length > 0

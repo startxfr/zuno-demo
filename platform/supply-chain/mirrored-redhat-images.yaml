@@ -1,0 +1,62 @@
+# ADR-0612 addendum 2026-11-14 / WP-261 family (e): the closed list of large Red Hat product images that the internal Quay
+# serves, so that a replaced node does not pull them from registry.redhat.io (12-50 MB/s measured on demo333 on 2026-11-13,
+# NeMo Guardrails about 9 min; the internal Quay served 51-103 MB/s the same night). Lots 1 and 2 of the owner's choice of
+# 2026-11-14. Nothing is mirrored that this file does not name; OpenShift release images and the other product images stay
+# on the cluster pull secret.
+#
+# Fields: source (registry.redhat.io/<repository>), digest (the one the operator runs, read from the pods), pin (always
+# digest: an ImageDigestMirrorSet redirects digest pulls only), signature (Red Hat signs on its own lookaside server, not in
+# the registry, so there is nothing to copy beside the image), size (on-disk size on a node, informative), reason.
+# Several digests of one repository may be listed (an operator upgrade adds one); remove the old one only after the
+# upgrade. `mirror_redhat_images.py --drift` lists the running digests that are missing here.
+#
+# Mirror path: <registry host>/zuno/redhat/<repository>. The repositories are PRIVATE: never make them public.
+images:
+  - source: registry.redhat.io/rhoai/odh-trustyai-nemo-guardrails-server-rhel9
+    digest: sha256:a24c80377da7555775d46c737a992e571e2fd9977f0811b0b8fb36906b575636
+    pin: digest
+    signature: red-hat-lookaside
+    size: 8.9 GB
+    reason: lot 1 - NeMo Guardrails server (zuno-ai-run nemo-guardrails), golden-path guardrails moment
+  - source: registry.redhat.io/rhoai/odh-ogx-core-rhel9
+    digest: sha256:a83fa2d57907b18fe73b2c1afc383bfa3965fcc51c5e097226f46b3201d48a24
+    pin: digest
+    signature: red-hat-lookaside
+    size: 5.5 GB
+    reason: lot 1 - OGX (redhat-ods-applications, zuno-ai-run, zuno-playground)
+  - source: registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9
+    digest: sha256:2318369ab1c83013228371694016836c058e0b891f405fa0ae8af83a54e7ba39
+    pin: digest
+    signature: red-hat-lookaside
+    size: 3.1 GB
+    reason: lot 1 - AAP controller execution environment (zuno-aap aap-controller-ee, init-receptor)
+  - source: registry.redhat.io/rhoai/odh-built-in-detector-rhel9
+    digest: sha256:e7667a0f9404b3c2e107c8151cbf82bae079571236e0de6762b7268252941593
+    pin: digest
+    signature: red-hat-lookaside
+    size: 1.4 GB
+    reason: lot 1 - guardrails built-in detector (zuno-ai-run zuno-guardrails-smoke-detectors), golden-path guardrails moment
+  - source: registry.redhat.io/rhoai/odh-mlflow-rhel9
+    digest: sha256:b076c093f1342d5a2d2910b0ab499493cba2a028f21ca8af0bd99ba1238d3e01
+    pin: digest
+    signature: red-hat-lookaside
+    size: 1.2 GB
+    reason: lot 1 - MLflow (redhat-ods-applications mlflow), 23 MB/s from the source on 2026-11-13
+  - source: registry.redhat.io/ansible-automation-platform-27/controller-rhel9
+    digest: sha256:0abd6d86c3cb60d3434381260bebe98575c340b0b4d9baecea31290484f4f6d8
+    pin: digest
+    signature: red-hat-lookaside
+    size: 1.0 GB
+    reason: lot 1 - AAP controller web, task and rsyslog (zuno-aap)
+  - source: registry.redhat.io/ansible-automation-platform-27/hub-rhel9
+    digest: sha256:f8fba13f908d9a90d4c3de0f1ef62edec66ceaada0495de258732a9a217938f3
+    pin: digest
+    signature: red-hat-lookaside
+    size: 0.7 GB
+    reason: lot 1 - AAP automation hub api, content and worker (zuno-aap), 14.5 MB/s from the source on 2026-11-13
+  - source: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9
+    digest: sha256:adbe513585a026c8392e27e7a8f3618d4edb5a90a8ec2bb79914765cb9e929e4
+    pin: digest
+    signature: red-hat-lookaside
+    size: 9.6 GB
+    reason: lot 2 - OpenShift Lightspeed offline knowledge portal (openshift-lightspeed rhokp)

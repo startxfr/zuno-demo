@@ -39,8 +39,9 @@ WORKDIR /src
 COPY platform/okf/install_release_tools.py platform/okf/release_cache.py platform/okf/agents.lock ./platform/okf/
 COPY platform/okf/sigstore ./platform/okf/sigstore
 COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/
+COPY platform/python/bootstrap/pyyaml/requirements.txt /tmp/bootstrap-pyyaml.txt
 RUN python3 platform/okf/install_release_tools.py /src/bin \
-    && python3 -m pip install --no-cache-dir pyyaml==6.0.2 \
+    && python3 -m pip install --no-cache-dir --require-hashes -r /tmp/bootstrap-pyyaml.txt \
     && PATH="/src/bin:${PATH}" python3 platform/okf/release_cache.py > /src/release-path \
     && cp -r "$(cat /src/release-path)" /okf \
     && chmod -R a+rX /okf
@@ -50,8 +51,9 @@ FROM ${BASE_IMAGE} AS base
 # ADR-0115 (WP-04): patch known HIGH CVEs baked into the upstream base image
 # at build time - apt upgrade picks up Debian's patched util-linux/bsdutils
 # (CVE-2026-53615), pip upgrade picks up patched pip/setuptools/wheel.
+COPY platform/python/bootstrap/tools/requirements.txt /tmp/bootstrap-tools.txt
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
+    pip install --no-cache-dir --require-hashes --upgrade -r /tmp/bootstrap-tools.txt
 
 WORKDIR /app
 

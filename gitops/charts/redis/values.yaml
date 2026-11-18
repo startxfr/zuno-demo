@@ -86,3 +86,12 @@ redis:
   # security-relevant backing service.
   networkPolicy:
     enabled: false
+
+# ADR-0619 clause 2 / WP-292: the alternative AI gateway Praxis AI (namespace zuno-ai-gateways) keeps its session
+# store here as the ai-gateway does: its pod is admitted on 6379 by templates/networkpolicy.yaml. Off by default:
+# with it off the render is the one of before; the Praxis release turns it on (same key as the models chart).
+altGatewayPeers:
+  praxis:
+    enabled: false
+    namespace: zuno-ai-gateways
+    podName: praxis

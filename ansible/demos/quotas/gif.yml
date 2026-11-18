@@ -1,0 +1,25 @@
+---
+# quotas: the first cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Written BEFORE the first
+# scout and take: tune it with `make demo gif quotas` once a take exists.
+# `make demo record quotas` takes the 5-minute version in ONE browser as ai-ops-01 (option A of 2026-11-16: the chain
+# cuts one kind per GIF, so the page's own tables are read on GitHub, not in a terminal):
+# evaluations/browser/walkthroughs/quotas.mjs.
+# Markers written by the walkthrough, in order: login, classes, dashboard, panel, evidence, end. The sign-in is not in
+# the cut. `classes` and `evidence` are the page itself on its public GitHub address (branch devel), scrolled to the
+# class table and to the evidence of 2026-11-03; `panel` is panel 7 of "Five experiences" alone over the page, over
+# the last 24 hours. Row 4:00 is words. No count of tokens in a caption: the panel's figures change with each day.
+record_notice: >-
+  a recorded browser session as ai-ops-01: the quotas page read on its public GitHub address (branch devel, nothing
+  typed there) and one Grafana panel, "One group across the experiences: tokens (over range)", over the last 24
+  hours, read only, no prompt and no model call. The panel needs token spend within the last 24 hours, which the
+  page's Start makes (a changing unit: demo333 asks the owner for it); with none the take fails on "No data". The
+  Grafana sign-in may store one OAuth authorization for ai-ops-01 and closes Grafana's announcement (declared changes)
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: classes, hold: 8, step: "0:00", caption: "0:00  One token budget per person, set by its class"}
+  - {from: classes, to: dashboard, fit: 4, hold: 3, step: "1:00", caption: "1:00  One gateway counts every experience"}
+  - {from: dashboard, to: panel, fit: 4, hold: 9, step: "1:00", caption: "1:00  Tokens by group and experience, last 24 hours"}
+  - {from: panel, to: evidence, fit: 4, hold: 9, step: "2:30", caption: "2:30  3 November: the same 429 in every experience"}
+  - {still: end, hold: 4, step: "4:00", caption: "One person, one budget, whatever the screen"}

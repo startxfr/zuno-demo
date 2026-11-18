@@ -6,9 +6,9 @@ Application's own values, raw manifest directories as they are; the same
 hermetic rendering as platform/vault/check_secret_access.py) and fails when:
 
   1. a PeerAuthentication is rendered in a namespace other than zuno-data,
-     zuno-auth and zuno-ai-run (mTLS is targeted, not mesh-wide, and never in
+     zuno-auth, zuno-ai-run and zuno-ai-gateways (mTLS is targeted, not mesh-wide, and never in
      redhat-ods-*), or Ansible applies one outside the charts;
-  2. one of those three namespaces has no namespace-wide PeerAuthentication
+  2. one of those namespaces has no namespace-wide PeerAuthentication
      `default` (no selector) in mode PERMISSIVE or STRICT, or has several;
   3. a portLevelMtls entry is not PERMISSIVE, or a PeerAuthentication that has
      one carries no selector or no zuno.io/permissive-reason annotation (the
@@ -17,7 +17,7 @@ hermetic rendering as platform/vault/check_secret_access.py) and fails when:
      inherit the namespace mode, or a STRICT flip would silently skip it), or
      two of them in one namespace use the same selector (Istio applies the
      oldest one only);
-  5. zuno-ai-run or zuno-unifai has no EgressFirewall, or one whose last rule is
+  5. zuno-ai-run, zuno-unifai or zuno-ai-gateways has no EgressFirewall, or one whose last rule is
      not Deny 0.0.0.0/0, or that allows 0.0.0.0/0 (or ::/0), or that allows
      nothing;
   6. any EgressFirewall is not named `default` or is not alone in its namespace
@@ -45,9 +45,10 @@ import check_secret_access as csa  # noqa: E402  (shared hermetic rendering)
 REPO_ROOT = csa.REPO_ROOT
 
 # ADR-0602 / WP-224 decision 1: the only namespaces with a PeerAuthentication.
-MTLS_NAMESPACES = {"zuno-data", "zuno-auth", "zuno-ai-run"}
+# ADR-0619 clause 2 / WP-292: zuno-ai-gateways (the alternative AI gateways) joins them.
+MTLS_NAMESPACES = {"zuno-data", "zuno-auth", "zuno-ai-run", "zuno-ai-gateways"}
 # ADR-0602 / WP-224 decision 2: the namespaces that must have a deny-all egress.
-EGRESS_NAMESPACES = {"zuno-ai-run", "zuno-unifai"}
+EGRESS_NAMESPACES = {"zuno-ai-run", "zuno-unifai", "zuno-ai-gateways"}
 # A namespace whose firewall is switched off on purpose, pending its rehearsal:
 # accepted only with `egress.enabled: false` AND a non-empty
 # `egress.disabledReason` in the chart's values (printed on every run).

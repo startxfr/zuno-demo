@@ -1,0 +1,9 @@
+---
+# ai-gateway-sovereignty 3:30 (5-minute version, step 4 of the 15-minute sequence). Do: the classification floor of
+# every agent, from the generated file the gateway mounts, read from git (no path printed; the live ConfigMap is
+# shown at 6:00 of the 15-minute version). Run locally on 2026-11-16: 8 lines, arkos C3, tekos C1.
+- name: "ai-gateway-sovereignty 3:30 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "git show HEAD:gitops/charts/ai-gateway/files/classification-floors.generated.yaml | awk '/^  [a-z]+:$/{a=$1} /^    floor:/{print a, $2}'"

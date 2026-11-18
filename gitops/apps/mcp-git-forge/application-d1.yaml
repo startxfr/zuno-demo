@@ -20,8 +20,11 @@ spec:
         # WP-225 lot C, rollout step 3 (user's go 2026-11-07): verify the mcp-gateway's per-call assertion
         # (public half of Vault mcp/gateway-call-assertion). Required since 2026-11-09 (user's go): a call without a valid assertion
         # gets 401. The only caller is the mcp-gateway (NetworkPolicy), which signs every call and every schema read.
-        # WP-225 lot B (user's go 2026-11-07): the dev and ops groups reach github:startxfr/zuno-demo only; the
-        # groups the tool policy lets use git tools (consultant, board, cdp) keep every repository.
+        # WP-225 lot B (user's go 2026-11-07): the dev and ops groups reach github:startxfr/zuno-demo only.
+        # Post-demo item 4 (user decision 2026-11-11): the groups the tool policy lets use git tools (consultant,
+        # board, cdp) reach the startxfr repositories only (the token is a fine-grained, public, read-only one, so
+        # this narrows reads; writes are refused by GitHub anyway). sales, finance, adv and recrut have no git tool
+        # in the tool policy, so they have no entry.
         repositoryAllowlist:
           groups:
             ocp-ai-dev: ["github:startxfr/zuno-demo"]
@@ -29,13 +32,9 @@ spec:
             ocp-paas-dev: ["github:startxfr/zuno-demo"]
             ocp-paas-ops: ["github:startxfr/zuno-demo"]
             aap_ops: ["github:startxfr/zuno-demo"]
-            consultant: ["*"]
-            board: ["*"]
-            cdp: ["*"]
-            sales: ["*"]
-            finance: ["*"]
-            adv: ["*"]
-            recrut: ["*"]
+            consultant: ["github:startxfr/*"]
+            board: ["github:startxfr/*"]
+            cdp: ["github:startxfr/*"]
           scope: all
         callAssertion:
           required: true

@@ -50,6 +50,12 @@
           the runtime would leave it Pending.
       when: _world_model_gpu_dependent_present | bool
 
+    - name: "world-model-gpu | check the cascade deletes MachineSets only"
+      ansible.builtin.include_tasks: assert_cascade_only_machinesets.yml
+      vars:
+        world_model_gpu_app_obj: "{{ _world_model_gpu_apps.results[1].resources[0] }}"
+      when: _world_model_gpu_app_present | bool
+
     - name: "world-model-gpu | delete the node's Application (cascades to the MachineSet and the EC2 instance)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
       vars:
@@ -78,6 +84,10 @@
                      zuno_repo_root + '/gitops/apps/machines-world-model/application-d0.yaml')
               | from_yaml)['spec']['source']['helm']['values'] | from_yaml }}
         _world_model_gpu_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
+        # Every ADR-0614 singleton switch the chart knows (incident 2026-11-15).
+        _world_model_gpu_chart_infra_keys: >-
+          {{ ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/machines/values.yaml')
+              | from_yaml)['infraPlacement'] | default({})).keys() | list }}
 
     # g7e capacity comes and goes per zone: the Application declares one MachineSet per zone (replicas 0) and the
     # zones named by zuno_world_model_gpu_azs (else zuno_world_model_gpu_az, else "a") are scaled to 1.
@@ -128,7 +138,15 @@
           - _world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='name') | difference(world_model_gpu_machinesets) | length == 0
           - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | selectattr('replicas', 'equalto', 1) | list | length) >= 1
           - "'placeholder' not in (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | map(attribute='ami') | join(','))"
-        fail_msg: "The world-model values are not exactly one resolved MachineSet: {{ _world_model_gpu_values }}"
+          - not ((_world_model_gpu_values.spotWorkers | default({})).enabled | default(false) | bool)
+          # Each singleton switch listed and false: an unlisted key takes the chart's default (true on demo333).
+          - _world_model_gpu_chart_infra_keys | length > 0
+          - >-
+            _world_model_gpu_chart_infra_keys | difference((_world_model_gpu_values.infraPlacement | default({}))
+            | dict2items | rejectattr('value') | map(attribute='key') | list) | length == 0
+        fail_msg: >-
+          The world-model values must render the world-model MachineSets only, with every infraPlacement key
+          ({{ _world_model_gpu_chart_infra_keys | join(', ') }}) set to false: {{ _world_model_gpu_values }}
 
     - name: "world-model-gpu | apply the node's Application"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

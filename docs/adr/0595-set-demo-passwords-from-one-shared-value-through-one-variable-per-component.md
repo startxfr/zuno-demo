@@ -47,7 +47,7 @@ another value later without a refactoring.
 
 ## Alternatives considered
 
-- **Keep `secretdemerde` as a literal default in the repository:** simplest for a clone, but publishes the Keycloak admin
+- **Keep the shared demo password as a literal default in the repository:** simplest for a clone, but publishes the Keycloak admin
   password. Rejected for the admins; the persona literal of ADR-0349 is retired too, so one rule applies.
 - **A random fallback at each run:** the Vault seed would fix the first value, but every other reader of the variable
   (derived tokens, checks) would see a different one on each play.

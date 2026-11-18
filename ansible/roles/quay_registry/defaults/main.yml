@@ -1,0 +1,20 @@
+---
+zuno_quay_namespace: zuno-registry
+# Per-cluster (ansible/clusters/<cluster>.yml, ADR-0547): zuno_quay_s3_bucket, zuno_quay_s3_region.
+zuno_quay_s3_bucket: ""
+zuno_quay_s3_region: eu-central-1
+# The one-time key file written by roles/registry_bucket.
+zuno_quay_s3_key_file: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/{{ zuno_quay_s3_bucket }}-key.json"
+# ADR-0612 clause 4: Clair updater sets that run. Red Hat only = one egress host. Whether the operator merges a
+# clair-config.yaml from the config bundle is verified in the first canary (WP-248).
+zuno_quay_clair_updater_sets: [rhel-vex]
+# Bootstrap (tasks/bootstrap.yml): organisation, first admin and robots. validate_certs is true: the route carries the
+# cluster wildcard certificate (ACME, ADR-0211); set false only for a canary on the internal CA.
+zuno_quay_organization: zuno
+zuno_quay_admin_email: quayadmin@zuno.invalid  # Quay only needs a well-formed address
+zuno_quay_organization_email: registry@zuno.invalid  # must differ from the admin email
+zuno_quay_validate_certs: true
+# WP-261 family (e): put the zuno+pull robot for the registry route host in the global pull secret
+# (tasks/node_pull_secret.yml), so the nodes can read the PRIVATE Red Hat mirror repositories. Per-cluster switch, set in
+# ansible/clusters/<cluster>.yml with the owner's go; flip it before gitops redhatRedirects.enabled.
+zuno_quay_node_pull_secret: false

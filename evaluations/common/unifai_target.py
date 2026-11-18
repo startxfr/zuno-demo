@@ -604,3 +604,64 @@ def tempo_gateway_tool_invoked(
             time.sleep(3)
     except httpx.HTTPError as exc:
         raise UnifaiError(f"tempo unreachable: {exc}") from exc
+
+
+def tempo_gateway_model_calls(
+    run_id: str,
+    tempo_url: str,
+    *,
+    task: str = "",
+    wait_seconds: float = 30,
+    client: Optional[httpx.Client] = None,
+) -> List[Dict[str, Any]]:
+    """The ai-gateway's `model_call` spans of run `run_id`, in start order: which provider and model served each
+    model call of the turn, at which classification. Each item holds `provider`, `model`, `classification`,
+    `model_kind` (local or saas) and `task`. Pass `task` to keep the calls of one task only.
+
+    The ai-gateway records every call with the run id the operator puts in `X-Zuno-Run-Id` (the session id).
+    These spans are not always in the workflow's own trace, so they are searched by run id, like
+    `tempo_gateway_tool_invoked`. Returns [] when none appears within `wait_seconds`. Raises `UnifaiError`
+    when Tempo cannot be reached."""
+    http = client or httpx.Client(timeout=20)
+    base = tempo_url.rstrip("/")
+    conds = ['name="model_call"', f'span.zuno.run_id="{run_id}"']
+    if task:
+        conds.append(f'span.zuno.task="{task}"')
+    query = "{ " + " && ".join(conds) + " }"
+    deadline = time.monotonic() + wait_seconds
+    try:
+        while True:
+            now = int(time.time())
+            found = http.get(f"{base}/api/search", params={"q": query, "limit": 20, "start": now - 3600, "end": now + 60})
+            if found.status_code != 200:
+                raise UnifaiError(f"tempo search failed: {found.status_code}")
+            calls: List[Tuple[int, Dict[str, Any]]] = []
+            for item in found.json().get("traces") or []:
+                trace = http.get(f"{base}/api/traces/{item['traceID']}")
+                if trace.status_code != 200:
+                    continue
+                for batch in trace.json().get("batches", []):
+                    for scope in batch.get("scopeSpans", []):
+                        for sp in scope.get("spans", []):
+                            attrs = _span_attrs(sp)
+                            if sp.get("name") != "model_call" or attrs.get("zuno.run_id") != run_id:
+                                continue
+                            if task and attrs.get("zuno.task") != task:
+                                continue
+                            calls.append((int(sp.get("startTimeUnixNano") or 0), {
+                                "provider": attrs.get("zuno.provider"),
+                                "model": attrs.get("zuno.model"),
+                                "classification": attrs.get("zuno.classification"),
+                                "model_kind": attrs.get("zuno.model_kind"),
+                                "task": attrs.get("zuno.task"),
+                            }))
+            if calls:
+                return [c for _, c in sorted(calls, key=lambda x: x[0])]
+            if time.monotonic() >= deadline:
+                return []
+            time.sleep(3)
+    except httpx.HTTPError as exc:
+        raise UnifaiError(f"tempo unreachable: {exc}") from exc
+    finally:
+        if client is None:
+            http.close()

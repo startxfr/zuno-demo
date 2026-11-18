@@ -1,0 +1,25 @@
+---
+# a2a-delegation-approval: the first cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py. Written
+# BEFORE the first take: tune it with `make demo gif a2a-delegation-approval` once a take exists.
+# `make demo record a2a-delegation-approval` takes the 5-minute version as consultant-02
+# (evaluations/browser/walkthroughs/a2a-delegation-approval.mjs). THE TAKE CLICKS APPROVE: each take needs the
+# owner's go, and AAP accepts 2 launches per caller in 15 minutes.
+# Markers, in order: login, hub, q-sent, card, approved, q-done, end. The waits (the card, then the answer) vary from
+# take to take: their motion uses `fit`. Row 4:15 is words: the close is a caption on the answer.
+record_notice: >-
+  a recorded browser session as consultant-02 on UnifAI, team workspace agent-arkos: one delegating question to
+  Arkos (tens of thousands of tokens on consultant-02's budget), then the take CLICKS APPROVE on the approval card of
+  aap.cluster.audit: AAP launches the job zuno-day0-check, a read-only audit of about six minutes that stays in AAP
+  (a job cannot be deleted); a second card, if one comes, is rejected; the session the take creates is deleted at the
+  end, and the take fails if the workspace's sessions differ before and after; the titles of earlier sessions of the
+  workspace's members show in the list; traces and metrics of the turn remain, as for any use
+target_seconds: [45, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account"}
+  - {still: hub, hold: 4, step: "0:00", caption: "0:00  A new session with Arkos, the team's agent"}
+  - {from: q-sent, to: card, fit: 8, hold: 7, step: "1:30", caption: "1:30  Tekos wants to launch a job: the platform asks me"}
+  - {still: approved, hold: 4, step: "2:30", caption: "2:30  I approve: only now does anything run"}
+  - {from: approved, to: q-done, fit: 8, hold: 7, caption: "Arkos returns the job Tekos launched in my name"}
+  - {still: end, hold: 5, step: "4:15", caption: "Never more rights than the person who asked"}

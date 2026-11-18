@@ -114,10 +114,13 @@ def subject_regexp(identities: dict, kind: str, accept_dev: bool) -> str:
     return "|".join(f"(?:{p})" for p in parts)
 
 
-def verify_image(reference: str, env: Dict[str, str], identities: dict, accept_dev: bool = False) -> Result:
+def verify_image(reference: str, env: Dict[str, str], identities: dict, accept_dev: bool = False,
+                 policy_reference: Optional[str] = None) -> Result:
+    """`policy_reference` names the image the identity rules are chosen by when `reference` is a copy of it
+    (an internal mirror keeps the digest and the signatures, only the registry changes)."""
     try:
         digest_of(reference)
-        kind = kind_of(reference)
+        kind = kind_of(policy_reference or reference)
     except ImageError as exc:
         return Result(reference, False, str(exc))
     subject = subject_regexp(identities, kind, accept_dev)

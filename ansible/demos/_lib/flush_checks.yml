@@ -1,0 +1,104 @@
+---
+# In a workshop (ADR-0616 clause 10) a scenario's check or start only queues (demo_unit.defer_flush): the queues
+# keep growing, and the workshop's own check.yml or start.yml runs everything once.
+# Run the queued checks once each (ADR-0616 clause 9): one `golden_path_probe.py --only` run and one
+# `browser/run.sh` with ONLY=, both read-only and allowed during a freeze; then empty the queues.
+# The queue holds probe names; the name `all` runs the whole golden path (`golden_path_probe.py` with no `--only`, every
+# probe of its PROBES once, the list the script owns) and absorbs every other queued probe.
+# The script runs `--only` in the order it is given and `trace` reads the run of `unifai-tekos`: the queue is put in
+# the script's own PROBES order first (platform/demo/probe_order.py reads it from the script), each name once.
+- name: "demo | put the queued golden-path probes in the script's order"
+  ansible.builtin.command:
+    argv: "{{ ['python3', zuno_repo_root ~ '/platform/demo/probe_order.py'] + demo_queued_probes }}"
+  register: _demo_probe_order
+  changed_when: false
+  when:
+    - demo_queued_probes | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
+
+- name: "demo | run the queued golden-path probes ({{ _demo_only }})"
+  ansible.builtin.command:
+    argv: >-
+      {{ ['python3', zuno_repo_root ~ '/evaluations/golden_path_probe.py']
+         + ([] if _demo_only == 'all' else ['--only', _demo_only]) }}
+    chdir: "{{ zuno_repo_root }}"
+  register: _demo_golden
+  changed_when: false
+  failed_when: false
+  timeout: 1800
+  vars:
+    _demo_only: "{{ _demo_probe_order.stdout | default('') | trim }}"
+  when:
+    - demo_queued_probes | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
+
+- name: "demo | run the queued browser checks ({{ demo_queued_browser | join(',') }})"
+  ansible.builtin.command:
+    argv: ["{{ zuno_repo_root }}/evaluations/browser/run.sh"]
+    chdir: "{{ zuno_repo_root }}"
+  environment:
+    ONLY: "{{ demo_queued_browser | join(',') }}"
+  register: _demo_browser
+  changed_when: false
+  failed_when: false
+  timeout: 900
+  when:
+    - demo_queued_browser | length > 0
+    - not (demo_unit.defer_flush | default(false) | bool)
+
+# Each run's exit code and output go to platform/demo/probe_rows.py on stdin: one check row per probe with the probe's
+# own detail, so a failed check names its probe and why (terminal RESULT, log, rehearsal report). The task's timeout
+# fails the unit by itself (Ansible ignores failed_when there); a run with no exit code is a failure here all the same.
+- name: "demo | one row per probe, with its detail"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/platform/demo/probe_rows.py"]
+    stdin: "{{ {'agent': demo_id, 'layer': demo_unit.name, 'runs': _demo_runs} | to_json }}"
+  register: _demo_probe_rows
+  changed_when: false
+  when:
+    - not (demo_unit.defer_flush | default(false) | bool)
+    - _demo_runs | length > 0
+  vars:
+    _demo_golden_ran: "{{ _demo_golden is defined and not (_demo_golden.skipped | default(false)) }}"
+    _demo_browser_ran: "{{ _demo_browser is defined and not (_demo_browser.skipped | default(false)) }}"
+    _demo_only: "{{ _demo_probe_order.stdout | default('') | trim }}"
+    _demo_golden_run: >-
+      {{ [{'kind': 'golden-path', 'names': _demo_only.split(','),
+           'cmd': 'python3 evaluations/golden_path_probe.py'
+                  ~ ('' if _demo_only == 'all' else ' --only ' ~ _demo_only),
+           'rc': _demo_golden.rc | default(-1), 'stdout': _demo_golden.stdout | default(''),
+           'stderr': _demo_golden.stderr | default(''), 'msg': _demo_golden.msg | default('')}]
+         if _demo_golden_ran else [] }}
+    _demo_browser_run: >-
+      {{ [{'kind': 'browser', 'names': demo_queued_browser,
+           'cmd': 'ONLY=' ~ (demo_queued_browser | join(',')) ~ ' evaluations/browser/run.sh',
+           'rc': _demo_browser.rc | default(-1), 'stdout': _demo_browser.stdout | default(''),
+           'stderr': _demo_browser.stderr | default(''), 'msg': _demo_browser.msg | default('')}]
+         if _demo_browser_ran else [] }}
+    _demo_runs: "{{ _demo_golden_run + _demo_browser_run }}"
+
+# The log keeps what a failed run printed besides its result lines (a traceback, an argparse refusal): Ansible does
+# not print the output of a task that is not failed. The result lines are in the report render.yml prints.
+- name: "demo | what a failed run printed besides its result lines"
+  ansible.builtin.debug:
+    msg: "{{ _demo_failed_runs | map(attribute='output') | map('split', _demo_nl) | flatten }}"
+  vars:
+    _demo_nl: "\n"
+    _demo_failed_runs: >-
+      {{ ((_demo_probe_rows.stdout | from_json).commands | rejectattr('rc', 'equalto', 0) | selectattr('output') | list)
+         if (_demo_probe_rows is defined and not (_demo_probe_rows.skipped | default(false))) else [] }}
+  when:
+    - not (demo_unit.defer_flush | default(false) | bool)
+    - _demo_failed_runs | length > 0
+
+- name: "demo | record the checks"
+  when: not (demo_unit.defer_flush | default(false) | bool)
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + (_demo_recorded.checks | default([])) }}"
+    demo_unit_commands: "{{ demo_unit_commands + (_demo_recorded.commands | default([])) }}"
+    demo_queued_probes: []
+    demo_queued_browser: []
+  vars:
+    _demo_recorded: >-
+      {{ (_demo_probe_rows.stdout | from_json)
+         if (_demo_probe_rows is defined and not (_demo_probe_rows.skipped | default(false))) else {} }}

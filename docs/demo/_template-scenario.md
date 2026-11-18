@@ -1,0 +1,207 @@
+# Scenario: &lt;Brick&gt; - &lt;feature&gt;
+
+How to use this template (delete this paragraph in a real page):
+
+- One brick, or one feature of a brick, per page. One proof per step.
+- The 5-minute version is the message and one visible proof, for any audience. The 15-minute version starts where the
+  5-minute version stops and goes into the mechanism, for a technical audience. It never repeats the 5-minute steps.
+- Each timed row is one step of `make demo step next`; its time stamp is the step's id and names its file
+  `ansible/demos/<id>/steps/MM-SS.yml`. A row that adds, moves or removes a step changes its file in the same commit.
+- Every step has a "You should see" checkpoint. If you do not see it, go to "If something goes wrong".
+- Prompts are given verbatim, in the language they were tested in. A translation that was never run is marked
+  *(untested translation)*.
+- Credentials are never written here: give the Vault path.
+- The Personas section lists every account the page signs in with, and the ones only named in the story. Each row
+  says who the persona is, what it is entitled to in this scenario, and what the presenter does with it.
+- Copy Appendix A unchanged and move the `class ... focus` line to the brick of the page.
+- An experience that needs its own installation or preflight on the presenter's side (an add-on, a GPU node switched
+  on) may add **Appendix C - Setup** after Appendix B. Keep the scenario sections free of installation steps.
+- The sections come in this order: Introduction, Personas, Presenter lifecycle, the versions, If something goes wrong,
+  Limits, Appendix A, Appendix B, References, and Page status last ([ADR-0617](../adr/0617-record-the-demos-and-publish-them-as-gifs-with-the-owners-go.md)).
+  The Introduction, Personas and Presenter lifecycle name no ADR and no work package and link nothing under
+  `docs/adr/` or `docs/roadmap/`: those go in References, and a sentence that cited one is reworded so that it still
+  reads.
+- When the demo has a GIF, its image line is the last element of the Introduction. The GIF is added only after the
+  owner's named "go <id>"; a page without a GIF has no image line.
+- Paths below are relative to `docs/demo/`. A page under `scenarios/<layer>/` adds `../../` to every link.
+
+## Introduction
+
+&lt;Two to four sentences: what the brick is and why Zuno has it. Where it sits in the platform:
+see [Appendix A](#appendix-a---hld). What is inside it: see [Appendix B](#appendix-b---lld).&gt;
+
+**The message:** &lt;one sentence the audience should repeat after the demo&gt;.
+
+## Personas
+
+The personas are fictional role accounts of the Keycloak realm `zuno`. They share one password, kept in Vault at
+`keycloak/demo-personas`. The [catalogue](README.md#personas) lists all of them.
+
+| Persona | Profile | What it can do here | Role in this demo |
+|---|---|---|---|
+| **&lt;persona&gt;** | &lt;job, office, the Keycloak groups that matter here&gt; | &lt;entitlements: tools, models, budget, RBAC&gt; | &lt;what the presenter does with it, and in which version&gt; |
+
+Other identities: &lt;service accounts, probe identities, the presenter's `oc` session&gt;.
+
+## Presenter lifecycle
+
+`make demo use <id> 5|15` selects this page. Each section below is printed after its action's Ansible file (`ansible/demos/<id>/<action>.yml`) has run, and says
+what is left to the presenter. Write "Nothing to do." when the file leaves nothing; never delete a section. Credentials
+are named by their Vault path, never written.
+
+### Status
+
+&lt;What `make demo status` reads (Applications, workloads, routes, the add-on), and what to do when it reports a
+missing piece. Or: Nothing to do.&gt;
+
+### Check
+
+&lt;What `make demo check` proves: the golden-path probe `<name>`, the browser check, the demo's own assertions; what
+to do when one fails. A page without a probe says so: rehearse it the same day. `make demo rehearse` lists the probes and
+browser checks of the sequence and asks for the demo id before it runs them.&gt;
+
+### Install
+
+&lt;Only the demo's own add-on (a workstation plug-in, an on-demand node, demo documents). The shared platform is
+verified, never installed here. Or: Nothing to do.&gt;
+
+### Start
+
+&lt;What the file prepared (warm-up, demo data), then what only a person does: browser profiles, sign-ins, tabs to
+open, known warnings on screen that are not failures.&gt;
+
+### Stop
+
+&lt;What the file cleans up after the session, and what the presenter closes. Or: Nothing to do.&gt;
+
+### Uninstall
+
+&lt;Removes the demo's own add-on only; a shared component is never removed. Or: Nothing to do.&gt;
+
+## 5-minute version
+
+| Time | Do | Say | You should see |
+|---|---|---|---|
+| 0:00 | &lt;action&gt; | &lt;sentence&gt; | &lt;checkpoint&gt; |
+| 1:30 | | | |
+| 4:00 | Close | &lt;the message&gt; | |
+
+## 15-minute version
+
+Run the 5-minute version, then:
+
+| Time | Do | Say | You should see |
+|---|---|---|---|
+| 5:00 | &lt;deep-dive: configuration, dashboard, trace, internals&gt; | | |
+| 14:00 | Close | | |
+
+## If something goes wrong
+
+| Symptom | Fallback | Say |
+|---|---|---|
+| &lt;what the presenter sees&gt; | &lt;what to do instead&gt; | &lt;one honest sentence&gt; |
+
+## Limits
+
+- &lt;What this scenario does not show, and why&gt;
+- &lt;Named limits of the brick&gt;
+
+## Appendix A - HLD
+
+Where the brick sits in Zuno. The highlighted box is the subject of this page. Plain arrows carry requests, dotted
+arrows carry identity, policy or telemetry.
+
+```mermaid
+flowchart TB
+  subgraph EXP["Experiences: clients of one governed backend"]
+    UNIFAI["UnifAI<br/>agents, RAG"]
+    OWUI["Open WebUI"]
+    CLAW["OpenClaw<br/>one assistant per persona"]
+    DIFY["Dify"]
+    KAGENT["kagent"]
+    LS["OpenShift Lightspeed"]
+    BLENDER["Blender add-on"]
+    WM["World model"]
+  end
+  subgraph GOV["Gateways and governance"]
+    TP["token proxy,<br/>egress proxy"]
+    RHCL["RHCL Kuadrant<br/>auth, rate limits"]
+    AIGW["ai-gateway<br/>classification, routing,<br/>guardrails, quotas"]
+    MCPGW["mcp-gateway<br/>tools by group"]
+    A2A["a2a-gateway<br/>delegation, approval"]
+  end
+  subgraph AI["Red Hat OpenShift AI"]
+    MAAS["MaaS<br/>gateway, portal, API keys"]
+    KSERVE["KServe llm-d<br/>local models on MIG GPUs"]
+    EXT["SaaS models<br/>Mistral, Codestral, OVHcloud"]
+    PG["GenAI playground"]
+    BUILD["Pipelines, MLflow,<br/>Kueue, model registry"]
+    EVAL["TrustyAI, EvalHub,<br/>LMEval"]
+  end
+  subgraph TOOLS["Agents and tools"]
+    OKF["OKF agents release<br/>zuno-demo-agents"]
+    MCPS["MCP servers<br/>Confluence, Git, AAP,<br/>k8s, Google Workspace"]
+  end
+  subgraph TRUST["Identity, secrets, supply chain"]
+    KC["Keycloak<br/>personas, groups"]
+    VAULT["Vault, ESO,<br/>cert-manager"]
+    SC["RHTAS, Quay,<br/>image policy"]
+  end
+  subgraph PLAT["Platform and operations"]
+    OCP["OpenShift, Service Mesh,<br/>GPU nodes"]
+    GITOPS["Argo CD GitOps,<br/>AAP Day 0-3"]
+    OBS["Prometheus, Grafana,<br/>Tempo"]
+  end
+  SAAS[("SaaS<br/>Confluence, Google,<br/>Salesforce")]
+
+  UNIFAI & OWUI & WM --> AIGW
+  CLAW & DIFY & KAGENT --> TP --> AIGW
+  BLENDER --> RHCL --> AIGW
+  UNIFAI --> A2A
+  UNIFAI & OWUI & TP & LS --> MCPGW
+  LS & PG --> MAAS
+  AIGW --> MAAS
+  MAAS --> KSERVE
+  AIGW --> EXT
+  MAAS -. published .-> EXT
+  MCPGW --> MCPS --> SAAS
+  BUILD --> KSERVE
+  EVAL --> MAAS
+  RHCL -. limits .-> MAAS
+  OKF -. agents, policies .-> UNIFAI & AIGW & MCPGW
+  KC -. tokens .-> AIGW & MCPGW & MAAS
+  AIGW & MCPGW -. metrics, traces .-> OBS
+
+  classDef focus fill:#ffd54f,stroke:#d84315,stroke-width:4px,color:#000;
+  class AIGW focus;
+```
+
+## Appendix B - LLD
+
+&lt;The brick's internals: pods, custom resources, ports, the request path and where the decision is made. Drawn from
+its chart and component in this repository. Name the files the diagram was drawn from.&gt;
+
+```mermaid
+flowchart LR
+  A["component"] --> B["component"]
+```
+
+## References
+
+The decisions this page rests on:
+
+- [ADR-NNNN](../adr/TEMPLATE.md): &lt;one line each&gt;.
+- [ADR-0349](../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): the demo personas, their
+  groups and their shared password.
+- [ADR-0616](../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): the `make demo`
+  lifecycle that the Presenter lifecycle section follows.
+
+Evidence: &lt;work-package evidence links, one line each, with what each proves&gt;.
+
+## Page status
+
+> **Status:** Not rehearsed. Prerequisites checked read-only on demo333 on YYYY-MM-DD: &lt;what was checked&gt;.
+> **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
+> Yes, golden-path probe `<name>` - or - No golden-path probe: rehearse before showing it to an audience.
+> **Personas:** see [Personas](#personas).
+> **Used in workshops:** &lt;links&gt;

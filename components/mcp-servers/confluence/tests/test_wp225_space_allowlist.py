@@ -1,8 +1,8 @@
 """WP-225 lot B (ADR-0603 M12): the Confluence space allowlist, from the signed caller context.
 
-Exercised through the real MCP SDK client against this server's ASGI app, with the
-caller context signed by the gateway's own module (components/mcp-gateway/app/
-caller_context.py), so the signer and this server's verifier are tested together.
+Exercised through the real MCP SDK client against this server's ASGI app. The caller's groups
+come from the `ctx` claim of the gateway's signed call assertion (WP-250 lot 2; minted here with
+test_support.assertion_headers, the shared workload token and HMAC headers are retired).
 
 Run from this directory:
 
@@ -11,21 +11,19 @@ Run from this directory:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import json
 import os
 import sys
 import time
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("CONFLUENCE_BASE_URL", "https://example.atlassian.net")
 os.environ.setdefault("CONFLUENCE_EMAIL", "technical@example.com")
 os.environ.setdefault("CONFLUENCE_API_TOKEN", "test-token")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -33,15 +31,9 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
-
-_spec = importlib.util.spec_from_file_location(
-    "gateway_caller_context", os.path.join(REPO, "components", "mcp-gateway", "app", "caller_context.py")
-)
-caller_context = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(caller_context)
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-TOKEN = "test-workload-token"
 AUD = "confluence"  # this server's backend name
 ALLOWLIST = json.dumps({"consultant": ["TECH", "OPS"], "ocp-paas-ops": ["*"]})
 
@@ -86,11 +78,8 @@ def _page(page_id, space, title="Runbook"):
     return {"id": page_id, "title": title, "space": {"key": space}, "version": {"number": 1}, "_links": {}}
 
 
-def _headers(tool, groups, *, token=TOKEN, iat=None):
-    h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims={"email": "u1@example.com"},
-                                  tool=tool, workload_token=token, now=iat))
-    return h
+def _headers(tool, groups, **kwargs):
+    return headers_for(AUD, tool, groups=groups, **kwargs)
 
 
 async def _call(transport, headers, tool, args, fake):
@@ -102,6 +91,18 @@ async def _call(transport, headers, tool, args, fake):
                 return await session.call_tool(tool, args)
 
 
+async def _refused(transport, headers, tool, args, fake):
+    """True when the call fails closed: the gateway-side 401 aborts the session (an exception in the
+    client) or the tool answers is_error."""
+    try:
+        result = await _call(transport, headers, tool, args, fake)
+    except BaseException as exc:  # noqa: BLE001 - ExceptionGroup from the SDK's task group
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        return True
+    return bool(result.is_error)
+
+
 def _text(result):
     return " ".join(getattr(b, "text", "") for b in result.content)
 
@@ -110,7 +111,7 @@ async def test_no_allowlist_behaves_as_before(transport):
     for value in ("", "{}"):  # unset, and the chart default rendered as JSON
         fake = _Fake([_Resp(200, {"id": "1", **_page("1", "HR")})])
         with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": value}):
-            result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "read_page", {"page_id": "1"}, fake)
+            result = await _call(transport, headers_for(AUD, "read_page", groups=None), "read_page", {"page_id": "1"}, fake)
         assert not result.is_error, (value, _text(result))
 
 
@@ -169,17 +170,15 @@ async def test_update_reporting_another_space_after_the_write_is_logged(transpor
     assert warned.called and "after the write" in warned.call_args[0][0]
 
 
-async def test_a_context_for_another_backend_or_from_the_future_is_refused(transport):
-    other = {"X-Zuno-Gateway-Token": TOKEN}
-    other.update(caller_context.build(audience="git-forge", sub="u-1", groups=["ocp-paas-ops"], claims={},
-                                      tool="create_page", workload_token=TOKEN))
-    future = _headers("create_page", ["ocp-paas-ops"], iat=time.time() + 120)
+async def test_an_assertion_for_another_backend_or_expired_is_refused(transport):
+    other = headers_for("git-forge", "create_page", groups=["ocp-paas-ops"])
+    expired = headers_for(AUD, "create_page", groups=["ocp-paas-ops"], now=time.time() - 3600)
     with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
-        for name, headers in (("other backend", other), ("future iat", future)):
+        for name, headers in (("other backend", other), ("expired", expired)):
             fake = _Fake([])
-            result = await _call(transport, headers, "create_page",
-                                 {"space_key": "HR", "title": "t", "body_html": "<p/>"}, fake)
-            assert result.is_error and fake.requests == [], name
+            refused = await _refused(transport, headers, "create_page",
+                                     {"space_key": "HR", "title": "t", "body_html": "<p/>"}, fake)
+            assert refused and fake.requests == [], name
 
 
 async def test_wildcard_group_reaches_any_space(transport):
@@ -232,30 +231,28 @@ async def test_write_scope_leaves_reads_open(transport):
     fake = _Fake([_Resp(200, _page("5", "HR"))])
     env = {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST, "CONFLUENCE_SPACE_ALLOWLIST_SCOPE": "write"}
     with mock.patch.dict(os.environ, env):
-        result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "read_page", {"page_id": "5"}, fake)
+        result = await _call(transport, headers_for(AUD, "read_page", groups=None), "read_page", {"page_id": "5"}, fake)
     assert not result.is_error, _text(result)
 
 
-async def test_unsigned_or_forged_or_stale_or_other_tool_context_is_refused(transport):
-    """A caller cannot name its own groups: a plain header, a context signed with
-    another key, an old one and one minted for another tool all fail closed."""
-    plain = {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-Groups": "ocp-paas-ops"}
-    forged = _headers("create_page", ["ocp-paas-ops"], token="not-the-workload-token")
-    forged["X-Zuno-Gateway-Token"] = TOKEN
-    stale = _headers("create_page", ["ocp-paas-ops"], iat=time.time() - 3600)
+async def test_unsigned_or_forged_or_other_tool_context_is_refused(transport):
+    """A caller cannot name its own groups: plain headers (X-Zuno-Groups, a client-sent
+    X-Zuno-Assertion-Caller), an assertion signed with another key, an assertion without ctx
+    and one minted for another tool all fail closed."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    spoof = headers_for(AUD, "create_page", groups=None)
+    spoof["X-Zuno-Groups"] = "ocp-paas-ops"
+    spoof["X-Zuno-Assertion-Caller"] = json.dumps({"groups": ["ocp-paas-ops"], "email": "u1@example.com"})
+    forged = headers_for(AUD, "create_page", groups=["ocp-paas-ops"], key=Ed25519PrivateKey.generate())
     other_tool = _headers("search_pages", ["ocp-paas-ops"])
-    tampered = _headers("create_page", ["consultant"])
-    tampered["X-Zuno-Caller-Context"] = caller_context.build(audience=AUD, 
-        sub="u-1", groups=["ocp-paas-ops"], claims={}, tool="create_page", workload_token=TOKEN
-    )["X-Zuno-Caller-Context"]
-    tampered["X-Zuno-Caller-Signature"] = "0" * 64
+    no_ctx = headers_for(AUD, "create_page", groups=None)
     with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
-        for name, headers in (("plain", plain), ("forged", forged), ("stale", stale),
-                              ("other tool", other_tool), ("tampered", tampered)):
+        for name, headers in (("spoofed headers", spoof), ("forged signature", forged),
+                              ("other tool", other_tool), ("no ctx", no_ctx)):
             fake = _Fake([])
-            result = await _call(transport, headers, "create_page",
-                                 {"space_key": "HR", "title": "t", "body_html": "<p/>"}, fake)
-            assert result.is_error, name
+            refused = await _refused(transport, headers, "create_page",
+                                     {"space_key": "HR", "title": "t", "body_html": "<p/>"}, fake)
+            assert refused, name
             assert fake.requests == [], name
 
 
@@ -268,7 +265,7 @@ async def test_malformed_allowlist_fails_closed(transport):
 
 
 async def test_ctx_is_not_in_the_published_schemas(transport):
-    http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers={"X-Zuno-Gateway-Token": TOKEN})
+    http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers_for(AUD, ""))
     async with streamable_http_client(f"{BASE_URL}/mcp", http_client=http_client) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

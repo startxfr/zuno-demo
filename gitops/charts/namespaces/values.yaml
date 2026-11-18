@@ -16,6 +16,15 @@ clusterBaseDomain: ""
 # ADR-0352/WP-211: Keycloak host the EgressFirewalls allow. Empty = the built-in
 # instance, keycloak.<clusterBaseDomain>.
 keycloakHost: ""
+# ADR-0352/WP-214: an EXTERNAL Redis endpoint, allowed by the EgressFirewall of
+# every entry with egressFirewall.redis (zuno-ai-run: ai-gateway's REDIS_ADDR).
+# ansible/tasks/redis_seam_values.yml fills it in external mode only. Empty
+# host = the built-in instance (in-cluster, no rule needed); a *.svc name gets
+# no rule either (in-cluster traffic is not filtered); an IPv4 address gets a
+# /32 cidrSelector, any other name a dnsName rule.
+redisExternal:
+  host: ""
+  port: 6379
 
 # ADR-0329 (supersedes ADR-0023): agent workloads no longer get a
 # dedicated zuno-agent-<name> namespace. Every active agent's FE/BFF
@@ -167,6 +176,8 @@ platformNamespaces:
     allowedFromNamespaces:
       - cert-manager
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: Praxis reaches zuno-redis (session store) and Keycloak's JWKS.
+      - zuno-ai-gateways
       - zuno-auth
       - zuno-data
       # ADR-0420/WP-068: the zuno-signer ServiceAccount and every debug
@@ -273,6 +284,8 @@ platformNamespaces:
     # invisible from zuno-mesh's side).
     allowedFromNamespaces:
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: Praxis exports its spans (OTLP) to the collector.
+      - zuno-ai-gateways
       - zuno-data
       - zuno-auth
       - zuno-ai-build
@@ -523,9 +536,14 @@ platformNamespaces:
       # Gateways' JWKS and issuer (public Route since WP-224), acceptance-gate
       # Jobs' token requests (KEYCLOAK_URL).
       keycloak: true
+      # ADR-0352/WP-214: ai-gateway's Redis when it is external (redisExternal
+      # above; renders nothing for the built-in instance).
+      redis: true
       routeHosts:
         - name: unifai-ui-zuno-unifai
           reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).
+        - name: quay-quay-zuno-registry
+          reason: okf-fetch of both gateways pulls the OKF release from the internal Quay through its route (ADR-0612 addendum; the Service certificate does not cover the Service name).
       # S3 answers each name lookup with other addresses out of a pool of hundreds; a name rule holds only the few it
       # resolved, so the storage-initializer of a recreated model pod stalled on blocked connections (embeddings-predictor
       # down 2026-11-08 02:30 to 14:30, found by the RAG pilot). The published eu-west-2 S3 ranges (syncToken 1794088025,
@@ -580,18 +598,10 @@ platformNamespaces:
           reason: KServe storage-initializer of every model (S3_ENDPOINT/AWS_ENDPOINT_URL).
         - dnsName: zuno-demo-sources.s3.eu-west-2.amazonaws.com
           reason: Virtual-hosted name of the model bucket (storageUri s3://zuno-demo-sources).
-        # okf-fetch init containers (a2a-gateway, mcp-gateway) pull the signed
-        # OKF bundles from quay.io/zuno/okf-* and verify them with cosign
-        # --offline; blobs are redirected to Quay's CDN. Found live 2026-11-07:
-        # without these a new gateway pod stays in Init:CrashLoopBackOff.
-        - dnsName: quay.io
-          reason: okf-fetch pulls the signed OKF bundles (quay.io/zuno/okf-*) and their cosign signatures.
-        - dnsName: cdn01.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
-        - dnsName: cdn02.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
-        - dnsName: cdn03.quay.io
-          reason: Quay blob redirects for the same OKF bundle pulls.
+        # WP-248: the okf-fetch init containers (a2a-gateway, mcp-gateway) read the signed OKF bundles from the internal Quay
+        # (zuno_okf_registry_mirror), so quay.io and its CDN hosts are no longer allowed here. The hosts were added 2026-11-07
+        # ("a new gateway pod stays in Init:CrashLoopBackOff" without them); to go back to quay.io, empty
+        # zuno_okf_registry_mirror AND restore the four dnsName rules quay.io, cdn01.quay.io, cdn02.quay.io, cdn03.quay.io.
         # TEMPORARY (WP-224 rehearsal, 2026-11-07): only the acceptance-gate Job
         # (ansible/roles/agents/tasks/run_acceptance_gate.yml) pip-installs its
         # requirements from PyPI at start-up; garak and ragas run from built
@@ -607,6 +617,50 @@ platformNamespaces:
       salesforce:
         enabled: false
         instanceHost: ""
+  # ADR-0619 clause 2 / WP-292: the shared namespace of the ALTERNATIVE AI gateways (Praxis AI first), next to the Zuno
+  # ai-gateway, which stays every client's default. Meshed like zuno-ai-run, with a port-8080 exception for the unmeshed
+  # clients, a default-deny ingress baseline, and an egress firewall for Keycloak and the two SaaS hosts only.
+  # allowedFromNamespaces are the callers the ai-gateway admits by namespace or by the zuno.io/experience-client label
+  # (a NetworkPolicy peer by label would need its own policy; this baseline lists the namespaces): UnifAI, the six
+  # experience namespaces (Open WebUI, Dify, kagent, world-model, the two OpenClaw personas), and the monitoring
+  # namespaces for the metrics port. The workload's own ingress policy (ports) is the praxis chart's.
+  - name: zuno-ai-gateways
+    displayName: Zuno AI Gateways
+    description: >-
+      The alternative AI gateways (Praxis AI first), run next to the Zuno ai-gateway, under the same Keycloak
+      identity (ADR-0619).
+    allowedFromNamespaces:
+      - zuno-unifai
+      - zuno-openwebui
+      - zuno-dify
+      - zuno-kagent
+      - zuno-world-model
+      - zuno-claw-consultant-02
+      - zuno-claw-sale-01
+      - openshift-monitoring
+      - openshift-user-workload-monitoring
+    extraLabels:
+      istio-injection: enabled
+      zuno.io/managed: "true"
+    peerAuthentication:
+      mode: STRICT
+      exceptions:
+        - name: praxis-from-unmeshed-clients
+          selector:
+            app.kubernetes.io/name: praxis
+          ports: [8080, 9902]
+          reason: >-
+            Unmeshed callers, as for ai-gateway: zuno-unifai (multiagent), the experience namespaces
+            (zuno-openwebui, zuno-world-model, the zuno-dify and zuno-kagent token proxies, the OpenClaw proxies)
+            and openshift-lightspeed, on 8080; Prometheus (unmeshed, plaintext) on the metrics port 9902.
+    egressFirewall:
+      # Praxis verifies the zuno Keycloak JWT against the issuer and JWKS (ADR-0619 clause 4).
+      keycloak: true
+      hosts:
+        - dnsName: api.anthropic.com
+          reason: Praxis provider anthropic (ADR-0619 clause 3, Claude is one of the two SaaS models).
+        - dnsName: api.mistral.ai
+          reason: Praxis provider mistral-codestral (ADR-0619 clause 3, Codestral is the other SaaS model).
   - name: zuno-mesh
     displayName: Zuno Infra Service Mesh
     description: >-
@@ -619,6 +673,8 @@ platformNamespaces:
       - zuno-data
       - zuno-auth
       - zuno-ai-run
+      # ADR-0619 clause 2 / WP-292: zuno-ai-gateways is injected; its sidecars reach istiod's xDS and istio-csr.
+      - zuno-ai-gateways
       - zuno-ai-build
       # redhat-ods-applications is namespace-injected (istio-injection:
       # enabled below); without this entry its sidecars can't reach
@@ -738,6 +794,86 @@ platformNamespaces:
     # to be re-patched on every Securesign reconcile).
     extraLabels:
       zuno.io/managed: "true"
+
+  # ADR-0612 / WP-248: the internal Red Hat Quay. quay-operator is OwnNamespace (its OperatorGroup lives here), so the
+  # namespace is repo-owned like zuno-rhtas. Not meshed: operator-owned workloads, TLS by the cluster wildcard on the route.
+  # Consumers pull through the Service; the baseline already admits the router.
+  - name: zuno-registry
+    displayName: Zuno Registry
+    description: >-
+      Internal Red Hat Quay (operator, Quay, Clair, Redis) holding the OKF release, the zuno images and a declared
+      selection of public images (ADR-0612).
+    # ADR-0614: Quay is Red Hat infra-eligible. true pins every pod of this
+    # namespace to the infra nodes through the namespace annotations (the
+    # QuayRegistry CR has no tolerations field). Flipped when the infra nodes
+    # exist; the pods move at their next restart.
+    infraNodes: true   # WP-260 P2 step 6, 2026-11-13
+    allowedFromNamespaces:
+      - zuno-ai-run
+      - zuno-ai-build
+      - zuno-unifai
+      - openshift-operators
+      - openshift-gitops
+    extraLabels:
+      zuno.io/managed: "true"
+    # Egress: the API (operator), S3 for the blobs, and the Red Hat vulnerability feed for Clair (ADR-0612 clause 4: the
+    # other Clair updaters stay disabled, so no further host is opened). The S3 name rules are not enough alone: S3 answers
+    # each lookup with other addresses out of a pool of hundreds (ADR-0611 F5), so the region's published ranges sit beside them.
+    egressFirewall:
+      apiServer: true
+      routeHosts:
+        - name: quay-quay-zuno-registry
+          reason: Clair fetches the layers through the registry's own route (proxy storage URLs name it); found by the WP-248 canary.
+      hosts:
+        - dnsName: s3.eu-central-1.amazonaws.com
+          reason: Registry blobs (bucket zuno-demo333-registry), path-style endpoint.
+        - dnsName: zuno-demo333-registry.s3.eu-central-1.amazonaws.com
+          reason: Virtual-hosted name of the registry bucket.
+        - dnsName: security.access.redhat.com
+          reason: Clair's Red Hat VEX updater (the only updater set enabled).
+      cidrs:
+        - cidr: 1.178.10.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.12.24.0/21
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.12.32.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 16.15.20.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.2.112.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.2.70.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.120.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.134.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.5.136.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.65.246.0/28
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 3.65.246.16/28
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.140.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.168.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.169.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.170.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.208.0/23
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.210.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.211.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.218.0/24
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.44.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
+        - cidr: 52.219.72.0/22
+          reason: AWS S3 eu-central-1 published range (syncToken 1794413225, 2026-11-11), blobs of the registry bucket.
 
   # ADR-0524: OpenShift Lightspeed's operator namespace. The operator's CSV
   # is OwnNamespace-only and its OLSConfig operand is a mandatory singleton

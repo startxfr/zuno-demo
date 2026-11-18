@@ -111,3 +111,12 @@ namespaces, the gateways' and the experience clients' Applications, and every `m
 
 [WP-238](../roadmap/work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) (the probes, the
 freeze protocol and the first demo-day runbook, for 2026-11-09).
+
+## Update 2026-11-14 (WP-269): `make demo check` changes meaning
+
+Clause 1 places the golden path "next to the webinar preflight `make demo check`". Under
+[ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) that preflight is retired
+(WP-272), and `make demo check` becomes the check of the demo chosen with `make demo use`: its golden-path probes
+(`--only`), its browser check and its own read-only assertions. `make demo golden-path` and `make demo browser` keep
+their catalogue-wide role in the four runs of clause 2 and in the freeze protocol. Every clause of this record stays in
+force; this is a dated correction note, not a supersession.

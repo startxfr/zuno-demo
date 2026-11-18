@@ -506,11 +506,11 @@
          | map('join', '@') | list }}
     _readiness_all_subs: >-
       {{ _readiness_olm.results | default([]) | selectattr('item.kind', 'equalto', 'Subscription')
-         | map(attribute='resources') | flatten | list }}
+         | selectattr('resources', 'defined') | map(attribute='resources') | flatten | list }}
   vars:
     _pkgs: >-
       {{ (_readiness_olm.results | default([]) | selectattr('item.kind', 'equalto', 'PackageManifest')
-          | map(attribute='resources') | flatten | default([]))
+          | selectattr('resources', 'defined') | map(attribute='resources') | flatten | default([]))
          | selectattr('status.catalogSource', 'defined') | list }}
 
 # Compared as package@catalog, not by package name alone: a Subscription is

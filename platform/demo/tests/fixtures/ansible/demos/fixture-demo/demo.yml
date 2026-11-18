@@ -1,0 +1,14 @@
+---
+# Test fixture of platform/demo/tests (WP-270). `cluster: false`: demo_run.yml does not resolve cluster credentials,
+# so the whole path runs on any workstation and in CI.
+kind: scenario
+page: docs/demo/scenarios/fixture/fixture-demo.md
+cluster: false
+addon: fixture marker
+probes: []
+browser: []
+mutations:
+  install: "Writes the fixture add-on marker under ~/.cache/zuno/demo/"
+  uninstall: "Removes the fixture add-on marker"
+steps:
+  "1:30": {mutating: true, optional: true, freeze: forbidden}

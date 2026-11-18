@@ -1,0 +1,149 @@
+# ADR-0612 clause 7(d) / WP-248 family (d): the closed list of third-party images the cluster pulls from public registries
+# and that the internal Quay serves. Nothing is mirrored that this file does not name. Snapshot of the pods of demo333 on
+# 2026-11-12 (OpenShift release images and Red Hat product images are out of scope: they stay on the cluster pull secret).
+#
+# Fields: source (registry/repository), digest (the pin the charts use), tag (informative), signature (none: these publishers
+# sign nothing we verify, the digest pin is the trust), reason (where it is used). `pin: tag` entries are NOT copied yet:
+# the chart must pin them by digest first (an ImageDigestMirrorSet redirects digest pulls only).
+#
+# Mirror path: <registry host>/zuno/mirror/<repository path without the registry host>.
+images:
+  - source: docker.io/bitnamilegacy/rabbitmq
+    digest: sha256:f31a9990bba3aec8bf2948a4a237e3656e54d2d53f4ecd4495ce044191cb5beb
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: docker.io/grafana/grafana
+    digest: sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    pin: digest
+    signature: none
+    reason: Grafana of the monitoring stack
+  - source: docker.io/hashicorp/vault
+    tag: "1.17.2"
+    pin: tag
+    signature: none
+    reason: Vault server (gitops/charts/vault)
+  - source: docker.io/library/mongo
+    digest: sha256:8565ecda5b221016d70f7745ac1ba0b97ccb05836157f8a343e987338fdc8350
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: docker.io/library/mongo
+    digest: sha256:c630c59342c1493d50345136df2af14a76b9e827dd5316bfabee07a0880a5f3a
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: docker.io/library/nginx
+    digest: sha256:2f4e10193b0c4f61472245e9d26cea78e7df7af266c7e7cf5e67353ee2731b51
+    tag: "1.29.3"
+    pin: digest
+    signature: none
+    reason: Dify (gitops/charts/dify)
+  - source: docker.io/library/python
+    digest: sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+    tag: "3.12-slim"
+    pin: digest
+    signature: none
+    reason: workload of zuno-ai-run
+  - source: docker.io/qdrant/qdrant
+    digest: sha256:1005201498cf927d835383d0f918b17d8c9da7db58550f169f694455e42d78f4
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: docker.io/redis/redisinsight
+    digest: sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: docker.io/temporalio/temporal
+    digest: sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: ghcr.io/containers/kubernetes-mcp-server
+    digest: sha256:1da9d62ad0c008a6cadcf2718c86c2e2d18753ca1d9f1f3313068980794b24f2
+    pin: digest
+    signature: none
+    reason: workload of zuno-ai-run
+  - source: ghcr.io/kagent-dev/kagent/controller
+    digest: sha256:e284fbddd327b06649f7e5ea4bc9df5e840c4b493538f07b4a36d9fa154e4af3
+    tag: "0.10.4"
+    pin: digest
+    signature: none
+    reason: kagent (ADR-0599..0601)
+  - source: ghcr.io/kagent-dev/kagent/golang-adk
+    tag: "0.10.4"
+    pin: tag
+    signature: none
+    reason: kagent (ADR-0599..0601)
+  - source: ghcr.io/kagent-dev/kagent/ui
+    digest: sha256:6133c1b72ee54ea98d6e5155a897facb78f492efe22abe3587c2e0938a684d37
+    tag: "0.10.4"
+    pin: digest
+    signature: none
+    reason: kagent (ADR-0599..0601)
+  - source: ghcr.io/open-webui/open-webui
+    digest: sha256:03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded
+    tag: "0.12.5"
+    pin: digest
+    signature: none
+    reason: Open WebUI experience (WP-180)
+  - source: ghcr.io/openclaw/openclaw
+    digest: sha256:8789721d2e9b24b780a1504b56deb4c6bd5c7dbf96a1dd117e7c45c2ed72c8ac
+    pin: digest
+    signature: none
+    reason: OpenClaw assistants (WP-182)
+  - source: docker.io/langgenius/dify-api
+    digest: sha256:52be6088dd842e01bc58cdb23a701266a55aa3814b24057c18adfb4d351f8079
+    tag: "1.17.0"
+    pin: digest
+    signature: none
+    reason: Dify (gitops/charts/dify)
+  - source: docker.io/langgenius/dify-plugin-daemon
+    digest: sha256:0b8f1f1e766826352d868aaf8c9eeeee8e37a3a3b023044ed8ab0d145f853cdf
+    tag: "0.6.10-local"
+    pin: digest
+    signature: none
+    reason: Dify (gitops/charts/dify)
+  - source: docker.io/langgenius/dify-web
+    digest: sha256:6a81fcdd82b51f6fe3436cdc25d1a358cd301a2c3457554bf96de7f5f32a6b5a
+    tag: "1.17.0"
+    pin: digest
+    signature: none
+    reason: Dify (gitops/charts/dify)
+  - source: quay.io/codeready-toolchain/claw-operator
+    tag: "f5aa592"
+    pin: tag
+    signature: none
+    reason: OpenClaw assistants (WP-182)
+  - source: quay.io/codeready-toolchain/claw-proxy
+    tag: "f5aa592"
+    pin: tag
+    signature: none
+    reason: OpenClaw assistants (WP-182)
+  - source: quay.io/docling-project/docling-serve-cpu
+    digest: sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: quay.io/fedora/redis-7
+    digest: sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b
+    pin: digest
+    signature: none
+    reason: UnifAI stack third-party service (ansible/clusters stack.images, pinned by digest)
+  - source: quay.io/jetstack/cert-manager-istio-csr
+    digest: sha256:b62b26e10339803cc0e3643ec90dc2ceaf6eb43b29bf0cadda71a9912a3e6d72
+    tag: "v0.16.0"
+    pin: digest
+    signature: none
+    reason: istio-csr (service mesh certificates)
+  - source: quay.io/jooholee/nfs-provisioner-operator
+    tag: "0.0.9"
+    pin: tag
+    signature: none
+    reason: NFS provisioner operator
+  - source: quay.io/oauth2-proxy/oauth2-proxy
+    digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+    pin: digest
+    signature: none
+    reason: OpenClaw assistants (WP-182)

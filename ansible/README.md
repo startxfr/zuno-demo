@@ -71,6 +71,26 @@ missing, and reads it on every run to (re-)seed Vault, so it can be deleted
 again afterwards unless Vault needs to be reinstalled. `ansible/confidential.yml`
 is gitignored; never commit it.
 
+**Encrypting it (ADR-0603 M22).** The file, and any `ansible/confidential-*.back` copy, can be kept
+`ansible-vault` encrypted so a leak of the working tree or of a backup exposes nothing. `ansible.cfg` points
+`vault_password_file` at `ansible/vault-pass.sh`, which prints the first line of `~/.config/zuno/vault-pass`
+(override with `ZUNO_VAULT_PASS_FILE`), so no `make` target ever prompts. The script never fails when that file
+is missing, so unencrypted checkouts, CI and AAP are unaffected; an encrypted file then fails with Ansible's own
+decrypt error. One-time setup, typed by hand so nothing lands in a log:
+
+```bash
+umask 077; mkdir -p ~/.config/zuno
+read -rs -p 'passphrase: ' p; printf '%s\n' "$p" > ~/.config/zuno/vault-pass; unset p   # keep a copy in your password manager
+ansible-vault encrypt ansible/confidential.yml ansible/confidential-*.back
+ansible-vault edit ansible/confidential.yml     # edit later; ansible-vault view to read
+```
+
+The passphrase file sits on the same disk as the secrets: this protects against leaks through git, backups and
+sync, not against theft of the workstation. Plain `grep` and `diff` on the file no longer work, and any script
+outside this repository that rewrites it must go through `ansible-vault view` and `ansible-vault edit`. The
+Makefile reads `zuno_make_aap_mode` through `ansible-vault view` and refuses to route when the file cannot be
+decrypted, instead of guessing local or remote.
+
 Install the required collections once: `ansible-galaxy collection install -r requirements.yml`.
 
 Every role keeps the same `precheck` / `install` / `uninstall` task file

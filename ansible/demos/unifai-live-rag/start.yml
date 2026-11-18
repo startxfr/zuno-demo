@@ -1,0 +1,29 @@
+---
+# unifai-live-rag start (WP-274, owner's decision of 2026-11-14): consultant-01's library is prepared before the
+# session, so the 5-minute version shows the loaded library. Declared changing in demo.yml: the presenter types the
+# demo id, or DEMO_CONFIRM=unifai-live-rag. The page section `## Presenter lifecycle` > `### Start` says what the
+# presenter does after it.
+- name: "unifai-live-rag start | delete the three named files, and nothing else"
+  ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/_library.yml"
+  vars:
+    rag_args: ["delete", "travel-and-expense-policy.md", "on-call-rota-handbook.md", "questions.md"]
+
+- name: "unifai-live-rag start | upload the two demo files (never questions.md) and wait until they are DONE"
+  ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/_library.yml"
+  vars:
+    rag_args:
+      - "upload"
+      - "{{ zuno_repo_root }}/docs/demo/unifai-rag-upload/travel-and-expense-policy.md"
+      - "{{ zuno_repo_root }}/docs/demo/unifai-rag-upload/on-call-rota-handbook.md"
+      - "--wait"
+      - "300"
+  when: demo_unit_commands | rejectattr('rc', 'equalto', 0) | list | length == 0
+
+- name: "unifai-live-rag start | warm the model with one turn of consultant-01-my-assistant"
+  ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/_library.yml"
+  vars:
+    rag_args: ["warm", "consultant-01-my-assistant"]
+  when: demo_unit_commands | rejectattr('rc', 'equalto', 0) | list | length == 0
+
+- name: "unifai-live-rag start | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

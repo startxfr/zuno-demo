@@ -11,18 +11,16 @@ Run from this directory:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import os
 import sys
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("AAP_API_TOKEN", "test-token")
 os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -30,15 +28,9 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
-
-_spec = importlib.util.spec_from_file_location(
-    "gateway_caller_context", os.path.join(REPO, "components", "mcp-gateway", "app", "caller_context.py")
-)
-caller_context = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(caller_context)
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-TOKEN = "test-workload-token"
 AUD = "aap"  # this server's backend name
 LIMIT = {"AAP_CLUSTER_AUDIT_RATE_LIMIT": "2", "AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS": "900"}
 
@@ -50,14 +42,12 @@ class _Launcher:
     async def __call__(self, progress=None):
         self.count += 1
         if self.fail:
-            raise ValueError("AAP Controller is unreachable")
+            raise server.ToolValueError("AAP Controller is unreachable")
         return {"launched": True, "job": {"id": self.count}}
 
 
 def _headers(sub):
-    h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(audience=AUD, sub=sub, groups=["ocp-ai-ops"], claims={}, tool="cluster_audit", workload_token=TOKEN))
-    return h
+    return headers_for(AUD, "cluster_audit", groups=["ocp-ai-ops"], sub=sub)
 
 
 async def _launch(transport, headers, launcher, env):
@@ -99,13 +89,13 @@ async def test_the_limit_is_per_caller(transport):
 
 
 async def test_unverified_calls_share_one_bucket(transport):
-    """Without a verified context, a caller cannot get a fresh bucket by changing a
-    header: every such call counts against the same one."""
+    """Without a `ctx` claim in the assertion, a caller cannot get a fresh bucket by changing
+    its sub: every such call counts against the same one."""
     _reset()
     launcher = _Launcher()
     for sub in ("x", "y"):
-        await _launch(transport, {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-Caller": sub}, launcher, LIMIT)
-    refused = await _launch(transport, {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-Caller": "z"}, launcher, LIMIT)
+        await _launch(transport, headers_for(AUD, "cluster_audit", groups=None, sub=sub), launcher, LIMIT)
+    refused = await _launch(transport, headers_for(AUD, "cluster_audit", groups=None, sub="z"), launcher, LIMIT)
     assert refused.is_error and launcher.count == 2
 
 
@@ -139,7 +129,7 @@ async def test_a_failure_after_a_successful_post_still_counts(transport):
         if method == "POST":
             posts.append(path)
             return {"id": 40 + len(posts)}
-        raise ValueError("AAP Controller did not answer within 20s (GET job status)")
+        raise server.ToolValueError("AAP Controller did not answer within 20s (GET job status)")
 
     async def launch(headers):
         http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers)
@@ -162,7 +152,7 @@ async def test_a_failure_before_the_post_does_not_count_and_buckets_are_pruned(t
     _reset()
 
     async def fake_request(client, method, path, **kwargs):
-        raise ValueError("AAP Controller is unreachable")
+        raise server.ToolValueError("AAP Controller is unreachable")
 
     with mock.patch.object(server, "_client", lambda: _NoClient()), \
             mock.patch.object(server, "_request", fake_request), mock.patch.dict(os.environ, LIMIT):

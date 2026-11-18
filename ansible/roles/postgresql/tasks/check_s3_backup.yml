@@ -83,6 +83,9 @@
         kind: Job
         name: zuno-postgresql-check-s3-backup
         namespace: zuno-data
+        # A Job deleted through the API without a policy orphans its pods (four were left in zuno-data on 2026-11-14).
+        delete_options:
+          propagationPolicy: Background
         wait: true
 
     # A throwaway Secret built directly from ansible/confidential.yml, NOT
@@ -275,6 +278,8 @@
         kind: Job
         name: zuno-postgresql-check-s3-backup
         namespace: zuno-data
+        delete_options:
+          propagationPolicy: Background
         wait: false
 
     - name: "postgresql | delete the throwaway S3-creds Secret (cleanup)"

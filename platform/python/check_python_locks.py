@@ -17,7 +17,12 @@ For every first-party `requirements.in` (the globs of compile_locks.py):
 6. a library locked by two components is locked at one version (the
    exceptions below carry their reason). A lock listed in
    compile_locks.SEPARATE_ENVIRONMENTS (a tool environment never installed
-   beside a component) is exempt from 4 and 6.
+   beside a component) is exempt from 4 and 6;
+7. no first-party Dockerfile or Containerfile passes a pinned requirement
+   (`name==version`) to `pip install` on its command line: pinned tools (pip,
+   setuptools, wheel, PyYAML) come from the hashed locks under
+   platform/python/bootstrap/, and the copy each MCP server carries for its own
+   build context (`bootstrap-tools.txt`) is byte for byte the original.
 
 Pure static text inspection (needs `packaging`), no network and no pip-tools; wired into
 lint.yml. Run from the repository root:
@@ -188,9 +193,43 @@ def check(dirs: List[pathlib.Path], constraints_file: pathlib.Path = CONSTRAINTS
     return problems
 
 
+# ADR-0603 M20 (WP-226 "not done here", closed 2026-11-12): pinned tools are installed from a hashed lock only.
+DOCKERFILE_GLOBS = ("components/**/Dockerfile*", "components/**/Containerfile*")
+BOOTSTRAP_TOOLS = pathlib.Path("platform/python/bootstrap/tools/requirements.txt")
+BOOTSTRAP_COPY = "bootstrap-tools.txt"
+PIP_INSTALL_RE = re.compile(r"\bpip3?\s+install\b(?P<args>[^&;|]*)")
+PINNED_ARG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(\[[^\]]*\])?==")
+# A COPY whose source is the copy next to the Dockerfile (a per-directory build context).
+COPY_BOOTSTRAP_RE = re.compile(r"^\s*COPY\s+(?:--\S+\s+)*bootstrap-tools\.txt\s", re.MULTILINE)
+
+
+def dockerfile_problems(root: pathlib.Path = REPO_ROOT) -> List[str]:
+    """Every `pip install` of a first-party image names its requirements through `-r <hashed lock>` only, and every
+    MCP server copy of the installer lock equals the original."""
+    problems: List[str] = []
+    files = sorted({p for g in DOCKERFILE_GLOBS for p in root.glob(g) if p.is_file()})
+    original = (root / BOOTSTRAP_TOOLS).read_bytes() if (root / BOOTSTRAP_TOOLS).is_file() else None
+    for path in files:
+        rel = path.relative_to(root)
+        text = path.read_text()
+        logical = re.sub(r"\\\n", " ", "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#")))
+        for match in PIP_INSTALL_RE.finditer(logical):
+            pinned = [a for a in match.group("args").split() if PINNED_ARG_RE.match(a)]
+            if pinned:
+                problems.append(f"{rel}: `pip install {' '.join(pinned)}` installs a pin without a hash "
+                                "(install it from a lock under platform/python/bootstrap/)")
+        if COPY_BOOTSTRAP_RE.search(text):
+            copy = path.parent / BOOTSTRAP_COPY
+            if not copy.is_file():
+                problems.append(f"{rel}: copies {BOOTSTRAP_COPY}, which is missing next to it")
+            elif original is None or copy.read_bytes() != original:
+                problems.append(f"{copy.relative_to(root)}: differs from {BOOTSTRAP_TOOLS} (copy it again)")
+    return problems
+
+
 def main() -> int:
     dirs = discover()
-    problems = check(dirs)
+    problems = check(dirs) + dockerfile_problems()
     for problem in problems:
         print(f"FAIL {problem}")
     print(f"{len(dirs)} lockfile(s) checked, {len(problems)} problem(s)")

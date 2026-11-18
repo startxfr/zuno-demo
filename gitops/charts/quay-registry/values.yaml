@@ -1,0 +1,139 @@
+# ADR-0612 / WP-248. Namespace zuno-registry is created by the namespaces chart (platformNamespaces).
+namespace: zuno-registry
+
+# d0 Application: the OwnNamespace operator (OperatorGroup + Subscription) through the vendored `operator` chart.
+# The Application passes enabled: true, the role passes the discovered channel and catalog.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: quay-registry
+    app: quay-registry
+  subscription:
+    enabled: true
+    name: quay-operator
+    namespace: zuno-registry
+    operator:
+      channel: ""
+      name: quay-operator
+      installPlanApproval: Automatic  # global switch: zuno_operator_install_plan_approval (ansible group_vars)
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: quay-operator-group
+    namespace: zuno-registry
+
+# d1 Application: the operand. Off by default so `helm template` with no values renders nothing.
+registry:
+  enabled: false
+  name: quay
+  # Name of the Secret holding config.yaml (database URI, S3 storage, proxy storage): created by roles/quay_registry.
+  configBundleSecret: quay-config-bundle
+  replicas: 1
+  # ADR-0614 right-sizing: the operator defaults request 2 cores for Quay and
+  # Clair and 0.5 for Redis and Clair's database, against a measured 7-day p95
+  # of 68m, 1m, 1m and 4m (2026-11-13). CPU requests = 2 x p95 (minimum 100m);
+  # every memory value and limit is the operator's own default, unchanged.
+  resources:
+    quay:
+      requests: {cpu: 150m, memory: 8Gi}
+      limits: {cpu: "2", memory: 8Gi}
+    clair:
+      requests: {cpu: 100m, memory: 2Gi}
+      limits: {cpu: "4", memory: 16Gi}
+    redis:
+      requests: {cpu: 100m, memory: 1Gi}
+      limits: {cpu: "4", memory: 16Gi}
+    clairpostgres:
+      requests: {cpu: 100m, memory: 2Gi}
+  # Components the operator does NOT manage (WP-248 step 1): database on PGO (PostgreSQL 15), object storage on S3,
+  # no autoscaler (single replica, ADR-0101), no mirror workers, monitoring left to the platform.
+  unmanaged: [postgres, objectstorage, horizontalpodautoscaler, mirror, monitoring]
+  # Clair (and its database), Redis, route and TLS (cluster wildcard certificate) stay managed.
+
+database:
+  name: quay-db
+  postgresVersion: 15          # Quay documents 15; the shared zuno-data cluster is 18 (WP-248 step 1)
+  storage: 10Gi
+  storageClassName: ""         # empty: cluster default
+  backupRepoStorage: 5Gi
+  # pgBackRest on repo1 (the PVC above), UTC. The image blobs are in the S3 bucket and are not covered: only the Quay metadata is.
+  backupSchedules:
+    full: "0 4 * * 0"
+    differential: "0 4 * * 1-6"
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {memory: 1Gi}
+
+# Pods allowed to reach the registry: every namespace that pulls or pushes images. The router (users, external pushes) and
+# the platform's own namespaces are in the namespaces chart baseline; this lists what the registry itself admits.
+consumers:
+  namespaces:
+    - zuno-ai-run
+    - zuno-ai-build
+    - zuno-unifai
+    - openshift-operators
+    - openshift-gitops
+
+# d0 Application, cluster-scoped: ImageDigestMirrorSet sending the digest pulls of the UnifAI repositories to this registry.
+# Off until the images are in the registry and the owner gives the go (the node configuration is reloaded when it is created).
+redirects:
+  enabled: false
+  host: ""                      # the registry route host; the Application passes it (apps.mycluster.example.com is replaced)
+  source: quay.io/zuno
+  organization: zuno
+  repositories:
+    - unifai-backend
+    - unifai-identity
+    - unifai-multiagent
+    - unifai-rag
+    - unifai-ui
+    - unifai-operator
+    - unifai-operator-bundle
+    - unifai-operator-catalog
+
+# WP-248 family (d): redirect of public third-party images (digest pins only). Keep in step with
+# platform/supply-chain/mirrored-images.yaml (a test compares both). Needs redirects.host.
+publicRedirects:
+  enabled: false
+  sources:
+    - docker.io/bitnamilegacy/rabbitmq
+    - docker.io/grafana/grafana
+    - docker.io/langgenius/dify-api
+    - docker.io/langgenius/dify-plugin-daemon
+    - docker.io/langgenius/dify-web
+    - docker.io/library/mongo
+    - docker.io/library/nginx
+    - docker.io/library/python
+    - docker.io/qdrant/qdrant
+    - docker.io/redis/redisinsight
+    - docker.io/temporalio/temporal
+    - ghcr.io/containers/kubernetes-mcp-server
+    - ghcr.io/kagent-dev/kagent/controller
+    - ghcr.io/kagent-dev/kagent/ui
+    - ghcr.io/open-webui/open-webui
+    - ghcr.io/openclaw/openclaw
+    - quay.io/docling-project/docling-serve-cpu
+    - quay.io/fedora/redis-7
+    - quay.io/jetstack/cert-manager-istio-csr
+    - quay.io/oauth2-proxy/oauth2-proxy
+
+# WP-261 family (e), ADR-0612 addendum 2026-11-14: redirect of the large Red Hat product images (digest pins only), copied
+# into PRIVATE repositories. Keep in step with platform/supply-chain/mirrored-redhat-images.yaml (a test compares both).
+# Needs redirects.host, and the pull robot in the global pull secret first (zuno_quay_node_pull_secret), else the nodes get
+# 401 from the mirror and fall back to registry.redhat.io. Adding a source reloads CRI-O; REMOVING one drains every node.
+redhatRedirects:
+  enabled: false
+  sources:
+    - registry.redhat.io/ansible-automation-platform-27/controller-rhel9
+    - registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9
+    - registry.redhat.io/ansible-automation-platform-27/hub-rhel9
+    - registry.redhat.io/offline-knowledge-portal/rhokp-rhel9
+    - registry.redhat.io/rhoai/odh-built-in-detector-rhel9
+    - registry.redhat.io/rhoai/odh-mlflow-rhel9
+    - registry.redhat.io/rhoai/odh-ogx-core-rhel9
+    - registry.redhat.io/rhoai/odh-trustyai-nemo-guardrails-server-rhel9

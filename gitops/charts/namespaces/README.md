@@ -47,6 +47,9 @@ exception, opening only the listed container ports to plaintext for a named
 non-mesh caller (`reason:`, rendered as the `zuno.io/permissive-reason`
 annotation). `templates/egressfirewall-namespace.yaml` renders the deny-all
 EgressFirewall of an entry with `egressFirewall` (zuno-ai-run), from its host
-list, once the d1 Application passes `clusterBaseDomain`. zuno-unifai's
+list, once the d1 Application passes `clusterBaseDomain`. An entry with
+`egressFirewall.redis` (zuno-ai-run) also allows `redisExternal`, the external
+Redis endpoint `ansible/tasks/redis_seam_values.yml` passes in ADR-0352
+external mode only (WP-214; nothing for the built-in or a `*.svc` name). zuno-unifai's
 EgressFirewall lives in `gitops/charts/unifai`, like the other experience
 charts (ADR-0590). `platform/security/check_mesh_mtls.py` guards both.

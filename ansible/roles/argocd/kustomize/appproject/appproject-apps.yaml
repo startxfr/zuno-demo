@@ -23,11 +23,11 @@ spec:
     Zuno workloads (ADR-0602 clause 5): gitops/apps Applications that render
     namespaced kinds only, in zuno namespaces and the two RHOAI namespaces
     the model catalogue writes
-  # The http S3 chart repository is a known risk (ADR-0602 C4); see
-  # appproject-platform.yaml.
+  # The startx chart repository is read over TLS (S3 REST endpoint) since 2026-11-11 (ADR-0602 amendment,
+  # C4); the plain-http S3 website endpoint is no longer admitted.
   sourceRepos:
     - https://github.com/startxfr/zuno-demo.git
-    - http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+    - https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   destinations:
     - {server: https://kubernetes.default.svc, namespace: "zuno-*"}
     # zuno-models-d1: MaaS model registrations and RHOAI serving runtimes.

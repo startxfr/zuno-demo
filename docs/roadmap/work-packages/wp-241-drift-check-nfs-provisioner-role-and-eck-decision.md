@@ -51,3 +51,6 @@ that the repository does not explain.
 nfs-provisioner adopted live (no restart, no spec change, Subscription pinned Manual on v0.0.9), known-good
 regenerated, `make d3 check drift` clean and strict on demo333. ECK: uninstall after the 2026-11-09 demonstration
 (Subscription and CSV in openshift-operators), then remove its entry from `platform/drift/external-operators.yaml`.
+
+ECK was uninstalled on 2026-11-11 (0f0b0428, CRDs kept). It came back from the web console on 2026-11-12 with OpenShift
+Virtualization; both were removed on 2026-11-14 with the owner's go, CRDs included (see ADR-0608's update of that day).

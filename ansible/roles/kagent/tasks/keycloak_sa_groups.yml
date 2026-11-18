@@ -64,6 +64,19 @@
   register: _kc_groups
   no_log: true
 
+- name: "kagent | work out the groups the service account must hold"
+  ansible.builtin.set_fact:
+    _kagent_wanted: >-
+      {{ _kc_groups.results[1].json
+         if (kagent_groups_follow_persona | bool)
+         else (_kc_groups.results[1].json | selectattr('name', 'in', kagent_groups) | list) }}
+  no_log: true
+
+- name: "kagent | fail when a wanted group is not a group of the persona"
+  ansible.builtin.assert:
+    that: (_kagent_wanted | map(attribute='name') | list | sort) == (kagent_groups | sort) or (kagent_groups_follow_persona | bool)
+    fail_msg: "kagent_groups {{ kagent_groups }} must all be groups of {{ kagent_persona }}."
+
 - name: "kagent | add the missing groups to service-account-kagent"
   ansible.builtin.uri:
     url: "{{ _kc_api }}/users/{{ _kc_users.results[0].json.id }}/groups/{{ item.id }}"
@@ -71,7 +84,19 @@
     headers: "{{ _kc_headers }}"
     status_code: [204]
     validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
-  loop: "{{ _kc_groups.results[1].json | rejectattr('id', 'in', _kc_groups.results[0].json | map(attribute='id') | list) | list }}"
+  loop: "{{ _kagent_wanted | rejectattr('id', 'in', _kc_groups.results[0].json | map(attribute='id') | list) | list }}"
+  loop_control:
+    label: "{{ item.path }}"
+  changed_when: true
+
+- name: "kagent | remove the groups the service account must not hold (S5)"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users/{{ _kc_users.results[0].json.id }}/groups/{{ item.id }}"
+    method: DELETE
+    headers: "{{ _kc_headers }}"
+    status_code: [204]
+    validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+  loop: "{{ _kc_groups.results[0].json | rejectattr('id', 'in', _kagent_wanted | map(attribute='id') | list) | list }}"
   loop_control:
     label: "{{ item.path }}"
   changed_when: true

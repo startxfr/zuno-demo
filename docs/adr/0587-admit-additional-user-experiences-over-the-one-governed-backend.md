@@ -4,6 +4,7 @@
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team
+- **Amended:** 2026-11-17 (see the dated amendment at the end)
 - **Related:** [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md), [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md), [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md), [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md), [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md), [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0588](0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0589](0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
 
 ## Context
@@ -105,3 +106,7 @@ NetworkPolicy peer means a namespace labelled by mistake can reach both gateways
 
 Every experience shows up in `zuno_model_*` with its `client`; an experience that sends nothing to the
 ai-gateway is visible as an empty series, which is the check that it does not bypass it.
+
+## Amendment (2026-11-17): alternative gateways in the alternative scenarios
+
+[ADR-0619](0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md) clause 6 amends clause 1 above. In the alternative scenarios, an experience may also send a model call to an alternative gateway of `zuno-ai-gateways`. That gateway verifies the same `zuno` JWT and holds the provider keys, so the experience still holds no key. The Zuno ai-gateway stays the default connection of every experience, and tools stay behind the mcp-gateway. The status of this record is unchanged.

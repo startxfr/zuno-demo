@@ -13,7 +13,7 @@ split as `cert-manager`.
 This chart deploys OpenShift Service Mesh **3** (the Sail Operator,
 `servicemeshoperator3`), not the Maistra-based OSSM 2. There's no
 OSSM-3-specific startx chart, so this wraps the generic startx `cluster-istio`
-chart (`alias:startx`, same convention as `openshift-ai`/`nvidia-gpu`/
+chart (the startx Helm repo over HTTPS, same convention as `openshift-ai`/`nvidia-gpu`/
 `keycloak`/`postgresql`/`nfd`/`cert-manager`) purely for its vendored
 `operator` subchart (`cluster-istio.operatorIstio`), which renders nothing
 beyond a plain `Subscription`/`OperatorGroup` pair driven entirely by

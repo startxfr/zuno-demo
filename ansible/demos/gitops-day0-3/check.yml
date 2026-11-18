@@ -1,0 +1,21 @@
+---
+# gitops-day0-3 check: the Argo CD Applications the page shows on stage (ADR-0616 clause 9). The page section
+# `## Presenter lifecycle` > `### Check` says what the presenter does after it. The two day-before checks of that
+# section (`make d0 check argocd`, then `make d3 check operators` and `make d3 check drift`) stay with the presenter:
+# the first fails when the GitOps operator pod restarted in the last 15 minutes, the others list findings on demo333
+# (elasticsearch-eck-operator-certified, kubevirt-hyperconverged) that the platform owner decides on. Both are also
+# the steps 3:00, 9:00 and 10:30. No golden-path probe covers this scenario.
+- name: "gitops-day0-3 check | the Application shown at 5:00, and the two known OutOfSync pair"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/argo_apps.yml"
+  vars:
+    argo_apps:
+      - "zuno-ai-gateway-d1"
+      - {"name": "startx-cluster-auth", "sync": "any"}  # OutOfSync/Healthy on demo333: shared resources, benign
+      - {"name": "startx-cluster-infra-config", "sync": "any"}  # OutOfSync/Healthy on demo333: shared resources, benign
+- name: "gitops-day0-3 check | Applications of openshift-gitops that are not Synced and Healthy (a few are expected)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get applications.argoproj.io -n openshift-gitops | awk 'NR==1 || $2!=\"Synced\" || $3!=\"Healthy\"'"
+- name: "gitops-day0-3 check | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

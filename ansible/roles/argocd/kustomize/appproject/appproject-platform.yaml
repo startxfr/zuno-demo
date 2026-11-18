@@ -27,11 +27,11 @@ spec:
   description: >-
     Zuno operators and cluster configuration (ADR-0602 clause 5): the
     gitops/apps Applications that render cluster-scoped kinds or OLM objects
-  # The http S3 chart repository is a known risk (ADR-0602 C4: a tampered
-  # chart in transit); moving it to HTTPS or digests is a later WP-224 step.
+  # The startx chart repository is read over TLS (S3 REST endpoint) since 2026-11-11 (ADR-0602 amendment,
+  # C4); the plain-http S3 website endpoint is no longer admitted.
   sourceRepos:
     - https://github.com/startxfr/zuno-demo.git
-    - http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+    - https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   destinations:
     - {server: https://kubernetes.default.svc, namespace: "zuno-*"}
     - {server: https://kubernetes.default.svc, namespace: ai-tenants}
@@ -62,6 +62,7 @@ spec:
     - {server: https://kubernetes.default.svc, namespace: openshift-opentelemetry-operator}
     - {server: https://kubernetes.default.svc, namespace: openshift-operators}
     - {server: https://kubernetes.default.svc, namespace: openshift-tempo-operator}
+    - {server: https://kubernetes.default.svc, namespace: openshift-user-workload-monitoring}
     - {server: https://kubernetes.default.svc, namespace: policy-controller-operator}
     - {server: https://kubernetes.default.svc, namespace: redhat-ods-applications}
     - {server: https://kubernetes.default.svc, namespace: redhat-ods-monitoring}
@@ -74,16 +75,19 @@ spec:
     - {group: autoscaling.openshift.io, kind: ClusterAutoscaler}
     - {group: cert-manager.io, kind: ClusterIssuer}
     - {group: config.openshift.io, kind: APIServer}
+    - {group: config.openshift.io, kind: ImageDigestMirrorSet}
     - {group: config.openshift.io, kind: OAuth}
     - {group: config.openshift.io, kind: Proxy}
     - {group: console.openshift.io, kind: ConsolePlugin}
     - {group: datasciencecluster.opendatahub.io, kind: DataScienceCluster}
     - {group: dscinitialization.opendatahub.io, kind: DSCInitialization}
     - {group: helm.openshift.io, kind: HelmChartRepository}
+    - {group: imageregistry.operator.openshift.io, kind: Config}
     - {group: keda.sh, kind: ClusterTriggerAuthentication}
     - {group: kueue.openshift.io, kind: Kueue}
     - {group: kueue.x-k8s.io, kind: ClusterQueue}
     - {group: kueue.x-k8s.io, kind: ResourceFlavor}
+    - {group: machineconfiguration.openshift.io, kind: MachineConfigPool}
     - {group: mlflow.opendatahub.io, kind: MLflow}
     - {group: nvidia.com, kind: ClusterPolicy}
     - {group: observability.openshift.io, kind: UIPlugin}
@@ -91,6 +95,7 @@ spec:
     - {group: operator.openshift.io, kind: CertManager}
     - {group: operator.openshift.io, kind: JobSetOperator}
     - {group: perses.dev, kind: PersesGlobalDatasource}
+    - {group: pipelines.openshift.io, kind: GitopsService}
     - {group: policy.sigstore.dev, kind: ClusterImagePolicy}
     - {group: policy.sigstore.dev, kind: TrustRoot}
     # The startx `project` subchart's PreSync hook creates a Namespace, which

@@ -10,7 +10,7 @@ version: 0.1.0
 dependencies:
   - name: cluster-istio
     version: "21.3.277"
-    repository: "alias:startx"
+    repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
   - name: cert-manager-istio-csr
     version: "0.16.0"
     repository: "https://charts.jetstack.io"

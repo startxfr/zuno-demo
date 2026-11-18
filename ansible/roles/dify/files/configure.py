@@ -2,6 +2,9 @@
 # administrator, installs the OpenAI-compatible provider plugin, registers the models behind the token proxy and the
 # governed MCP gateway as a tool. The input is one JSON object on stdin (the password never reaches argv or a log):
 # {email, password, pkg, models: [{name, mode, context}], proxy, mcp_name, proxy_key (WP-225 lot C, may be empty)}
+# WP-300 (ADR-0619 clause 5): a model may carry `endpoint` (default <proxy>/v1) and `endpoint_model` (the name asked
+# of that endpoint, default its own name): a model of an alternative gateway is `<name>-auto` on
+# <proxy>/alt/<name>/v1, asking for `auto`.
 import base64
 import json
 import sys
@@ -80,7 +83,7 @@ def credentials(m):
             "mode": m["mode"], "context_size": str(m["context"]), "max_tokens_to_sample": "4096",
             # WP-225 lot C: the token proxy's inbound key when it asks for one; the proxy drops it either way.
             "display_name": m["name"], "api_key": IN.get("proxy_key") or "dummy-dropped-by-the-token-proxy",
-            "endpoint_url": IN["proxy"] + "/v1", "endpoint_model_name": m["name"],
+            "endpoint_url": m.get("endpoint") or IN["proxy"] + "/v1", "endpoint_model_name": m.get("endpoint_model") or m["name"],
             "function_calling_type": "tool_call", "stream_function_calling": "supported",
             "vision_support": "no_support", "structured_output_support": "not_supported",
         },

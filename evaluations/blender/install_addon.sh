@@ -4,6 +4,7 @@
 #
 #   bash evaluations/blender/install_addon.sh            # fetch, install, show version and checksum
 #   bash evaluations/blender/install_addon.sh --dry-run  # same, but copy nothing
+#   bash evaluations/blender/install_addon.sh --remove   # delete the add-on from this machine (add --dry-run to list)
 #
 # After an update: close Blender completely and reopen it (a running Blender keeps the old module in memory), then
 # tick "Zuno 3D generator (demo)" in Edit > Preferences > Add-ons if it is not ticked.
@@ -13,7 +14,29 @@ set -euo pipefail
 
 BRANCH=${ZUNO_ADDON_BRANCH:-devel}
 FILE=evaluations/blender/zuno_3d_generator.py
-dry=0; [ "${1:-}" = "--dry-run" ] && dry=1
+dry=0; remove=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry=1 ;;
+    --remove) remove=1 ;;
+    *) echo "Usage: $0 [--remove] [--dry-run]" >&2; exit 2 ;;
+  esac
+done
+
+# --remove: delete the add-on from every Blender user add-on folder (`make demo uninstall blender-3d`, ADR-0616).
+# Nothing is fetched, and the platform entry on the cluster is not touched.
+if [ "$remove" = 1 ]; then
+  found=0
+  for dest in "$HOME"/.var/app/org.blender.Blender/config/blender/*/scripts/addons/zuno_3d_generator.py \
+              "$HOME"/.config/blender/*/scripts/addons/zuno_3d_generator.py; do
+    [ -f "$dest" ] || continue
+    found=1
+    if [ "$dry" = 1 ]; then echo "would remove: $dest"; else rm -f "$dest" && echo "removed    : $dest"; fi
+  done
+  [ "$found" = 1 ] || echo "no installed copy found: nothing to remove"
+  [ "$dry" = 1 ] || [ "$found" = 0 ] || echo "Now close Blender completely: a running Blender keeps the module in memory."
+  exit 0
+fi
 
 repo=$(git rev-parse --show-toplevel)
 git -C "$repo" fetch -q origin "$BRANCH"

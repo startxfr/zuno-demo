@@ -1,6 +1,6 @@
 # ADR-0584: Define agent lifecycle states, roles and incident revocation
 
-- **Status:** Partially implemented
+- **Status:** Implemented
 - **Target:** v0.16 (retargeted from v0.15 on 2026-11-07: v0.15 became the demo-ready band of ADR-0605, and WP-221 needs an operator release that waits for the window after the 2026-11-09 demonstration)
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -131,3 +131,13 @@ deletes the agent's team; the delete waits while the chart's `knowledge-<agent>`
 remove the team's workspace and sessions once nothing does. The way back is in the
 [runbook](../platform/agent-revocation-runbook.md). This record moves to `Implemented` when the fork stops pruning the agent
 team on revocation and retirement.
+
+## Status note (2026-11-12): Implemented
+
+The fork defect of the previous note is fixed in UnifAI v0.1.69: R-536, fork commit 3e6897452. A revoked or retired
+agent keeps its group team, so its workspace and sessions stay readable. v0.1.69 is pinned on demo333 since
+2026-11-12 16:49 UTC, operator and stack, with the golden path passing
+([evidence](../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
+
+The fix was not re-run live on demo333. A second revocation rehearsal on a test agent is optional and needs its own go;
+the [runbook](../platform/agent-revocation-runbook.md) keeps the way back.

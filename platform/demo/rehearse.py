@@ -1,0 +1,205 @@
+"""`make demo rehearse <id> 5|15`: the whole sequence without pauses, with a report (ADR-0616 clause 11, WP-270).
+
+status, check, install, start, every step, stop, uninstall, in one runner playbook run. A step the manifest declares
+changing is never run: it is recorded `SKIPPED (mutating)`, optional or not. When the sequence queues golden-path probes or browser checks, the
+command lists them and asks for the demo id first, in the same prompt as the changing units (2026-11-15). An action the manifest lists under
+`not_rehearsed:` (world-model's install: ADR-0616 clause 11) is recorded `SKIPPED` with its reason. The report goes to
+`~/.cache/zuno/demo/rehearsals/<id>-<version>-<date>.md` and ends with `RESULT: PASS` or `RESULT: FAIL`. The session is
+never touched.
+"""
+from __future__ import annotations
+
+import datetime
+import pathlib
+from typing import Dict, List, Optional, Tuple
+
+import guard
+import probe_order
+import session
+from catalogue import Page
+from runner import RunResult, Unit, UnitResult
+
+VERSION_LABEL = {"5": "5-minute", "15": "15-minute", "w": "workshop"}
+
+
+def plan_units(page: Page, version: str, demo_dir: pathlib.Path, manifest: dict) -> Tuple[List[Unit], List[UnitResult]]:
+    """(units to run, results decided without running: skipped and missing files), in sequence order."""
+    to_run: List[Unit] = []
+    decided: List[UnitResult] = []
+    order = ["status", "check", "install", "start"]
+    not_rehearsed = (manifest or {}).get("not_rehearsed") or {}
+    for action in order:
+        if action in not_rehearsed:
+            decided.append(UnitResult(action, "skipped", messages=[f"not rehearsed: {not_rehearsed[action]}"]))
+            continue
+        _add(action, f"{action}.yml", "action", demo_dir, to_run, decided)
+    mutating = guard.mutating_steps(manifest)
+    for step in page.steps(version):
+        if step.time in mutating:
+            decided.append(UnitResult(step.time, "skipped"))
+            continue
+        _add(step.time, f"steps/{step.file_name}", "step", demo_dir, to_run, decided)
+    for action in ("stop", "uninstall"):
+        if action in not_rehearsed:
+            decided.append(UnitResult(action, "skipped", messages=[f"not rehearsed: {not_rehearsed[action]}"]))
+            continue
+        _add(action, f"{action}.yml", "action", demo_dir, to_run, decided)
+    return to_run, decided
+
+
+def _add(name: str, rel: str, kind: str, demo_dir: pathlib.Path, to_run: List[Unit], decided: List[UnitResult]) -> None:
+    if (demo_dir / rel).is_file():
+        to_run.append(Unit(name, rel, kind))
+    else:
+        decided.append(UnitResult(name, "missing", error=f"{rel} is missing (WP-271)"))
+
+
+def sequence(page: Page, version: str) -> List[str]:
+    return ["status", "check", "install", "start"] + [s.time for s in page.steps(version)] + ["stop", "uninstall"]
+
+
+def merge(page: Page, version: str, run: Optional[RunResult], decided: List[UnitResult],
+          names: Optional[List[str]] = None) -> List[UnitResult]:
+    """One result per unit, in sequence order (`names`: a workshop's own order)."""
+    by_name = {u.name: u for u in decided}
+    for u in (run.units if run else []):
+        by_name[u.name] = u
+    order = names if names is not None else sequence(page, version)
+    return [by_name.get(name, UnitResult(name, "failed", error="no result")) for name in order]
+
+
+def report(page: Page, version: str, results: List[UnitResult], run: Optional[RunResult],
+           changing: Optional[Dict[str, object]] = None, confirmed: str = "") -> Tuple[str, bool]:
+    """The rehearsal report. `changing`: the units the manifest declares changing that this rehearsal ran, with what
+    they change; `confirmed`: the demo id that confirmed them (typed or DEMO_CONFIRM)."""
+    passed = not any(r.failed for r in results) and not (run and run.error)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    skipped = [r.name for r in results if r.status == "skipped" and not r.messages]
+    if changing:
+        units = "; ".join(f"{unit} ({guard.mutation_summary(value)})" for unit, value in changing.items())
+        changes = f"- Changing units, confirmed by `{confirmed or '?'}`: {units}"
+    else:
+        changes = "- Changing units: none (every action is a read or has nothing to run)"
+    lines = [
+        f"# Rehearsal: {page.id}, " + ("workshop" if version == "w" else f"{VERSION_LABEL[version]} version"),
+        "",
+        f"- Date: {stamp}",
+        f"- Page: `{page.path.name}`",
+        changes,
+        f"- Steps not run (declared mutating): {', '.join(skipped)}" if skipped else "- Steps not run: none",
+        f"- Log: `{run.log_path}`" if run and run.log_path else "- Log: none (nothing ran)",
+        "",
+        "| Unit | Result | Seconds | Detail |",
+        "|---|---|---|---|",
+    ]
+    for r in results:
+        detail = "; ".join(filter(None, [r.error] + r.messages + [
+            f"{c.get('cmd')} -> exit {c.get('rc')}" for c in r.commands if c.get("rc") not in (0, None)] + [
+            f"{c.get('id')} FAIL" + (f": {c.get('detail')}" if c.get("detail") else "")
+            for c in r.checks if c.get("passed") not in (True, "True", "true")]))
+        status = {"ok": "PASS", "nothing": "PASS (nothing to run)",
+                  "skipped": "SKIPPED" if r.messages else "SKIPPED (mutating)",
+                  "missing": "FAIL (missing)", "failed": "FAIL"}.get(r.status, r.status)
+        cell = " ".join(detail.split()).replace("|", "\\|")
+        lines.append(f"| {r.name} | {status} | {r.seconds:.1f} | {cell} |")
+    lines += failed_output(results)
+    if run and run.error:
+        lines += ["", f"Runner error: {run.error}"]
+    lines += ["", f"RESULT: {'PASS' if passed else 'FAIL'}", ""]
+    return "\n".join(lines), passed
+
+
+def failed_output(results: List[UnitResult]) -> List[str]:
+    """What the failed commands of the units printed (already masked and cut by what recorded them), one block each:
+    the table cell names the failure, this keeps its output next to it instead of only in the log."""
+    lines: List[str] = []
+    for r in results:
+        for c in r.commands:
+            output = str(c.get("output") or "").strip("\n")
+            if c.get("rc") in (0, None) or not output:
+                continue
+            if not lines:
+                lines += ["", "## Output of the failed commands"]
+            lines += ["", f"`{r.name}`: `{c.get('cmd')}` -> exit {c.get('rc')}", "", "```text"]
+            lines += [line.replace("```", "'" * 3) for line in output.split("\n")]
+            lines += ["```"]
+    return lines
+
+
+def write_report(page: Page, version: str, text: str) -> pathlib.Path:
+    directory = session.rehearsals_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    path = directory / f"{page.id}-{version}-{stamp}.md"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def last_rehearsal(demo_id: str, version: str) -> Optional[Tuple[str, str]]:
+    """(date, PASS|FAIL) of the newest report, or None."""
+    directory = session.rehearsals_dir()
+    if not directory.is_dir():
+        return None
+    reports = sorted(directory.glob(f"{demo_id}-{version}-*.md"))
+    reports = [p for p in reports if p.name[len(demo_id) + len(version) + 2:][:4].isdigit()]
+    if not reports:
+        return None
+    newest = reports[-1]
+    result = "?"
+    for line in newest.read_text(encoding="utf-8").split("\n"):
+        if line.startswith("RESULT: "):
+            result = line.split(": ", 1)[1].strip()
+    date = newest.stem[len(demo_id) + len(version) + 2:][:10]
+    return date, result
+
+
+def queued_checks(units: List[Unit], demo_dir: pathlib.Path) -> Tuple[List[str], List[str]]:
+    """(golden-path probes, browser checks) the check and start files of these units queue, read from the files.
+
+    A rehearsal that runs at least one asks for the demo id first (the owner's decision of 2026-11-15): the probes
+    change nothing, but they call the models and spend the probe personas' budgets.
+    """
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    Loader.add_constructor("!unsafe", lambda loader, node: loader.construct_scalar(node))
+    probes: List[str] = []
+    browser: List[str] = []
+
+    def walk(tasks) -> None:
+        for task in tasks or []:
+            if not isinstance(task, dict):
+                continue
+            variables = task.get("vars") if isinstance(task.get("vars"), dict) else {}
+            for name in variables.get("queue_probes") or []:
+                if name not in probes:
+                    probes.append(str(name))
+            for name in variables.get("queue_browser") or []:
+                if name not in browser:
+                    browser.append(str(name))
+            for key in ("block", "rescue", "always"):
+                walk(task.get(key))
+
+    for unit in units:
+        action = unit.action or unit.name
+        if unit.kind != "action" or action not in ("check", "start"):
+            continue
+        path = pathlib.Path(unit.dir or demo_dir) / unit.file
+        try:
+            walk(yaml.load(path.read_text(encoding="utf-8"), Loader=Loader))
+        except (OSError, yaml.YAMLError):
+            continue
+    return probes, browser
+
+
+def check_notices(probes: List[str], browser: List[str]) -> List[str]:
+    notices = []
+    if probes:
+        probes = probe_order.ordered(probes)   # the order flush_checks.yml runs them in
+        what = "every golden-path probe" if "all" in probes else f"golden-path probes: {', '.join(probes)}"
+        notices.append(f"{what} (real model calls, they spend the probe personas' budgets)")
+    if browser:
+        notices.append(f"browser checks: {', '.join(browser)}")
+    return notices

@@ -18,8 +18,9 @@ reached.
 
 Network location (`gitops/charts/mcp-salesforce`'s `NetworkPolicy`,
 restricting ingress to the gateway's pods specifically) is not the only
-control. Every `POST /mcp` call must also carry `X-Zuno-Gateway-Token`, a
-shared secret only the gateway holds (same pattern as confluence/salesforce).
+control. Every `POST /mcp` call must also carry the gateway's
+Vault-Transit-signed call assertion (`Authorization: Bearer`; WP-250 retired the
+shared `X-Zuno-Gateway-Token`); the caller's identity comes from its `ctx` claim.
 
 **Authentication mode: `service-identity`.** Every call to Salesforce uses
 one shared technical connected-app identity - a pre-issued OAuth2 bearer

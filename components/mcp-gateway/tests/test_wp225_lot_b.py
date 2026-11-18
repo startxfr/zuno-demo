@@ -1,7 +1,7 @@
 """WP-225 lot B (ADR-0603 M12, M13, M15) in the mcp-gateway:
 
-- the signed caller context sent to every streamable-HTTP backend, built from the
-  validated identity only;
+- the caller context carried in the signed call assertion (`ctx` claim, WP-250; it was
+  HMAC headers before), built from the validated identity only;
 - the namespace matcher enforced in every selector of a `metrics.query` PromQL
   (app/promql_scope.py), including the crafted queries that try to escape it;
 - the email recipient allowlist of `email.report.send`, by the caller's groups;
@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import hashlib
-import hmac
 import json
 import os
 import pathlib
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -38,7 +37,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient  # noqa: E402
 
 import app.main as gateway_main  # noqa: E402
-from app import caller_context, downstream, promql_scope  # noqa: E402
+import jwt  # noqa: E402
+from cryptography.hazmat.primitives import serialization  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
+
+from app import call_assertion, caller_context, downstream, promql_scope  # noqa: E402
 from app.auth import CallerIdentity, validate_token_or_kubernetes  # noqa: E402
 from app.handlers import email_report  # noqa: E402
 from app.policy import PolicyStore  # noqa: E402
@@ -50,6 +53,20 @@ OPS = CallerIdentity(sub="ops-01", groups=["ocp-ai-ops"], raw_claims={"iss": "zu
                                                                          "preferred_username": "ops-01"}, token="jwt")
 
 
+_GW_KEY = Ed25519PrivateKey.generate()
+_KEY_DIR = tempfile.mkdtemp(prefix="wp250-lotb-")
+_GW_KEY_FILE = os.path.join(_KEY_DIR, "call-assertion.pem")
+with open(_GW_KEY_FILE, "wb") as _fh:
+    _fh.write(_GW_KEY.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                    serialization.NoEncryption()))
+_ASSERTION_ENV = {"MCP_OUTBOUND_IDENTITY": "assertion", "MCP_CALL_ASSERTION_KEY_FILE": _GW_KEY_FILE}
+
+
+def _assertion_claims(header, audience):
+    return jwt.decode(header.split(" ", 1)[1], _GW_KEY.public_key(), algorithms=["EdDSA"], audience=audience,
+                      issuer="mcp-gateway")
+
+
 def _decode(raw):
     return json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
 
@@ -58,7 +75,7 @@ class _Captured(Exception):
     pass
 
 
-def _capture_outbound(binding_name, workload_token="wt"):
+def _capture_outbound(binding_name):
     """Invoke the real downstream path for `binding_name` and return the headers of
     the outbound HTTP client (the MCP session itself is stopped before any I/O)."""
     captured = {}
@@ -71,7 +88,7 @@ def _capture_outbound(binding_name, workload_token="wt"):
         raise _Captured()
 
     binding = gateway_main.binding_registry.resolve(binding_name)
-    with mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", workload_token), \
+    with mock.patch.dict(os.environ, _ASSERTION_ENV), \
             mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
             mock.patch.object(downstream, "streamable_http_client", _stop):
         try:
@@ -83,42 +100,29 @@ def _capture_outbound(binding_name, workload_token="wt"):
 
 
 class CallerContextTest(unittest.TestCase):
-    def test_signed_from_the_identity_for_one_backend(self):
+    def test_the_context_comes_from_the_identity_for_the_assertion(self):
         claims = {**OPS.raw_claims, "email_verified": True}
-        h = caller_context.build(sub="s", groups=["b", "a", "a"], claims=claims, tool="create_page",
-                                 audience="confluence", workload_token="wt", now=1000)
-        raw, sig = h[caller_context.CONTEXT_HEADER], h[caller_context.SIGNATURE_HEADER]
-        expected = hmac.new(caller_context.derive_key("wt", "confluence"), raw.encode(), hashlib.sha256).hexdigest()
-        self.assertEqual(sig, expected)
-        self.assertEqual(_decode(raw), {"v": 1, "aud": "confluence", "sub": "s", "groups": ["a", "b"],
-                                        "email": "ops@example.com", "email_verified": True,
-                                        "username": "ops-01", "tool": "create_page", "iat": 1000})
-        self.assertNotEqual(caller_context.derive_key("wt", "confluence"), b"wt")
-        self.assertNotEqual(caller_context.derive_key("wt", "confluence"), caller_context.derive_key("wt", "aap"),
-                            "each backend has its own key")
+        ctx = caller_context.assertion_context(groups=["b", "a", "a"], claims=claims)
+        self.assertEqual(ctx, {"groups": ["a", "b"], "email": "ops@example.com", "email_verified": True,
+                               "username": "ops-01"})
 
     def test_email_verified_is_true_only_for_a_json_true(self):
         for value in (False, None, "true", 1):
-            h = caller_context.build(sub="s", groups=[], claims={"email": "a@b", "email_verified": value},
-                                     tool="t", audience="salesforce", workload_token="wt")
-            self.assertIs(_decode(h[caller_context.CONTEXT_HEADER])["email_verified"], False, value)
+            ctx = caller_context.assertion_context(groups=[], claims={"email": "a@b", "email_verified": value})
+            self.assertIs(ctx["email_verified"], False, value)
 
-    def test_no_workload_token_or_audience_no_headers(self):
-        self.assertEqual(caller_context.build(sub="s", groups=[], claims={}, tool="t", audience="aap",
-                                              workload_token=""), {})
-        self.assertEqual(caller_context.build(sub="s", groups=[], claims={}, tool="t", audience="",
-                                              workload_token="wt"), {})
-
-    def test_a_consuming_binding_gets_a_context_for_its_own_backend(self):
+    def test_a_consuming_binding_gets_the_context_inside_its_assertion(self):
         binding, captured = _capture_outbound("confluence.page.create")
         self.assertTrue(binding.caller_context)
-        self.assertEqual(captured.get("X-Zuno-Gateway-Token"), "wt")
-        payload = _decode(captured[caller_context.CONTEXT_HEADER])
-        self.assertEqual((payload["aud"], payload["sub"], payload["groups"], payload["tool"]),
-                         ("confluence", "ops-01", ["ocp-ai-ops"], binding.provider_tool))
-        expected = hmac.new(caller_context.derive_key("wt", "confluence"),
-                            captured[caller_context.CONTEXT_HEADER].encode(), hashlib.sha256).hexdigest()
-        self.assertEqual(captured[caller_context.SIGNATURE_HEADER], expected)
+        claims = _assertion_claims(captured["Authorization"], "confluence")
+        self.assertEqual((claims["aud"], claims["sub"], claims["tool"]), ("confluence", "ops-01", binding.provider_tool))
+        self.assertEqual(claims["ctx"], {"groups": ["ocp-ai-ops"], "email": "ops@example.com",
+                                         "email_verified": False, "username": "ops-01"})
+
+    def test_no_shared_secret_and_no_hmac_headers_are_sent_any_more(self):
+        _, captured = _capture_outbound("confluence.page.create")
+        for name in ("X-Zuno-Gateway-Token", "X-Zuno-Caller-Context", "X-Zuno-Caller-Signature"):
+            self.assertNotIn(name, captured)
 
     def test_only_the_four_zuno_servers_consume_the_context(self):
         consuming = {b.backend for b in gateway_main.binding_registry._bindings if b.caller_context}
@@ -127,13 +131,11 @@ class CallerContextTest(unittest.TestCase):
             if b.caller_context:
                 self.assertEqual(b.transport, "streamable-http", b.capability)
 
-    def test_a_third_party_backend_gets_neither_the_context_nor_the_workload_token(self):
+    def test_a_third_party_backend_gets_neither_the_context_nor_an_identity(self):
         binding, captured = _capture_outbound("metrics.query")
         self.assertEqual(binding.backend, "k8s")
-        self.assertNotIn(caller_context.CONTEXT_HEADER, captured)
-        self.assertNotIn(caller_context.SIGNATURE_HEADER, captured)
-        self.assertNotIn("X-Zuno-Gateway-Token", captured)
-        self.assertEqual(captured["Authorization"], "Bearer jwt")
+        for name in ("X-Zuno-Caller-Context", "X-Zuno-Caller-Signature", "X-Zuno-Gateway-Token", "Authorization"):
+            self.assertNotIn(name, captured)
 
     def test_inbound_caller_headers_are_never_forwarded(self):
         """A caller that sends its own X-Zuno-Caller-* to the gateway: the outbound
@@ -152,8 +154,7 @@ class CallerContextTest(unittest.TestCase):
         gateway_main.app.dependency_overrides[validate_token_or_kubernetes] = lambda: OPS
         env = {"MCP_FRONTDOOR_CAPABILITIES": "metrics.query,aap.platform.audit", "METRICS_NAMESPACES_BY_GROUP": ""}
         try:
-            with mock.patch.dict(os.environ, env), \
-                    mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", "wt"), \
+            with mock.patch.dict(os.environ, {**env, **_ASSERTION_ENV}), \
                     mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
                     mock.patch.object(downstream, "streamable_http_client", _stop), \
                     mock.patch.object(gateway_main, "invoke_downstream", downstream.invoke), \
@@ -167,11 +168,11 @@ class CallerContextTest(unittest.TestCase):
             gateway_main.app.dependency_overrides.clear()
         self.assertEqual(len(seen), 2, seen)
         k8s, aap = seen
-        self.assertNotIn("X-Zuno-Caller-Context", k8s)
-        self.assertNotIn("X-Zuno-Caller-Signature", k8s)
-        self.assertNotEqual(aap["X-Zuno-Caller-Context"], forged["X-Zuno-Caller-Context"])
-        self.assertNotEqual(aap["X-Zuno-Caller-Signature"], forged["X-Zuno-Caller-Signature"])
-        self.assertEqual(_decode(aap["X-Zuno-Caller-Context"])["aud"], "aap")
+        for sent in (k8s, aap):
+            self.assertNotIn("X-Zuno-Caller-Context", sent)
+            self.assertNotIn("X-Zuno-Caller-Signature", sent)
+        self.assertNotIn("Authorization", k8s)
+        self.assertEqual(_assertion_claims(aap["Authorization"], "aap")["ctx"]["groups"], ["ocp-ai-ops"])
 
     def test_a_non_boolean_flag_fails_the_binding(self):
         from app.bindings import Binding, _validate

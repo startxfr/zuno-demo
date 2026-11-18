@@ -1,6 +1,6 @@
 # ADR-0038: Use standards-compliant OKF v0.2 Markdown bundles
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0615](0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (2026-11-14: the envelope fields `provenance`, `verification`, `freshness`, free-text `sources` and the per-document `okf_version: v0.2`; the Markdown-bundle layout and the namespaced `zuno` extension stay in force)
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

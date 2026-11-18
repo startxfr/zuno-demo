@@ -1,0 +1,61 @@
+---
+# `make d3 backup quay-registry` - on-demand pgBackRest backup of quay-db (WP-248). Same mechanism as roles/postgresql/tasks/backup.yml:
+# PGO runs a backup Job whenever the pgbackrest-backup annotation changes and reports it under status.pgbackrest.manualBackup,
+# keyed by the annotation value, so the wait is an identity check on the run started here. Scope: the Quay metadata only; the
+# image blobs are in the S3 bucket. The repository is a PVC in the same cluster (repo1): it protects against a bad write or a
+# lost database volume, not against losing the cluster.
+- name: "quay_registry | look up the PostgresCluster"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-db
+  register: _quay_registry_backup_cluster
+
+- name: "quay_registry | fail if quay-db does not exist or has no manual backup block"
+  ansible.builtin.fail:
+    msg: >-
+      quay-db not found in {{ zuno_quay_namespace }}, or its spec.backups.pgbackrest.manual is empty (the d1 Application predates
+      WP-248 backups). Run 'make d2 install quay-registry' first.
+  when: >-
+    (_quay_registry_backup_cluster.resources | default([]) | length) == 0
+    or (_quay_registry_backup_cluster.resources[0].spec.backups.pgbackrest.manual | default({}, true) | length) == 0
+
+- name: "quay_registry | generate the on-demand backup id"
+  ansible.builtin.set_fact:
+    _quay_registry_backup_id: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+
+- name: "quay_registry | trigger an on-demand backup"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-db
+    definition:
+      metadata:
+        annotations:
+          postgres-operator.crunchydata.com/pgbackrest-backup: "{{ _quay_registry_backup_id }}"
+
+# `finished` alone is not success, so succeeded is checked too, and the id must match or an older manual backup would satisfy it.
+- name: "quay_registry | wait for this backup to finish successfully"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay-db
+  register: _quay_registry_backup_poll
+  vars:
+    _mb: "{{ (_quay_registry_backup_poll.resources[0].status.pgbackrest.manualBackup | default({}, true)) }}"
+  until:
+    - (_mb['id'] | default('')) == _quay_registry_backup_id
+    - (_mb['finished'] | default(false)) | bool
+    - (_mb['succeeded'] | default(0)) | int > 0
+  retries: 60
+  delay: 10
+
+- name: "quay_registry | report the backup"
+  ansible.builtin.debug:
+    msg: >-
+      On-demand backup {{ _quay_registry_backup_id }} of quay-db done:
+      {{ (_quay_registry_backup_poll.resources[0].status.pgbackrest.manualBackup | default({}, true)) }}

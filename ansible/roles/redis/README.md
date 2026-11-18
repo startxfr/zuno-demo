@@ -45,3 +45,39 @@ version "v1beta1" of external-secrets.io/ExternalSecret`). `vault` (the
 secret's source) and `namespaces` (owner of `zuno-auth`) still matter
 too, but `external_secrets` (the CRD provider) is the binding constraint
 on ordering.
+
+## Internal or external mode (ADR-0352, WP-214)
+
+`zuno_redis_mode` in `ansible/confidential.yml` (absent = `internal`, the
+behaviour above, unchanged). `external` means a Redis this platform does not
+own; the payload is `zuno_redis_external_{host,port,password,ca_bundle}`
+(documented in `ansible/confidential.example.yml`).
+
+| Verb | Internal | External |
+|---|---|---|
+| install | `install_internal.yml`: the two Applications, as before | `install_external.yml`: validate the payload (sentinel host, port, CA shape) before any write; refuse a TLS endpoint (see Limits); seed the password into Vault `zuno/redis/session-store` (`vault kv put`, a new KV version); run `external_assert.yml` with a hard fail. Nothing is deployed. |
+| check | Applications Synced/Healthy and the master StatefulSet ready | `external_assert.yml`, record only: a `redis-external-assert` redis-cli Job in `zuno-auth` (PING with AUTH, TLS when a CA is given, `maxclients` at least `zuno_redis_external_min_clients`, default 100, when `CONFIG GET` is allowed) |
+| uninstall | deletes both Applications | removes nothing external; only a leftover assert Job/Secret |
+
+Consumers never read the mode (clause 11): `ansible/tasks/resolve_redis_endpoint.yml`
+resolves `redis_endpoint_{host,port,addr,tls,ca_bundle}`, and
+`ansible/tasks/redis_seam_values.yml` (included by `apply_gitops_app.yml` for
+the d1 Applications, external mode only) fills in ai-gateway's
+`semanticCache.redis.addr` and the namespaces chart's `redisExternal` (the
+Allow rule of the zuno-ai-run EgressFirewall). Internal mode renders the same
+Application values as before.
+
+Not available in external mode: the redis_exporter metrics and its
+ServiceMonitor (the `redis_*` series of the Grafana and Perses data
+dashboards lose their source), the 1Gi persistence, this chart's
+NetworkPolicy. The `redis-metrics-from-monitoring` PeerAuthentication
+exception of `zuno-auth` (gitops/charts/namespaces) is left as is in both
+modes: its selector matches no pod once the built-in instance is gone, so it is
+inert, not wrong.
+
+Limits: ai-gateway has no Redis TLS option (its clients are
+`redis.Redis(host, port, password)`), so the install refuses a CA bundle until
+the code and image support it. The mode lives in `confidential.yml`, which AAP
+checkouts do not carry: run this role and the consumer roles locally while the
+mode is external. A mode flip is a migration event: the runbook is in the
+WP-214 brief.

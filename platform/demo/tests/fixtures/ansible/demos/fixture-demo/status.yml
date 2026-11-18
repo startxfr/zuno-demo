@@ -1,0 +1,19 @@
+---
+# Status: one read without a shell, then whether the fixture add-on marker exists.
+- name: "fixture | read the last commit"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "git log -1 --format=%h"
+
+- name: "fixture | look for the add-on marker"
+  ansible.builtin.stat:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.cache/zuno/demo/fixture-demo.installed"
+  register: _fixture_marker
+
+- name: "fixture | record the add-on"
+  ansible.builtin.set_fact:
+    demo_unit_checks: >-
+      {{ demo_unit_checks + [{'agent': demo_id, 'layer': demo_unit.name, 'id': 'fixture-add-on',
+         'category': 'add-on', 'passed': true,
+         'detail': 'installed' if _fixture_marker.stat.exists else 'not installed', 'duration_ms': 0}] }}

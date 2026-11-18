@@ -1,6 +1,11 @@
 ---
 # ADR-0588 (WP-181): Open WebUI, the general-purpose chat experience.
 # Order: secrets in Vault, the admin group in Keycloak, then the Application.
+# WP-296: open_webui_alt_gateways lives in ansible/clusters/<cluster>.yml (committed, so AAP reads it too). Without
+# this include the role kept its empty default and the Application was applied unchanged (live, 2026-11-17).
+- name: "open-webui | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "open-webui | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
@@ -27,21 +32,31 @@
     (_open_webui_network.resources[0].spec.clusterNetwork | default([]) | length) == 0 or
     (_open_webui_network.resources[0].spec.serviceNetwork | default([]) | length) == 0
 
+# WP-296: a chart cannot write its subchart's values, so the one list open_webui_alt_gateways goes to the three
+# values that need it; openaiBaseApiUrls keeps the chart's own first URL (the ai-gateway). Empty list: no key added.
+- name: "open-webui | the values of the alternative gateways (WP-296)"
+  ansible.builtin.set_fact:
+    _open_webui_alt_values: >-
+      {{ {} if (open_webui_alt_gateways | length) == 0 else {
+           'altGateways': open_webui_alt_gateways,
+           'global': {'zuno': {'altGateways': open_webui_alt_gateways}},
+           'open-webui': {'openaiBaseApiUrls':
+             ((lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/charts/open-webui/values.yaml') | from_yaml)['open-webui'].openaiBaseApiUrls[:1])
+             + (open_webui_alt_gateways | map(attribute='url') | list)}
+         } }}
+
 - name: "open-webui | apply the Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "open-webui"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-open-webui-d1"
-    gitops_app_extra_helm_values:
-      global:
-        zuno:
-          clusterBaseDomain: "{{ cluster_base_domain }}"
-          routeHost: "open-webui.{{ cluster_base_domain }}"
-      egress:
-        clusterCIDRs: >-
-          {{ (_open_webui_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
-             + _open_webui_network.resources[0].spec.serviceNetwork }}
+    gitops_app_extra_helm_values: >-
+      {{ {
+           'global': {'zuno': {'clusterBaseDomain': cluster_base_domain, 'routeHost': 'open-webui.' ~ cluster_base_domain}},
+           'egress': {'clusterCIDRs': (_open_webui_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
+                                      + _open_webui_network.resources[0].spec.serviceNetwork}
+         } | combine(_open_webui_alt_values, recursive=True) }}
 
 - name: "open-webui | wait for the Deployment to be available"
   kubernetes.core.k8s_info:

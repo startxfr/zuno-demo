@@ -38,6 +38,15 @@ dify_plugin_sha256: a3c6524f183083e0f6f57ac50f201700fd019e786bd1971249ef086adcb7
 dify_models:
   - { name: auto, mode: chat, context: 128000 }
   - { name: zuno-code, mode: chat, context: 32000 }
+# WP-300 (ADR-0619 clause 5): the alternative AI gateways Dify also gets a model for, in the `altGateways`
+# contract: {name, label, url, models}. Dify cannot forward a user token, so each goes through the token proxy's
+# alternate route (WP-297): the list is given to the zuno-token-proxy release of this namespace (the route, the
+# egress rule to zuno-ai-gateways:8080), and `make d2 configure dify` registers one model per entry, named
+# <name>-auto (Dify indexes models by name), on http://zuno-token-proxy:8080/alt/<name>/v1, asking the gateway for
+# the entry's first `models` item (default auto). Empty: the values and the models are the ones of before.
+zuno_dify_alt_gateways: []
+# The context size Dify is told for a model of an alternative gateway (an entry's own `context` wins).
+dify_alt_model_context: 128000
 # WP-205: the External Knowledge API and the one knowledge base registered in Dify. kb_id is the
 # knowledge_id Dify sends to the adapter (KNOWLEDGE_BASES of gitops/charts/zuno-dify-knowledge).
 dify_knowledge:

@@ -1,0 +1,62 @@
+---
+# Status reads: each workload is ready. A Deployment or StatefulSet has all its desired replicas ready; a Pod is
+# Ready (the Tempo monolith runs as the bare pod tempo-tempo-0).
+# Vars: workloads ([{name, namespace, kind (default Deployment)}]).
+# Deployments and StatefulSets are read with one list per namespace and kind, not one call per workload: each
+# k8s_info call starts a module, and dify's ten Deployments took most of its 73 s status (2026-11-15). A Pod is read
+# by name (a namespace's whole pod list would be heavier).
+- name: "demo | workloads: start the list of reads"
+  ansible.builtin.set_fact:
+    _demo_wl_groups: []
+
+- name: "demo | workloads: one read per namespace and kind"
+  ansible.builtin.set_fact:
+    _demo_wl_groups: "{{ (_demo_wl_groups + [_demo_wl_key]) | unique }}"
+  loop: "{{ workloads | default([]) }}"
+  loop_control:
+    label: "{{ _demo_wl_key }}"
+  vars:
+    _demo_wl_kind: "{{ item.kind | default('Deployment') }}"
+    _demo_wl_key: "{{ item.namespace }}/{{ _demo_wl_kind }}/{{ item.name if _demo_wl_kind == 'Pod' else '' }}"
+
+- name: "demo | read the workloads"
+  kubernetes.core.k8s_info:
+    api_version: "{{ 'v1' if item.split('/')[1] == 'Pod' else 'apps/v1' }}"
+    kind: "{{ item.split('/')[1] }}"
+    namespace: "{{ item.split('/')[0] }}"
+    name: "{{ item.split('/')[2] if item.split('/')[2] | length > 0 else omit }}"
+  loop: "{{ _demo_wl_groups }}"
+  register: _demo_workloads
+  failed_when: false
+
+- name: "demo | record the workloads"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ workloads | default([]) }}"
+  loop_control:
+    label: "{{ _demo_kind }} {{ item.namespace }}/{{ item.name }}"
+  vars:
+    _demo_kind: "{{ item.kind | default('Deployment') }}"
+    _demo_key: "{{ item.namespace }}/{{ _demo_kind }}/{{ item.name if _demo_kind == 'Pod' else '' }}"
+    _demo_read: "{{ _demo_workloads.results | selectattr('item', 'equalto', _demo_key) | first | default({}, true) }}"
+    _demo_obj: >-
+      {{ _demo_read.resources | default([]) | selectattr('metadata.name', 'equalto', item.name) | first
+         | default({}, true) }}
+    _demo_pod_ready: >-
+      {{ _demo_obj.status.conditions | default([]) | selectattr('type', 'equalto', 'Ready')
+         | map(attribute='status') | first | default('absent') }}
+    _demo_desired: "{{ _demo_obj.spec.replicas | default(1) | int if _demo_obj else 0 }}"
+    _demo_ready: "{{ _demo_obj.status.readyReplicas | default(0) | int if _demo_obj else 0 }}"
+    _demo_ok: >-
+      {{ (_demo_pod_ready == 'True') if _demo_kind == 'Pod'
+         else ((_demo_desired | int > 0) and (_demo_ready | int >= _demo_desired | int)) }}
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "{{ _demo_kind | lower }}/{{ item.namespace }}/{{ item.name }}"
+      category: workload
+      passed: "{{ (_demo_obj | length > 0) and (_demo_ok | bool) }}"
+      detail: >-
+        {{ 'not found' if not _demo_obj else (('Ready=' ~ _demo_pod_ready) if _demo_kind == 'Pod'
+           else (_demo_ready ~ '/' ~ _demo_desired ~ ' ready')) }}
+      duration_ms: 0

@@ -1,0 +1,18 @@
+---
+# The IAM identity that writes the PostgreSQL pgBackRest repo2 and the UnifAI backups into the cluster's backups bucket
+# (ADR-0546 convention zuno-<cluster>-backups). The bucket itself already exists and MariaDB writes under mariadb/ with
+# its own identity; this one is scoped to the two prefixes below and cannot read or write mariadb/.
+# Per-cluster values live in ansible/clusters/<cluster>.yml (ADR-0547).
+zuno_backups_s3_bucket: ""            # e.g. zuno-demo333-backups
+zuno_backups_s3_region: eu-central-1  # passed explicitly: the AWS profile's declared region is wrong
+zuno_backups_s3_iam_user: "{{ zuno_backups_s3_bucket }}-databases"
+# Key prefixes this identity may use: pgBackRest repo2-path /postgresql and UnifAI's unifai/<namespace>.
+zuno_backups_s3_prefixes:
+  - postgresql
+  - unifai
+# AWS profile of the operator; needs IAM user/policy/key rights and s3:HeadBucket.
+zuno_backups_aws_profile: default
+# Nothing is written to AWS unless this is true (default: print the plan only).
+backups_bucket_apply: false
+# Where the one-time access key lands (0600, outside the repository). It cannot be read again from AWS.
+backups_bucket_key_file: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/zuno/{{ zuno_backups_s3_iam_user }}-key.json"

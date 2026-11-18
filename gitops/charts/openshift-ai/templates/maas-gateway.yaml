@@ -42,10 +42,20 @@ data:
   # traffic, materially heavier than a plain sidecar. Same
   # infrastructure.parametersRef ConfigMap mechanism as the `service` key
   # above, keyed by resource kind, per Istio's Gateway API deployer.
+  # ADR-0614 (WP-260 P3): maasGateway.replicas pods spread over zones, so a
+  # zone or node loss leaves one gateway carrying every model call.
   deployment: |
     spec:
+      replicas: {{ .Values.maasGateway.replicas | default 1 }}
       template:
         spec:
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  gateway.networking.k8s.io/gateway-name: maas-default-gateway
           containers:
             - name: istio-proxy
               resources:

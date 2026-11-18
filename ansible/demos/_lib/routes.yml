@@ -1,0 +1,41 @@
+---
+# Status reads: each Route exists and is admitted; its host is recorded.
+# Vars: routes ([{namespace, name} or {namespace, host}]). Match by host when the name is generated (the RHTAS
+# operator names its Routes fulcio-server-4z2gl...).
+- name: "demo | read the Routes"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name | default(omit) }}"
+  loop: "{{ routes | default([]) }}"
+  loop_control:
+    label: "{{ item.namespace }}/{{ item.name | default(item.host) }}"
+  register: _demo_routes
+  failed_when: false
+
+- name: "demo | record the Routes"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+  loop: "{{ _demo_routes.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.namespace }}/{{ item.item.name | default(item.item.host) }}"
+  vars:
+    _demo_matches: >-
+      {{ (item.resources | default([]) | selectattr('spec.host', 'equalto', item.item.host) | list)
+         if item.item.host is defined else (item.resources | default([])) }}
+    _demo_obj: "{{ _demo_matches | first | default({}, true) }}"
+    _demo_admitted: >-
+      {{ _demo_obj.status.ingress | default([]) | map(attribute='conditions') | map('default', [])
+         | map('selectattr', 'type', 'equalto', 'Admitted') | map('selectattr', 'status', 'equalto', 'True')
+         | map('list') | select | list | length > 0 }}
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: "route/{{ item.item.namespace }}/{{ item.item.name | default(item.item.host) }}"
+      category: route
+      passed: "{{ (_demo_obj | length > 0) and (_demo_admitted | bool) }}"
+      detail: >-
+        {{ ('https://' ~ _demo_obj.spec.host ~ ('' if _demo_admitted | bool else ' (not admitted)'))
+           if _demo_obj else 'not found' }}
+      duration_ms: 0

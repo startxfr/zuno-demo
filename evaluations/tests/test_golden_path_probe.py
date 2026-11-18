@@ -156,6 +156,25 @@ class GuardrailsAndTrace(unittest.TestCase):
         self.assertIn("2 span(s)", r.detail)
 
 
+class AiGatewayLogs(unittest.TestCase):
+    """ADR-0614: the ai-gateway runs two replicas, so its log must be read from every pod."""
+
+    def test_reads_every_replica_with_no_tail_limit(self):
+        seen = {}
+        real = g.oc
+        g.oc = lambda *args, **kw: seen.setdefault("args", args) or types.SimpleNamespace(stdout="", returncode=0)
+        try:
+            g.ai_gateway_logs("5m")
+        finally:
+            g.oc = real
+        args = seen["args"]
+        self.assertIn("-l", args)
+        self.assertIn("app.kubernetes.io/name=ai-gateway", args)
+        self.assertIn("--tail=-1", args)
+        self.assertIn("--since=5m", args)
+        self.assertNotIn("deploy/ai-gateway", args)
+
+
 class WorldModel(unittest.TestCase):
     OK = {"runtime_ready": True, "engine": "waypoint-1.5-1b", "encoder": "nvenc", "create_status": 201, "frames": 30,
           "first_keyframe": True, "edit_status": 202, "edit_result": "applied", "edit_ms": 1800, "released": True}

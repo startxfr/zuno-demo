@@ -117,7 +117,10 @@ class ScenarioResult:
     skipped: bool = False
 
 
-_token_cache: Dict[str, str] = {}
+# persona -> (access token, time.monotonic() after which a fresh one is fetched)
+_token_cache: Dict[str, tuple] = {}
+# Re-mint this long before the token's own expiry, so a call never carries a token that expires on the way.
+TOKEN_REFRESH_MARGIN_SECONDS = 30
 
 
 def _login_name(persona: str) -> str:
@@ -133,9 +136,16 @@ def get_token(persona: str) -> str:
     the UnifAI UI's own browser OIDC flow, see unifai_target.py). The token
     is for the platform services called directly below (MCP gateway,
     ai-gateway); UnifAI itself is driven through a session cookie.
+
+    The token is cached per persona until shortly before its `expires_in`: a
+    long run (the Arkos gate with its trace-proven scenarios takes longer than
+    the realm's access-token lifespan) otherwise sends an expired token to the
+    last checks, which then fail on 401 "Signature has expired" instead of
+    testing what they test.
     """
-    if persona in _token_cache:
-        return _token_cache[persona]
+    cached = _token_cache.get(persona)
+    if cached and time.monotonic() < cached[1]:
+        return cached[0]
     if not TOKEN_CLIENT_SECRET:
         raise RuntimeError("EVAL_CLIENT_SECRET (zuno-evaluations) is required to obtain persona tokens")
     if not DEMO_PASSWORD:
@@ -154,8 +164,10 @@ def get_token(persona: str) -> str:
         timeout=10,
     )
     resp.raise_for_status()
-    token = resp.json()["access_token"]
-    _token_cache[persona] = token
+    body = resp.json()
+    token = body["access_token"]
+    lifetime = int(body.get("expires_in") or 60)
+    _token_cache[persona] = (token, time.monotonic() + max(lifetime - TOKEN_REFRESH_MARGIN_SECONDS, 0))
     return token
 
 
@@ -700,6 +712,57 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
+def _unifai_gateway_model_calls(run_id: str, tempo_url: str, task: str):
+    from unifai_target import tempo_gateway_model_calls  # lazy, same reason as _unifai()
+
+    return tempo_gateway_model_calls(run_id, tempo_url, task=task)
+
+
+def u_chat_routing(s: Dict[str, Any]) -> ScenarioResult:
+    """One turn of one task's workflow is served by the expected model at the expected classification: the
+    pair of coding examples (tekos write-code at C1 on Mistral Codestral, arkos write-code at C3 on the local
+    gpt-oss-20b).
+
+    The proof is the ai-gateway's own `model_call` spans for the run (Tempo, `TEMPO_URL`), the provider and
+    level of every model call of the turn. Without `TEMPO_URL` the routing decision carried on the answer
+    (`routing_of`) is used when the workflow returns one; with neither, the scenario is skipped, never passed.
+    A fallback to another provider fails it: the scenario proves which model serves the task, not only that
+    the task answers."""
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
+    expect = set(s["expect_providers"])
+    level = s.get("expect_classification", "")
+    try:
+        run_ = _unifai().run(s["persona"], s["message"], workflow=s["workflow"],
+                             timeout=int(s.get("timeout_seconds", 180)))
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    if run_.status != 200 or not run_.reply.strip():
+        return ScenarioResult(s["id"], s["title"], False,
+                              f"status={run_.status} reply_chars={len(run_.reply)} {str(run_.raw)[:200]}")
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    if tempo:
+        try:
+            calls = _unifai_gateway_model_calls(run_.session_id, tempo, s.get("task", ""))
+        except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
+            return ScenarioResult(s["id"], s["title"], False, f"trace backend: {exc}")
+        source = "model_call spans"
+        if not calls:
+            return ScenarioResult(s["id"], s["title"], False, f"no model_call span for run {run_.session_id}")
+    else:
+        routing = run_.raw.get("routing")
+        if not routing:
+            return _skip(s, "no trace backend (TEMPO_URL unset) and no routing decision on the answer")
+        calls, source = [routing], "routing decision"
+    seen = [f"{c.get('provider')}@{c.get('classification')}" + (" (fallback)" if c.get("fallback_used") else "")
+            for c in calls]
+    ok = all(c.get("provider") in expect and not c.get("fallback_used") for c in calls) and (
+        not level or all(c.get("classification") == level for c in calls))
+    detail = (f"{source}: {seen}; expected {sorted(expect)}" + (f" at {level}" if level else "")
+              + f"; reply_chars={len(run_.reply)} run={run_.session_id}")
+    return ScenarioResult(s["id"], s["title"], ok, detail)
+
+
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
     """ADR-0007 on UnifAI: a placeholder agent must not answer. Its workflow is not exposed to
     the persona; if it nevertheless is, a chat turn must not return a reply."""
@@ -823,6 +886,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "rag_retrieval_has_citation": u_rag_retrieval,
     "rag_retrieval_executed": u_rag_retrieval_executed,
     "chat_delegates": u_chat_delegates,
+    "chat_routing": u_chat_routing,
     "chat_blocked_for_placeholder_agent": u_chat_blocked_for_placeholder_agent,
     # ADR-0526 (WP-087): only the agents whose scenarios.yaml declares the
     # type actually run it.

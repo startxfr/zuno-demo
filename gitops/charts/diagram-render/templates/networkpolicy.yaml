@@ -1,7 +1,7 @@
 # diagram-render must accept traffic ONLY from mcp-gateway, not other
 # same-namespace pods (e.g. ai-gateway) - same reasoning as
 # gitops/charts/mcp-confluence's own NetworkPolicy. The app also validates
-# the X-Zuno-Gateway-Token shared secret as defense in depth (server.js).
+# the gateway's signed call assertion as defense in depth (server.js, assertion.js).
 #
 # Live-cluster-confirmed 2026-08-23: this exact class of gap (a
 # NetworkPolicy never granting mcp-gateway ingress to a service it needs

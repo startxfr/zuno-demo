@@ -1,6 +1,0 @@
-apiVersion: v2
-name: okf-mirror
-description: In-cluster OCI registry (zot) holding the admitted OKF release by digest, so pod start does not depend on quay.io (ADR-0611, WP-246).
-type: application
-version: 0.1.0
-appVersion: "2.1.22"

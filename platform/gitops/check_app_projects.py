@@ -98,6 +98,8 @@ LIVE_ONLY_KINDS: Dict[str, str] = {
 # rendering them here keeps what a real install applies inside the check.
 # Source: the include of ansible/tasks/apply_gitops_app.yml in each role.
 PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
+    # ADR-0612 family (c): the redirect of the UnifAI images is committed off; a real install after the owner's flip renders it.
+    "zuno-quay-registry-d0": {"redirects": {"enabled": True, "host": "quay.example"}},
     # ansible/roles/cert_manager: both ADR-0211 consumer patches (APIServer, IngressController).
     "zuno-cert-manager-d1": {"acme": {"consumers": {"routerDefaultCert": True, "apiServerNamedCert": True}}},
     # ansible/roles/nvidia_gpu: the ClusterPolicy with the discovered spec.
@@ -125,6 +127,8 @@ PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
     "zuno-external-secrets-d1": {"operatorconfig": {"enabled": True}, "secretStores": {"enabled": True}},
     "zuno-postgresql-d1": {"postgresCluster": {"enabled": True}},
     "zuno-mlflow-d1": {"mlflowConfig": {"enabled": True}},
+    # ADR-0614: the per-component infra-node switches, committed off and flipped one at a time during the rollout.
+    "zuno-machines-d0": {"infraPlacement": {"registry": True, "userWorkloadMonitoring": True, "gitops": True}},
 }
 
 
@@ -344,12 +348,22 @@ def check_apps(rendered: List[Rendered], projects: Dict[str, Dict[str, Any]], cl
     return used
 
 
-def check_unused_whitelist(projects: Dict[str, Dict[str, Any]], used: Dict[str, Set[str]], findings: Findings) -> None:
+def check_unused_whitelist(projects: Dict[str, Dict[str, Any]], used: Dict[str, Set[str]], findings: Findings,
+                           unproven: bool = False) -> None:
+    """A whitelist entry no Application renders is a permission nobody uses. When some chart's subcharts are not built
+    (a workstation without `helm dependency build`), the kinds those subcharts render are invisible, so an entry that looks
+    unused cannot be proven so: it is reported as a note, not a failure. CI builds the dependencies and passes
+    --strict-dependencies, where every chart is rendered whole and the entry fails."""
     for name in (PLATFORM,):
         for entry in (projects.get(name) or {}).get("clusterResourceWhitelist", []) or []:
             gk = f"{entry.get('group', '')}/{entry.get('kind', '')}"
-            findings.check(gk in used.get(name, set()) or gk in LIVE_ONLY_KINDS,
-                           f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application")
+            if gk in used.get(name, set()) or gk in LIVE_ONLY_KINDS:
+                findings.passes += 1
+            elif unproven:
+                findings.notes.append(f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application "
+                                      "that could be rendered whole (some subcharts are not built); not proven unused")
+            else:
+                findings.check(False, f"AppProject {name}: clusterResourceWhitelist entry {gk} is rendered by no Application")
 
 
 def check_root_app(findings: Findings, path: pathlib.Path = ROOT_APP) -> None:
@@ -392,7 +406,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     check_projects(projects, findings)
     check_root_app(findings)
     used = check_apps(rendered, projects, cluster_scoped, findings)
-    check_unused_whitelist(projects, used, findings)
+    check_unused_whitelist(projects, used, findings,
+                           unproven=any('not built, rendered without them' in n for n in findings.notes))
     counts: Dict[str, int] = {}
     for app in rendered:
         counts[app.project] = counts.get(app.project, 0) + 1

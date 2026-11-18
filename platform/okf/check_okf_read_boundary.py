@@ -34,7 +34,7 @@ HOOKS: Dict[str, str] = {
     "components/mcp-gateway/app/agent_declarations.py": "mcp-gateway hook",
     "components/a2a-gateway/app/agent_declarations.py": "a2a-gateway hook (ADR-0585)",
     "platform/supply-chain/admit_okf_bundle.py": "admission hook (agents_view)",
-    "platform/supply-chain/okf_narrowing.py": "admission hook (v0.3 narrowing rule)",
+    "platform/supply-chain/okf_narrowing.py": "admission hook (narrowing rule, legacy v0.3 and profile 1.0)",
     "platform/okf/generate_stack_config.py": "ADR-0581 generator hook",
     "platform/okf/release_cache.py": "release access point",
     "components/mlops/src/mlops.py": "mlops hook (_task_system_prompt)",

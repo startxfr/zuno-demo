@@ -1,0 +1,31 @@
+---
+# ADR-0619 (WP-292). The switch lives in ansible/clusters/<cluster>.yml (committed: AAP reads the SCM) and may be
+# overridden locally from ansible/confidential.yml. The models and redis roles read the same switch, to admit the
+# Praxis pod (altGatewayPeers.praxis in both charts).
+zuno_praxis_enabled: false
+
+praxis_namespace: zuno-ai-gateways
+praxis_app_name: zuno-praxis-d1
+praxis_app_name_d0: zuno-praxis-d0
+
+# The image: quay.io/zuno/praxis-ai, by digest (ADR-0619 clause 7). `make d2 build praxis` (WP-291) prints it; write it
+# in ansible/clusters/<cluster>.yml. Empty: the install refuses, there is no image to run.
+zuno_praxis_image_digest: ""
+
+# Claude and Codestral, the only SaaS models (ADR-0619 clause 3). Off: the gateway serves the sovereign models only and
+# its ExternalSecrets for the two provider keys are not rendered (an unseeded Vault path would leave them Degraded).
+zuno_praxis_saas_enabled: false
+# token_rate_limit per subject on the shared Redis, and the OpenTelemetry export: both need OUR build of Praxis (features
+# token-rate-limit-filter and opentelemetry, ADR-0620), not the published image. Off until that image is the one deployed.
+zuno_praxis_token_rate_limit_enabled: false
+# Tokens per authenticated subject per window (1h). A low value shows the 429 live (`-e zuno_praxis_token_rate_limit_capacity=2000`
+# with the 2000 reserved per call: the second call of a subject is refused); install again without it to restore.
+zuno_praxis_token_rate_limit_capacity: 1000000
+zuno_praxis_otel_enabled: false
+# Admit the zuno-agent-gateway proxy in Praxis's NetworkPolicy: pairs with the connectivity-link
+# praxisWorkstationEntry (WP-298), turn both on together.
+zuno_praxis_workstation_entry: false
+
+# Rolling the Deployment pulls the image, starts Praxis and waits for its metrics port /ready.
+praxis_wait_retries: 40
+praxis_wait_delay: 15

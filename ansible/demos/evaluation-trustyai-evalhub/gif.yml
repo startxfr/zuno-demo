@@ -1,0 +1,26 @@
+---
+# evaluation-trustyai-evalhub: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written
+# BEFORE the first take: tune it with `make demo gif evaluation-trustyai-evalhub` once a take exists.
+# `make demo record evaluation-trustyai-evalhub` takes the Grafana rows of the 5-minute version as ai-ops-01
+# (evaluations/browser/walkthroughs/evaluation-trustyai-evalhub.mjs, sign-in by walkthroughs/_grafana.mjs).
+# Markers written by the walkthrough, in order: login, dashboard, jobs, ragas, garak, end.
+# Every moment is a still: a dashboard does not move. No caption quotes a score: the values are the last run's.
+# Row 3:30 (two repository files in an editor) is not filmed; rows 0:00 and 4:30 are words.
+record_notice: >-
+  a recorded browser session as ai-ops-01 on Grafana, read only: it signs in through OpenShift (provider openshift)
+  and Keycloak, opens the dashboard TrustyAI evaluation & guardrails over the last 7 days and looks at three panels;
+  no prompt, no model call, no evaluation started, nothing created, nothing saved or starred in Grafana; the sign-in
+  is the only trace (an OpenShift and a Grafana session of ai-ops-01) and, if OpenShift shows its Authorize Access
+  page for Grafana's proxy, the take approves it (user:info and user:check-access): one OAuth authorization of
+  ai-ops-01 stays on the cluster; Grafana's product announcement, if it shows, is closed by its cross, which stores
+  in Grafana's user storage of ai-ops-01 that the notice was seen
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account"}
+  - {still: dashboard, hold: 5, caption: "Evaluations and guardrails on one dashboard"}
+  - {still: jobs, hold: 9, step: "0:45", caption: "0:45  The evaluators are Jobs on the cluster, pass or fail"}
+  - {still: ragas, hold: 10, step: "1:30", caption: "1:30  RAGAS: is each RAG answer grounded and relevant?"}
+  - {still: garak, hold: 10, step: "2:30", caption: "2:30  Garak: jailbreak attack success rate, per model"}
+  - {still: end, hold: 6, step: "4:30", caption: "Measured before they change; failures stay visible"}

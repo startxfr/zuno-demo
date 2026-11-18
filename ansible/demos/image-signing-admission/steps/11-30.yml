@@ -1,0 +1,11 @@
+---
+# image-signing-admission 11:30 (15-minute version, step 12 of the 15-minute sequence). Do: `grep -c 'release_tag'
+# platform/supply-chain/pinned-releases.yaml`, then `grep -A8 'release_tag: v0.15.0'
+# platform/supply-chain/pinned-releases.yaml`
+# Both are plain reads of a repository file, run by readonly.py (first-segment grep on a repository file).
+- name: "image-signing-admission 11:30 | the ledger file: the count and the v0.15.0 entry"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "grep -c 'release_tag' platform/supply-chain/pinned-releases.yaml"
+      - "grep -A8 'release_tag: v0.15.0' platform/supply-chain/pinned-releases.yaml"

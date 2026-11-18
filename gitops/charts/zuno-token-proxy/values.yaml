@@ -38,6 +38,16 @@ mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 aiHeaders: {}
 mcpHeaders: {}
 
+# WP-297 (ADR-0619 clause 5): the alternative AI gateways this proxy also fronts, in the `altGateways` contract
+# of the client charts: {name, label, url, models}, plus two optional keys read here only: `headers` (fixed
+# headers for that gateway; default aiHeaders) and `timeoutSeconds` (read timeout; default upstreamTimeoutSeconds).
+# `url` is the gateway's OpenAI base URL (it ends with /v1); the client calls
+# http://zuno-token-proxy.<namespace>.svc:8080/alt/<name>/v1 with the same dummy key. The gateway sees this
+# client's Keycloak token, as the Zuno gateways do. Empty (the default): no route, no env, no egress rule.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []
+
 # Pods of the client namespace allowed to call the proxy (empty = every pod of the namespace).
 clientPodSelector: {}
 
@@ -45,6 +55,9 @@ egress:
   # The two gateways' namespace and pod port (WP-179 ingress peers).
   gatewayNamespace: zuno-ai-run
   gatewayPort: 8080
+  # The alternative gateways' namespace and pod port (ADR-0619 clause 2); used only when altGateways is not empty.
+  altGatewayNamespace: zuno-ai-gateways
+  altGatewayPort: 8080
   # Pod and Service networks, excluded from the HTTPS-out rule; the client's role
   # reads them from Network.config.openshift.io/cluster, as ansible/roles/open_webui does.
   clusterCIDRs:

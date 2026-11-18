@@ -12,17 +12,17 @@
 # Requires zuno_vault_token (ADR-0602 clause 1 / WP-223): the caller includes
 # ansible/tasks/vault_login.yml once before its seed loop - not here, so a
 # loop of N seeds logs in once, not N times.
+# ADR-0603 M9: both commands go through ansible/tasks/vault_cli.yml, which passes the token and the values as
+# files, never on the exec command line.
 - name: "vault | check whether zuno/{{ vault_seed_path }} already exists"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -format=json zuno/{{ vault_seed_path }}"
-  register: _vault_seed_existing
-  changed_when: false
-  failed_when: false
-  no_log: true
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv get -format=json zuno/{{ vault_seed_path }}"
+    vault_cli_fail_on_error: false
+
+- name: "vault | remember the existence check of zuno/{{ vault_seed_path }}"
+  ansible.builtin.set_fact:
+    _vault_seed_existing_rc: "{{ vault_cli_result.rc | int }}"
 
 # Review finding (WP-223): only "no value found" (vault exits 2) means the path
 # is missing. Any other failure (exec or TLS error, standby node) must stop the
@@ -30,17 +30,13 @@
 - name: "vault | fail when the existence check itself failed"
   ansible.builtin.fail:
     msg: >-
-      Could not tell whether zuno/{{ vault_seed_path }} exists (rc={{ _vault_seed_existing.rc | default('n/a') }}).
+      Could not tell whether zuno/{{ vault_seed_path }} exists (rc={{ _vault_seed_existing_rc }}).
       Not seeding: a read error is not proof the path is empty.
-  when: (_vault_seed_existing.rc | default(1)) not in [0, 2]
+  when: (_vault_seed_existing_rc | int) not in [0, 2]
 
 - name: "vault | seed zuno/{{ vault_seed_path }} (first run only)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/{{ vault_seed_path }}
-      {% for field_name, field_value in vault_seed_fields.items() %}{{ field_name }}={{ field_value | quote }} {% endfor %}"
-  when: _vault_seed_existing.rc == 2
-  no_log: true
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv put zuno/{{ vault_seed_path }} @PAYLOAD"
+    vault_cli_payload: "{{ vault_seed_fields }}"
+  when: (_vault_seed_existing_rc | int) == 2

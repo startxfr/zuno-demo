@@ -70,6 +70,29 @@ class Pin(unittest.TestCase):
               admission=lambda refs: [v.Result(r, True, "admitted") for r in refs])
         self.assertIn(NEW, self.path.read_text(encoding="utf-8"))
 
+    def test_a_digest_missing_from_the_internal_registry_changes_nothing_and_is_named(self):
+        """WP-282: operator, bundle and catalog are all checked, before the webhook is asked."""
+        asked, admitted = [], []
+
+        def registry(refs):
+            asked.extend(refs)
+            return [{"reference": r, "ok": "bundle" not in r, "reason": "is not in the registry"} for r in refs]
+
+        with self.assertRaises(p.PinError) as ctx:
+            p.pin("latest", "0.1.40", self.path, resolver=resolver, verifier=ok, registry=registry,
+                  admission=lambda refs: admitted.extend(refs) or [])
+        self.assertEqual({r.split("@")[0].rsplit("/", 1)[1] for r in asked},
+                         {"unifai-operator-catalog", "unifai-operator", "unifai-operator-bundle"})
+        self.assertIn("unifai-operator-bundle@", str(ctx.exception))
+        self.assertIn("1 image(s) not in the internal registry", str(ctx.exception))
+        self.assertEqual(admitted, [])
+        self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)
+
+    def test_a_registry_that_holds_everything_lets_the_pin_through(self):
+        p.pin("latest", "0.1.40", self.path, resolver=resolver, verifier=ok,
+              registry=lambda refs: [{"reference": r, "ok": True, "reason": ""} for r in refs])
+        self.assertIn(NEW, self.path.read_text(encoding="utf-8"))
+
     def test_a_catalog_digest_without_its_version_tag_is_warned_about(self):
         seen = []
         p.pin("latest", "0.1.40", self.path, dry_run=True, resolver=resolver, verifier=ok, warn=seen.append)

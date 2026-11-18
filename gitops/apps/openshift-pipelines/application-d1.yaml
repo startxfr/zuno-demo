@@ -1,0 +1,31 @@
+---
+# ADR-0620 (WP-291): the generic source-image-build Pipeline and the quay.io push Secret in
+# zuno-ai-build. PipelineRuns are created by Ansible build roles (ansible/roles/praxis_build)
+# and are excluded from ArgoCD (ansible/roles/argocd/kustomize/argocd/argocd.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-pipelines-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-119"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-pipelines
+    helm:
+      releaseName: zuno-openshift-pipelines-d1
+      values: |
+        sourceBuilds:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-build
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

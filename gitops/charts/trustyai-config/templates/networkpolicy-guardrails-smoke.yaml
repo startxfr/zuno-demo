@@ -1,0 +1,43 @@
+{{- /*
+The operator creates a public edge Route for the built-in detector server and the GuardrailsOrchestrator CRD
+has no switch to turn it off. The Route answered /health and /docs from the internet without any
+authentication (checked 2026-11-14). The mesh exception for this workload cannot tell the router from
+monitoring, so the entry is closed one layer lower: only the namespace itself (ai-gateway calls the Service)
+and the monitoring stacks may reach the pod. The ingress namespace is absent, so the Route stops answering.
+Same pattern as the *-prometheus-scraping policies of the model pods.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.guardrailsSmoke.enabled .Values.guardrailsSmoke.closeRoute }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.guardrailsSmoke.name }}-no-router
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: trustyai-guardrails
+    app.kubernetes.io/component: guardrails-smoke
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.guardrailsSmoke.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 15090
+          protocol: TCP
+{{- end }}

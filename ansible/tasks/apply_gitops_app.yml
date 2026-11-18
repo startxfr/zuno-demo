@@ -101,6 +101,14 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/keycloak_seam_values.yml"
   when: (zuno_keycloak_mode | default('internal')) == 'external'
 
+# ADR-0352 / WP-214: the same for an EXTERNAL Redis (ai-gateway's REDIS_ADDR, the zuno-ai-run EgressFirewall rule).
+# Only d1 Applications carry Redis seams; internal mode skips this, so nothing is rendered differently.
+- name: "gitops | point the Redis consumers at the external Redis (ADR-0352, external mode only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/redis_seam_values.yml"
+  when:
+    - (zuno_redis_mode | default('internal')) == 'external'
+    - gitops_app_phase == 'd1'
+
 # Global OLM approval switch (zuno_operator_install_plan_approval): one variable for every operator Subscription.
 - name: "gitops | apply the global OLM approval mode to the chart's Subscriptions"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/install_plan_approval.yml"

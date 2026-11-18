@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.68, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.71, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:e497eb34f7f1e71e56e3fca498ec64f8dc0772299af692a3772b3f0f67aa0f28
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:f745767713c1404fb06670c345546476ab3c482639c169b05e28f72a9149bb9c
   catalogSourceName: unifai-operator-catalog
   channel: alpha
   package: unifai-operator
@@ -41,6 +41,14 @@ stack:
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
   extraEnv: {}
+  # Typed replacements of the former extraEnv RAG_BEARER_AUDIENCE and OUTBOUND_ALLOWED_HOSTS (unifai-operator >= 0.1.70).
+  # Audience a user token must carry for the RAG search (mcp-gateway rag_query, trustyai-eval, evaluations).
+  # Rendered as spec.rag.bearerAudience.
+  ragBearerAudience: zuno-admin-api
+  # Hosts multiagent may call besides the stack's own namespace, which the operator adds itself (an extraEnv
+  # OUTBOUND_ALLOWED_HOSTS would replace the whole value). zuno-ai-run holds mcp-gateway and a2a-gateway (delegation).
+  # Rendered as spec.outboundAllowedHosts.
+  outboundAllowedHosts: [.zuno-ai-run.svc, .zuno-ai-run.svc.cluster.local]
   # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
   # embedding model of `rag` below.
   memory:
@@ -130,6 +138,49 @@ stack:
 # `enabled: false` plus a `disabledReason` here (ArgoCD recreates it otherwise).
 egress:
   enabled: true
+  # The address ranges AWS publishes for S3 in the backup bucket's region (stack.backup.region), allowed on 443 next to
+  # the name rules (templates/egressfirewall.yaml says why). Refresh: curl -s https://ip-ranges.amazonaws.com/ip-ranges.json |
+  # jq -r '.prefixes[] | select(.service=="S3" and .region=="<region>") | .ip_prefix' | sort -u. A region missing here
+  # keeps the name rules only: it works, slowly. eu-west-2 from syncToken 1794458826 (2026-11-12); eu-central-1 (the
+  # backups bucket's region since 2026-11-14) from syncToken 1794608225 (2026-11-13).
+  s3CidrsByRegion:
+    eu-central-1:
+      - 1.178.10.0/24
+      - 16.12.24.0/21
+      - 16.12.32.0/22
+      - 16.15.20.0/22
+      - 3.2.112.0/24
+      - 3.2.70.0/24
+      - 3.5.120.0/22
+      - 3.5.134.0/23
+      - 3.5.136.0/22
+      - 3.65.246.0/28
+      - 3.65.246.16/28
+      - 52.219.140.0/24
+      - 52.219.168.0/24
+      - 52.219.169.0/24
+      - 52.219.170.0/23
+      - 52.219.208.0/23
+      - 52.219.210.0/24
+      - 52.219.211.0/24
+      - 52.219.218.0/24
+      - 52.219.44.0/22
+      - 52.219.72.0/22
+    eu-west-2:
+      - 1.178.94.0/24
+      - 16.12.15.0/24
+      - 16.12.16.0/23
+      - 18.168.37.160/28
+      - 18.168.37.176/28
+      - 3.2.110.0/24
+      - 3.2.72.0/24
+      - 3.5.244.0/22
+      - 52.219.219.0/24
+      - 52.95.142.0/23
+      - 52.95.144.0/24
+      - 52.95.148.0/23
+      - 52.95.150.0/24
+      - 52.95.191.0/24
   # The Kubernetes API on the control-plane nodes (6443): rag-server's
   # TokenReview (stack.rag.tokenReview; RAG_TOKENREVIEW_ENABLED=true live).
   apiServer: true
@@ -157,6 +208,19 @@ egress:
       reason: git RAG source (UnifAI 0.1.65), archive download.
   # Not listed: us.cloud.langfuse.com (multiagent LANGFUSE_BASE_URL, but
   # LANGFUSE_ENABLED=false live). Add it here when Langfuse is turned on.
+
+# WP-299 (ADR-0619 clause 5): the alternative AI gateways, {name, label, url, models}. Each entry is one more
+# shared UnifaiLLM, <gatewayLLM.name>-<name> (zuno-gateway-praxis), next to the one below and built in like it
+# (gatewayLLM.builtin): the entry's url, the user's own token (forward_user_token), model_name the entry's first
+# `models` item (default auto), and NO routing lookup (/routing-decisions exists on the Zuno ai-gateway only).
+# The agent bundles and the tasks keep the Zuno ai-gateway. With an entry, `.<altGatewayNamespace>.svc` is added
+# to the hosts multiagent may call (stack.outboundAllowedHosts). zuno-unifai has no egress NetworkPolicy to
+# extend. Empty (the default): nothing more is rendered.
+#   altGateways:
+#     - {name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}
+altGateways: []
+# The alternative gateways' namespace (ADR-0619 clause 2).
+altGatewayNamespace: zuno-ai-gateways
 
 # Shared LLM of the platform: the ai-gateway, called with the user's own token
 # (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.
@@ -269,3 +333,10 @@ redhatDocs:
 #   aclGroups: [agent_tekos]
 #   syncInterval: 6h
 #   resyncToken: demo-1   # WP-200: change the value to sync now (a live oc patch is reverted by ArgoCD)
+
+# The zuno-cluster-reader credential tier's ServiceAccount, used by the *-check Job Templates in AAP.
+# templates/rolebinding-aap-day0-check.yaml lets it run the backup check's short-lived Job in this namespace.
+# Kept in sync by hand with gitops/charts/aap-config/values.yaml, as gitops/charts/postgresql does.
+dayCheck:
+  serviceAccount: aap-day0-check
+  namespace: zuno-aap

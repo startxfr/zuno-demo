@@ -17,6 +17,13 @@ spec:
     path: gitops/charts/diagram-render
     helm:
       releaseName: zuno-diagram-render-d1
+      valuesObject:
+        callAssertion:
+          # WP-250 lot 2 (WP-247): the PUBLIC half of the Vault Transit key mcp-call-assertion.
+          publicKey: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEA3UJL9yklPJrs7fUan0/ESqoNUfsbxsCKvWAG9aHu2WE=
+            -----END PUBLIC KEY-----
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

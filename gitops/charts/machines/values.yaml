@@ -242,6 +242,118 @@ cluster-machine:
           - key: zuno.io/gpu-burst
             value: "true"
             effect: NoSchedule
+      # General-purpose workers, one per zone (2026-11-13). They exist so the
+      # three control-plane nodes can stop running workloads
+      # (Scheduler mastersSchedulable=false, ansible/roles/machines): on
+      # demo333 a master hit 97% CPU with 179 pods, etcd answered slowly and
+      # every operator lost its leader election. Zone-spread because EBS
+      # volumes are zone-bound: a pod leaving master N must be able to land
+      # in master N's zone. The installer's own worker sets stay at 0 (t3a).
+      # No taint, no label: any non-GPU pod may land here. Replicas are
+      # never pushed by Argo (ignoreDifferences), scale with `oc scale`.
+      - name: zuno-worker-a
+        az: a
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 200
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-worker-b
+        az: b
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-b
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 200
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-worker-c
+        az: c
+        type: worker
+        group: general
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.4xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-c
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 200
+              volumeType: gp3
+        replicas: 1
+      # Infra nodes, one per zone (ADR-0614, 2026-11-13). type: infra makes the
+      # subchart label them node-role.kubernetes.io/infra (no worker label) and
+      # taint them node-role.kubernetes.io/infra:NoSchedule, so only components
+      # that tolerate it land here: the Red Hat infra-eligible set only (default
+      # router, internal registry, platform + user-workload monitoring,
+      # OpenShift GitOps, Quay). Sized for one zone lost: ~5 vCPU / 34 GiB of
+      # requests must fit on the two survivors (2 x m5a.2xlarge). Monitoring and
+      # Quay DB volumes are bound to zones a and b, hence one node per zone. The
+      # infra MachineConfigPool below gives them the worker config.
+      - name: zuno-infra-a
+        az: a
+        type: infra
+        group: infra
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.2xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-infra-b
+        az: b
+        type: infra
+        group: infra
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.2xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-b
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+      - name: zuno-infra-c
+        az: c
+        type: infra
+        group: infra
+        ami: ami-mycluster-placeholder
+        instanceType: m5a.2xlarge
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-c
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+      # unifai-worker-a (two m5a.4xlarge in zone a, 75 GB, created by hand on
+      # 2026-10-15) is NOT declared here: it is drained and retired by WP-260 P4,
+      # and declaring it would make ArgoCD adopt a MachineSet whose selector
+      # differs from the chart's.
 
   machineAutoscaler:
     enabled: false # flipped by zuno-machines-d0
@@ -259,9 +371,66 @@ cluster-machine:
   # startx-cluster-machine-* apps managed MachineConfig(Pool)s and
   # MachineHealthChecks too; those stay out of scope here (the worker/infra
   # MCPs they created were orphaned in place, see ADR-0351).
+  # machineConfigPool: only the subchart's built-in "infra" pool (worker +
+  # infra MachineConfigs, nodeSelector node-role.kubernetes.io/infra). The
+  # storage/virt pools stay off and the list is empty, so the live master and
+  # worker pools are never rendered. Flipped on by zuno-machines-d0 (ADR-0614).
   machineConfigPool:
-    enabled: false
+    enabled: false # flipped by zuno-machines-d0
+    infra: true
+    storage: false
+    virt: false
+    list: []
   machineConfig:
     enabled: false
   machineHealthCheck:
     enabled: false
+
+# Spot overflow workers (ADR-0614). The vendored cluster-machine subchart cannot
+# render spotMarketOptions, so templates/machineset-spot.yaml renders these.
+# ami / securityGroupName / subnet_name are placeholders that
+# ansible/roles/machines replaces exactly like the subchart list. No replicas
+# here: the MachineAutoscalers rendered next to them own them (min 0, max
+# maxReplicas). Both are rendered only when enabled, so a push of this chart
+# never creates an autoscaler for a MachineSet that does not exist yet.
+# 0 until the ClusterAutoscaler sees Pending pods (build or e2e peaks, or the
+# overflow after a zone is lost); the on-demand zuno-worker-a/b/c alone carry
+# the cluster, Spot is never counted for the one-zone-lost sizing.
+spotWorkers:
+  enabled: false # flipped by zuno-machines-d0
+  list:
+    - name: zuno-worker-spot-a
+      az: a
+      group: general-spot
+      ami: ami-mycluster-placeholder
+      instanceType: m5a.2xlarge
+      securityGroupName: mycluster-infraid-node
+      subnet_name: mycluster-infraid-subnet-private-a
+      volumeSize: 200
+      maxReplicas: 1
+    - name: zuno-worker-spot-b
+      az: b
+      group: general-spot
+      ami: ami-mycluster-placeholder
+      instanceType: m5a.2xlarge
+      securityGroupName: mycluster-infraid-node
+      subnet_name: mycluster-infraid-subnet-private-b
+      volumeSize: 200
+      maxReplicas: 1
+    - name: zuno-worker-spot-c
+      az: c
+      group: general-spot
+      ami: ami-mycluster-placeholder
+      instanceType: m5a.2xlarge
+      securityGroupName: mycluster-infraid-node
+      subnet_name: mycluster-infraid-subnet-private-c
+      volumeSize: 200
+      maxReplicas: 1
+
+# ADR-0614: OpenShift built-ins moved onto the infra nodes by
+# templates/infra-placement.yaml. One switch each, all false until the infra
+# nodes exist; flipped one at a time in zuno-machines-d0's values.
+infraPlacement:
+  registry: true   # P2 step 1, 2026-11-13
+  userWorkloadMonitoring: true   # WP-260 P2 step 4, 2026-11-13
+  gitops: true   # WP-260 P2 step 5, 2026-11-13

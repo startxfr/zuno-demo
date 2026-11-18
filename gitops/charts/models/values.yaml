@@ -115,6 +115,17 @@ hardwareProfiles:
 metrics:
   enabled: true
 
+# ADR-0619 clause 2 / WP-292: the alternative AI gateway Praxis AI (namespace zuno-ai-gateways) calls the four local
+# models as the ai-gateway does: its pod is admitted by their NetworkPolicies on 8000 (templates/networkpolicy-*.yaml)
+# and its ServiceAccount has a MaaSSubscription and a MaaSAuthPolicy per model (maas.models below). Off by default:
+# with it off the render is the one of before; the Praxis release turns it on.
+altGatewayPeers:
+  praxis:
+    enabled: false
+    namespace: zuno-ai-gateways
+    podName: praxis
+    serviceAccount: praxis
+
 # WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
 # runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
 # 8000. templates/networkpolicy-evalhub-clients.yaml admits them, per listed model.
@@ -836,6 +847,17 @@ weshModel:
   # Flipped 2026-09-05: verified byte-identical to modelsS3 first (226
   # objects, same sizes, empty aws s3 sync --dryrun).
   s3Source: sources
+  # 2026-11-17 (owner report: praxis.qwen3.5-9b-wesh answered with odd symbols).
+  # Root cause, measured on vLLM raw: no sampling defaults in the exported
+  # generation_config.json (6/32 answers with foreign-script tokens, 0/32 with
+  # these values), and the answer landing in `reasoning` (content null) because
+  # the fine-tune never closes the template's `<think>`. Empty map = no flag.
+  defaultChatTemplateKwargs:
+    enable_thinking: false
+  generationConfig:
+    temperature: 0.7
+    top_k: 20
+    top_p: 0.95
   # The variant carries all of Comage's traffic and sits in the larger
   # 48GB slice, so it keeps the same 32768 the other 48GB model uses.
   maxModelLen: 32768

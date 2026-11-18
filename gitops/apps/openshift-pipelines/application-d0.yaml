@@ -1,0 +1,33 @@
+---
+# ADR-0620 (WP-291): the Red Hat OpenShift Pipelines operator (Subscription only) in
+# openshift-operators, whose global OperatorGroup already exists. The channel and catalog are
+# discovered by ansible/roles/openshift_pipelines (ADR-0048). The Pipeline itself is the d1
+# Application, in zuno-ai-build.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-pipelines-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-120"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-pipelines
+    helm:
+      releaseName: zuno-openshift-pipelines-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

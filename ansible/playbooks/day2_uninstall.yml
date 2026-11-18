@@ -16,6 +16,8 @@
       # ADR-0599/ADR-0600 (WP-202): Dify and kagent first, like the other experience clients.
       # ADR-0604 (WP-235): before everything it relies on, and before the GPU node (make d0 uninstall world-model-gpu).
       - world_model
+      # ADR-0619 (WP-292): an alternative gateway the experience clients may call: before the models it relies on.
+      - praxis
       - kagent
       - dify
       - openclaw
@@ -27,7 +29,8 @@
       - mlops
       - agents
       - mcp
-      - okf_mirror
+      # ADR-0612 (WP-248): after everything that pulls from it.
+      - quay_registry
       - models
       - llm
       - namespaces

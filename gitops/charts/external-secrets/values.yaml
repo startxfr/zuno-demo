@@ -58,6 +58,7 @@ secretStores:
     - redhat-ods-monitoring
     - zuno-aap
     - zuno-ai-build
+    - zuno-ai-gateways
     - zuno-ai-run
     - zuno-auth
     - zuno-data

@@ -33,6 +33,15 @@ spec:
     ragClients:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+  {{- $hosts := $s.outboundAllowedHosts | default list }}
+  {{- if .Values.altGateways }}
+  {{- /* WP-299 (ADR-0619 clause 5): multiagent may also call the alternative gateways' namespace. */}}
+  {{- $hosts = append $hosts (printf ".%s.svc" .Values.altGatewayNamespace) | uniq }}
+  {{- end }}
+  {{- with $hosts }}
+  outboundAllowedHosts:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- $extra := deepCopy ($s.extraEnv | default dict) }}
   {{- if $s.identity.oidcClaims }}
   {{- /* ADR-0583: teams may hold Keycloak groups; the identity service verifies the token against the realm JWKS. */}}
@@ -96,6 +105,9 @@ spec:
   {{- end }}
   {{- end }}
   rag:
+    {{- with $s.ragBearerAudience }}
+    bearerAudience: {{ . }}
+    {{- end }}
     embedding:
       mode: remote
       url: {{ $s.rag.embeddingUrl }}

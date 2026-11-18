@@ -17,8 +17,8 @@ regenerate this page, don't edit policy to match a stale copy here.
 
 Source files:
 
-- [`policies/knowledge/knowledge-policy.yaml`](../../policies/knowledge/knowledge-policy.yaml)
-- [`policies/tools/tool-policy.yaml`](../../policies/tools/tool-policy.yaml)
+- [`policies/knowledge/knowledge-policy.yaml`](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/knowledge/knowledge-policy.yaml)
+- [`policies/tools/tool-policy.yaml`](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/tools/tool-policy.yaml)
 - [`gitops/charts/keycloak/files/realm-zuno.json`](../../gitops/charts/keycloak/files/realm-zuno.json) (business-role group definitions)
 
 ## Business roles (ADR-0340 conceptual mapping)

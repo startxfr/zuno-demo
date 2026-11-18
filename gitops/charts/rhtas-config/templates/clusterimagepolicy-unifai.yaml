@@ -9,6 +9,44 @@
 # and the operator release workflow. mode warn = a violation is a warning, nothing is refused.
 # Not checked here: provenance and SBOM (see values.yaml); zuno's verifier does it before the stack is applied.
 # v1alpha1, see clusterimagepolicy.yaml.
+{{- $mirror := .Values.policyOperand.unifai.signatureMirror }}
+{{- if $mirror.host }}
+{{- /*
+WP-248 family (c): the signatures are read from the internal registry, so a pod start does not need quay.io for the
+check either. The webhook accepts one `source` per authority, hence one policy per repository, with exact globs
+(`unifai-operator**` would also catch unifai-operator-bundle and -catalog). Images keep their quay.io names; the
+mirror holds `sha256-<digest>.sig` next to each image (platform/supply-chain/mirror_unifai_images.py).
+*/ -}}
+{{- range $mirror.repositories }}
+---
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: ClusterImagePolicy
+metadata:
+  name: zuno-unifai-images-{{ . }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  mode: {{ $.Values.policyOperand.unifai.mode }}
+  images:
+    - glob: {{ printf "%s/%s@*" $mirror.origin . | quote }}
+    - glob: {{ printf "%s/%s:*" $mirror.origin . | quote }}
+  authorities:
+    - name: github-keyless
+      source:
+        - oci: {{ printf "%s/%s/%s" $mirror.host $mirror.organization . | quote }}
+      ctlog:
+        trustRootRef: public-sigstore-trust-root
+      keyless:
+        trustRootRef: public-sigstore-trust-root
+        identities:
+          {{- range $.Values.policyOperand.unifai.subjectRegExps }}
+          - issuer: {{ $.Values.policyOperand.unifai.issuer | quote }}
+            subjectRegExp: {{ . | quote }}
+          {{- end }}
+{{- end }}
+{{- else }}
 apiVersion: policy.sigstore.dev/v1alpha1
 kind: ClusterImagePolicy
 metadata:
@@ -32,4 +70,5 @@ spec:
           - issuer: {{ $.Values.policyOperand.unifai.issuer | quote }}
             subjectRegExp: {{ . | quote }}
           {{- end }}
+{{- end }}
 {{- end }}

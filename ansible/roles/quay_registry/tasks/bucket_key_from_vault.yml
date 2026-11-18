@@ -1,0 +1,37 @@
+---
+# The bucket access key is created once by registry_bucket.yml and written to ~/.config/zuno/<bucket>-key.json on the workstation
+# that ran it; bootstrap.yml keeps a second copy in Vault (registry/quay-bucket). When that file is gone (the workstation copy
+# was deleted on purpose, or this is another workstation), the role reads the Vault copy instead, so the key does not have to
+# stay on disk. Sets _quay_registry_s3_key = {AccessKeyId, SecretAccessKey}, the shape of the AWS CLI's create-access-key output.
+- name: "quay_registry | bucket key | find the Vault pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "quay_registry | bucket key | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+- name: "quay_registry | bucket key | read registry/quay-bucket"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
+  vars:
+    vault_cli_args: "kv get -format=json zuno/registry/quay-bucket"
+    vault_cli_capture_stdout: true
+    vault_cli_fail_on_error: false
+
+- name: "quay_registry | bucket key | stop when Vault does not hold the key either"
+  ansible.builtin.fail:
+    msg: >-
+      The bucket key file {{ zuno_quay_s3_key_file }} is missing and Vault has no zuno/registry/quay-bucket (rc={{ vault_cli_result.rc }}).
+      Create the bucket key first: ansible-playbook ansible/playbooks/registry_bucket.yml -e registry_bucket_apply=true.
+  when: (vault_cli_result.rc | int) != 0
+
+- name: "quay_registry | bucket key | use the Vault copy"
+  ansible.builtin.set_fact:
+    _quay_registry_s3_key:
+      AccessKeyId: "{{ (vault_cli_result.stdout | from_json).data.data.access_key_id }}"
+      SecretAccessKey: "{{ (vault_cli_result.stdout | from_json).data.data.secret_access_key }}"
+  no_log: true

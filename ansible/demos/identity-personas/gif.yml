@@ -1,0 +1,24 @@
+---
+# identity-personas: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE
+# the first take: tune it with `make demo gif identity-personas` once a take exists.
+# `make demo record identity-personas` films TWO takes in one run, consultant-02 then sale-01, each in its own
+# browser and its own video (evaluations/browser/walkthroughs/identity-personas.mjs): every moment names its take.
+# Markers written by each take, in order: login, unifai, workspaces, webui, q-sent, q-done, end.
+# The answers are live model answers to a prompt the page marks untested: no caption quotes or counts the tools;
+# set the captions after the first take, from what its q-done.png pictures show.
+# Row 0:00 (the persona table of the catalogue) is words: it is not filmed.
+record_notice: >-
+  two recorded browser sessions, as consultant-02 then as sale-01, each in UnifAI then in Open WebUI: 1 real model
+  answer on each persona's budget; the Open WebUI chat each one creates is deleted at the end, and a take fails if
+  its persona's chats differ before and after; nothing is created in UnifAI and no workspace is selected; traces
+  and model-call metrics of the two answers remain, as for any use
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {take: consultant-02, still: login, hold: 3, caption: "One company account for every application"}
+  - {take: consultant-02, still: workspaces, hold: 5, step: "0:45", caption: "0:45  consultant-02: workspaces from its groups"}
+  - {take: sale-01, still: workspaces, hold: 5, step: "1:30", caption: "1:30  sale-01: other groups, other workspaces"}
+  - {take: consultant-02, from: q-sent, to: q-done, fit: 8, hold: 5, step: "2:30", caption: "2:30  Another application, the same account"}
+  - {take: sale-01, from: q-sent, to: q-done, fit: 8, hold: 5, step: "3:30", caption: "3:30  Same question, other groups, other tools"}
+  - {take: sale-01, still: end, hold: 5, step: "4:15", caption: "The groups decide, in every application"}

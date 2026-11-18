@@ -1,4 +1,11 @@
-{{- if and .Values.acme.enabled .Values.acme.consumers.routerDefaultCert }}
+{{- $routerCert := and .Values.acme.enabled .Values.acme.consumers.routerDefaultCert }}
+{{- /* The placement renders ONLY where the certificate patch renders (the d1
+Application). Two Applications render this chart (d0 and d1); on
+2026-11-13 the d0 one also rendered IngressController/default with the
+placement alone, took ownership and its apply removed defaultCertificate:
+the router served the operator's self-signed certificate (WP-260). */}}
+{{- $routerInfra := and $routerCert .Values.infraNodes .Values.infraNodes.router }}
+{{- if $routerCert }}
 {{- /*
 ADR-0211 consumer patch 1 - like gitops/charts/openshift-oauth's
 cluster-trusted-ca.yaml (ADR-0347's Proxy/cluster pattern), this is a
@@ -19,6 +26,19 @@ metadata:
 spec:
   defaultCertificate:
     name: router-wildcard-tls
+  {{- if $routerInfra }}
+  {{- /* ADR-0614: the default router runs on the infra nodes. This chart is the
+  only owner of IngressController/default, so the placement lives here next
+  to the certificate (two Applications patching one object would fight). */}}
+  nodePlacement:
+    nodeSelector:
+      matchLabels:
+        node-role.kubernetes.io/infra: ""
+    tolerations:
+      - key: node-role.kubernetes.io/infra
+        operator: Exists
+        effect: NoSchedule
+  {{- end }}
 {{- end }}
 {{- if and .Values.acme.enabled .Values.acme.consumers.apiServerNamedCert }}
 {{- $apiDomain := printf "api.%s" (trimPrefix "apps." .Values.acme.clusterBaseDomain) }}

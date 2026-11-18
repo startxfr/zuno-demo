@@ -1,0 +1,98 @@
+---
+# `make demo <action|step|rehearse>` (ADR-0616 clauses 3, 7 and 12, WP-270): the one runner playbook of the presenter
+# lifecycle. platform/demo/runner.py writes a vars file and runs, locally and never through AAP:
+#
+#   ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
+#
+# Vars: demo_id, demo_dir (ansible/demos/<id>), demo_lib (ansible/demos/_lib), demo_readonly
+# (platform/demo/readonly.py), demo_units ([{name, file, kind}]: an action such as "status" or a step time such as
+# "7:30", and its file relative to demo_dir), demo_confirmed (the demo id the presenter typed or set in DEMO_CONFIRM),
+# demo_results_path (one JSON result per unit, written after each unit).
+#
+# Each unit is an Ansible task file of the demo, included in turn; a failing unit is recorded and the next one runs
+# (a rehearsal plays every unit). A unit the manifest declares changing (`mutations:`) runs only when demo_confirmed
+# is this demo's id, so a direct ansible-playbook run is guarded too; a step declared mutating is never run here.
+- name: "Demo lifecycle: run a demo's action and step files (ADR-0616)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    demo_units: []
+    demo_confirmed: ""
+    demo_results: []
+    demo_queued_probes: []
+    demo_queued_browser: []
+  tasks:
+    - name: "demo | the runner needs a demo, its directory and a results path"
+      ansible.builtin.assert:
+        that:
+          - demo_id is defined
+          - demo_id | length > 0
+          - demo_dir is defined
+          - demo_lib is defined
+          - demo_readonly is defined
+          - demo_results_path is defined
+        quiet: true
+        fail_msg: "Run demo_run.yml through `make demo` (platform/demo/presenter.py), which writes its vars file."
+
+    - name: "demo | read the manifest of {{ demo_id }}"
+      ansible.builtin.include_vars:
+        file: "{{ demo_dir }}/demo.yml"
+        name: demo_manifest
+
+    - name: "demo | a changing unit runs only with this demo's confirmation (ADR-0616 clause 7)"
+      ansible.builtin.assert:
+        that:
+          - demo_confirmed == demo_id
+        quiet: true
+        fail_msg: >-
+          {{ _demo_changing | join(', ') }} of {{ demo_id }} change the cluster. Confirm with this demo's id (type it,
+          or DEMO_CONFIRM={{ demo_id }}); no other id and no global yes is accepted.
+      vars:
+        _demo_changing: >-
+          {{ demo_units | map(attribute='name') | select('in', (demo_manifest.mutations | default({}, true)) | list)
+             | list }}
+      when: _demo_changing | length > 0
+
+    - name: "demo | a step declared changing is never run by the runner"
+      ansible.builtin.assert:
+        that:
+          - _demo_mutating_steps | length == 0
+        quiet: true
+        fail_msg: >-
+          Step(s) {{ _demo_mutating_steps | join(', ') }} of {{ demo_id }} are declared mutating in demo.yml: the
+          presenter runs them by hand, as the page says.
+      vars:
+        _demo_step_meta: "{{ demo_manifest.steps | default({}, true) | dict2items }}"
+        _demo_mutating_names: >-
+          {{ _demo_step_meta | selectattr('value.mutating', 'defined') | selectattr('value.mutating')
+             | map(attribute='key') | map('string') | list }}
+        _demo_mutating_steps: >-
+          {{ demo_units | selectattr('kind', 'equalto', 'step') | map(attribute='name')
+             | select('in', _demo_mutating_names) | list }}
+
+    - name: "demo | resolve cluster API credentials"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+      when: demo_manifest.cluster | default(true)
+
+    - name: "demo | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+      when: demo_manifest.cluster | default(true)
+
+    # platform/demo/runner.py keeps the domain per API server (~/.cache/zuno/demo/cluster-domain.json) and passes it
+    # back as cluster_base_domain, so the discovery above (one k8s_info call) runs once per cluster, not per command.
+    - name: "demo | hand the cluster base domain back to the runner"
+      ansible.builtin.copy:
+        content: "{{ cluster_base_domain }}\n"
+        dest: "{{ demo_results_path }}.domain"
+        mode: "0600"
+      when:
+        - demo_manifest.cluster | default(true)
+        - cluster_base_domain is defined
+
+    - name: "demo | run each unit"
+      ansible.builtin.include_tasks: "{{ demo_lib }}/unit.yml"
+      loop: "{{ demo_units }}"
+      loop_control:
+        loop_var: demo_unit
+        label: "{{ demo_unit.name }} ({{ demo_unit.file }})"

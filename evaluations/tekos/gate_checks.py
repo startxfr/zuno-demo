@@ -76,10 +76,10 @@ def c2_permits_saas_fallback_when_not_local_only() -> CheckResult:
 
 def tekos_write_code_prefers_mistral_codestral() -> CheckResult:
     """ADR-0417: Tekos's `write-code` task must genuinely prefer
-    `mistral-codestral` first, and must remain non-strict (unlike Arkos's
-    `strict: true` for the same task - Arkos seeds C3 and wants a Codestral
-    failure to surface as a visible error, Tekos seeds C1 and deliberately
-    wants a silent drop to a local model instead). Checks
+    `mistral-codestral` first, and must remain non-strict (Tekos seeds C1
+    and deliberately wants a silent drop to a local model instead; Arkos's
+    write-code, floored at C3, runs on local models only since agents
+    v1.0.1). Checks
     policies/model-routing/model-routing-policy.yaml directly (same style
     as c2_permits_saas_fallback_when_not_local_only above), cross-checked
     against platform/ai-gateway/provider-routing.yaml so the preference

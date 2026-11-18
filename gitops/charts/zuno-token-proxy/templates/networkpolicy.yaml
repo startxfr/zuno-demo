@@ -44,6 +44,16 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.egress.gatewayPort }}
+    {{- if .Values.altGateways }}
+    # WP-297 (ADR-0619 clause 5): the alternative gateways' namespace, their pod port only.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.altGatewayNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.altGatewayPort }}
+    {{- end }}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

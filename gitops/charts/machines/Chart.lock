@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-machine
-  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   version: 21.3.277
-digest: sha256:70262cc1f19935d02fdcef79e7aea1ae726a9f04600e7c735dfa9f72c89d2d9e
-generated: "2026-08-17T14:10:36.708060139+02:00"
+digest: sha256:6301c46a15aa194e47f980d8ebdcb275e3c6077d43ce457e21f1551dd944697c
+generated: "2026-11-11T23:45:59.342856886+01:00"

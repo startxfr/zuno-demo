@@ -26,8 +26,9 @@
       - namespaces
       - llm
       - models
+      # ADR-0612 (WP-248): the internal registry, before the OKF mirror it replaces.
+      - quay_registry
       # ADR-0611 (WP-246): before mcp, whose okf-fetch can read it.
-      - okf_mirror
       - mcp
       - agents
       - mlops
@@ -43,6 +44,8 @@
       - kagent
       # ADR-0604 (WP-235): follows zuno_world_model_enabled, a no-op while the demo is off.
       - world_model
+      # ADR-0619 (WP-292): Praxis AI, an alternative AI gateway; follows zuno_praxis_enabled, a no-op while it is off.
+      - praxis
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

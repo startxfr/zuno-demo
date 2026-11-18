@@ -1,0 +1,33 @@
+---
+# blender-3d: the cut list of its GIF (ADR-0618, WP-290), read by platform/demo/gif.py with `make demo gif blender-3d`.
+# No take is recorded for this demo. The owner's decision (2026-11-17, 11:14:24 CET) was "Images fixes de la page", but
+# the page embeds no image. The owner then opened their own screen captures of 2026-11-07 to the team (11:33:36 CET,
+# the 09:01-10:00 and 21:19-21:22 ones only). Each of the 11 was reviewed one by one. 7 are not of Blender and are
+# not used. One shows Blender's preferences with a path in the owner's home directory and is dropped. 3 are used,
+# cropped as below. The take is assembled by hand in the cache (markers.json `kind: assembled`), never in git: each
+# still is listed in `source` with the original's SHA-256 and its own, which gif.py checks before it cuts.
+# What was cropped, and why:
+#   panel  from the capture of 21:19:50, cropped to the Zuno 3D panel (572x312 at 984,106): at 960 px the full
+#          window makes the panel's text unreadable. The panel shows the cluster domain, the domain this page and the
+#          other GIFs already show.
+#          original 91eb21226216bf9c8474164d98ce5677ab13513c9876b3b2e7413fb46cc3b5fa
+#          cropped  b84cd9224b39bcff7aaba844ef74d5b497b5ca5d4402696333d039b84d1b3212
+#   table  the same capture (21:19:50), cropped to the Blender window (the desktop's top bar removed, 1920x1048).
+#          original 91eb21226216bf9c8474164d98ce5677ab13513c9876b3b2e7413fb46cc3b5fa
+#          cropped  95d5aaa7b8e2a4ae335dd84876da61e435adeec3ad9234e87b96f68197d1deda
+#   render the capture of 21:19:31 (the same table rendered by EEVEE), cropped the same way.
+#          original dc9ba6b1e94e8f109cdf6a337eee2ce80a858fa2db311e0cb96be3131329faa3
+#          cropped  583fd41c71320adf2bb5ec60f4d7788812ccbea166202d657a04fa5b52f3588f
+#   house  the capture of 21:22:46 (another prompt of the measured set: a small house), cropped the same way.
+#          original 5ae1986956bb97efd2ad6fe076a81ac77a95ac48526546607ba7a82b25f5164e
+#          cropped  171140089fcc7d942fa96ae41fb927a5c242709c59b35d5cf3639cd0ac1ad965
+# Rows 0:00, 0:20, 1:30 (Scale X, then Ctrl+Z), 2:00 (the mug) and 2:40 have no capture. The house is not the 2:00
+# mug, so it carries no step. The render shows no row either: its caption says only what the frame shows.
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: panel, hold: 11, step: "0:40", caption: "0:40  Check passed: review the script, then Run"}
+  - {still: table, hold: 11, step: "1:10", caption: "1:10  Run script: a table, its legs and a lamp"}
+  - {still: render, hold: 9, caption: "Real Blender objects: EEVEE renders them"}
+  - {still: house, hold: 11, caption: "Another sentence: a small house with its roof"}

@@ -1,0 +1,81 @@
+---
+# One unit of ansible/playbooks/demo_run.yml (ADR-0616 clause 3): an action file or a step file of the demo. The
+# unit's file and the _lib files it includes append to demo_unit_commands (readonly.py results), demo_unit_checks
+# (platform/testing/day2_report.py Day2Result rows) and demo_unit_messages. A failure is recorded, never fatal: the
+# next unit still runs. The unit's result is written to demo_results_path at once, so a stopped run keeps it.
+- name: "demo | {{ demo_unit.name }}: reset the unit's record"
+  ansible.builtin.set_fact:
+    demo_unit_commands: []
+    demo_unit_checks: []
+    demo_unit_messages: []
+    demo_unit_error: ""
+    demo_unit_failed: false
+    demo_unit_nothing: false
+    demo_unit_started: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%S+00:00') }}"
+
+- name: "demo | {{ demo_unit.name }}: run {{ demo_unit.file }}"
+  block:
+    # A workshop's unit may belong to another demo (demo_unit.dir): its own manifest is read for its step variables
+    # (`env:`), and what that manifest declares changing is re-checked here, against the workshop's confirmation.
+    - name: "demo | {{ demo_unit.name }}: read the manifest of the demo that owns the file"
+      ansible.builtin.include_vars:
+        file: "{{ demo_unit.dir | default(demo_dir, true) }}/demo.yml"
+        name: demo_manifest
+
+    - name: "demo | {{ demo_unit.name }}: a changing unit runs only with the confirmation (ADR-0616 clause 7)"
+      ansible.builtin.assert:
+        that:
+          - demo_confirmed == demo_id
+        quiet: true
+        fail_msg: >-
+          {{ demo_unit.name }} changes the cluster: confirm with the id {{ demo_id }} (type it, or
+          DEMO_CONFIRM={{ demo_id }}).
+      when:
+        - demo_unit.kind == 'action'
+        - (demo_unit.action | default(demo_unit.name, true)) in ((demo_manifest.mutations | default({}, true)) | list)
+
+    - name: "demo | {{ demo_unit.name }}: a step declared changing is never run"
+      ansible.builtin.assert:
+        that:
+          - not (_demo_step_meta.mutating | default(false) | bool)
+        quiet: true
+        fail_msg: "{{ demo_unit.name }} is declared mutating in its demo.yml: the presenter runs it by hand."
+      vars:
+        _demo_step_time: "{{ demo_unit.time | default(demo_unit.name, true) }}"
+        _demo_step_meta: "{{ (demo_manifest.steps | default({}, true))[_demo_step_time] | default({}, true) }}"
+      when: demo_unit.kind == 'step'
+
+    - name: "demo | {{ demo_unit.name }}: include {{ demo_unit.file }}"
+      ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/{{ demo_unit.file }}"
+  rescue:
+    - name: "demo | {{ demo_unit.name }}: record the failure"
+      ansible.builtin.set_fact:
+        demo_unit_failed: true
+        demo_unit_error: "{{ ansible_failed_result.msg | default('a task failed') | string }}"
+  always:
+    - name: "demo | {{ demo_unit.name }}: record the result"
+      ansible.builtin.set_fact:
+        demo_results: "{{ demo_results + [_demo_unit_result] }}"
+      vars:
+        _demo_bad_commands: "{{ demo_unit_commands | rejectattr('rc', 'equalto', 0) | list }}"
+        _demo_bad_checks: "{{ demo_unit_checks | rejectattr('passed', 'in', [true, 'True', 'true']) | list }}"
+        _demo_failed: "{{ demo_unit_failed or (_demo_bad_commands | length > 0) or (_demo_bad_checks | length > 0) }}"
+        _demo_unit_result:
+          name: "{{ demo_unit.name }}"
+          file: "{{ demo_unit.file }}"
+          status: >-
+            {{ 'failed' if _demo_failed
+               else ('nothing' if (demo_unit_nothing and not demo_unit_commands and not demo_unit_checks)
+               else 'ok') }}
+          commands: "{{ demo_unit_commands }}"
+          checks: "{{ demo_unit_checks }}"
+          messages: "{{ demo_unit_messages }}"
+          error: "{{ demo_unit_error }}"
+          started: "{{ demo_unit_started }}"
+          ended: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%S+00:00') }}"
+
+    - name: "demo | {{ demo_unit.name }}: write the results"
+      ansible.builtin.copy:
+        content: "{{ demo_results | to_nice_json }}\n"
+        dest: "{{ demo_results_path }}"
+        mode: "0600"

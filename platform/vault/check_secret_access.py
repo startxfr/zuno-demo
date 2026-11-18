@@ -94,7 +94,9 @@ APP_OVERLAYS: Dict[str, Dict[str, Any]] = {
     # ansible/roles/rhtas_config resolves the TUF root live.
     "zuno-rhtas-config-d1": {"policyOperand": {"trustRoot": {"rootJsonBase64": "cGxhY2Vob2xkZXI="}}},
     # ansible/roles/dify dify_token_proxy_inbound_auth (WP-225 lot C, default false).
-    "zuno-mcp-d1": {"outboundIdentity": {"mode": "assertion"}},
+    # ADR-0612 / WP-248: the cut-over of the OKF release to Quay sets the pull Secret (ansible/roles/mcp, family (a)).
+    "zuno-mcp-d1": {"outboundIdentity": {"mode": "assertion"},
+                    "okf": {"fetch": {"mirror": {"prefix": "quay.example/zuno/okf", "pullSecret": "quay-pull"}}}},
     "zuno-a2a-gateway-d1": {"agentChain": {"sign": True}},
     "zuno-token-proxy-dify-d1": {"inboundAuth": {"enabled": True}},
     "zuno-dify-knowledge-d1": {"proxyAuth": {"enabled": True}},

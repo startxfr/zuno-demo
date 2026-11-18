@@ -1,0 +1,13 @@
+---
+# guardrails start (WP-273): wakes the model with one answer through Dify's token proxy, as consultant-02, with the
+# golden-path moment `dify` (no injection text: the injection is the 0:45 step, live). The page section
+# `## Presenter lifecycle` > `### Start` says what the presenter does after it. Nothing changes on the cluster.
+- name: "guardrails start | wake the model: one answer through Dify's token proxy (golden-path moment dify)"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/queue_probes.yml"
+  vars:
+    queue_probes:
+      - "dify"
+- name: "guardrails start | run it"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/flush_checks.yml"
+- name: "guardrails start | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

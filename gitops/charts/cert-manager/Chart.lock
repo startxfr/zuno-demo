@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-certmanager
-  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   version: 21.3.277
-digest: sha256:e1a9721770438353f740d8330697cf8d8e8d92ef70c95c7bb955d79d0dba308d
-generated: "2026-08-09T01:11:58.363705343+02:00"
+digest: sha256:739f4950386b92232211dedea3c0c6439cc099a5b58a0b47cd392bcd85c37b7a
+generated: "2026-11-11T23:45:44.57373068+01:00"

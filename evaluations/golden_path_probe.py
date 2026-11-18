@@ -93,6 +93,14 @@ def oc(*args: str, stdin: Optional[str] = None, timeout: float = 120) -> subproc
     return subprocess.run(cmd + list(args), input=stdin, capture_output=True, text=True, timeout=timeout)
 
 
+def ai_gateway_logs(since: str, timeout: float = 120) -> subprocess.CompletedProcess:
+    """The ai-gateway log of EVERY replica (ADR-0614: two pods since WP-260 P3). `oc logs deploy/...` reads one pod
+    only, so a line written by the other replica was missed. A label selector defaults to the last 10 lines per
+    pod, hence --tail=-1."""
+    return oc("-n", "zuno-ai-run", "logs", "-l", "app.kubernetes.io/name=ai-gateway", "-c", "ai-gateway",
+              f"--since={since}", "--tail=-1", "--max-log-requests=10", timeout=timeout)
+
+
 def secret_value(namespace: str, name: str, key: str) -> str:
     jsonpath = "{.data." + key.replace(".", "\\.") + "}"
     out = oc("-n", namespace, "get", "secret", name, "-o", f"jsonpath={jsonpath}")
@@ -416,7 +424,7 @@ def probe_guardrails(ctx: Context) -> Result:
     if answered.get("status") not in (200, 400, 403):
         return Result("guardrails", FAIL, f"the DAN prompt got no answer: {answered or sent.stderr.strip()[:160]}")
     time.sleep(3)
-    log = oc("-n", "zuno-ai-run", "logs", "deploy/ai-gateway", "-c", "ai-gateway", "--since=5m", timeout=120)
+    log = ai_gateway_logs("5m", timeout=120)
     return judge_guardrails(log.stdout)
 
 
@@ -803,7 +811,7 @@ def probe_blender(ctx: Context) -> Result:
             s["problems"] = addon.check_script(code)
         else:
             s["generation_error"] = str(answer.get("error", answer) if isinstance(answer, dict) else answer)[:160]
-        logs = oc("-n", "zuno-ai-run", "logs", "deploy/ai-gateway", "-c", "ai-gateway", "--since=3m", timeout=60)
+        logs = ai_gateway_logs("3m", timeout=60)
         s["floor_logged"] = bool(_FLOOR_LINE_RE.search(logs.stdout or ""))
         s["gpt_oss_called"] = bool(_GPT_OSS_CALL_RE.search(logs.stdout or ""))
     finally:

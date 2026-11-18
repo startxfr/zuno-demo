@@ -59,7 +59,7 @@ Acceptance criteria: Standard clauses (docs/adr/README.md#standard-clauses).
    > (fail closed when the resuming subject differs). Raw conversation
    > persistence beyond checkpoints remains out of scope (ADR-0209).
    >
-   > See [Standard clauses](README.md#standard-clauses) for Alternatives
+   > See [Standard clauses](../../adr/README.md#standard-clauses) for Alternatives
    > considered, Consequences, Security/Operational considerations,
    > Acceptance criteria and Review evidence.
 

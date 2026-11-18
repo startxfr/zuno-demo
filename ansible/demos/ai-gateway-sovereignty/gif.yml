@@ -1,0 +1,23 @@
+---
+# ai-gateway-sovereignty: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record ai-gateway-sovereignty` captures the 5-minute version as a real terminal session and checks it as
+# text; `make demo record ai-gateway-sovereignty render` replays it in xterm.js and films it, then cuts it with this
+# list. The GIF stays in ~/.cache/zuno/demo/recordings/ until the owner's "go ai-gateway-sovereignty".
+# Rows 0:00 and 3:30 read repository files from git, row 1:00 runs the probe; 2:30 and 4:15 are reading and words.
+# Markers: start, then per row <MM-SS>-typed and <MM-SS>-done, then end. The probe's wait is played fast and its
+# result screen carries the 2:30 caption. No caption names a model. Re-planned on 2026-11-16 when rows 0:00 and 3:30
+# became commands, from the first take's timing (the probe answered in 2 s): check the total after the re-take.
+record_notice: >-
+  a real terminal session with your oc login: two reads of repository files from git (the providers and their data
+  classes, the agents and their floors), then `ONLY=sovereignty make demo golden-path`, the sovereignty probe, real
+  model calls on the gateway persona's budget; the probe reads its credentials itself and prints none
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 00-00-done, fit: 8, hold: 5, step: "0:00", caption: "0:00  Only our own models may serve C3 data"}
+  - {from: 00-00-done, to: 01-00-typed, fit: 3, hold: 3, step: "1:00", caption: "1:00  One real call to Arkos, labelled C1 by the caller"}
+  - {from: 01-00-typed, to: 01-00-done, fit: 6, hold: 0, step: "1:00", caption: "1:00  The probe runs; a local model may take a few seconds"}
+  - {still: 01-00-done, hold: 6, step: "2:30", caption: "2:30  Raised to C3: answered by a model on our GPUs"}
+  - {from: 01-00-done, to: 03-30-done, fit: 9, hold: 5, step: "3:30", caption: "3:30  Each agent has a floor: Arkos C3, Tekos C1"}
+  - {still: end, hold: 5, step: "4:15", caption: "If no local model is ready, Zuno refuses"}

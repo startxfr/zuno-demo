@@ -1,0 +1,30 @@
+---
+# lora-pipeline-mlflow-kueue: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py. Tune it with
+# `make demo gif lora-pipeline-mlflow-kueue` once a take exists.
+# `make demo record lora-pipeline-mlflow-kueue` takes the 5-minute version as ai-dev-01 on the OpenShift AI dashboard
+# (evaluations/browser/walkthroughs/lora-pipeline-mlflow-kueue.mjs).
+# Markers written by the walkthrough, in order: login, dashboard, pipeline, trainjob, end. Every screen is held about
+# 2 s by the walkthrough itself, so each motion moment has frames to cut. The graph is of the latest tekos version the
+# dashboard opens (v0-4-0-tekos on 2026-11-16 at 18:50); its nodes are labelled component..component-4 and the step
+# names are in its description line ("prepare-dataset -> train-lora -> evaluate -> push-registry", legible at 960 px in
+# the take of 2026-11-16 21:15), which the 0:45 caption follows word for word. Every caption says only what its frame
+# shows: the Jobs frame has the job's name, Type TrainJob, Nodes 0 and Created, and no status column at 1280 px.
+# Stills only (demo333's review of the re-cut at 40d8e9c6): every span between two markers is mostly loading pages
+# (Home, a white "Loading", "Loading pipeline versions", the Jobs title with a spinner) and passes over the project
+# Zuno MLOps's page, whose long internal description stays out of the GIF. The marker images are taken once each
+# screen is ready, so each row is its marker's still, held long enough to read the small description line. Row 2:45 (MLflow) is not in the GIF: the
+# rescouts of 2026-11-16 found no experiment in MLflow's workspace zuno-mlops, in either of its views. Row 3:45 (the
+# WP-133 evidence) is not filmed: no caption speaks of MLflow, the registry or serving. Rows 0:00 and 4:30 are words.
+record_notice: >-
+  a recorded browser session as ai-dev-01 on the OpenShift AI dashboard: the project Zuno MLOps, the graph of the
+  tekos pipeline (its latest version) and the Jobs page with the training job lora-comage-4c28m, read only: no run
+  started, nothing created or changed, no prompt, no model call; the sign-in is an OpenShift session of ai-dev-01
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account, through OpenShift"}
+  - {still: dashboard, hold: 7, step: "0:00", caption: "0:00  OpenShift AI, as a developer, with its projects"}
+  - {still: pipeline, hold: 13, step: "0:45", caption: "0:45  The tekos pipeline: prepare, train, evaluate, register"}
+  - {still: trainjob, hold: 11, step: "1:45", caption: "1:45  The training job: a TrainJob, kept in Zuno MLOps"}
+  - {still: end, hold: 8, step: "4:30", caption: "A fine-tuned model is a build artefact like any other"}

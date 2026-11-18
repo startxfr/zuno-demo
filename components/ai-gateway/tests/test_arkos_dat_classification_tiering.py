@@ -119,13 +119,25 @@ def test_confluence_reading_tasks_are_local_only_at_every_level() -> None:
 
 def test_tasks_that_do_not_read_confluence_keep_their_external_providers() -> None:
     """The local-only rule is scoped to the tasks that read Confluence or the technical docs (WP-187). A
-    task that does not (tekos check-my-drive-docs, arkos write-code) keeps the external providers of its own
+    task that does not (tekos check-my-drive-docs, tekos write-code) keeps the external providers of its own
     preference entry, so the rule is not applied wider than intended. (This replaces the guard on Comage's
     compare-historical-deals, removed from the agents release with knowledge.sxa-legacy, WP-185.)"""
     drive = [c.name for c in _candidates("tekos", "check-my-drive-docs", "C1")]
     assert "ovhcloud-gpt-oss-120b" in drive, drive
-    code = [c.name for c in _candidates("arkos", "write-code", "C1")]
-    assert "mistral-codestral" in code, code
+    code = [c.name for c in _candidates("tekos", "write-code", "C1")]
+    assert code and code[0] == "mistral-codestral", code
+
+
+def test_arkos_write_code_is_served_locally_at_every_level() -> None:
+    """Agents v1.0.1: arkos write-code was pinned strictly to mistral-codestral (ADR-0417), which is C1/C2 only,
+    while Arkos is floored at C3 (ADR-0565), so every call failed closed. Its chain is now local only, at every
+    level, with gpt-oss-20b first: the C3 half of the coding pair, whose C1 half is tekos write-code on
+    Codestral (the test above)."""
+    external = {c.name for c in RoutingTable(_PROVIDER_ROUTING_PATH).candidates_for("C1") if getattr(c, "kind", "") == "saas"}
+    for level in ("C1", "C2", "C3"):
+        names = [c.name for c in _candidates("arkos", "write-code", level)]
+        assert names[:2] == ["local-gpt-oss-maas", "local-gpt-oss"], (level, names)
+        assert not (set(names) & external), (level, set(names) & external)
 
 
 TESTS = [
@@ -137,6 +149,7 @@ TESTS = [
     test_workshop_presentation_is_local_only_at_every_level,
     test_confluence_reading_tasks_are_local_only_at_every_level,
     test_tasks_that_do_not_read_confluence_keep_their_external_providers,
+    test_arkos_write_code_is_served_locally_at_every_level,
 ]
 
 

@@ -1,0 +1,44 @@
+{{- if .Values.saas.enabled }}
+# The routing overlay of the Claude candidate (a versioned envelope, praxis-ai intelligent_route). Only an overlay
+# candidate can carry the provider profile (api_format messages, the /v1/messages path, the target model) that makes
+# openai_chat_completions_to_anthropic translate: a static candidate cannot. The envelope is content-addressed: its
+# revision and content_digest are the SHA-256 of the RFC 8785 canonical form of {candidates, local_site, network}.
+# Go's toJson sorts the keys and these values hold no character it escapes, so the digest below is that hash; the
+# gateway refuses the file if it is not (praxis-ai validates it at startup, and `-t` too).
+{{- $v := .Values }}
+{{- $c := $v.saas.claude }}
+{{- $network := "zuno" }}
+{{- $candidates := list (dict
+      "kind" "inference_model"
+      "name" $c.name
+      "site" "zuno"
+      "cluster" "anthropic"
+      "fresh" true
+      "stable_id" (printf "zuno-praxis-%s" $c.name)
+      "api_format" "messages"
+      "path" "/v1/messages"
+      "target_model" $c.targetModel
+      "credential" (dict "strategy" "apikey" "secretRef" (dict "name" $c.secretName "namespace" $v.namespace "key" "api_key"))) }}
+{{- $semantic := dict "candidates" $candidates "local_site" "zuno" "network" $network }}
+{{- $digest := sha256sum (toJson $semantic) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: praxis-routing
+  namespace: {{ $v.namespace }}
+  labels:
+    app.kubernetes.io/name: praxis
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+data:
+  routing-overlay.json: |
+    {{- dict
+          "schema_version" "1.0.0"
+          "revision" (dict "kind" "content_addressed" "algorithm" "sha256" "value" $digest)
+          "content_digest" (dict "algorithm" "sha256" "value" $digest)
+          "scope" (dict "network" $network "gateway" "praxis" "namespace" $v.namespace "local_site" "zuno")
+          "provenance" (dict "producer" "zuno-praxis-chart" "producer_version" $.Chart.Version "source_name" $network "source_uid" "zuno-praxis" "source_generation" 1 "rendered_at" "2026-11-17T00:00:00Z")
+          "overlay" (dict "local_site" "zuno" "network" $network "candidates" $candidates)
+      | toPrettyJson | nindent 4 }}
+{{- end }}

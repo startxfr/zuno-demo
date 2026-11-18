@@ -1,0 +1,76 @@
+{{- if .Values.sourceBuilds.enabled }}
+{{- $sb := .Values.sourceBuilds }}
+# ADR-0620 clause 2: one generic pipeline. git-clone then buildah, both taken from the operator's
+# catalog through the cluster resolver. A run is created explicitly by an Ansible build role
+# (ansible/roles/praxis_build), never by a trigger. The run carries the annotation
+# sidecar.istio.io/inject=false: zuno-ai-build is sidecar-injected and a task pod must not wait on
+# an istio-proxy that never exits.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: source-image-build
+  namespace: {{ $sb.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  description: Build a third-party image from a pinned commit of its source repository and push it to quay.io.
+  params:
+    - name: git-url
+      type: string
+      description: Source repository (only the sources listed in the build role's defaults are used).
+    - name: git-revision
+      type: string
+      description: Full commit SHA, resolved by the build role before the run.
+    - name: containerfile
+      type: string
+      default: ./Containerfile
+    - name: context
+      type: string
+      default: .
+    - name: build-args
+      type: array
+      default: []
+    - name: image
+      type: string
+      description: Full image reference with its tag, e.g. quay.io/zuno/praxis-ai:fork-<sha12>.
+  workspaces:
+    - name: source
+    - name: dockerconfig
+  results:
+    - name: IMAGE_DIGEST
+      value: $(tasks.build.results.IMAGE_DIGEST)
+    - name: IMAGE_URL
+      value: $(tasks.build.results.IMAGE_URL)
+    - name: COMMIT
+      value: $(tasks.fetch.results.COMMIT)
+  tasks:
+    - name: fetch
+      taskRef:
+        resolver: cluster
+        params:
+          - {name: kind, value: task}
+          - {name: name, value: {{ $sb.gitCloneTask }}}
+          - {name: namespace, value: {{ $sb.catalogNamespace }}}
+      params:
+        - {name: URL, value: $(params.git-url)}
+        - {name: REVISION, value: $(params.git-revision)}
+      workspaces:
+        - {name: output, workspace: source}
+    - name: build
+      runAfter: [fetch]
+      taskRef:
+        resolver: cluster
+        params:
+          - {name: kind, value: task}
+          - {name: name, value: {{ $sb.buildahTask }}}
+          - {name: namespace, value: {{ $sb.catalogNamespace }}}
+      params:
+        - {name: IMAGE, value: $(params.image)}
+        - {name: DOCKERFILE, value: $(params.containerfile)}
+        - {name: CONTEXT, value: $(params.context)}
+        - {name: BUILD_ARGS, value: ["$(params.build-args[*])"]}
+        - {name: TLSVERIFY, value: "true"}
+      workspaces:
+        - {name: source, workspace: source}
+        - {name: dockerconfig, workspace: dockerconfig}
+{{- end }}

@@ -11,12 +11,16 @@ image:
   # Used only on the :latest path: a rendered digest pulls IfNotPresent (ADR-0603 M16).
   pullPolicy: Always
 
-replicas: 1
+# ADR-0614 (WP-260 P3, 2026-11-13): two replicas spread over zones, so the loss
+# of one zone or node leaves one serving pod. # Two replicas need the quota ledger in Redis (quotaLedger.store: redis, set by
+# the llm role): with the in-memory store each pod would count its own budget.
+# /admin/optimizer/* overrides and per-key stream counts stay per pod.
+replicas: 2
 
 # ADR-0101 (roadmap WP-12): the HA-capable shape - a PodDisruptionBudget
 # (templates/poddisruptionbudget.yaml) and topology spread across nodes,
 # both correct and safe at any replica count including the current
-# demo-scale replicas: 1 above (a PDB with minAvailable 1 simply protects
+# replicas count above (a PDB with minAvailable 1 simply protects
 # the sole pod from voluntary eviction; whenUnsatisfiable ScheduleAnyway
 # makes the spread constraint a soft preference, never a scheduling
 # blocker on a single-node/single-zone cluster). replicas itself is left
@@ -291,6 +295,12 @@ semanticCache:
   enabled: false
   ttlSeconds: "3600"
   embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
+  # REDIS_ADDR, also read by the quota ledger (quotaLedger.store: redis) and
+  # the routing-decision side-channel. ADR-0352/WP-214: the default is the
+  # built-in instance; with an external Redis (zuno_redis_mode: external)
+  # ansible/tasks/redis_seam_values.yml sets addr to its host:port, and the
+  # password still comes from Vault redis/session-store (the redis role seeds
+  # it). No TLS option: the code opens plain TCP (WP-214 limit).
   redis:
     addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
     secretName: ai-gateway-redis-credentials

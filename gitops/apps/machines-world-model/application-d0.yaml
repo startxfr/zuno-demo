@@ -214,6 +214,20 @@ spec:
                   - key: zuno.io/gpu-world-model
                     value: "true"
                     effect: NoSchedule
+        # The ADR-0614 singletons (image registry Config, user-workload
+        # monitoring ConfigMap, GitopsService) belong to zuno-machines-d0 only.
+        # The chart turns them on by default, so this Application rendered
+        # them too until 2026-11-15. Its cascade delete at the end of a GPU
+        # search then deleted the GitopsService (the openshift-gitops Argo CD
+        # instance went with it) and the registry Config (the operator deleted
+        # the registry's S3 bucket). Every key of the chart's infraPlacement
+        # must be listed here as false: the role and
+        # platform/gitops/tests/test_world_model_gpu_singletons.py refuse
+        # anything else.
+        infraPlacement:
+          registry: false
+          userWorkloadMonitoring: false
+          gitops: false
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-machine-api

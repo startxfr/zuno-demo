@@ -39,7 +39,7 @@ COPY package.json ./
 # agent-frontend's `npm ci` which needs a committed lockfile for byte-
 # identical UI builds).
 RUN npm install --omit=dev
-COPY server.js ./
+COPY server.js assertion.js ./
 
 # Restricted SCC: the container runs as an arbitrary non-root UID assigned
 # by OpenShift, which must still be able to read/write everything under

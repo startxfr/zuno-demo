@@ -103,6 +103,21 @@ policyOperand:
     imageGlob: "quay.io/zuno/unifai-**"
     issuer: https://token.actions.githubusercontent.com
     subjectRegExps: []
+    # WP-248 family (c): read the signatures from the internal registry instead of quay.io (empty host = quay.io, as
+    # before). One policy per repository, the webhook takes one signature source per authority.
+    signatureMirror:
+      host: ""            # the registry route host; ansible/roles/rhtas_config passes it from the cluster file
+      organization: zuno
+      origin: quay.io/zuno
+      repositories:
+        - unifai-backend
+        - unifai-identity
+        - unifai-multiagent
+        - unifai-rag
+        - unifai-ui
+        - unifai-operator
+        - unifai-operator-bundle
+        - unifai-operator-catalog
 
   # Images that match no ClusterImagePolicy: the controller denies them by default ("no matching policies"), which
   # would refuse the third-party services (mongo, qdrant, ...) of an opted-in namespace. `warn` only reports them.

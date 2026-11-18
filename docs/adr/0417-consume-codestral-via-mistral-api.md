@@ -228,3 +228,14 @@ considerations, Migration/evolution, Acceptance criteria and Review evidence.
   `MISTRAL_CODESTRAL_API_KEY`: a real completion came back,
   `response_metadata.model_name: codestral-latest`. The id is correct as written and the
   dedicated credential chain resolves end to end.
+- Pending the promotion of agents v1.0.1: the Arkos half of this decision no longer holds. It
+  pinned `arkos/write-code` to `mistral-codestral` with `strict: true`, relying on the agent
+  runtime evaluating that branch at a fixed C2 ceiling. That runtime was removed on 2026-10-23,
+  and ADR-0565 gives every task its agent's floor: Arkos is C3, Codestral is eligible for C1/C2
+  only, so every Arkos code call failed closed. Agents v1.0.1 routes `arkos/write-code` to the
+  local models only (`local_only_for: [C1, C2, C3]`): gpt-oss-20b first, the local quality model
+  as fallback. Codestral keeps serving Tekos `write-code` (C1, non-strict) and the "Zuno Code"
+  experience. The two tasks make the coding pair of the demo: the same request is served by
+  Codestral for Tekos (C1) and by gpt-oss-20b on the local GPUs for Arkos (C3), proven by
+  scenarios tekos 21 and arkos 22 (`chat_routing`). User decision 2026-11-14: no task-level
+  classification for now, so one Arkos task cannot run at C2 for one request and C3 for another.

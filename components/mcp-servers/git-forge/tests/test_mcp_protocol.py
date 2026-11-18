@@ -25,11 +25,12 @@ import os
 import sys
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("GITHUB_TOKEN", "test-github-token")
 os.environ.setdefault("GITLAB_TOKEN", "test-gitlab-token")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -37,15 +38,18 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
+from test_support.assertion_headers import headers_for  # noqa: E402
 from github.GithubException import UnknownObjectException  # noqa: E402
 from gitlab.exceptions import GitlabGetError  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-GATEWAY_HEADERS = {"X-Zuno-Gateway-Token": "test-workload-token"}
+AUD = server.CALLER_CONTEXT_AUDIENCE
 
 
-async def _open_session(transport, headers):
-    http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers)
+async def _open_session(transport, tool):
+    """One call assertion covers one session with ONE tools/call of `tool`
+    (tool "" = a session that only lists tools)."""
+    http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers_for(AUD, tool))
     return streamable_http_client(f"{BASE_URL}/mcp", http_client=http_client)
 
 
@@ -305,11 +309,11 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
         )
-    assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
+    assert resp.status_code == 401, f"expected 401 with no call assertion, got {resp.status_code}"
 
 
 async def test_tools_list_reports_exactly_the_eight_declared_tools(transport) -> None:
-    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+    async with await _open_session(transport, "") as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
@@ -330,7 +334,7 @@ async def test_read_repository_content_github_file(transport) -> None:
     repo = _FakeGithubRepo("acme/widgets", contents={"README.md": _FakeGithubContentFile("README.md", b"hello world", "abc123")})
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -348,7 +352,7 @@ async def test_read_repository_content_github_missing_path_is_a_tool_error(trans
     repo = _FakeGithubRepo("acme/widgets", contents={})
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -362,7 +366,7 @@ async def test_read_repository_content_gitlab_file(transport) -> None:
     project = _FakeGitlabProject(files={"README.md": _FakeGitlabProjectFile("README.md", b"bonjour", "blob-1")})
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -380,7 +384,7 @@ async def test_read_repository_content_gitlab_directory(transport) -> None:
     project = _FakeGitlabProject(files={}, tree=tree)
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -397,7 +401,7 @@ async def test_read_repository_content_refuses_private_github(transport) -> None
     repo = _FakeGithubRepo("acme/secret", contents={"README.md": _FakeGithubContentFile("README.md", b"shh", "sha1")}, private=True)
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -412,7 +416,7 @@ async def test_read_repository_content_refuses_private_gitlab(transport) -> None
     project = _FakeGitlabProject(files={"README.md": _FakeGitlabProjectFile("README.md", b"shh", "blob-1")}, visibility="private")
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -426,7 +430,7 @@ async def test_read_private_repository_content_allows_private_gitlab(transport) 
     project = _FakeGitlabProject(files={"README.md": _FakeGitlabProjectFile("README.md", b"shh", "blob-1")}, visibility="private")
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_private_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -443,7 +447,7 @@ async def test_read_private_repository_content_refuses_github_provider(transport
         raise AssertionError("read_private_repository_content must never construct a GitHub client")
 
     with mock.patch.object(server, "_github_client", _boom):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "read_private_repository_content") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -457,7 +461,7 @@ async def test_list_repositories_github_user(transport) -> None:
     repos = [_FakeGithubRepoSummary("widgets", "acme/widgets", False, "widgets repo", "https://github.com/acme/widgets")]
     fake = _FakeGithubClient(user=_FakeGithubAccount(repos=repos))
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -479,7 +483,7 @@ async def test_list_repositories_gitlab_organization(transport) -> None:
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -498,7 +502,7 @@ async def test_list_repositories_filters_out_private_github(transport) -> None:
     ]
     fake = _FakeGithubClient(user=_FakeGithubAccount(repos=repos))
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -525,7 +529,7 @@ async def test_list_repositories_filters_out_private_gitlab(transport) -> None:
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -552,7 +556,7 @@ async def test_list_private_repositories_gitlab_includes_private(transport) -> N
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_private_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -586,7 +590,7 @@ async def test_list_repositories_github_returns_top10_starred_and_active_deduped
     account = _FakeGithubAccount(repos=shared + active_only)
     fake = _FakeGithubClient(user=account, search_repos=shared + starred_only)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -638,7 +642,7 @@ def _gitlab_star_activity_fixture() -> list:
 async def test_list_repositories_gitlab_returns_top10_starred_and_active_deduped_and_excludes_private(transport) -> None:
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": _gitlab_star_activity_fixture()})
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -670,7 +674,7 @@ async def test_list_private_repositories_gitlab_includes_the_top_starred_private
     difference between the two tools to the visibility query param."""
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": _gitlab_star_activity_fixture()})
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_private_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -689,7 +693,7 @@ async def test_list_private_repositories_refuses_github_provider(transport) -> N
         raise AssertionError("list_private_repositories must never construct a GitHub client")
 
     with mock.patch.object(server, "_github_client", _boom):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "list_private_repositories") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -702,7 +706,7 @@ async def test_write_file_github_creates_when_absent(transport) -> None:
     repo = _FakeGithubRepo("acme/widgets", contents={})
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "write_file") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -726,7 +730,7 @@ async def test_write_file_github_updates_when_present(transport) -> None:
     repo = _FakeGithubRepo("acme/widgets", contents={"NEW.md": _FakeGithubContentFile("NEW.md", b"old", "old-sha")})
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "write_file") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -751,7 +755,7 @@ async def test_write_file_gitlab_creates_when_absent(transport) -> None:
     project = _FakeGitlabProject(files={})
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "write_file") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -775,7 +779,7 @@ async def test_write_file_refuses_private_github(transport) -> None:
     repo = _FakeGithubRepo("acme/secret", contents={}, private=True)
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "write_file") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -797,7 +801,7 @@ async def test_write_file_refuses_private_gitlab(transport) -> None:
     project = _FakeGitlabProject(files={}, visibility="private")
     fake = _FakeGitlabClient(project=project)
     with _patch_gitlab(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "write_file") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -819,7 +823,7 @@ async def test_create_repository_github(transport) -> None:
     created = _FakeGithubRepoSummary("widgets", "acme/widgets", True, "", "https://github.com/acme/widgets")
     fake = _FakeGithubClient(org=_FakeGithubAccount(created_repo=created))
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "create_repository") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -836,7 +840,7 @@ async def test_fork_repository_github(transport) -> None:
     repo = _FakeGithubRepo("acme/widgets", fork_result=fork)
     fake = _FakeGithubClient(repo=repo)
     with _patch_github(fake):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "fork_repository") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -852,7 +856,7 @@ async def test_delete_repository_github_always_refuses_and_never_touches_a_clien
         raise AssertionError("delete_repository must never construct a GitHub client")
 
     with mock.patch.object(server, "_github_client", _boom), mock.patch.object(server, "_gitlab_client", _boom):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "delete_repository") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -869,7 +873,7 @@ async def test_delete_repository_gitlab_always_refuses_and_never_touches_a_clien
         raise AssertionError("delete_repository must never construct a GitLab client")
 
     with mock.patch.object(server, "_github_client", _boom), mock.patch.object(server, "_gitlab_client", _boom):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, "delete_repository") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(

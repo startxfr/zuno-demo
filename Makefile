@@ -43,7 +43,7 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # sit Degraded for the whole window while ArgoCD self-healed it back.
 # "nfs-provisioner" (ADR-0608/WP-241) needs only OLM and provides the `nfs`
 # StorageClass that Day 2's "unifai" uses for its shared volumes.
-DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config openshift-pipelines
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environment
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
@@ -76,9 +76,9 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models okf-mirror mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
+DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model praxis
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model praxis
 DAY2_VERBS := check install build uninstall reconcile all reinstall
 # Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
 # to them: a Day 2 reconcile never falls back to re-installing a component.
@@ -106,7 +106,7 @@ DAY2_RECONCILE_COMPONENTS := models
 # availability test for agents/platform and to each component's own
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
-DAY3_BACKUP_COMPONENTS := postgresql unifai
+DAY3_BACKUP_COMPONENTS := postgresql unifai quay-registry
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
 # (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and
@@ -115,7 +115,9 @@ DAY3_BACKUP_COMPONENTS := postgresql unifai
 # OLSConfig operand is absent, and vice versa.
 # "operators" (2026-11-04): report-only audit of the OLM operators that can be
 # updated (platform/olm/audit_operator_updates.py, ansible/roles/operators).
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift
+# "recovery" (2026-11-12): read-only, is the cluster back after a node drain or a reboot
+# (platform/recovery/check_recovery.py, ansible/roles/recovery).
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift recovery
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
 # already-installed platform - the same tier as backup/restore, never
@@ -135,14 +137,18 @@ DAY3_ADMIT_COMPONENTS := agents
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check admit run release scenario-failover-node
 
-# WP-136/ADR-0550 presenter tooling, regrouped as a `make demo <verb>`
-# verb group (originally flat demo-* targets). Unlike day0-3 there is no
-# component argument and no AAP routing - these are read-only-or-idempotent
-# presenter conveniences against an already-installed platform, never an
-# install/operational action with its own AAP Job/Workflow Template.
-# "all-check" is WP-136's suggested alias for "check" - it dispatches to
-# the same playbook, never a second implementation.
-DEMO_VERBS := check all-check golden-path browser reset step-1 step-2 step-3 step-4 step-5
+# ADR-0616/WP-270: the presenter lifecycle of every catalogue demo, as
+# `make demo <verb> [arguments]`. The verbs run locally, never through AAP:
+# platform/demo/presenter.py runs each action or step file of the demo
+# (ansible/demos/<id>/) through ansible/playbooks/demo_run.yml, then prints
+# the page section. golden-path and browser are the catalogue-wide checks
+# of ADR-0605/ADR-0606, dispatched here exactly as before. The WP-136
+# webinar verbs and their playbooks were retired by WP-272 (ADR-0616
+# clause 13); the GPU failover drill stays `make d3 scenario-failover-node`.
+# ADR-0617/WP-284: record and gif take a demo's 5-minute version in a browser
+# and cut its GIF under ~/.cache/zuno/demo/recordings/, locally, never AAP;
+# scout (ADR-0618/WP-286) is the sign-in-only run a take needs first.
+DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse scout record gif golden-path browser
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -153,7 +159,11 @@ DEMO_VERBS := check all-check golden-path browser reset step-1 step-2 step-3 ste
 # resolve_aap_mode() reads ansible/confidential.yml directly: the Makefile
 # has no other way to reach an Ansible-sourced variable before deciding
 # whether to invoke ansible-playbook at all, and this decision must happen
-# here, in the shell, before any playbook runs. Never fails even if the
+# here, in the shell, before any playbook runs. When the file is
+# ansible-vault encrypted it is read through `ansible-vault view` (the
+# passphrase comes from ansible.cfg vault_password_file); a failed decrypt is
+# reported as "undecryptable" and aap_route refuses to run, because guessing
+# local or remote would be worse than stopping. Never fails even if the
 # file, PyYAML, or the key itself is missing - defaults to "auto"
 # throughout, matching this repo's existing "graceful if confidential.yml
 # is absent" convention (see ansible/roles/aap/tasks/install.yml).
@@ -181,8 +191,13 @@ define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
   local mode="auto"; \
   if [[ -f ansible/confidential.yml ]]; then \
-    local val; \
-    val="$$(python3 -c "import yaml; d=yaml.safe_load(open('ansible/confidential.yml')) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
+    local val txt; \
+    if head -n 1 ansible/confidential.yml | grep -q '^[$$]ANSIBLE_VAULT;'; then \
+      txt="$$(ansible-vault view ansible/confidential.yml 2>/dev/null)" || { echo "Cannot decrypt ansible/confidential.yml (ansible.cfg vault_password_file, see ansible/README.md)" >&2; echo "undecryptable"; return 0; }; \
+    else \
+      txt="$$(cat ansible/confidential.yml)"; \
+    fi; \
+    val="$$(printf '%s' "$$txt" | python3 -c "import sys, yaml; d=yaml.safe_load(sys.stdin) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
     [[ -n "$$val" ]] && mode="$$val"; \
   fi; \
   case "$$mode" in \
@@ -202,6 +217,7 @@ aap_route() { \
         return 99; \
       fi ;; \
     remote) ;; \
+    *) echo "zuno_make_aap_mode could not be resolved ('$$mode'): refusing to guess between local and remote" >&2; return 2 ;; \
   esac; \
   $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "{\"aap_launch_type\": \"$$kind\", \"aap_launch_template\": \"$$template\", \"aap_launch_extra_vars\": $$extra_vars_json}" $(EXTRA_VARS); \
 };
@@ -251,9 +267,17 @@ help:
 	  '  make day3|d3 admit [component]       Verify and validate the zuno-demo-agents release in platform/okf/agents.lock (ADR-0580)' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
-	  '  make demo check       Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness (alias: all-check)' \
-	  '  make demo reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
-	  '  make demo step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
+	  '  make demo list                       The catalogue demos, their step counts (5/15), show-ready, last rehearsal (ADR-0616)' \
+	  '  make demo use <id> 5|15              Select a demo and its version (a workshop takes no version)' \
+	  '  make demo status|check|install|start|stop|uninstall [<id>]   Run the demo'"'"'s action file, then print its page section' \
+	  '  make demo step next|<N>              Run the step'"'"'s reads, then print its Do, Say and You should see' \
+	  '  make demo freeze on|off              Freeze marker on this workstation: install, uninstall, rehearse, scout and record refuse' \
+	  '  make demo rehearse <id> 5|15         The whole sequence without pauses, with a report' \
+	  '  make demo scout <id>                 Sign in as the walkthrough'"'"'s persona and open its menus: no prompt, nothing created (ADR-0618)' \
+	  '  make demo record <id>                Record the 5-minute version in a browser, then cut its GIF in ~/.cache (ADR-0617)' \
+	  '  make demo record <id> [render]       A terminal demo: capture and check as text; render films it after the transcript is read (ADR-0618)' \
+	  '  make demo gif <id>                   Cut the newest recording again, offline; never copies into the repository' \
+	  '  make demo golden-path|browser        The catalogue-wide checks (ADR-0605, ADR-0606); ONLY=a,b limits them' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
@@ -282,43 +306,24 @@ new-mcp-server:
 	fi
 	python3 platform/scaffolding/new_mcp_server.py "$(NAME)" $(if $(DESCRIPTION),--description "$(DESCRIPTION)")
 
-# WP-136/ADR-0550: presenter tooling for the 20-minute sovereign-AI
-# webinar demo, dispatched as `make demo <verb>` (same MAKECMDGOALS
-# word-2 mechanism as day0-3, see DEMO_VERBS above for why there is no
-# component argument and no aap_route dispatch). Each verb maps 1:1 to
-# ansible/playbooks/demo_<verb with - replaced by _>.yml; "all-check" is
-# rewritten to "check" first (WP-136's alias, single implementation).
-# The step-5 prompter deliberately never calls
-# `make d3 scenario-failover-node` itself - that command is
-# interactive-only and mutates live shared GPU infra (ADR-0536), so it
-# must stay a separate, explicit action the presenter runs themselves,
-# not a side effect of a prompter target.
+# ADR-0616/WP-270: `make demo <verb> [arguments]`. Every word after `demo`
+# goes to platform/demo/presenter.py (DEMO_ARGS), which checks the
+# kubeconfig itself, only for the verbs that touch the cluster - so `demo`
+# no longer depends on credentials-check, except for golden-path and
+# browser, which keep their exact behaviour: credentials-check, then
+# ansible/playbooks/demo_golden_path.yml or demo_browser.yml with
+# $(EXTRA_VARS) (ONLY= passes through the environment).
+DEMO_ARGS := $(if $(filter demo,$(firstword $(MAKECMDGOALS))),$(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS)))
+
 define DEMO_RECIPE
 @verb="$(DAY_VERB)"; \
-if [[ -z "$$verb" ]]; then \
-  printf '%s\n' \
-    'Zuno Demo - webinar presenter tooling (WP-136/ADR-0550)' \
-    '' \
-    'Usage: make demo <verb>' \
-    '' \
-    '  check       Read-only presenter preflight - app/project/model/failover-topology/training readiness' \
-    '  golden-path One real call per demonstration moment (ADR-0605): UnifAI, sovereignty, delegation+approval,' \
-    '              Open WebUI, Zuno Code, Dify, kagent, OpenClaw, Lightspeed, guardrails, Tempo trace' \
-    '  browser     One browser check per experience (ADR-0606/WP-243): Keycloak sign-in, first screen, screenshots' \
-    '  all-check   Alias for check' \
-    '  reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
-    '  step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your' \
-    '              behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
-    '' \
-    'Example: make demo check'; \
-  exit 0; \
-fi; \
-case " $(DEMO_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported demo verb: '$$verb' (expected one of: $(DEMO_VERBS))" >&2; exit 2;; esac; \
-if [[ "$$verb" == "all-check" ]]; then verb=check; fi; \
-$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/demo_$${verb//-/_}.yml" $(EXTRA_VARS)
+case "$$verb" in \
+  golden-path|browser) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/demo_$${verb//-/_}.yml" $(EXTRA_VARS) ;; \
+  *) ZUNO_REPO_ROOT="$(CURDIR)" python3 platform/demo/presenter.py $(DEMO_ARGS) ;; \
+esac
 endef
 
-demo: $(if $(DAY_VERB),credentials-check)
+demo: $(if $(filter golden-path browser,$(DAY_VERB)),credentials-check)
 	$(DEMO_RECIPE)
 
 # Bash completion for `make <top-level target>`, then
@@ -363,6 +368,7 @@ _complete-components:
 	       release) echo "$(DAY3_RELEASE_COMPONENTS) all" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
 	     esac ;; \
+	  demo) python3 platform/demo/presenter.py --complete "$(VERB)" $(ARG) ;; \
 	esac
 
 completion:
@@ -387,6 +393,9 @@ completion:
 	  '  elif [[ $$COMP_CWORD -eq 3 ]]; then' \
 	  '    verb=$${COMP_WORDS[2]}' \
 	  '    COMPREPLY=( $$(compgen -W "$$(command make -s -C "$(CURDIR)" _complete-components DAY=$$day VERB=$$verb 2>/dev/null)" -- "$$cur") )' \
+	  '  elif [[ $$COMP_CWORD -eq 4 && $$day == demo ]]; then' \
+	  '    verb=$${COMP_WORDS[2]}' \
+	  '    COMPREPLY=( $$(compgen -W "$$(command make -s -C "$(CURDIR)" _complete-components DAY=demo VERB=$$verb ARG=$${COMP_WORDS[3]} 2>/dev/null)" -- "$$cur") )' \
 	  '  fi' \
 	  '}' \
 	  'complete -F _zuno_demo_make_complete make'
@@ -757,6 +766,7 @@ case "$$verb" in \
       prune_args=(--mirror "$$OKF_MIRROR_TO" --keep "$${OKF_MIRROR_KEEP:-3}"); \
       case "$${OKF_MIRROR_PLAIN_HTTP:-0}" in 1|true|yes) prune_args+=(--plain-http) ;; esac; \
       case "$${OKF_MIRROR_PRUNE:-0}" in 1|true|yes) prune_args+=(--apply) ;; esac; \
+      case "$${OKF_MIRROR_QUAY:-0}" in 1|true|yes) prune_args+=(--quay) ;; esac; \
       python3 platform/supply-chain/admit_okf_bundle.py prune "$${prune_args[@]}"; \
     fi ;; \
   release) \
@@ -794,8 +804,19 @@ d3: $(if $(DAY_VERB),credentials-check)
 
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
 # day1/d1/day2/d2/day3/d3/demo recipes read MAKECMDGOALS words 2 and 3
-# directly, so e.g. `make d0 check postgresql` or `make demo step-1`
-# needs "check"/"postgresql"/"step-1" to resolve to *something* as Make
+# directly, so e.g. `make d0 check postgresql` or `make demo step next`
+# needs "check"/"postgresql"/"next" to resolve to *something* as Make
 # goals without erroring as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
+NOOP_WORDS := $(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS))
+$(NOOP_WORDS):
 	@:
+
+# ADR-0616/WP-270: after `demo`, every other word (a demo id, next, a step
+# number, 5, 15, on, off) is a no-op goal too - except the words that are
+# already targets, so `make demo help` never redefines `help`.
+DEMO_REAL_TARGETS := help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components
+DEMO_NOOP_WORDS := $(sort $(filter-out $(NOOP_WORDS) $(DEMO_REAL_TARGETS),$(DEMO_ARGS)))
+ifneq ($(DEMO_NOOP_WORDS),)
+$(DEMO_NOOP_WORDS):
+	@:
+endif

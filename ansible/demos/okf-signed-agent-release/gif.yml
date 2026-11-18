@@ -1,0 +1,21 @@
+---
+# okf-signed-agent-release: the cut list of its GIF (ADR-0618, WP-289), read by platform/demo/gif.py.
+# `make demo record okf-signed-agent-release` captures the 5-minute version as a real terminal session and checks it
+# as text; `make demo record okf-signed-agent-release render` replays it in xterm.js and films it, then cuts it with
+# this list. The GIF stays in ~/.cache/zuno/demo/recordings/ until the owner's "go okf-signed-agent-release".
+# Two rows have a command (1:15, 2:15). Row 0:00 is the Arkos sheet on GitHub, in the agents repository: not in the
+# take and not in the GIF, and no caption speaks of it. Row 3:30 points at the start of the 2:15 reference, which is
+# on screen: it is a caption over the 2:15 result. Markers: start, 01-15-typed, 01-15-done, 02-15-typed, 02-15-done,
+# end. Planned before the first take on synthetic markers at the capture's typing pace: check the total after it.
+record_notice: >-
+  a real terminal session on the cluster with your oc login: a read of platform/okf/agents.lock from git and the
+  okf-fetch log line of the tool gateway, no Secret value; row 0:00 (the Arkos sheet on GitHub) is not filmed
+target_seconds: [40, 60]
+width: 960
+fps: 10
+moments:
+  - {from: start, to: 01-15-done, fit: 5, hold: 7, step: "1:15", caption: "1:15  One agents release, pinned by its digest"}
+  - {from: 01-15-done, to: 02-15-typed, fit: 5, hold: 3, step: "2:15", caption: "2:15  Before the gateway starts: is the release signed?"}
+  - {from: 02-15-typed, to: 02-15-done, fit: 3, hold: 7, step: "2:15", caption: "2:15  VERIFIED: the signed release, its agents listed"}
+  - {still: 02-15-done, hold: 7, step: "3:30", caption: "3:30  Read from our own registry, not from the internet"}
+  - {still: end, hold: 6, step: "4:15", caption: "Agents run only from a signed release, chosen by digest"}

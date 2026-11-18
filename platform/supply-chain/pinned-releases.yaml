@@ -792,3 +792,84 @@ releases:
     digest: sha256:59fe1e97cdaee37964e9375a071fae4713938b303a3cc82c2074083520b19312
     signed: true
     signed_at: '2026-11-08T16:28:10Z'
+- release_tag: v0.15.0
+  pinned_at: '2026-11-11T16:25:00Z'
+  pins:
+  - chart_values: gitops/charts/a2a-gateway/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:20deee69dc09542234dddfc6f9c3495e159534ef25813c274b64cd4de72f9d4a
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/a2a-gateway/values.yaml
+    path: okf.fetch.image.tag
+    tag: v0.15.0
+    digest: sha256:cd8fbaab22828059f97b57f05a0216579ddd184bcf45ad2b2b7d3b5c01f4eacb
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:72c44510b98a7d1206d5a6002630082f9cf5fc1b4d1e63e2f9ca5b48e0a69808
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/diagram-render/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:fb5d8492392c00a47b0ffc9b4d2c5ece2aac334903e8164d29e23226a2368093
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-aap/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:47dcf076e1f964d89266d811736ed59f6ee73890509ec7e5c0df66dc87e233be
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:f84447e25b69091348fdd44f23015a0317ae444cfa810ec5c393976d2366ad57
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:65679d2854c56b16678dc6f3d17570720c3ec3f60edadaeaa53c121026939b68
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: okf.fetch.image.tag
+    tag: v0.15.0
+    digest: sha256:cd8fbaab22828059f97b57f05a0216579ddd184bcf45ad2b2b7d3b5c01f4eacb
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:fa86768b71ceb1e7c6e0d303a3aa78384e6bcd26153972212cafd2d50a9efd24
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:3b1994d7568aa39974aaaad2b97daf4b8d2b3010bd10c9963ec88919e966d254
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.15.0
+    digest: sha256:e4c040f6118e15ebffeabeba12a13fc52ef49af87fbf955c772af8a47872cb77
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/zuno-dify-knowledge/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:2161b1fd7b78b9e12845db56f9223b4bb1d05f63bb475f00209696d42028db26
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'
+  - chart_values: gitops/charts/zuno-token-proxy/values.yaml
+    path: image.tag
+    tag: v0.15.0
+    digest: sha256:42a1f0f50d02a1fcd7ef1fc8f7b39caeb3830e97c8b30949ca884f7c2d673d0b
+    signed: true
+    signed_at: '2026-11-11T16:25:00Z'

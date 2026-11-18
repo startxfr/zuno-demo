@@ -1,0 +1,11 @@
+---
+# unifai-live-rag stop (WP-274): deletes the three named files from consultant-01's Personal documents, and nothing
+# else. Declared changing in demo.yml. The page section `## Presenter lifecycle` > `### Stop` says what the presenter
+# does after it.
+- name: "unifai-live-rag stop | delete the three named files, and nothing else"
+  ansible.builtin.include_tasks: "{{ demo_unit.dir | default(demo_dir, true) }}/_library.yml"
+  vars:
+    rag_args: ["delete", "travel-and-expense-policy.md", "on-call-rota-handbook.md", "questions.md"]
+
+- name: "unifai-live-rag stop | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

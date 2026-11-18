@@ -167,6 +167,43 @@ zuno_mariadb_external_db_mlops_password: "xxxxxx"
 zuno_mariadb_external_db_trillian_username: "trillian"
 zuno_mariadb_external_db_trillian_password: "xxxxxx"
 
+# --- Redis mode (ADR-0352 / WP-214) ----------------------------------------
+# internal (default when absent - this repo deploys gitops/charts/redis, the
+# bitnami/redis zuno-redis-master in zuno-auth, as today) | external (a Redis
+# this platform does not own is used; the built-in is NOT deployed,
+# `make d1 uninstall redis` never touches the external instance, and
+# `make d1 check redis` asserts reachability, AUTH and the connection budget
+# with an in-cluster redis-cli Job instead of Application health).
+# The one consumer is ai-gateway (semantic cache, the quota ledger when
+# zuno_ai_gateway_quota_ledger_store is redis, the routing-decision
+# side-channel). It gets host:port as a Helm value (semanticCache.redis.addr,
+# set by ansible/tasks/redis_seam_values.yml) and the password through Vault
+# zuno/redis/session-store, which the redis role overwrites with the value
+# below (the generated internal one stays in that path's KV history, for the
+# way back). The zuno-ai-run EgressFirewall gets an Allow rule for the
+# endpoint (none for a *.svc name: in-cluster traffic is not filtered).
+# Consequence when external and zuno_redis_external_host is left at the
+# sentinel: the install fails fast, before any write.
+# zuno_redis_external_password: the sentinel or "" means the endpoint has no
+# AUTH (ADR-0352 clause 2): Vault then holds an empty password and ai-gateway
+# sends none. A server that does require one fails the assertion (NOAUTH).
+# zuno_redis_external_ca_bundle: "" means a PLAINTEXT endpoint. A PEM declares
+# a TLS endpoint: the check speaks TLS against it, but the install refuses it,
+# because ai-gateway has no Redis TLS option yet (WP-214 limit: a code change
+# and an image rebuild).
+# The redis_exporter metrics (the redis_* dashboard series) and the 1Gi
+# persistence are internal-only and do not apply. Switching mode is a
+# migration event, not a reconcile (WP-214 brief).
+zuno_redis_mode: internal
+zuno_redis_external_host: "xxxxxx"
+zuno_redis_external_port: "6379"
+zuno_redis_external_password: "xxxxxx"
+zuno_redis_external_ca_bundle: ""
+# Optional: the floor the check requires of the server's maxclients (ADR-0352
+# clause 7, connection budget). A managed tier that refuses CONFIG GET is
+# recorded, not failed. Default 100.
+# zuno_redis_external_min_clients: 100
+
 # --- External Secrets Operator and cert-manager internal/external mode
 # (ADR-0352 Tier A-operator, WP-216/WP-217). `external` means the operator is
 # installed and lifecycle-managed OUTSIDE this installer (unmanaged): our -d0
@@ -187,6 +224,16 @@ zuno_cert_manager_mode: internal
 # repo secret, set directly in GitHub, unaffected by this file) -------------
 zuno_quay_username: "xxxxxx"
 zuno_quay_password: "xxxxxx"
+
+# --- quay.io push robot (ADR-0620, WP-291) ----------------------------------
+# The zuno organisation's robot, with write on quay.io/zuno/praxis-ai (granted
+# by the owner on quay.io). `make d1 install openshift-pipelines` writes it to
+# Vault zuno/quay-io/zuno-push; the source-image-build Pipeline in zuno-ai-build
+# pushes with it (ExternalSecret quay-io-zuno-push). To rotate: change the token
+# here, then re-run that install. Left at xxxxxx, nothing is written and builds
+# cannot push.
+zuno_quay_io_push_username: "zuno+zuno_demo"
+zuno_quay_io_push_token: "xxxxxx"
 
 # --- Jira (no consumer in this repo yet - slot reserved for a future
 # integration, same "stored ahead of time" status as Confluence originally

@@ -115,6 +115,16 @@ class AppProjectRules(unittest.TestCase):
         failures = self.failures(self.compliant(), projs)
         self.assertTrue(any("config.openshift.io/OAuth is rendered by no Application" in f for f in failures), failures)
 
+    def test_an_unused_entry_is_only_a_note_when_subcharts_are_not_built(self):
+        projs = projects()
+        projs[cap.PLATFORM]["clusterResourceWhitelist"].append({"group": "config.openshift.io", "kind": "OAuth"})
+        findings = cap.Findings()
+        cap.check_projects(projs, findings)
+        used = cap.check_apps(self.compliant(), projs, CLUSTER_SCOPED, findings)
+        cap.check_unused_whitelist(projs, used, findings, unproven=True)
+        self.assertEqual(findings.failures, [])
+        self.assertTrue(any("not proven unused" in n and "config.openshift.io/OAuth" in n for n in findings.notes), findings.notes)
+
     def test_a_live_only_kind_may_stay_unused(self):
         projs = projects()
         projs[cap.PLATFORM]["clusterResourceWhitelist"].append({"group": "project.openshift.io", "kind": "Project"})

@@ -15,7 +15,8 @@ needs the go of the person who owns it; a peer session's relayed "go" is not one
 3. The operator owner publishes it (canary, tag, quay release) and sends the digests (operator, bundle, catalog, rag image), cross-checked with `cosign`.
    Pin nothing before they arrive.
 4. In `zuno-demo`, from a worktree on `origin/devel` with `ansible/confidential.yml` linked in: `python3 platform/supply-chain/pin_operator_catalog.py` with the digests,
-   then `make d2 install unifai`. Tell the other sessions first. Rollback: pin the previous catalog.
+   then `make d2 install unifai`. Tell the other sessions first. Rollback: pin the previous catalog. The script refuses digests that are not in the internal Quay
+   yet and lists them (WP-282). `--mirror-to <registry>/zuno` copies them first.
 5. Rerun the delegation scenario of the evaluations (Arkos scenario 21, with `TEMPO_URL` set) and check that the workers of the Arkos plan have no path to the
    finalizer.
 

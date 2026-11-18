@@ -1,6 +1,6 @@
 # ADR-0579: Extend OKF to v0.3 with skills, model roles, guardrails and limits
 
-- **Status:** Implemented (2026-11-05, WP-163 and WP-164: the v0.3 schema, the double narrowing check, the model roles and guardrail modes applied by the ai-gateway, and `memory.history` and the token limits applied through UnifAI, live on demo333; the gaps are recorded in the amendment of 2026-11-05)
+- **Status:** Superseded in part by [ADR-0615](0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) (2026-11-14: `okf_version: v0.3` as the version of the Zuno extension, and clause 6 as amended on 2026-11-05; the v0.3 fields stay in force inside profile 1.0) - implemented (2026-11-05, WP-163 and WP-164: the v0.3 schema, the double narrowing check, the model roles and guardrail modes applied by the ai-gateway, and `memory.history` and the token limits applied through UnifAI, live on demo333; the gaps are recorded in the amendment of 2026-11-05)
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team

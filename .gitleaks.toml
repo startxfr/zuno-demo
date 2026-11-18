@@ -15,3 +15,11 @@ regexes = [
 # A literal placeholder, not a credential: commit 224615ab (WP-238) sent `Bearer placeholder` through OpenClaw's
 # egress proxy, which replaces it. The header is gone since; this keeps a full-history scan green.
 commits = ["224615ab387771fda0dd9788036ec5348704fa50"]
+# Fake credentials built by two test modules, never real ones: platform/demo/tests/test_terminal_take.py writes
+# placeholder JWTs and a `curl -H "Authorization: ..."` line to prove the terminal-take filter finds and refuses them;
+# components/mcp-servers/test_support/assertion_headers.py signs test assertions with a key made at import time.
+# The paths are listed (not the commits) so the next edit of these tests stays green too.
+paths = [
+  '''^platform/demo/tests/test_terminal_take\.py$''',
+  '''^components/mcp-servers/test_support/assertion_headers\.py$''',
+]

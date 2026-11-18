@@ -1,0 +1,3 @@
+# ADR-0603 M20: the PyYAML the okf-release build stages (ai-gateway, mlops) and the supply-chain signer install on
+# their own, outside a component lock. Same version as platform/python/constraints.txt.
+PyYAML==6.0.2

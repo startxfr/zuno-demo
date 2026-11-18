@@ -17,6 +17,7 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d1
     day1_components:
+      - openshift_pipelines
       - rhtas_config
       - rhtas
       - lightspeed

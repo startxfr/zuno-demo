@@ -17,8 +17,7 @@
 # only ever wants to report, never fail).
 # `day2_render_fail_hint` (default '' - set by a caller that can tell,
 # from its own results which specific next-step command would address
-# the failure(s), e.g. demo_check.yml pointing at `make demo reset` for
-# a missing demo project or `make d3 run mlops` for missing training
+# the failure(s), e.g. `make d3 run mlops` for missing training
 # evidence). Appended to the fail message when non-empty; this task stays
 # generic and never guesses a remediation itself - running that command
 # is still the operator's call, this only surfaces what the report above

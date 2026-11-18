@@ -1,0 +1,143 @@
+# ADR-0619 (WP-292): Praxis AI, an alternative AI gateway in zuno-ai-gateways. The Zuno ai-gateway stays every
+# client's default; this one is an additional, named connection. Reference style: gitops/charts/ai-gateway.
+namespace: zuno-ai-gateways
+
+image:
+  repository: quay.io/zuno/praxis-ai
+  # Pinned by digest (ADR-0619 clause 7), built by the source-image-build Pipeline (WP-291, `make d2 build praxis`)
+  # and written here by whoever deploys it. Empty = the chart renders no Deployment: there is no image to run.
+  # fork 0c024efb with the core otel feature, PipelineRun praxis-build-nz69t, 2026-11-17.
+  digest: "sha256:e319e228a64c0854ca5a20720b4dc830a9dda5d0340242cc4256ceb10e99f24c"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# apps.mycluster.example.com is the substitution placeholder (ansible/tasks/apply_gitops_app.yml rewrites it in the
+# Application manifest, which passes it back here via helm values - same pattern as gitops/charts/ai-gateway).
+clusterBaseDomain: apps.mycluster.example.com
+
+# The `zuno` Keycloak identity, verified by the gateway itself (ADR-0619 clause 4).
+keycloak:
+  # Empty = https://keycloak.<clusterBaseDomain>/realms/zuno.
+  issuer: ""
+  # Empty = <issuer>/protocol/openid-connect/certs. It must be https: the policy engine reads it through the public
+  # Route (Let's Encrypt, ADR-0211) and refuses a private address unless the host is listed in trusted_private_endpoints
+  # (the chart lists the issuer's host: in the cluster the Route resolves to the router's private address).
+  jwksUrl: ""
+  audience: zuno-admin-api
+  algorithms: [RS256]
+  leewaySeconds: 60
+
+# The models Praxis serves. `name` is what a client sends; `service` is the LLMInferenceService behind it.
+# Each goes through the RHOAI MaaS gateway first, then directly to KServe on 429/502/503/504, as in
+# platform/ai-gateway/provider-routing.yaml.
+models:
+  - {name: qwen3.6-27b-instruct, service: qwen36-27b-instruct}
+  - {name: gpt-oss-20b, service: gpt-oss-20b}
+  - {name: qwen3.5-9b, service: qwen35-9b}
+  - {name: qwen3.5-9b-wesh, service: qwen35-9b-wesh}
+# `auto` is rewritten to this model, so a client that sends `auto` keeps working (ADR-0619 clause 3).
+alias:
+  name: auto
+  target: qwen3.6-27b-instruct
+
+maas:
+  # The MaaS gateway's Service; the path of each model is /<namespace>/<service>/v1/chat/completions.
+  host: maas-default-gateway-istio.openshift-ingress.svc.cluster.local
+  port: 443
+  modelsNamespace: zuno-ai-run
+  # TCP + TLS to the MaaS gateway, and the longest silence between two reads of its answer (a non-streamed answer's
+  # first byte comes at its end: keep this above the longest plain completion). Past either, the step answers 502
+  # and the router goes to the direct step.
+  connectTimeoutMs: 5000
+  readTimeoutMs: 180000
+  # The projected ServiceAccount token the gateway presents (audience maas-gateway-auth's kubernetesTokenReview),
+  # rotated by the kubelet; credential_inject follows the file without a restart.
+  tokenPath: /var/run/secrets/maas/token
+  tokenAudience: https://kubernetes.default.svc
+direct:
+  # https://<service>-kserve-workload-svc.<modelsNamespace>.svc:<port>, certificate from the service CA.
+  port: 8000
+serviceCA:
+  configMap: openshift-service-ca.crt
+  mountPath: /etc/ssl/openshift-service-ca
+  file: service-ca.crt
+
+# The only SaaS models (ADR-0619 clause 3): Claude through Anthropic Messages, Codestral through Mistral's
+# OpenAI-compatible API. Their keys come from Vault by ExternalSecrets. Off by default: with the switch off the
+# gateway serves the sovereign models only and refuses these names as unlisted models.
+saas:
+  enabled: false
+  # Clients whose token (azp) may not use a SaaS model: the policy refuses it with model_not_allowed_for_client.
+  deniedClients: [claude-code]
+  claude:
+    name: claude
+    # claude-3-5-sonnet-latest is retired (Anthropic 404 "model: claude-3-5-sonnet-latest", live 2026-11-17).
+    targetModel: claude-opus-5-5
+    host: api.anthropic.com
+    port: 443
+    apiVersion: "2023-06-01"
+    secretName: praxis-anthropic
+    vault: {key: providers/anthropic, property: api_key}
+  codestral:
+    name: codestral-latest
+    targetModel: codestral-latest
+    host: api.mistral.ai
+    port: 443
+    secretName: praxis-mistral-codestral
+    vault: {key: providers/mistral-codestral, property: api_key}
+
+# Request and stream limits. A coding turn on a local model can run for minutes: the router's own deadline is 30 s.
+limits:
+  timeoutMs: 600000
+  maxBodyBytes: 4194304
+
+# token_rate_limit per authenticated subject on the shared Redis (the session store of zuno-auth). Off by default:
+# the filter is in our own build (features token-rate-limit-filter, ADR-0620) and not in the published image.
+tokenRateLimit:
+  enabled: false
+  window: 1h
+  capacity: 1000000
+  reservedTokens: 2000
+  redis:
+    host: zuno-redis-master.zuno-auth.svc
+    port: 6379
+    secretName: praxis-redis
+    vault: {key: redis/session-store, property: password}
+    namespace: praxis
+
+# OpenTelemetry spans to the platform collector. Off by default: it needs our own build (feature `opentelemetry`).
+opentelemetry:
+  enabled: false
+  endpoint: http://zuno-otel-collector-collector.zuno-monitoring.svc:4317
+  serviceName: praxis
+  samplingRate: 0.1
+
+# The /metrics endpoint (admin.metrics_address). The admin API itself stays on 127.0.0.1:9901 (it must be loopback).
+metrics:
+  port: 9902
+
+# Who may call the gateway, by namespace label and pod, as the ai-gateway's NetworkPolicy does.
+networkPolicy:
+  # Namespaces labelled zuno.io/experience-client=true (Open WebUI, Dify, kagent, world-model, the OpenClaw personas).
+  experienceClients: true
+  unifaiNamespace: zuno-unifai
+  # The zuno-agent-gateway proxy (connectivity-link praxisWorkstationEntry) in openshift-ingress, for the workstation
+  # clients. Turn it on together with that entry.
+  workstationEntry: false
+  # Namespaces that scrape /metrics.
+  monitoringNamespaces: [openshift-monitoring, openshift-user-workload-monitoring]
+  # Pods of zuno-ai-gateways that call it (the alternative gateways' token proxies, when they run here).
+  sameNamespacePods: []
+
+serviceMonitor:
+  enabled: true
+  interval: 30s

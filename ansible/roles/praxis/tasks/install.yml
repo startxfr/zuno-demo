@@ -1,0 +1,103 @@
+---
+# ADR-0619 (WP-292): Praxis AI follows ONE switch, zuno_praxis_enabled. On: needs an image digest, applies the
+# Application and waits for the pod. Off: removes what is left, so `make d2 install all` (and the AAP install workflow)
+# costs nothing while Praxis is off. The allow-lists that admit its pod (models, redis) follow the same switch in their
+# own roles; install llm, models and redis first when turning it on.
+- name: "praxis | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "praxis | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _praxis_confidential_file
+
+- name: "praxis | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _praxis_confidential_file.stat.exists
+
+# ---------------------------------------------------------------- switch off
+- name: "praxis | switch off: converge to no application"
+  when: not (zuno_praxis_enabled | bool)
+  block:
+    - name: "praxis | look up the Applications"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+        name: "{{ item }}"
+      loop: ["{{ praxis_app_name }}", "{{ praxis_app_name_d0 }}"]
+      register: _praxis_apps
+
+    - name: "praxis | delete the Applications that exist (cascades to the Deployment, Service, policies and secrets)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "{{ item.item }}"
+      loop: "{{ _praxis_apps.results }}"
+      when: (item.resources | default([])) | length > 0
+
+    - name: "praxis | say what the switch means"
+      ansible.builtin.debug:
+        msg: >-
+          zuno_praxis_enabled is false: Praxis is not installed. Set it to true in ansible/clusters/<cluster>.yml
+          (with zuno_praxis_image_digest from `make d2 build praxis`), then `make d2 install models`,
+          `make d1 install redis` and `make d2 install praxis`, to run it.
+
+# ----------------------------------------------------------------- switch on
+- name: "praxis | switch on: install the gateway"
+  when: zuno_praxis_enabled | bool
+  block:
+    - name: "praxis | require an image digest"
+      ansible.builtin.assert:
+        that:
+          - zuno_praxis_image_digest | length > 0
+          - zuno_praxis_image_digest is match('^sha256:[0-9a-f]{64}$')
+        fail_msg: >-
+          zuno_praxis_image_digest is empty or not sha256:<64 hex>. Build the image first
+          (`make d2 build praxis`, WP-291), then write the digest it prints in ansible/clusters/<cluster>.yml.
+
+    - name: "praxis | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "praxis | apply the Application (d0, no-op)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+      vars:
+        gitops_component_name: "praxis"
+        gitops_app_phase: "d0"
+        gitops_app_name: "{{ praxis_app_name_d0 }}"
+
+    # The dict REPLACES the Application's values (check_gitops_values_clobber): every key of
+    # gitops/apps/praxis/application-d1.yaml is written here.
+    - name: "praxis | apply the Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+      vars:
+        gitops_component_name: "praxis"
+        gitops_app_phase: "d1"
+        gitops_app_name: "{{ praxis_app_name }}"
+        gitops_app_wait_retries: "{{ praxis_wait_retries }}"
+        gitops_app_wait_delay: "{{ praxis_wait_delay }}"
+        gitops_app_extra_helm_values:
+          clusterBaseDomain: "{{ cluster_base_domain }}"
+          image:
+            digest: "{{ zuno_praxis_image_digest }}"
+          saas:
+            enabled: "{{ zuno_praxis_saas_enabled | bool }}"
+          tokenRateLimit:
+            enabled: "{{ zuno_praxis_token_rate_limit_enabled | bool }}"
+            capacity: "{{ zuno_praxis_token_rate_limit_capacity | int }}"
+          opentelemetry:
+            enabled: "{{ zuno_praxis_otel_enabled | bool }}"
+          networkPolicy:
+            workstationEntry: "{{ zuno_praxis_workstation_entry | bool }}"
+
+    - name: "praxis | wait for the Deployment to be available"
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ praxis_namespace }}"
+        name: praxis
+      register: _praxis_deploy
+      until: >-
+        (_praxis_deploy.resources | default([]) | length > 0) and
+        ((_praxis_deploy.resources[0].status.availableReplicas | default(0)) >= 1)
+      retries: "{{ praxis_wait_retries }}"
+      delay: "{{ praxis_wait_delay }}"

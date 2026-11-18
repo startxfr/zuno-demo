@@ -1,0 +1,28 @@
+---
+# State detection (never fails).
+- name: "quay_registry | check the quay-registry Applications (d0, d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-quay-registry-d1"
+
+- name: "quay_registry | look up the QuayRegistry"
+  kubernetes.core.k8s_info:
+    api_version: quay.redhat.com/v1
+    kind: QuayRegistry
+    namespace: "{{ zuno_quay_namespace }}"
+    name: quay
+  register: _quay_registry_lookup
+  failed_when: false
+
+- name: "quay_registry | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _state_check_result
+        and (_quay_registry_lookup.resources | default([]) | length) > 0
+        and ((_quay_registry_lookup.resources[0].status.conditions | default([])
+              | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list) == ['True'])
+      }}
+
+- name: "quay_registry | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

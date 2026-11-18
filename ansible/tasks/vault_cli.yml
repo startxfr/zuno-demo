@@ -1,0 +1,102 @@
+---
+# ADR-0603 M9: run one `vault` CLI command in the Vault server pod with no secret on its command line.
+#
+# A secret in a `k8s_exec` command string lands in the exec request's URL, so in the API server's audit log, in the
+# pod's process list and, on a failure, in the task result. Here the token (zuno_vault_token, or vault_cli_token) and
+# the optional payload are copied into a private directory of the pod by kubernetes.core.k8s_cp, which streams them
+# as a tar archive on the exec's stdin, never in its URL. The command reads them from there, and the same exec
+# deletes the directory.
+#
+# Inputs:
+#   vault_cli_args           the vault arguments, without any secret ("kv put zuno/smtp/technical @PAYLOAD");
+#                            "@PAYLOAD" stands for the payload file
+#   vault_cli_payload        optional dict, written as a JSON object whose values are all strings (what
+#                            `vault kv put key=value` stores)
+#   vault_cli_capture_stdout optional, default false: keep the command's stdout (a `kv get` would print secrets)
+#   vault_cli_fail_on_error  optional, default true: fail, with a token-free message, when the command fails
+#   vault_cli_token          optional, default zuno_vault_token
+# Needs _vault_pod (the Vault server pod, as ansible/tasks/vault_login.yml finds it).
+# Output: vault_cli_result = {rc, stdout}.
+#
+# no_log is set on every task: it does not propagate from the include.
+- name: "vault-cli | pick a private directory in the Vault pod"
+  ansible.builtin.set_fact:
+    _vault_cli_dir: "/tmp/zuno-vault-cli-{{ lookup('ansible.builtin.password', '/dev/null', length=16, chars=['ascii_lowercase', 'digits']) }}"
+  no_log: true
+
+- name: "vault-cli | run the command with the token and payload read from files"
+  block:
+    - name: "vault-cli | create the private directory"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        command: "sh -c {{ ('umask 077 && mkdir -m 700 ' ~ (_vault_cli_dir | quote)) | quote }}"
+      changed_when: false
+      no_log: true
+
+    - name: "vault-cli | copy the token into the pod"
+      kubernetes.core.k8s_cp:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        remote_path: "{{ _vault_cli_dir }}/token"
+        content: "{{ vault_cli_token | default(zuno_vault_token) }}"
+        state: to_pod
+      changed_when: false
+      no_log: true
+
+    - name: "vault-cli | copy the payload into the pod"
+      kubernetes.core.k8s_cp:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        remote_path: "{{ _vault_cli_dir }}/payload.json"
+        content: "{{ dict(vault_cli_payload.keys() | zip(vault_cli_payload.values() | map('string'))) | to_json }}"
+        state: to_pod
+      when: vault_cli_payload is defined
+      changed_when: false
+      no_log: true
+
+    - name: "vault-cli | vault {{ (vault_cli_args | split(' '))[:2] | join(' ') }}"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        command: "sh -c {{ _vault_cli_script | quote }}"
+      vars:
+        _vault_cli_script: >-
+          d={{ _vault_cli_dir | quote }};
+          VAULT_TOKEN="$(cat "$d/token")"; export VAULT_TOKEN;
+          vault {{ vault_cli_args | replace('@PAYLOAD', '@' ~ _vault_cli_dir ~ '/payload.json') }}
+          {{ '' if (vault_cli_capture_stdout | default(false) | bool) else '>/dev/null' }};
+          rc=$?; rm -rf "$d"; exit $rc
+      register: _vault_cli_exec
+      failed_when: false
+      changed_when: (_vault_cli_exec.rc | default(1)) == 0 and (vault_cli_args is match('kv (put|patch) |write '))
+      no_log: true
+
+    - name: "vault-cli | keep the result"
+      ansible.builtin.set_fact:
+        vault_cli_result:
+          rc: "{{ _vault_cli_exec.rc | default(1) }}"
+          stdout: "{{ _vault_cli_exec.stdout | default('') if (vault_cli_capture_stdout | default(false) | bool) else '' }}"
+      no_log: true
+
+  always:
+    - name: "vault-cli | remove the private directory (also after a failure)"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-vault
+        pod: "{{ _vault_pod.resources[0].metadata.name }}"
+        container: vault
+        command: "sh -c {{ ('rm -rf ' ~ (_vault_cli_dir | quote)) | quote }}"
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+- name: "vault-cli | fail without printing a secret"
+  ansible.builtin.fail:
+    msg: "vault {{ vault_cli_args }} failed in the Vault pod (rc={{ vault_cli_result.rc }})."
+  when:
+    - vault_cli_fail_on_error | default(true) | bool
+    - (vault_cli_result.rc | int) != 0

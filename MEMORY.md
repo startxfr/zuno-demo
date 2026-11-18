@@ -1064,3 +1064,62 @@ target; revert to `latest` immediately after proving it.
   all Done). OKF v0.2 (extraction to a standalone `zuno-okf` repo) and
   OKF v0.3 (live reconciliation) remain open future work under this
   stream, not yet started.
+
+### Dated entries (roadmap work packages, v0.16) — current status per ADR
+
+- **2026-11-15 — WP-287 Done (ADR-0618 stays Accepted).** `vault-pki` is the first terminal demo recorded and published:
+  a real session captured, gated as text (no hit), the transcript read before rendering, replayed and filmed, GIF
+  published with the owner's "go vault-pki" (`afb13dae`). Evidence
+  `docs/roadmap/evidence/wp-287-terminal-recording-vault-pki-2026-11-15.md`. Traps kept: the window of a terminal take
+  is the demo's own (`record.cols`/`rows` in `demo.yml`; 100 columns wrapped the tables); the gate's refusal and the
+  allowed-`make`-row path were seen offline only; the privacy review of frames is a sample.
+- **2026-11-15 — WP-286 Done (ADR-0618 stays Accepted).** The recording chain was re-proved live on Open WebUI: a scout
+  (`make demo scout open-webui`, mandatory, tied to the walkthrough file's SHA-256) then a take that lists what it
+  created and cleaned and compares what the persona owns before and after. Evidence
+  `docs/roadmap/evidence/wp-286-recording-chain-improvements-2026-11-15.md`. Traps kept: read a GIF's size from its
+  `gif.json`, not from the report of the take; the refusal paths (a refused model answer, a refused click, a stale scout
+  hash) were exercised offline only; no privacy review was done on this take.
+- **2026-11-15 — ADR-0617 Implemented (WP-284 and WP-285, both Done).** The Open WebUI GIF is published and every
+  catalogue page has the presenter's shape: `## References` and `## Page status` last, no ADR or WP reference in the
+  Introduction, Personas and Presenter lifecycle. The shape checks of `platform/demo/consistency.py` are problems, not
+  warnings; `scaffold.py` reads probe names from `## Page status`. Traps kept: the banner is only under `## Page status`
+  (a rehearsal result goes there); a sentence that cited an ADR or a WP in a presenter section is reworded and its
+  source listed under References; a page row that says what a screen shows must be checked on the screen (the
+  rows left open: identity-personas 2:30 and 3:30, mcp-tools-by-group, openclaw tool lists, README persona table).
+- **2026-11-15 — ADR-0618 Accepted (Phase 57, WP-286 to WP-290, Not started).** Every catalogue scenario gets a GIF
+  by the chain of ADR-0617, terminal demos included; the workshops get none for now. A terminal demo is a real bash
+  session on the workstation, captured as an asciicast (bytes and timing), checked as TEXT (masks plus a deny list of
+  the real local values; a hit refuses the take; the stream is never edited), reviewed as a transcript, then replayed
+  in a vendored xterm.js and filmed. A `make` row is typed only if the demo's `demo.yml` lists it under
+  `record: {allow: [...]}`; `oc whoami -t`, `oc config view`, `env` and kubeconfig reads are always refused.
+  Server-side traces that cannot be deleted are accepted and stated; `record` does not read a persona's budget (no
+  endpoint; a refused answer fails the take). Six demos wait for the owner's decision, one by one, last: blender-3d,
+  world-model, a2a-delegation-approval, maas-portal-api-keys, openclaw, genai-playground. Traps kept: every
+  delete-by-id call outside Open WebUI and every sign-in flow other than the Keycloak form are unverified until a
+  scout; a page row that names a screen the take cannot show is settled before the take.
+- **2026-11-15 — ADR-0617 stays Accepted; WP-284 Done (the Open WebUI pilot).** The first demo GIF is published
+  (`docs/assets/img/demo/open-webui.gif`, 42.9 s, 1.3 MB, owner's "go open-webui", evidence
+  `docs/roadmap/evidence/wp-284-open-webui-gif-2026-11-15.md`). WP-285 (the page shape rollout) waits for the owner's
+  gate. Traps kept for the next demo: on Open WebUI 0.12.5 the tools menu shows one connection, Zuno tools, not tool
+  names, so the presenter says the names; the walkthrough's selectors are tied to that version, and a collapsed sidebar
+  rail looks like an open sidebar; use `record.sh <id> --scout` before a first take; `fit` slows a fast answer and
+  never freezes a frame, the caption goes in a band under the picture; the privacy review of the first GIF sampled 29 of
+  429 frames, so a later review should say how many it looked at.
+- **2026-11-15 — ADR-0617 Accepted (Phase 57, WP-284 and WP-285, Not started).** Each demo page will show a 40 to 60
+  second silent GIF of its 5-minute version, recorded by a dedicated walkthrough (`make demo record <id>`, then
+  `make demo gif <id>`) and published only with the owner's named "go <id>"; the `.webm` is never published. Every
+  catalogue page takes one order: Introduction, Personas, Presenter lifecycle, the versions, If something goes wrong,
+  Limits, the appendices, `## References`, and `## Page status` last (the status banner). ADR-0617 amends the section
+  order of ADR-0616 clause 4 by a dated note; ADR-0616 stays Implemented. Open WebUI is the pilot of both; the other
+  pages change after the owner's gate. Traps kept for the next change: the recorder deletes the chat it creates, and
+  `record` is refused during a freeze and without a passed `check` of the day; the page-shape checks of
+  `consistency.py` and the `scaffold.py` probe reading go live in the same push as the last page.
+- **2026-11-15 — ADR-0616 Implemented (Phase 56, WP-269 to WP-281, all Done).** Every demo of `docs/demo/` is prepared
+  and played through `make demo` (`use`, `status`, `check`, `install`, `start`, `step next|N`, `stop`, `uninstall`,
+  `rehearse`): one Ansible file per action and step under `ansible/demos/<id>/`, one page section each, engine in
+  `platform/demo/`. The 30 scenarios (both versions) and the 6 workshops have a rehearsal report ending with
+  `RESULT: PASS` (`docs/roadmap/evidence/wp-281-full-rehearsal-2026-11-15.md`). A rehearsal `PASS` is not
+  "show-ready": the world model is switched off and `model-catalog-registry` has no `ModelRegistry`. Traps kept for
+  the next change: queued probes must run in the probe script's order (`platform/demo/probe_order.py`); inside a
+  workshop `demo_dir` is the workshop's directory, a scenario file uses `demo_unit.dir`; a demo `status` never asserts
+  the DSC `Ready` condition while GuardrailsOrchestrator `zuno-guardrails-smoke` is parked in Error.

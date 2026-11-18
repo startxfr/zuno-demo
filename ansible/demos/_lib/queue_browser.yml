@@ -1,0 +1,6 @@
+---
+# Queue browser checks for one merged run by flush_checks.yml.
+# Vars: queue_browser (names of evaluations/browser/run.mjs checks: dify, open-webui, kagent, openclaw, unifai...).
+- name: "demo | queue browser checks"
+  ansible.builtin.set_fact:
+    demo_queued_browser: "{{ (demo_queued_browser + (queue_browser | default([]))) | unique }}"

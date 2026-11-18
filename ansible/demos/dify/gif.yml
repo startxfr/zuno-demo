@@ -1,0 +1,27 @@
+---
+# dify: the first cut list of its GIF (ADR-0618, WP-288), read by platform/demo/gif.py. Written BEFORE the first take:
+# tune it with `make demo gif dify` once a take exists.
+# `make demo record dify` takes the 5-minute version (evaluations/browser/walkthroughs/dify.mjs): consultant-02 at the
+# front door, then Dify's single administrator on Dify's own form. That second password is read at run time by the
+# caller and handed to the recorder in DIFY_ADMIN_PASSWORD; no still and no motion shows either sign-in form filled.
+# Markers, in order: login, studio, agent, q-sent, q-done, workflow, run-form, run-done, end.
+# Rows 3:45 and 4:15 are words: the close is a caption on the last screen.
+record_notice: >-
+  a recorded browser session on Dify: consultant-02 at the front door, then Dify's single administrator (a second
+  credential, typed by the recorder, never shown); one Zuno Agent turn and one run of Zuno Confluence Search, model
+  and tool calls made as consultant-02 on its budget; real Confluence page titles show in the answers; the Agent's
+  conversation is deleted at the end when Dify lists it, but the workflow's run stays in Dify's run log, which
+  cannot be deleted; no configuration is sent to Dify and the editor's own saves are refused in the browser, but the Zuno Agent's
+  edited date moves at each Agent turn (Dify's server does it); traces
+  and metrics of the calls remain, as for any use
+target_seconds: [45, 60]
+width: 960
+fps: 10
+moments:
+  - {still: login, hold: 3, caption: "Sign in with the company account at the door"}
+  - {still: studio, hold: 5, step: "0:00", caption: "0:00  A no-code canvas, three example apps"}
+  - {still: agent, hold: 3, caption: "Zuno Agent: an agent drawn, not coded"}
+  - {from: q-sent, to: q-done, fit: 10, hold: 6, step: "0:45", caption: "0:45  It searches Confluence through the platform's gateway"}
+  - {still: workflow, hold: 4, caption: "The same search, drawn as a fixed workflow"}
+  - {from: run-form, to: run-done, fit: 6, hold: 6, step: "2:30", caption: "2:30  Run it: a tool box, then a summary box"}
+  - {still: end, hold: 6, step: "4:15", caption: "Models, tools and budget stay the platform's"}

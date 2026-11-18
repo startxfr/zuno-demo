@@ -33,9 +33,16 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 `RESULT: PASS` means every required moment passed. A `FAIL` on the morning of the demonstration switches that moment
 to its fallback in the runbook; it does not open a fix.
 
-Personas and limits: the probes sign in as `eval-consultant-01` (`GOLDEN_PERSONA`) so the demonstration personas'
-histories and quotas are untouched. The delegation moment spends one Arkos turn; if it fails with a quota refusal
-(429), the evaluation persona's budget is spent, not the platform broken.
+Personas and limits: the probes that sign in do so as `eval-consultant-01` (`GOLDEN_PERSONA`), so the demonstration
+personas' histories and quotas are untouched by them. Some probes do spend a demonstration persona's budget, because
+they call as that persona:
+- `dify`, `kagent` and `guardrails` go through the experience's token proxy, so they count as **consultant-02** (Dify)
+  and **ai-ops-01** (kagent);
+- `openclaw` answers through each assistant's egress proxy, so it counts as **consultant-02** and **sale-01**;
+- `world-model` signs in as `GOLDEN_WORLD_PERSONA`, **ai-ops-01** by default.
+
+Each probe spends one short turn. The delegation moment spends one Arkos turn. If a probe fails with a quota refusal
+(429), the budget of the persona it called as is spent; the platform is not broken.
 
 ## 2. Screens (about 2 minutes, then 5 minutes by eye)
 

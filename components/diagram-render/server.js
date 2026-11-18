@@ -39,25 +39,17 @@ app.use(express.json({ limit: "256kb" }));
 
 let ready = false;
 
-// ADR-0037's second layer, same posture as components/mcp-servers/
-// confluence/server.py: NetworkPolicy (ingress from mcp-gateway only) is
-// the first layer; this shared secret proves a call actually came from
-// the gateway, not merely from a network-adjacent pod. Rendering
-// arbitrary Mermaid-derived content through a real headless-Chromium
-// process is a more interesting attack surface than a plain API
-// pass-through, so this stays on even though diagram-render (unlike
-// confluence-mcp) holds no credential of its own to protect - the
-// resource being protected here is the render process itself. Not
-// enforced as a hard startup requirement (same as diagram_gen.py's own
-// MCP_GATEWAY_WORKLOAD_TOKEN reasoning) so this still starts and serves
-// health checks if the secret hasn't landed yet.
-const GATEWAY_TOKEN = process.env.MCP_GATEWAY_WORKLOAD_TOKEN || "";
-app.use("/render", (req, res, next) => {
-  if (GATEWAY_TOKEN && req.get("X-Zuno-Gateway-Token") !== GATEWAY_TOKEN) {
-    return res.status(403).json({ error: "missing or invalid gateway token" });
-  }
-  next();
-});
+// WP-250 lot 2: /render accepts only a call assertion signed by the mcp-gateway's Vault
+// Transit key (app/call_assertion.py, verified by ./assertion.js), the same trust anchor as the
+// MCP servers. NetworkPolicy (ingress from mcp-gateway only) stays the first layer. The retired
+// shared workload token is no longer read. Fail closed: without MCP_CALL_ASSERTION_PUBLIC_KEY
+// every /render call is refused, while /healthz still answers.
+const { createVerifier, middleware: assertionMiddleware } = require("./assertion");
+app.use("/render", assertionMiddleware(createVerifier({
+  publicKeyPem: process.env.MCP_CALL_ASSERTION_PUBLIC_KEY || "",
+  audience: "diagram-render",
+  tool: "render",
+})));
 
 async function renderMermaidToSvg(mermaidSource) {
   // mermaid-cli's run() operates on files, not strings in memory - a

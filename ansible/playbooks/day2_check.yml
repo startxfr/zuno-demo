@@ -26,8 +26,9 @@
       - namespaces
       - llm
       - models
+      # ADR-0612 (WP-248): the internal registry, before the OKF mirror it replaces.
+      - quay_registry
       # ADR-0611 (WP-246): before mcp, whose okf-fetch can read it.
-      - okf_mirror
       - mcp
       - agents
       - mlops
@@ -43,6 +44,8 @@
       - kagent
       # ADR-0604 (WP-235): the world-model chain (GPU node, models, auth, gateway), skipped while the demo is off.
       - world_model
+      # ADR-0619 (WP-292): Praxis AI; reports the switch against what is installed, probes the gateway when it is.
+      - praxis
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

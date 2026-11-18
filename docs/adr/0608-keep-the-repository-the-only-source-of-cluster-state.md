@@ -94,3 +94,14 @@ Subscription's ADR-0607 pin (`Manual`, `startingCSV` v0.0.9). The known-good fil
 operation, not a gap in this record. Clause 3's label is in `docs/platform/parallel-sessions.md`; clause 4 holds
 because OpenShift builds label their images with `io.openshift.build.commit.id`, which the drift check reads; clause 7
 is in `RELEASING.md`.
+
+## Update 2026-11-14: two operators installed from the console, removed
+
+ECK was uninstalled on 2026-11-11 (0f0b0428). On 2026-11-12, ECK (14:17Z) and OpenShift Virtualization
+(`kubevirt-hyperconverged`, 14:40Z, in a new `openshift-cnv` namespace) were installed again from the OpenShift web
+console: their Subscriptions' only writer was the console, not ArgoCD or a playbook. The operator audit's known-good gate
+found them on 2026-11-14 (`audit_operator_updates.py --against`). Neither had an instance: no Elastic resource, no
+`HyperConverged`. With the owner's go the same day, both were removed: their Subscriptions and CSVs (with their
+webhooks), the 12 `elastic.co` and 8 `kubevirt.io` CRDs, and the `openshift-cnv` OperatorGroup and namespace. Afterwards
+the audit gate and `make d3 check drift` are clean. An install from the console is the case clause 1 exists for: the
+gate caught it two days later, not at the install.

@@ -1,0 +1,10 @@
+---
+# okf-signed-agent-release 1:15 (5-minute version, step 2 of the 15-minute sequence). Do: `git show
+# HEAD:platform/okf/agents.lock | tail -2`
+# A read of a repository file from git (the engine takes oc, make, curl and git commands, ADR-0616 clause 14), run
+# by readonly.py. Run locally on 2026-11-16: `# release v1.0.1` and the okf-corp digest.
+- name: "okf-signed-agent-release 1:15 | the last two lines of the agents lock"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "git show HEAD:platform/okf/agents.lock | tail -2"

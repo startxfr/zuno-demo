@@ -3,7 +3,7 @@
 - **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0586](../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md)
 - **Depends on:** [WP-176](wp-176-verify-the-unifai-runtime-images-before-deploying-them.md)
-- **Related:** [WP-110](wp-110-rhtas-operator-live-findings.md)
+- **Related:** [WP-110](wp-110-rhtas-operator-deployment-and-fundamentals.md)
 - **Target:** v0.11
 - **Estimated files touched:** ~9 in `zuno-demo` (`gitops/charts/rhtas-config`, `ansible/roles/rhtas_config`, `platform/supply-chain`, docs) and none in the fork
 

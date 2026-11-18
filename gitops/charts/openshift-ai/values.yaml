@@ -388,6 +388,8 @@ dataScienceCluster:
 # comment for the full reasoning.
 maasGateway:
   enabled: false
+  # ADR-0614 (WP-260 P3): two gateway pods spread over zones.
+  replicas: 2
   # Placeholder auto-substituted with the real cluster domain by
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com
@@ -511,6 +513,27 @@ prometheusK8s:
       memory: 6Gi
     limits:
       memory: 8Gi
+
+# ADR-0614: put every platform monitoring component on the infra nodes
+# (nodeSelector + toleration of the infra NoSchedule taint). false until the
+# infra nodes exist; Prometheus and Alertmanager then follow their zone-a/b
+# volumes onto the infra node of the same zone.
+infraNodes:
+  enabled: true   # WP-260 P2 step 3, 2026-11-13
+  components:
+    - alertmanagerMain
+    - prometheusK8s
+    - prometheusOperator
+    # prometheusOperatorAdmissionWebhook is NOT listed: the monitoring config
+    # webhook refuses nodeSelector/tolerations for it ("unknown field
+    # prometheusOperatorAdmissionWebhook.tolerations", OCP 4.22), so its two
+    # small pods stay on the workers.
+    - kubeStateMetrics
+    - monitoringPlugin
+    - openshiftStateMetrics
+    - telemeterClient
+    - thanosQuerier
+    - metricsServer
 
 # ADR-0322 v0.1 integration scope: stands up an OGXServer instance (the OGX
 # Operator's data-plane CR - spec.components.ogx: Managed above only

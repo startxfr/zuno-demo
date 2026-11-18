@@ -15,6 +15,7 @@ ansible/confidential*.back
 # once to the Ansible controller by ansible/roles/vault (and its .bak copies).
 ansible/vault-recovery*
 
+
 # Real / unapproved business data
 *.dump
 *.sql.gz
@@ -52,3 +53,8 @@ evaluations/benchmarks/*.json
 # ADR-0580/WP-165: the admitted zuno-demo-agents release, extracted and
 # verified per locked digest by platform/okf/release_cache.py.
 .cache/
+
+# ADR-0617/WP-284: a demo recording is never published; only its GIF, after the
+# owner's go. Recordings live under ~/.cache/zuno/demo/recordings/.
+*.webm
+recordings/

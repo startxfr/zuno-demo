@@ -9,8 +9,9 @@ fake `httpx.AsyncClient`-shaped object) - these tests prove the MCP
 protocol surface and the four tools' request/response mapping, not a live
 Confluence call.
 
-Also re-proves ADR-0037's workload-identity requirement holds: a request
-with no X-Zuno-Gateway-Token is rejected before any MCP protocol handling.
+Also re-proves ADR-0037's workload-identity requirement holds (WP-250 lot 2: the
+gateway's signed call assertion replaced the shared workload token): a request
+without a call assertion is rejected with 401 before any MCP protocol handling.
 
 Run from this directory:
 
@@ -23,12 +24,13 @@ import os
 import sys
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("CONFLUENCE_BASE_URL", "https://example.atlassian.net")
 os.environ.setdefault("CONFLUENCE_EMAIL", "technical@example.com")
 os.environ.setdefault("CONFLUENCE_API_TOKEN", "test-token")
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -36,9 +38,10 @@ from mcp.client.session import ClientSession  # noqa: E402
 from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
+from test_support.assertion_headers import headers_for  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-GATEWAY_HEADERS = {"X-Zuno-Gateway-Token": "test-workload-token"}
+AUD = "confluence"  # this server's backend name
 
 
 class _FakeResponse:
@@ -100,11 +103,11 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
         )
-    assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
+    assert resp.status_code == 401, f"expected 401 with no call assertion, got {resp.status_code}"
 
 
 async def test_tools_list_reports_exactly_the_four_declared_tools(transport) -> None:
-    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+    async with await _open_session(transport, headers_for(AUD, "")) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
@@ -127,7 +130,7 @@ async def test_search_pages_round_trip(transport) -> None:
     fake_client = _FakeConfluenceClient([_FakeResponse(200, fake_search_payload)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "search_pages")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("search_pages", {"query": "model serving"})
@@ -159,7 +162,7 @@ async def test_search_pages_strips_stopwords_from_a_long_question(transport) -> 
     fake_client = _FakeConfluenceClient([_FakeResponse(200, {"results": []})])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "search_pages")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -227,7 +230,7 @@ async def test_search_pages_filters_out_a_cql_hit_that_does_not_match_the_title(
     fake_client = _FakeConfluenceClient([_FakeResponse(200, fake_search_payload)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "search_pages")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("search_pages", {"query": "model serving"})
@@ -242,7 +245,7 @@ async def test_read_page_not_found_reports_as_a_tool_error_not_a_crash(transport
     fake_client = _FakeConfluenceClient([_FakeResponse(404)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "read_page")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool("read_page", {"page_id": "999"})
@@ -262,7 +265,7 @@ async def test_create_page_round_trip(transport) -> None:
     fake_client = _FakeConfluenceClient([_FakeResponse(200, fake_created)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "create_page")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
@@ -296,7 +299,7 @@ async def test_update_page_reads_current_version_then_increments_it(transport) -
     fake_client = _FakeConfluenceClient([_FakeResponse(200, current), _FakeResponse(200, updated)])
 
     with _patch_client(fake_client):
-        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with await _open_session(transport, headers_for(AUD, "update_page")) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(

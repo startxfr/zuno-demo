@@ -1,0 +1,6 @@
+# ADR-0603 M20 (WP-226 "not done here", closed 2026-11-12): the installer bootstrap every first-party image upgrades
+# before it installs its own lock. Compiled with hashes like a component lock; installed with
+# `pip install --require-hashes --upgrade -r <this lock>`. Bump it with the base-image refresh.
+pip==26.0.1
+setuptools==84.2.1
+wheel==0.48.0

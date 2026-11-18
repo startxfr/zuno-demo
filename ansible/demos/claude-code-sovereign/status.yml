@@ -1,0 +1,11 @@
+---
+# claude-code-sovereign status: the page's `### Status` reads: the Deployments named there and, where it names them, the Agents. Fast
+# reads only; no model call. The alternative gateway does not exist on the cluster yet, so this file reports it missing.
+# Written by hand for WP-304 on the model of ansible/demos/kagent/status.yml.
+- name: "claude-code-sovereign status | the Deployments"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "praxis", "namespace": "zuno-ai-gateways"}
+- name: "claude-code-sovereign status | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

@@ -85,7 +85,21 @@ from fastapi import FastAPI
 from github import Auth, Github
 from github.GithubException import UnknownObjectException
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+
+
+class ToolValueError(ToolError, ValueError):
+    """A tool failure whose message is meant for the caller.
+
+    mcp 2.2 reduces any exception that is not a ToolError to "Error executing
+    tool <name>"; this keeps the message and stays a ValueError for callers
+    and tests that catch that.
+    """
+
+
+class ToolPermissionError(ToolError, PermissionError):
+    """A refusal whose message is meant for the caller (see ToolValueError)."""
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -95,11 +109,6 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN", "")
 GITLAB_BASE_URL = os.getenv("GITLAB_BASE_URL", "https://gitlab.com")
 HTTP_TIMEOUT_SECONDS = float(os.getenv("GIT_FORGE_HTTP_TIMEOUT_SECONDS", "20"))
-
-# ADR-0037: required, not optional - this server has no purpose other than
-# serving the gateway (same reasoning as every other server in
-# components/mcp-servers/).
-GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 logger = logging.getLogger("git_forge")
 
@@ -119,51 +128,12 @@ logger = logging.getLogger("git_forge")
 # The audience of the caller context: this server's backend name in
 # platform/bindings/tools/tool-bindings.yaml.
 CALLER_CONTEXT_AUDIENCE = "git-forge"
-CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
-CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
-CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
-# A context dated in the future beyond clock skew is refused, so a signed context
-# cannot be minted to stay valid for longer than its age bound.
-CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
-
-
-def _caller_context_key() -> bytes:
-    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
-    # for another backend does not verify here.
-    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
-    if not headers or not GATEWAY_WORKLOAD_TOKEN:
-        return None
-    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
-    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
-    if not raw or not signature:
-        return None
-    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature):
-        return None
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
-    except (ValueError, TypeError):
-        return None
-    if not isinstance(payload, dict) or payload.get("v") != 1:
-        return None
-    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
-        return None
-    iat = payload.get("iat")
-    now = time.time()
-    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
-        return None
-    groups = payload.get("groups")
-    return {
-        "sub": str(payload.get("sub") or ""),
-        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
-        "email": str(payload.get("email") or "").lower(),
-        "email_verified": payload.get("email_verified") is True,
-        "username": str(payload.get("username") or ""),
-    }
+    # WP-250: the caller is read from the verified call assertion only (`ctx`, see the
+    # call-assertion verifier block). No shared secret is involved any more.
+    return _assertion_caller(headers, tool)
 
 
 def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
@@ -244,7 +214,7 @@ def _repo_policy(ctx: Optional[Context], tool: str, *, write: bool) -> Optional[
         return None
     caller = _caller(ctx, tool)
     if caller is None:
-        raise PermissionError(
+        raise ToolPermissionError(
             f"{tool} is refused: a repository allowlist is configured and the call carries no verified caller context"
         )
     return caller, allowlist
@@ -264,22 +234,22 @@ def _check_repo(target: str, policy: Optional[_RepoPolicy]) -> None:
     if policy is None:
         return
     if not _TARGET_RE.fullmatch(target) or ".." in target:
-        raise PermissionError(f"repository {target!r} is not a plain <provider>:<owner>/<repo> name (ADR-0603 M12)")
+        raise ToolPermissionError(f"repository {target!r} is not a plain <provider>:<owner>/<repo> name (ADR-0603 M12)")
     if not _allowed(target, *policy):
-        raise PermissionError(
+        raise ToolPermissionError(
             f"repository {target!r} is outside the repository allowlist of the caller's groups (ADR-0603 M12)"
         )
 
 Provider = Literal["github", "gitlab"]
 
 
-class GitForgeConfigError(RuntimeError):
+class GitForgeConfigError(ToolError, RuntimeError):
     pass
 
 
 def _require_provider(provider: str) -> None:
     if provider not in ("github", "gitlab"):
-        raise ValueError(f"unknown provider {provider!r} - expected 'github' or 'gitlab'")
+        raise ToolValueError(f"unknown provider {provider!r} - expected 'github' or 'gitlab'")
 
 
 def _github_client() -> Github:
@@ -318,7 +288,7 @@ def _github_read_content(
     # private GitHub content through any tool, including the private-scoped
     # one (which refuses provider="github" entirely - see its own docstring).
     if gh_repo.private:
-        raise ValueError(
+        raise ToolValueError(
             f"{owner}/{repo} is a private GitHub repository - this server "
             "never reads private GitHub content (private access is "
             "GitLab-only via read_private_repository_content, ADR-0121)"
@@ -327,7 +297,7 @@ def _github_read_content(
     try:
         contents = gh_repo.get_contents(path or "", **kwargs)
     except UnknownObjectException:
-        raise ValueError(f"no such GitHub content: {owner}/{repo}:{path or '/'}")
+        raise ToolValueError(f"no such GitHub content: {owner}/{repo}:{path or '/'}")
 
     if isinstance(contents, list):
         return {
@@ -353,7 +323,7 @@ def _gitlab_read_content(
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
     _check_resolved("gitlab", getattr(project, "path_with_namespace", None), policy)
     if project.visibility != "public" and not allow_private:
-        raise ValueError(
+        raise ToolValueError(
             f"{owner}/{repo} is not a public GitLab project (visibility="
             f"{project.visibility!r}) - use read_private_repository_content "
             "for private/internal access (ADR-0121)"
@@ -377,7 +347,7 @@ def _gitlab_read_content(
 
     tree = project.repository_tree(path=path or "", ref=resolved_ref, all=True)
     if path and not tree:
-        raise ValueError(f"no such GitLab content: {owner}/{repo}:{path}")
+        raise ToolValueError(f"no such GitLab content: {owner}/{repo}:{path}")
     return {
         "type": "directory",
         "path": path or "",
@@ -499,7 +469,7 @@ def _gitlab_list_repos(owner: str, owner_type: str, *, allow_private: bool) -> L
     else:
         users = gl.http_list("/users", query_data={"username": owner})
         if not users:
-            raise ValueError(f"no such GitLab user: {owner}")
+            raise ToolValueError(f"no such GitLab user: {owner}")
         path = f"/users/{users[0]['id']}/projects"
 
     # visibility=public filters server-side, before the top-10 cut - same
@@ -522,7 +492,7 @@ def _check_resolved(provider: str, full_name: Optional[str], policy: Optional[_R
     if policy is None:
         return
     if not full_name:
-        raise PermissionError("the provider did not report the repository's name; refused (ADR-0603 M12)")
+        raise ToolPermissionError("the provider did not report the repository's name; refused (ADR-0603 M12)")
     _check_repo(f"{provider}:{full_name}", policy)
 
 
@@ -546,7 +516,7 @@ def _github_write_file(
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if gh_repo.private:
-        raise ValueError(
+        raise ToolValueError(
             f"{owner}/{repo} is a private GitHub repository - this server "
             "only writes to public repositories (ADR-0121)"
         )
@@ -571,7 +541,7 @@ def _gitlab_write_file(
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if project.visibility != "public":
-        raise ValueError(
+        raise ToolValueError(
             f"{owner}/{repo} is not a public GitLab project (visibility="
             f"{project.visibility!r}) - this server only writes to public "
             "repositories (ADR-0121)"
@@ -620,7 +590,7 @@ def _gitlab_create_repo(name: str, owner: Optional[str], private: bool, descript
     if owner:
         namespaces = gl.http_list("/namespaces", query_data={"search": owner})
         if not namespaces:
-            raise ValueError(f"no such GitLab namespace: {owner}")
+            raise ToolValueError(f"no such GitLab namespace: {owner}")
         payload["namespace_id"] = namespaces[0]["id"]
     project = gl.projects.create(payload)
     return {
@@ -642,7 +612,7 @@ def _fork_landed(provider: str, full_name: Optional[str], policy: Optional[_Repo
         _check_resolved(provider, full_name, policy)
     except PermissionError as exc:
         logger.warning("fork landed outside the repository allowlist: %s", full_name)
-        raise PermissionError(f"the fork was created as {full_name!r}, outside the allowlist; remove it: {exc}") from exc
+        raise ToolPermissionError(f"the fork was created as {full_name!r}, outside the allowlist; remove it: {exc}") from exc
 
 
 def _github_fork_repo(
@@ -769,7 +739,7 @@ async def read_private_repository_content(
     read_repository_content instead."""
     _require_provider(provider)
     if provider != "gitlab":
-        raise ValueError(
+        raise ToolValueError(
             "read_private_repository_content only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
@@ -819,7 +789,7 @@ async def list_private_repositories(
     grants private GitHub access."""
     _require_provider(provider)
     if provider != "gitlab":
-        raise ValueError(
+        raise ToolValueError(
             "list_private_repositories only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
@@ -905,17 +875,6 @@ async def delete_repository(provider: Provider, owner: str, repo: str) -> Dict[s
     }
 
 
-class GatewayTokenMiddleware(BaseHTTPMiddleware):
-    """ADR-0037 workload-identity check, ahead of any MCP protocol handling
-    (identical pattern to every other server in components/mcp-servers/)."""
-
-    async def dispatch(self, request: Request, call_next):
-        caller_token = request.headers.get("x-zuno-gateway-token", "")
-        if not GATEWAY_WORKLOAD_TOKEN or not hmac.compare_digest(caller_token, GATEWAY_WORKLOAD_TOKEN):
-            return JSONResponse({"detail": "missing or invalid X-Zuno-Gateway-Token"}, status_code=401)
-        return await call_next(request)
-
-
 # --------------------------------------------------------------------------
 # BEGIN call-assertion verifier (WP-225 lot C)
 #
@@ -930,8 +889,12 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
 # refused (401). A tools/call whose name is not the assertion's tool, whose
 # arguments do not match its `args` hash, or whose jti was already consumed, is
 # refused (403); a body that is not JSON 400, one past the size cap 413. With
-# MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
-# refused; without it a request carrying no assertion is served as before.
+# A request without a valid assertion is always refused (WP-250 lot 2: the env switch
+# MCP_CALL_ASSERTION_REQUIRED is no longer read).
+# WP-250: the assertion may carry `ctx` (groups, email, email_verified, username), the
+# caller context signed with the assertion. After verification the middleware hands it to
+# the tool code as the header X-Zuno-Assertion-Caller; any such header sent by a client
+# is removed first, so only a verified assertion can set it (`_assertion_caller`).
 # This block is byte-identical in confluence, git-forge, salesforce and aap
 # (each image is built from its own directory, ADR-0119); the lot C tests
 # compare the copies.
@@ -956,12 +919,14 @@ _CALL_ASSERTION_KEYS: Dict[str, Any] = {}
 _CALL_ASSERTION_SEEN: Dict[str, float] = {}
 
 
-class CallAssertionError(ValueError):
+class CallAssertionError(ToolValueError):
     """The assertion is not acceptable; the message is safe to return."""
 
 
 def _call_assertion_required() -> bool:
-    return os.getenv("MCP_CALL_ASSERTION_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+    # WP-250 lot 2: always. The assertion is the only way in (the shared workload token is
+    # gone); without a configured public key every request is refused (fail closed).
+    return True
 
 
 def _call_assertion_max_body_bytes() -> int:
@@ -994,6 +959,60 @@ def _call_assertion_public_key() -> Any:
             key = None
         _CALL_ASSERTION_KEYS[pem] = key
     return _CALL_ASSERTION_KEYS[pem]
+
+
+ASSERTION_CALLER_HEADER = "x-zuno-assertion-caller"
+
+
+def _strip_assertion_caller(scope: Any) -> Any:
+    """The scope without any client-sent X-Zuno-Assertion-Caller header."""
+    headers = scope.get("headers") or []
+    wanted = ASSERTION_CALLER_HEADER.encode("latin-1")
+    if not any(k.lower() == wanted for k, _ in headers):
+        return scope
+    cleaned = dict(scope)
+    cleaned["headers"] = [(k, v) for k, v in headers if k.lower() != wanted]
+    return cleaned
+
+
+def _with_assertion_caller(scope: Any, claims: Dict[str, Any]) -> Any:
+    """The scope carrying the caller context of a VERIFIED assertion, if it has one."""
+    ctx = claims.get("ctx")
+    if not isinstance(ctx, dict):
+        return scope
+    payload = {
+        "sub": claims.get("sub", ""),
+        "tool": claims.get("tool", ""),
+        "groups": ctx.get("groups", []),
+        "email": ctx.get("email", ""),
+        "email_verified": ctx.get("email_verified") is True,
+        "username": ctx.get("username", ""),
+    }
+    raw = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("=")
+    carried = dict(scope)
+    carried["headers"] = list(scope.get("headers") or []) + [(ASSERTION_CALLER_HEADER.encode("latin-1"), raw.encode("ascii"))]
+    return carried
+
+
+def _assertion_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    """The caller of a call that arrived with a verified assertion carrying `ctx`, or None."""
+    raw = (headers.get(ASSERTION_CALLER_HEADER) if headers else "") or ""
+    if not raw:
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("tool") != tool:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
+        "username": str(payload.get("username") or ""),
+    }
 
 
 def _call_assertion_type(token: str) -> str:
@@ -1030,6 +1049,13 @@ def _verify_call_assertion(token: str, key: Any, now: Optional[float] = None) ->
         raise CallAssertionError("call assertion has no tool or jti")
     if "args" in claims and not isinstance(claims["args"], str):
         raise CallAssertionError("call assertion has a malformed args hash")
+    ctx = claims.get("ctx")
+    if ctx is not None and (
+        not isinstance(ctx, dict)
+        or not isinstance(ctx.get("groups", []), list)
+        or not all(isinstance(g, str) for g in ctx.get("groups", []))
+    ):
+        raise CallAssertionError("call assertion has a malformed caller context")
     return claims
 
 
@@ -1072,6 +1098,7 @@ class CallAssertionMiddleware:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
+        scope = _strip_assertion_caller(scope)
         key, required = _call_assertion_public_key(), _call_assertion_required()
         if not required and not os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip():
             await self.app(scope, receive, send)
@@ -1131,7 +1158,7 @@ class CallAssertionMiddleware:
                 return {"type": "http.request", "body": body, "more_body": False}
             return await receive()
 
-        await self.app(scope, replay, send)
+        await self.app(_with_assertion_caller(scope, claims), replay, send)
 
 
 # END call-assertion verifier (WP-225 lot C)
@@ -1149,7 +1176,5 @@ mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
         ).split(","),
     ),
 )
-mcp_asgi_app.add_middleware(GatewayTokenMiddleware)
-# WP-225 lot C: added last, so it runs first (outermost), ahead of the workload-token check.
 mcp_asgi_app.add_middleware(CallAssertionMiddleware)
 app.mount("/", mcp_asgi_app)

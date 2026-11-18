@@ -90,7 +90,7 @@ jobTemplates:
     playbook: ansible/playbooks/day1_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
   - name: zuno-day1-build
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
@@ -102,30 +102,30 @@ jobTemplates:
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, openshift-pipelines]
 
   - name: zuno-day2-check
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, okf-mirror, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, supply-chain]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [mcp, mlops, token-proxy]
+    surveyComponents: [mcp, mlops, token-proxy, praxis]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, okf-mirror, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -143,7 +143,7 @@ jobTemplates:
     playbook: ansible/playbooks/day3_backup.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql, unifai]
+    surveyComponents: [postgresql, unifai, quay-registry]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day3-restore
     playbook: ansible/playbooks/day3_restore.yml
@@ -308,6 +308,9 @@ workflowTemplates:
       # later.
       # WP-156: aiagent-operator, formerly the tail node, was retired.
       - id: rhtas-config
+        successNodes: [openshift-pipelines]
+      # ADR-0620 (WP-291): needs only OLM; last, so it never delays the platform operators.
+      - id: openshift-pipelines
         successNodes: []
   - name: zuno-day1-check-workflow
     jobTemplate: zuno-day1-check
@@ -337,9 +340,9 @@ workflowTemplates:
         successNodes: [models]
       # mcp only needs models (ADR-0060).
       - id: models
-        successNodes: [okf-mirror]
-      # ADR-0611 (WP-246): the internal OKF release mirror, before the gateways that read it.
-      - id: okf-mirror
+        successNodes: [quay-registry]
+      # ADR-0612 (WP-248): the internal registry (it replaced the zot OKF mirror), before the gateways that read the OKF release.
+      - id: quay-registry
         successNodes: [mcp]
       - id: mcp
         successNodes: [agents]
@@ -363,7 +366,7 @@ workflowTemplates:
       # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
       # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis]
       # ADR-0587 (WP-179): the experience clients, independent branches
       # so one track's failure never blocks the other (Dify and kagent: WP-202).
       - id: open-webui
@@ -377,6 +380,9 @@ workflowTemplates:
       # ADR-0604 (WP-235): a no-op while zuno_world_model_enabled is false.
       - id: world-model
         successNodes: []
+      # ADR-0619 (WP-292): a no-op while zuno_praxis_enabled is false. After models (and redis, Day 1).
+      - id: praxis
+        successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
     nodes:
@@ -385,9 +391,9 @@ workflowTemplates:
       - id: llm
         successNodes: [models]
       - id: models
-        successNodes: [okf-mirror]
-      # ADR-0611 (WP-246): the internal OKF release mirror, before the gateways that read it.
-      - id: okf-mirror
+        successNodes: [quay-registry]
+      # ADR-0612 (WP-248): the internal registry (it replaced the zot OKF mirror), before the gateways that read the OKF release.
+      - id: quay-registry
         successNodes: [mcp]
       - id: mcp
         successNodes: [agents]
@@ -406,7 +412,7 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model, supply-chain]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, supply-chain]
       # ADR-0587 (WP-179): experience clients, independent leaves.
       - id: open-webui
         successNodes: []
@@ -417,6 +423,8 @@ workflowTemplates:
       - id: kagent
         successNodes: []
       - id: world-model
+        successNodes: []
+      - id: praxis
         successNodes: []
       - id: supply-chain
         successNodes: []
@@ -429,6 +437,8 @@ workflowTemplates:
       - {id: mcp, successNodes: []}
       - {id: mlops, successNodes: []}
       - {id: token-proxy, successNodes: []}
+      # ADR-0620 (WP-291): a PipelineRun, not a BuildConfig; independent of the others.
+      - {id: praxis, successNodes: []}
 
   # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one
   # Job Template fanned out by target_component - each node names its OWN

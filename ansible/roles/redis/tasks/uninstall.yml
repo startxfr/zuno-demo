@@ -1,11 +1,58 @@
 ---
 # Reverse of install.yml.
-- name: "redis | delete the redis GitOps Application (d1)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
-  vars:
-    gitops_app_name: "zuno-redis-d1"
+#
+# ADR-0352 / WP-214 clause 4: in external mode the platform never deletes,
+# mutates or de-provisions a Redis it does not own, and there are no
+# zuno-redis Applications to remove. Only what this role itself creates in
+# external mode is removed: a redis-external-assert Job (and Secret) left by a
+# failed or interrupted assertion. The Vault seed stays (the consumer's
+# ExternalSecret keeps reading it until the mode is flipped back).
+- name: "redis | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _redis_confidential_file
 
-- name: "redis | delete the redis GitOps Application (d0, no-op)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
-  vars:
-    gitops_app_name: "zuno-redis-d0"
+- name: "redis | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _redis_confidential_file.stat.exists
+
+- name: "redis | external mode: leave the external Redis untouched (ADR-0352 clause 4)"
+  when: (zuno_redis_mode | default('internal')) == 'external'
+  block:
+    - name: "redis | remove a leftover external-assert Job and Secret"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: "{{ item.api_version }}"
+        kind: "{{ item.kind }}"
+        namespace: zuno-auth
+        name: redis-external-assert
+        # Background propagation: the Job's pods go with it (see external_assert.yml).
+        delete_options:
+          propagationPolicy: Background
+      loop:
+        - { api_version: batch/v1, kind: Job }
+        - { api_version: v1, kind: Secret }
+      loop_control:
+        label: "{{ item.kind }}/redis-external-assert"
+
+    - name: "redis | nothing else to uninstall in external mode"
+      ansible.builtin.debug:
+        msg: >-
+          zuno_redis_mode is 'external' - the external Redis is not owned by
+          this platform and is left untouched. Flip the mode back to internal
+          (a migration event, ADR-0352 clause 4) to redeploy the built-in
+          instance.
+
+- name: "redis | uninstall the built-in Redis (internal mode only)"
+  when: (zuno_redis_mode | default('internal')) != 'external'
+  block:
+    - name: "redis | delete the redis GitOps Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "zuno-redis-d1"
+
+    - name: "redis | delete the redis GitOps Application (d0, no-op)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "zuno-redis-d0"

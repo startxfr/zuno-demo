@@ -39,6 +39,14 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    # Held on purpose, each with its reason (2026-11-17, PR 49): ragas 0.4 needs datasets>=4 while
+    # platform/python/constraints.txt keeps datasets 2.21 / fsspec 2024.6.1 for the mlops training stack, and
+    # components/trustyai-eval/ragas_eval.py uses the ragas 0.2 API. Lift these three together, in one change.
+    ignore:
+      - dependency-name: "ragas"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "datasets"
+      - dependency-name: "fsspec"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"

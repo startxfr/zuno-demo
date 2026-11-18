@@ -25,6 +25,11 @@
 - name: "unifai | resolve the backup location"
   ansible.builtin.set_fact:
     _unifai_s3: "{{ _unifai_check_stack.resources[0].spec.backup.s3 }}"
+    # The backup CronJobs' own aws-cli image, pinned by digest in spec.backup.images: the cluster's image policy
+    # (policy.rhtas.com) refuses a tag in zuno-unifai, which is how this check broke (2026-11-14).
+    _unifai_check_image: >-
+      {{ (_unifai_check_stack.resources[0].spec.backup.images | default({}, true)).awsCli
+         | default('public.ecr.aws/aws-cli/aws-cli:2.22.35', true) }}
     _unifai_check_id: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
 
 - name: "unifai | list the newest backups from a short-lived Job"
@@ -46,7 +51,7 @@
             restartPolicy: Never
             containers:
               - name: aws
-                image: public.ecr.aws/aws-cli/aws-cli:2.22.35
+                image: "{{ _unifai_check_image }}"
                 command: ["/bin/sh", "-c"]
                 args:
                   - |

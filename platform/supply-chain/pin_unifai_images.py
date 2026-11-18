@@ -10,8 +10,14 @@ tag that does not exist, changes nothing. Then, when the cluster answers, the sa
 Pod, `admission_preflight.py`, WP-178): a warning or a refusal stops the pin too. `--no-admission-preflight` skips that
 step; an unreachable cluster skips it with a notice.
 
+Copy before pin (WP-248, WP-282): when the cluster's admission policies read the signatures from the internal Quay
+(`zuno_unifai_signature_mirror_host`), the five digests must be there with their `.sig` tags before the pin is written, or
+the missing ones are listed and nothing is written. `--mirror-to <registry>/zuno` copies them first (it used to copy after
+the write). A dry run copies nothing: it lists what the real run has to copy.
+
 Run from the repository root:
-    python3 platform/supply-chain/pin_unifai_images.py devel-ffb64e335 [--cluster demo333] [--accept-dev] [--dry-run]
+    python3 platform/supply-chain/pin_unifai_images.py devel-ffb64e335 [--cluster demo333] [--accept-dev] [--dry-run] \\
+        [--mirror-to quay-quay-zuno-registry.apps.demo333.startx.fr/zuno]
 
 `--accept-dev` is required for a `devel-<sha>` (a development identity); a release tag `vX.Y.Z` needs
 none. The edit is line by line, so the comments of the cluster file survive. Exit 0 on success,
@@ -34,6 +40,7 @@ sys.path.insert(0, str(HERE))
 
 import admit_okf_bundle as admit  # noqa: E402
 import admission_preflight  # noqa: E402
+import check_unifai_in_registry as registry_check  # noqa: E402
 import verify_unifai_images as v  # noqa: E402
 from check_unifai_pins import APPLICATION_IMAGES  # noqa: E402
 
@@ -74,7 +81,8 @@ def rewrite(text: str, pins: Dict[str, str], label: str) -> str:
 def pin(tag: str, cluster_file: pathlib.Path, accept_dev: bool, dry_run: bool = False,
         resolver: Callable[[str, str], str] = resolve_digest,
         verifier: Optional[Callable[[List[str], bool], List[v.Result]]] = None,
-        admission: Optional[Callable[[List[str]], List[v.Result]]] = None) -> Dict[str, str]:
+        admission: Optional[Callable[[List[str]], List[v.Result]]] = None,
+        registry: Optional[Callable[[List[str]], List[dict]]] = None) -> Dict[str, str]:
     if not TAG_RE.match(tag):
         raise PinError(f"{tag}: expected devel-<sha> or vX.Y.Z")
     if tag.startswith("devel-") and not accept_dev:
@@ -84,6 +92,10 @@ def pin(tag: str, cluster_file: pathlib.Path, accept_dev: bool, dry_run: bool = 
     refused = [r for r in results if not r.ok]
     if refused:
         raise PinError("; ".join(f"{r.reference}: {r.reason[:200]}" for r in refused))
+    if registry:  # copy before pin (WP-282), before the webhook: it would refuse a missing image with less to say
+        missing = [r for r in registry(list(pins.values())) if not r["ok"]]
+        if missing:
+            raise PinError(registry_check.refusal(missing))
     # What the cluster's admission webhook says about the same digests (WP-178): a digest cosign accepts but the
     # policy-controller does not (e.g. a signature only in the Ed25519 Rekor v2 log) would be refused in `enforce`.
     if admission:
@@ -103,6 +115,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--cluster", default="demo333")
     parser.add_argument("--accept-dev", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--mirror-to", metavar="PREFIX",
+                        help="before the pin is written, copy the missing images with their signatures into the internal Quay, "
+                             "e.g. quay-quay-zuno-registry.apps.demo333.startx.fr/zuno (push robot in DOCKER_CONFIG; ADR-0612). "
+                             "The operator, bundle and catalog travel with pin_operator_catalog.py --mirror-to")
     parser.add_argument("--no-admission-preflight", action="store_true",
                         help="do not ask the cluster's admission webhook about the digests (WP-178)")
     args = parser.parse_args(argv)
@@ -111,11 +127,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error(f"{path} does not exist")
     try:
         pins = pin(args.tag, path, args.accept_dev, args.dry_run,
-                   admission=None if args.no_admission_preflight else admission_preflight.run_or_skip)
+                   admission=None if args.no_admission_preflight else admission_preflight.run_or_skip,
+                   registry=registry_check.pin_gate(path, args.mirror_to, args.dry_run, args.accept_dev))
     except (PinError, admit.AdmissionError, OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
         return 1
-    print(json.dumps({"ok": True, "tag": args.tag, "written": not args.dry_run, "pins": pins}, indent=2))
+    print(json.dumps({"ok": True, "tag": args.tag, "written": not args.dry_run, "pins": pins,
+                      "mirrored_to": args.mirror_to if not args.dry_run else None}, indent=2))
     return 0
 
 

@@ -26,8 +26,9 @@ WORKDIR /src
 COPY platform/okf/install_release_tools.py platform/okf/release_cache.py platform/okf/agents.lock ./platform/okf/
 COPY platform/okf/sigstore ./platform/okf/sigstore
 COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/
+COPY platform/python/bootstrap/pyyaml/requirements.txt /tmp/bootstrap-pyyaml.txt
 RUN python3 platform/okf/install_release_tools.py /src/bin \
-    && python3 -m pip install --no-cache-dir pyyaml==6.0.2 \
+    && python3 -m pip install --no-cache-dir --require-hashes -r /tmp/bootstrap-pyyaml.txt \
     && PATH="/src/bin:${PATH}" python3 platform/okf/release_cache.py > /src/release-path \
     && cp -r "$(cat /src/release-path)" /okf \
     && chmod -R a+rX /okf
@@ -40,7 +41,8 @@ COPY components/mlops/requirements.txt /tmp/requirements.txt
 # is upgraded first, as in the other images: older pip releases refuse a lock
 # whose transitive requirements name an extra (`uvicorn` next to
 # `uvicorn[standard]`) in hash-checking mode.
-RUN pip install --no-cache-dir --upgrade pip==26.0.1 \
+COPY platform/python/bootstrap/pip/requirements.txt /tmp/bootstrap-pip.txt
+RUN pip install --no-cache-dir --require-hashes --upgrade -r /tmp/bootstrap-pip.txt \
     && pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 

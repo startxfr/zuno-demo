@@ -2,6 +2,7 @@
 {{- range .Values.personas }}
 {{- $ns := printf "%s%s" $.Values.namespacePrefix .name }}
 {{- $tokenURL := printf "%s/protocol/openid-connect/token" (include "openclaw.issuer" $) }}
+{{- $persona := .name }}
 ---
 # ADR-0589/0590: the persona's assistant. Its only model and tool paths are the
 # ai-gateway and the mcp-gateway, through the operator's proxy, which exchanges the
@@ -48,6 +49,21 @@ spec:
         X-Zuno-Task: {{ $.Values.gateways.mcpTask | quote }}
         X-Zuno-Data-Classification: {{ $.Values.gateways.mcpDataClassification | default $.Values.gateways.dataClassification | quote }}
       {{- end }}
+    {{- range $.Values.altGateways }}
+    {{- include "openclaw.altGatewayCheck" . }}
+    - name: zuno-alt-{{ .name }}
+      type: oauth2
+      domain: {{ include "openclaw.altGatewayDomain" . }}
+      oauth2:
+        clientID: openclaw-{{ $persona }}
+        tokenURL: {{ $tokenURL }}
+      secretRef:
+        - {name: openclaw-client, key: client-secret}
+      defaultHeaders:
+        X-Zuno-Agent: openclaw
+        X-Zuno-Task: {{ $.Values.gateways.mcpTask | quote }}
+        X-Zuno-Data-Classification: {{ $.Values.gateways.dataClassification | quote }}
+    {{- end }}
   customProviders:
     - name: zuno
       api: openai-completions
@@ -58,6 +74,19 @@ spec:
         # ADR-0596 (WP-194): the ai-gateway routes zuno-code under the task
         # `code`, Codestral first, local models as fallback.
         - {name: zuno-code, alias: zuno-code}
+    {{- range $.Values.altGateways }}
+    {{- $gw := . }}
+    # WP-301 (ADR-0619 clause 5): the alternative gateway {{ .label | default .name }}, through the same proxy and
+    # the persona's own token (credential zuno-alt-{{ .name }}).
+    - name: {{ .name }}
+      api: openai-completions
+      baseUrl: {{ .url }}
+      credentialRef: zuno-alt-{{ .name }}
+      models:
+        {{- range $i, $m := (.models | default (list "auto")) }}
+        - {name: {{ $m }}, alias: {{ if eq $i 0 }}{{ $gw.name }}{{ else }}{{ printf "%s-%s" $gw.name $m }}{{ end }}}
+        {{- end }}
+    {{- end }}
   mcpServers:
     zuno:
       url: {{ $.Values.gateways.mcpUrl }}

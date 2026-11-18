@@ -114,6 +114,10 @@ spec:
                 operator: In
                 values:
                   - {{ .Values.quotaEnforcement.routeNamespace }}
+                  {{- if and .Values.praxisWorkstationEntry.enabled (ne .Values.praxisWorkstationEntry.namespace .Values.quotaEnforcement.routeNamespace) }}
+                  # ADR-0619 clause 8 (WP-298): praxis-workstation-entry.yaml's HTTPRoute lives there.
+                  - {{ .Values.praxisWorkstationEntry.namespace }}
+                  {{- end }}
 {{- range .Values.quotaEnforcement.routes }}
 ---
 apiVersion: route.openshift.io/v1

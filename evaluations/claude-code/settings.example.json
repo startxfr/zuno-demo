@@ -1,0 +1,16 @@
+{
+  "apiKeyHelper": "~/.local/bin/zuno_claude_token.py",
+  "skipWebFetchPreflight": true,
+  "env": {
+    "ZUNO_CLUSTER_DOMAIN": "apps.demo333.startx.fr",
+    "ANTHROPIC_BASE_URL": "https://praxis.apps.demo333.startx.fr",
+    "ANTHROPIC_MODEL": "qwen3.6-27b-instruct",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "qwen3.6-27b-instruct",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "qwen3.6-27b-instruct",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "qwen3.5-9b",
+    "ANTHROPIC_SMALL_FAST_MODEL": "qwen3.5-9b",
+    "CLAUDE_CODE_API_KEY_HELPER_TTL_MS": "600000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
+  }
+}

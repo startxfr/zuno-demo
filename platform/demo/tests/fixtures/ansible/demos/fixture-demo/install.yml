@@ -1,0 +1,7 @@
+---
+# Install (declared changing in demo.yml): writes the fixture add-on marker.
+- name: "fixture | write the add-on marker"
+  ansible.builtin.copy:
+    content: "fixture-demo add-on\n"
+    dest: "{{ lookup('ansible.builtin.env', 'HOME') }}/.cache/zuno/demo/fixture-demo.installed"
+    mode: "0600"

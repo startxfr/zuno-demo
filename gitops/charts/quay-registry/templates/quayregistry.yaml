@@ -1,0 +1,51 @@
+{{- if .Values.registry.enabled }}
+# The CRD exists only after the d0 operator is installed: do not fail the dry run before that.
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: {{ .Values.registry.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  configBundleSecret: {{ .Values.registry.configBundleSecret }}
+  components:
+    {{- range .Values.registry.unmanaged }}
+    - kind: {{ . }}
+      managed: false
+    {{- end }}
+    # One replica of each (ADR-0101, ADR-0612 clause 1): with the autoscaler unmanaged the operator would run two.
+    - kind: quay
+      managed: true
+      overrides:
+        replicas: {{ .Values.registry.replicas }}
+        {{- with (.Values.registry.resources | default dict).quay }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+    - kind: clair
+      managed: true
+      overrides:
+        replicas: {{ .Values.registry.replicas }}
+        {{- with (.Values.registry.resources | default dict).clair }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+    - kind: clairpostgres
+      managed: true
+      {{- with (.Values.registry.resources | default dict).clairpostgres }}
+      overrides:
+        resources: {{- toYaml . | nindent 10 }}
+      {{- end }}
+    - kind: redis
+      managed: true
+      {{- with (.Values.registry.resources | default dict).redis }}
+      overrides:
+        resources: {{- toYaml . | nindent 10 }}
+      {{- end }}
+    - kind: route
+      managed: true
+    - kind: tls
+      managed: true
+{{- end }}

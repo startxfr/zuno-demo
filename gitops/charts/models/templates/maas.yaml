@@ -231,6 +231,19 @@ and drops the persona-group ones. Off by default (current behaviour).
 {{- $tier := $.Values.maas.agentSubscriptionTier }}
 {{- $subs = append $subs (dict "name" (printf "%s-agents" .publishedName) "groups" $generated.groups "tokenRateLimits" $tier.tokenRateLimits "priority" $tier.priority) }}
 {{- end }}
+{{- /*
+ADR-0619 clause 2 / WP-292: the alternative gateway Praxis calls the local models as the ai-gateway does, so it gets
+the same subscription for its own ServiceAccount: a copy of each ai-gateway `user:` subscription of a local model,
+same limits and priority. The MaaSAuthPolicy below picks the user up from the subscriptions. Off by default
+(altGatewayPeers.praxis.enabled): the render is then the one of before.
+*/}}
+{{- if and $.Values.altGatewayPeers.praxis.enabled (ne (toString .modelRefKind) "ExternalModel") }}
+{{- range .subscriptions }}
+{{- if and .user (hasSuffix ":ai-gateway" .user) }}
+{{- $subs = append $subs (merge (dict "name" (printf "%s-praxis" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.praxis.namespace $.Values.altGatewayPeers.praxis.serviceAccount)) (omit . "name" "user")) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
 {{- $subs = list }}
 {{- range .subscriptions }}

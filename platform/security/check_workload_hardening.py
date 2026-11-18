@@ -48,8 +48,6 @@ DEPLOYMENT_CHARTS = [
     "mcp-aap",
     # ADR-0604/WP-235: the world-model experience (the GPU runtime, the web tier, the front door).
     "world-model",
-    # ADR-0611/WP-246: the OKF release mirror.
-    "okf-mirror",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;
@@ -90,7 +88,15 @@ def _helm_template(chart: str, set_values: Dict[str, str] | None = None) -> List
     cmd = ["helm", "template", "test", str(REPO_ROOT / "gitops" / "charts" / chart)]
     for key, value in (set_values or {}).items():
         cmd.extend(["--set", f"{key}={value}"])
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # A chart whose Chart.yaml lists a dependency renders only after `helm dependency build`
+        # (needs `helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable`).
+        # Say so instead of a bare CalledProcessError traceback.
+        sys.exit(
+            f"helm template failed for chart '{chart}':\n{proc.stderr.strip()}\n"
+            f"If it names a missing dependency, run: helm dependency build gitops/charts/{chart}"
+        )
     return [d for d in yaml.safe_load_all(proc.stdout) if d]
 
 
@@ -361,7 +367,7 @@ def main() -> int:
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "models", "world-model", "okf-mirror"]:
+    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "models", "world-model"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

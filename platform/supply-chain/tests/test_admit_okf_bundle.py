@@ -152,6 +152,82 @@ class ValidateTest(AdmitTestCase):
                             "  model: {preferred_classification: C1}\n  delegation: {targets: [{agent: demo, task: ask}]}\n"))
         self.assertIn("delegation is an OKF v0.3 field", admit.validate(self.release)[0][0])
 
+    # ADR-0615 clauses 5 and 6: profile 1.0 (okf_version "0.2" + zuno.profile "1.0").
+
+    def _profile10_demo(self, extra: str = "") -> None:
+        write(self.release / "agents/demo/agent.okf.md",
+              AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                   .replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n')
+                   .replace("  model: {preferred_classification: C1}\n",
+                            "  model: {preferred_classification: C1}\n" + extra))
+        write(self.release / "agents/demo/tasks/ask.md",
+              TASK.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                  .replace("  allowed_tools:", '  profile: "1.0"\n  allowed_tools:'))
+        # The bundle-root index.md of profile bundles: okf_version only, no type, no zuno.profile.
+        # No reader opens it; were one to, the dispatch rule would refuse it.
+        write(self.release / "agents/demo/index.md", '---\nokf_version: "0.2"\n---\n\n# Demo\n')
+
+    def test_a_profile10_release_is_admitted(self) -> None:
+        self._profile10_demo()
+        self.assertEqual(admit.validate(self.release)[0], [])
+        self.assertEqual(admit.agents_view(self.release)["demo"]["tasks"],
+                         {"ask": {"tools": ["search_docs"], "knowledge": ["knowledge.tech"], "quota_class": "standard"}})
+
+    def test_a_profile10_widening_is_refused_at_admission(self) -> None:
+        # ADR-0615 clause 6 (F11): the v0.3 rules apply from v0.3 up, profile 1.0 included.
+        # A gate testing `okf_version == "v0.3"` would skip this bundle in silence.
+        self._profile10_demo("  limits: {max_tokens: 99999, delegation: {max_depth: 3}}\n")
+        write(self.release / "policies/limits/limits-policy.yaml", "max_tokens: 8192\nmax_delegation_depth: 2\n")
+        errors = admit.validate(self.release)[0]
+        self.assertEqual(len(errors), 2, errors)
+        self.assertIn("max_tokens 99999 exceeds the corp ceiling 8192", errors[0])
+        self.assertIn("delegation max_depth 3 exceeds the corp ceiling 2", errors[1])
+
+    def test_a_profile10_skill_the_task_does_not_cover_is_refused(self) -> None:
+        self._profile10_demo()
+        write(self.release / "agents/demo/tasks/ask.md",
+              TASK.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                  .replace("  allowed_tools:", '  profile: "1.0"\n  skills: [cite]\n  allowed_tools:'))
+        write(self.release / "agents/demo/skills/cite.md",
+              '---\nokf_version: "0.2"\ntype: skill\nzuno:\n  profile: "1.0"\n  allowed_tools: [send_email]\n---\n')
+        self.assertIn("skill 'cite' needs tool 'send_email'", admit.validate(self.release)[0][0])
+
+    def test_the_narrowing_level_orders_the_versions(self) -> None:
+        import okf_narrowing
+
+        self.assertEqual([okf_narrowing.at_least_v03(v) for v in ("v0.2", "v0.3", "1.0")], [False, True, True])
+        self.assertFalse(okf_narrowing.at_least_v03("v0.9"))
+
+    def test_the_narrowing_rule_fails_closed_on_an_unsupported_version(self) -> None:
+        import okf_narrowing
+
+        for front, needle in (('okf_version: "0.2"', "unsupported zuno.profile None"),
+                              ("okf_version: 0.2", "unsupported okf_version 0.2"),
+                              ("okf_version: v0.9", "unsupported okf_version 'v0.9'")):
+            with self.subTest(front=front):
+                write(self.release / "agents/demo/agent.okf.md", AGENT.replace("okf_version: v0.2", front))
+                findings = okf_narrowing.check_release(self.release)
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn(needle, findings[0])
+
+    def test_profile_and_version_refusals_are_named(self) -> None:
+        for agent, needle in (
+                (AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"'), "unsupported zuno.profile None"),
+                (AGENT.replace("okf_version: v0.2", 'okf_version: "0.2"')
+                      .replace("  name: demo\n", '  profile: "2.0"\n  name: demo\n'),
+                 "unsupported zuno.profile '2.0'"),
+                (AGENT.replace("okf_version: v0.2", "okf_version: 0.2")
+                      .replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n'),
+                 "unsupported okf_version 0.2"),
+                (AGENT.replace("  name: demo\n", '  profile: "1.0"\n  name: demo\n'),
+                 'zuno.profile is only valid with okf_version "0.2"')):
+            with self.subTest(needle=needle):
+                write(self.release / "agents/demo/agent.okf.md", agent)
+                with self.assertRaises(ValueError) as caught:
+                    admit.validate(self.release)
+                self.assertIn(needle, str(caught.exception))
+                self.assertIn("agents/demo/agent.okf.md", str(caught.exception))
+
     def test_unserved_knowledge_domain_is_a_warning(self) -> None:
         # WP-168: nothing serves the domain (no UnifAI source tagged with it).
         # Allowing it grants no access, so the release stays servable.
@@ -498,6 +574,90 @@ class PruneTests(unittest.TestCase):
 
         self.assertEqual(admit.lock_history(3, git), self._history(4, 3, 2))
         self.assertEqual(admit.lock_history(5, git), self._history(4, 3, 2, 1))
+
+
+class QuayPruneTests(unittest.TestCase):
+    """ADR-0612: the same retention on Red Hat Quay, by tag deletion through its API."""
+
+    MIRROR = "quay.example.svc/zuno"
+    CORP = {1: "a" * 64, 2: "b" * 64, 3: "c" * 64, 4: "d" * 64}
+    TEKOS = {1: "1" * 64, 2: "2" * 64, 3: "3" * 64, 4: "4" * 64}
+
+    def _src(self, n: int) -> str:
+        return "quay.io/zuno/okf-corp@sha256:" + self.CORP[n]
+
+    def _world(self, releases, page_size=100):
+        calls = []
+        repos = {"okf-corp": self.CORP, "okf-tekos": self.TEKOS}
+
+        def tags_of(name):
+            out = []
+            for n in releases:
+                d = repos[name][n]
+                out += [{"name": f"release-{d[:12]}", "manifest_digest": "sha256:" + d},
+                        {"name": f"sha256-{d}", "manifest_digest": "sha256:" + "7" * 64},
+                        {"name": f"sha256-{d}.sig", "manifest_digest": "sha256:" + "9" * 64},
+                        {"name": f"sha256-{d}.att", "manifest_digest": "sha256:" + "8" * 64}]
+            return out
+
+        def http(method, url, token):
+            calls.append((method, url, token))
+            if method == "DELETE":
+                return None
+            if "/repository?namespace=zuno" in url:
+                return {"repositories": [{"name": "okf-corp"}, {"name": "okf-tekos"}]}
+            name = url.split("/zuno/")[1].split("/")[0]
+            page = int(url.rsplit("page=", 1)[1])
+            tags = tags_of(name)
+            chunk = tags[(page - 1) * page_size: page * page_size]
+            return {"tags": chunk, "has_additional": page * page_size < len(tags)}
+
+        def fake_layer(reference, media_type):
+            digest = reference.split("@sha256:")[1]
+            n = next(k for k, v in self.CORP.items() if v == digest)
+            if n not in releases:
+                raise admit.AdmissionError("not found")
+            return ('{"release": "0.0.%d", "agents": [{"name": "tekos", "reference": '
+                    '"quay.io/zuno/okf-tekos@sha256:%s"}]}' % (n, self.TEKOS[n])).encode()
+
+        saved = admit._layer
+        admit._layer = fake_layer
+        self.addCleanup(lambda: setattr(admit, "_layer", saved))
+        return calls, http
+
+    def _history(self, *ns):
+        return [self._src(n) for n in ns]
+
+    def test_a_dry_run_lists_the_oldest_release_tags_and_deletes_nothing(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        d1, t1 = self.CORP[1], self.TEKOS[1]
+        self.assertEqual(sorted(ref for _k, ref in result["candidates"]), sorted([
+            f"zuno/okf-corp:release-{d1[:12]}", f"zuno/okf-corp:sha256-{d1}", f"zuno/okf-corp:sha256-{d1}.sig",
+            f"zuno/okf-corp:sha256-{d1}.att", f"zuno/okf-tekos:release-{t1[:12]}", f"zuno/okf-tekos:sha256-{t1}",
+            f"zuno/okf-tekos:sha256-{t1}.sig", f"zuno/okf-tekos:sha256-{t1}.att"]))
+        self.assertFalse([c for c in calls if c[0] == "DELETE"])
+
+    def test_apply_deletes_exactly_the_listed_tags_with_the_token(self) -> None:
+        calls, http = self._world([1, 2, 3, 4])
+        planned = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)["candidates"]
+        calls.clear()
+        admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
+        deletes = [c for c in calls if c[0] == "DELETE"]
+        self.assertEqual(len(deletes), len(planned))
+        self.assertTrue(all(c[2] == "tok" and c[1].startswith("https://quay.example.svc/api/v1/repository/zuno/") for c in deletes))
+        self.assertIn(f"https://quay.example.svc/api/v1/repository/zuno/okf-corp/tag/release-{self.CORP[1][:12]}",
+                      [c[1] for c in deletes])
+
+    def test_every_page_of_tags_is_read(self) -> None:
+        _calls, http = self._world([1, 2, 3, 4], page_size=4)
+        result = admit.prune_quay(self.MIRROR, "tok", 3, False, self._history(4, 3, 2), http)
+        self.assertEqual(len(result["candidates"]), 8)
+
+    def test_it_refuses_when_the_locked_release_is_not_on_quay(self) -> None:
+        _calls, http = self._world([1, 2, 3])
+        with self.assertRaises(admit.AdmissionError):
+            admit.prune_quay(self.MIRROR, "tok", 3, True, self._history(4, 3, 2), http)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # ADR-0550: Demonstrate sovereign AI through classification, specialization and resilience
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) (2026-11-14, WP-269) - the "Demo automation" helpers (`make demo check|reset|step-1..5`) are replaced by the per-demo `make demo` lifecycle of the catalogue and retired by WP-272; the routing decisions (classification, specialization, resilience) stay in force
 - **Target:** v0.4
 - **Date:** 2026-09-05
 - **Decision owners:** Zuno Demo architecture team
@@ -452,3 +452,13 @@ screens) is recorded in WP-136 for the live webinar's runbook.
 - Proposed execution: WP-137, WP-135, WP-136.
 - Existing failover implementation reused unchanged: WP-105.
 - Existing external-model/MaaS effort reused unchanged: WP-125.
+
+## Update 2026-11-14 (WP-269): the webinar helpers are superseded
+
+[ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md) replaces the "Demo
+automation" section above. The demonstrations the project gives are now the scenarios and workshops of `docs/demo/`,
+each prepared and played through `make demo use <id> 5|15`, its six actions and its steps. The webinar steps open
+surfaces retired with the agent runtime in October 2026 (`arkos.`, `tekos.`, `comage.`), so `make demo check`
+(webinar meaning), `all-check`, `reset` and `step-1..5` are removed by
+[WP-272](../roadmap/work-packages/wp-272-retire-the-webinar-demo-tools.md). The routing decisions of this record are
+not affected, and the GPU failover drill stays the Day-3 verb `make d3 scenario-failover-node` (ADR-0536).

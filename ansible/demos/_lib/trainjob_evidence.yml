@@ -1,0 +1,38 @@
+---
+# Check reads (salvaged from the retired demo_check.yml): at least one TrainJob finished with Complete=True.
+# Vars: trainjob_namespace (default zuno-mlops), trainjob_selector (default app.kubernetes.io/part-of=mlops).
+- name: "demo | read the TrainJobs"
+  kubernetes.core.k8s_info:
+    api_version: trainer.kubeflow.org/v1alpha1
+    kind: TrainJob
+    namespace: "{{ trainjob_namespace | default('zuno-mlops') }}"
+    label_selectors:
+      - "{{ trainjob_selector | default('app.kubernetes.io/part-of=mlops') }}"
+  register: _demo_trainjobs
+  failed_when: false
+
+- name: "demo | find the complete TrainJobs"
+  ansible.builtin.set_fact:
+    _demo_complete: "{{ (_demo_complete | default([])) + ([item.metadata.name] if _demo_done else []) }}"
+  loop: "{{ _demo_trainjobs.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    _demo_done: >-
+      {{ item.status.conditions | default([]) | selectattr('type', 'equalto', 'Complete')
+         | selectattr('status', 'equalto', 'True') | list | length > 0 }}
+
+- name: "demo | record the training evidence"
+  ansible.builtin.set_fact:
+    demo_unit_checks: "{{ demo_unit_checks + [_demo_row] }}"
+    _demo_complete: []
+  vars:
+    _demo_names: "{{ _demo_complete | default([]) }}"
+    _demo_row:
+      agent: "{{ demo_id }}"
+      layer: "{{ demo_unit.name }}"
+      id: trainjob-evidence
+      category: training
+      passed: "{{ _demo_names | length > 0 }}"
+      detail: "Complete TrainJobs: {{ _demo_names | join(', ') if _demo_names else 'none' }}"
+      duration_ms: 0

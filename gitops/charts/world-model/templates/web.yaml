@@ -43,6 +43,11 @@ spec:
             - {name: ALLOWED_ORIGINS, value: "https://{{ .Values.global.zuno.routeHost }}"}
             - {name: AI_GATEWAY_URL, value: {{ .Values.web.aiGatewayUrl | quote }}}
             - {name: PROMPT_MODEL, value: {{ .Values.web.promptModel | quote }}}
+            {{- if .Values.altGateways }}
+            {{- /* WP-303: the alternative gateways of the prompt enhancement; the web tier validates the list at start. */}}
+            - {name: ALT_GATEWAYS, value: {{ .Values.altGateways | toJson | quote }}}
+            - {name: PROMPT_GATEWAY, value: {{ .Values.web.promptGateway | quote }}}
+            {{- end }}
             - {name: MAX_PROMPT_CHARS, value: {{ .Values.web.maxPromptChars | quote }}}
             - {name: SESSION_IDLE_SECONDS, value: {{ .Values.web.idleSeconds | quote }}}
             - {name: SESSION_DETACHED_SECONDS, value: {{ .Values.web.detachedSeconds | quote }}}

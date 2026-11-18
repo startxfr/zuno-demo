@@ -7,18 +7,16 @@ Run from this directory:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import os
 import sys
 import unittest.mock as mock
 
-os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("SALESFORCE_BASE_URL", "https://example.my.salesforce.com")
 os.environ.setdefault("SALESFORCE_ACCESS_TOKEN", "test-access-token")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+sys.path.insert(0, os.path.join(HERE, "..", ".."))
 
 import httpx2  # noqa: E402
 from httpx2 import ASGITransport  # noqa: E402
@@ -27,14 +25,10 @@ from mcp.client.streamable_http import streamable_http_client  # noqa: E402
 
 import server  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location(
-    "gateway_caller_context", os.path.join(REPO, "components", "mcp-gateway", "app", "caller_context.py")
-)
-caller_context = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(caller_context)
+from test_support.assertion_headers import headers_for  # noqa: E402
+from test_support import assertion_headers  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
-TOKEN = "test-workload-token"
 AUD = "salesforce"  # this server's backend name
 USER_ID = "005000000000001AAA"
 OPP_ID = "006000000000001AAA"
@@ -78,10 +72,7 @@ class _Fake:
 
 
 def _headers(tool, groups, email="seller@example.com", verified=True):
-    h = {"X-Zuno-Gateway-Token": TOKEN}
-    claims = {"email": email, "email_verified": verified}
-    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims=claims, tool=tool, workload_token=TOKEN))
-    return h
+    return headers_for(AUD, tool, groups=groups, email=email, email_verified=verified)
 
 
 async def _call(transport, headers, tool, args, fake, env):
@@ -103,7 +94,7 @@ def _user_lookup(n=1):
 
 async def test_off_behaves_as_before(transport):
     fake = _Fake([_Resp(200, {"records": []})])
-    result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "read_opportunity", {"query": "Acme"}, fake,
+    result = await _call(transport, headers_for(AUD, "read_opportunity", groups=None), "read_opportunity", {"query": "Acme"}, fake,
                          {"SALESFORCE_OWNER_SCOPING": "off"})
     assert not result.is_error, _text(result)
     assert "OwnerId" not in fake.requests[0][2]["params"]["q"]
@@ -128,9 +119,14 @@ async def test_all_records_group_is_not_scoped(transport):
 
 async def test_no_verified_caller_is_refused(transport):
     fake = _Fake([])
-    headers = {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-User-Email": "boss@example.com"}
-    result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
-    assert result.is_error and fake.requests == [], _text(result)
+    headers = headers_for(AUD, "read_opportunity", groups=None)
+    headers["X-Zuno-Assertion-Caller"] = "boss@example.com"  # client-sent: must be ignored
+    try:
+        result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
+        refused = result.is_error
+    except Exception:  # noqa: BLE001  (401/403 at the transport)
+        refused = True
+    assert refused and fake.requests == []
 
 
 async def test_an_unverified_email_is_refused_before_any_lookup(transport):
@@ -144,20 +140,22 @@ async def test_an_unverified_email_is_refused_before_any_lookup(transport):
         assert fake.requests == [], verified
 
 
-async def test_a_context_signed_for_another_backend_is_refused(transport):
+async def test_an_assertion_for_another_backend_is_refused(transport):
     fake = _Fake([])
-    headers = {"X-Zuno-Gateway-Token": TOKEN}
-    headers.update(caller_context.build(audience="confluence", sub="u-1", groups=["sales"],
-                                        claims={"email": "seller@example.com", "email_verified": True},
-                                        tool="read_opportunity", workload_token=TOKEN))
-    result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
-    assert result.is_error and fake.requests == [], _text(result)
+    headers = headers_for("confluence", "read_opportunity", groups=["sales"], email="seller@example.com",
+                          email_verified=True)
+    try:
+        result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
+        refused = result.is_error
+    except Exception:  # noqa: BLE001  (401/403 at the transport)
+        refused = True
+    assert refused and fake.requests == []
 
 
 async def test_an_invalid_record_id_is_refused_even_with_scoping_off(transport):
     for bad in ("../../sobjects/User/005", "006000000000001AAA?x=1", "short"):
         fake = _Fake([])
-        result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "update_opportunity",
+        result = await _call(transport, headers_for(AUD, "update_opportunity", groups=None), "update_opportunity",
                              {"opportunity_id": bad, "stage": "Closed Won"}, fake, {"SALESFORCE_OWNER_SCOPING": "off"})
         assert result.is_error and fake.requests == [], bad
 
@@ -204,6 +202,45 @@ async def test_create_is_owned_by_the_caller(transport):
                          {"name": "Acme", "stage": "Prospecting", "close_date": "2026-12-31"}, fake, ON)
     assert not result.is_error, _text(result)
     assert fake.requests[1][2]["json"]["OwnerId"] == USER_ID
+
+
+async def test_an_assertion_for_another_tool_is_refused(transport):
+    fake = _Fake([])
+    try:
+        result = await _call(transport, _headers("create_opportunity", ["sales"]), "read_opportunity",
+                             {"query": "Acme"}, fake, ON)
+        refused = result.is_error
+    except Exception:  # noqa: BLE001  (403 at the transport)
+        refused = True
+    assert refused and fake.requests == []
+
+
+async def test_an_assertion_signed_by_another_key_is_refused(transport):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    fake = _Fake([])
+    forged = {"Authorization": "Bearer " + assertion_headers.assertion(
+        AUD, "read_opportunity", groups=["sales-managers"], email="seller@example.com", email_verified=True,
+        key=Ed25519PrivateKey.generate())}
+    try:
+        result = await _call(transport, forged, "read_opportunity", {"query": "Acme"}, fake, ON)
+        refused = result.is_error
+    except Exception:  # noqa: BLE001  (401 at the transport)
+        refused = True
+    assert refused and fake.requests == []
+
+
+async def test_an_expired_assertion_is_refused(transport):
+    import time
+    fake = _Fake([])
+    old = {"Authorization": "Bearer " + assertion_headers.assertion(
+        AUD, "read_opportunity", groups=["sales"], email="seller@example.com", email_verified=True,
+        now=time.time() - 3600)}
+    try:
+        result = await _call(transport, old, "read_opportunity", {"query": "Acme"}, fake, ON)
+        refused = result.is_error
+    except Exception:  # noqa: BLE001
+        refused = True
+    assert refused and fake.requests == []
 
 
 TESTS = [v for k, v in dict(globals()).items() if k.startswith("test_")]

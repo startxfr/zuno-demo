@@ -1,0 +1,6 @@
+---
+# An action or step with nothing to automate (ADR-0616 clause 3: the file exists anyway). The unit is recorded
+# `nothing` and the presenter sees "Nothing to run." before the page section.
+- name: "demo | nothing to run"
+  ansible.builtin.set_fact:
+    demo_unit_nothing: true

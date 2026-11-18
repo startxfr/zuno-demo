@@ -1,0 +1,119 @@
+---
+# ADR-0620 (WP-291): `make d2 build praxis` - one PipelineRun of source-image-build for Praxis AI.
+# The run is explicit (no trigger). Its result is the pushed digest, which WP-292 pins in
+# gitops/charts/praxis/values.yaml.
+- name: "praxis_build | pick the source"
+  ansible.builtin.set_fact:
+    _praxis_src: "{{ zuno_praxis_build_sources[zuno_praxis_build_source] }}"
+  failed_when: zuno_praxis_build_source not in zuno_praxis_build_sources
+
+- name: "praxis_build | resolve the revision to a full commit SHA"
+  ansible.builtin.command:
+    argv: [git, ls-remote, "{{ _praxis_src.url }}", "{{ _praxis_src.revision }}"]
+  register: _praxis_ls_remote
+  changed_when: false
+  when: not (_praxis_src.revision is match('^[0-9a-f]{40}$'))
+
+- name: "praxis_build | keep the commit"
+  ansible.builtin.set_fact:
+    _praxis_commit: >-
+      {{ _praxis_src.revision if (_praxis_src.revision is match('^[0-9a-f]{40}$'))
+         else (_praxis_ls_remote.stdout_lines | first | default('') | split | first | default('')) }}
+  failed_when: not (_praxis_commit is match('^[0-9a-f]{40}$'))
+
+- name: "praxis_build | the source-image-build Pipeline exists (make d1 install openshift-pipelines)"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: Pipeline
+    namespace: "{{ zuno_praxis_build_namespace }}"
+    name: source-image-build
+  register: _praxis_pipeline
+  failed_when: (_praxis_pipeline.resources | default([]) | length) != 1
+
+- name: "praxis_build | create the PipelineRun"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: praxis-build-
+        namespace: "{{ zuno_praxis_build_namespace }}"
+        labels:
+          zuno.io/managed-by: zuno-ansible
+          zuno.io/build: praxis
+          zuno.io/build-source: "{{ zuno_praxis_build_source }}"
+        annotations:
+          # zuno-ai-build is sidecar-injected; a task pod must not wait on an istio-proxy.
+          sidecar.istio.io/inject: "false"
+          zuno.io/source-url: "{{ _praxis_src.url }}"
+          zuno.io/source-commit: "{{ _praxis_commit }}"
+      spec:
+        pipelineRef:
+          name: source-image-build
+        params:
+          - {name: git-url, value: "{{ _praxis_src.url }}"}
+          - {name: git-revision, value: "{{ _praxis_commit }}"}
+          - {name: containerfile, value: ./Containerfile}
+          - {name: context, value: .}
+          - {name: build-args, value: ["PRAXIS_AI_FEATURES={{ _praxis_src.features }}"]}
+          - name: image
+            value: "{{ zuno_praxis_build_image_repository }}:{{ zuno_praxis_build_source }}-{{ _praxis_commit[:12] }}"
+        timeouts:
+          pipeline: "{{ zuno_praxis_build_timeout }}"
+        taskRunTemplate:
+          serviceAccountName: pipeline
+        taskRunSpecs:
+          - pipelineTaskName: build
+            computeResources: "{{ zuno_praxis_build_resources }}"
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                resources:
+                  requests:
+                    storage: 2Gi
+          - name: dockerconfig
+            secret:
+              secretName: quay-io-zuno-push
+  register: _praxis_run
+
+- name: "praxis_build | wait for {{ _praxis_run.result.metadata.name }}"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: PipelineRun
+    namespace: "{{ zuno_praxis_build_namespace }}"
+    name: "{{ _praxis_run.result.metadata.name }}"
+  register: _praxis_run_state
+  until: >-
+    (_praxis_run_state.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Succeeded') | map(attribute='status') | list | first | default('Unknown'))
+    in ['True', 'False']
+  retries: "{{ zuno_praxis_build_wait_retries }}"
+  delay: "{{ zuno_praxis_build_wait_delay }}"
+
+- name: "praxis_build | read the outcome"
+  ansible.builtin.set_fact:
+    _praxis_condition: >-
+      {{ _praxis_run_state.resources[0].status.conditions | selectattr('type', 'equalto', 'Succeeded') | first }}
+    _praxis_results: >-
+      {{ dict((_praxis_run_state.resources[0].status.results | default([])) | map(attribute='name')
+              | zip((_praxis_run_state.resources[0].status.results | default([])) | map(attribute='value'))) }}
+
+- name: "praxis_build | the run succeeded"
+  ansible.builtin.assert:
+    that:
+      - _praxis_condition.status == 'True'
+      - (_praxis_results.IMAGE_DIGEST | default('')) is match('^sha256:[0-9a-f]{64}$')
+    fail_msg: >-
+      {{ _praxis_run.result.metadata.name }}: {{ _praxis_condition.reason | default('') }} -
+      {{ _praxis_condition.message | default('') }}. Logs: tkn pipelinerun logs
+      {{ _praxis_run.result.metadata.name }} -n {{ zuno_praxis_build_namespace }}
+
+- name: "praxis_build | pushed image"
+  ansible.builtin.debug:
+    msg: >-
+      {{ zuno_praxis_build_image_repository }}@{{ _praxis_results.IMAGE_DIGEST }}
+      ({{ zuno_praxis_build_source }} {{ _praxis_src.url }} at {{ _praxis_commit }}).
+      Pin this digest in gitops/charts/praxis/values.yaml (WP-292).

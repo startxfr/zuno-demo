@@ -4,6 +4,22 @@
 {{- if not .Values.clientId }}{{ fail "clientId is required" }}{{ end -}}
 {{- end -}}
 
+{{/*
+WP-297 (ADR-0619 clause 5): the ALT_GATEWAYS env of the proxy, from the `altGateways` contract: a JSON list of
+{name, url, headers, timeout_s?}. `label` and `models` are the client's side of the contract and are not sent.
+*/}}
+{{- define "zuno-token-proxy.altGateways" -}}
+{{- $out := list -}}
+{{- range .Values.altGateways -}}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$" (toString .name)) }}{{ fail (printf "altGateways: name %q must be a DNS label of at most 40 characters" (toString .name)) }}{{ end -}}
+{{- if not (regexMatch "^https?://[^/ ]+" (toString .url)) }}{{ fail (printf "altGateways: %s: url must be an http(s) URL" .name) }}{{ end -}}
+{{- $entry := dict "name" .name "url" .url "headers" (.headers | default $.Values.aiHeaders) -}}
+{{- if .timeoutSeconds }}{{ $_ := set $entry "timeout_s" (float64 .timeoutSeconds) }}{{ end -}}
+{{- $out = append $out $entry -}}
+{{- end -}}
+{{- $out | toJson -}}
+{{- end -}}
+
 {{- define "zuno-token-proxy.tokenUrl" -}}
 {{- .Values.tokenUrl | default (printf "https://keycloak.%s/realms/zuno/protocol/openid-connect/token" .Values.clusterBaseDomain) -}}
 {{- end -}}

@@ -18,6 +18,13 @@ metadata:
     openshift.io/description: {{ .description | quote }}
     openshift.io/display-name: {{ .displayName | quote }}
     openshift.io/requester: zuno
+    {{- if .infraNodes }}
+    {{- /* ADR-0614: every pod of this namespace runs on the infra nodes. Used
+    where the operator's CR exposes no tolerations (QuayRegistry overrides only
+    carry affinity). Applies to pods created after the change. */}}
+    openshift.io/node-selector: node-role.kubernetes.io/infra=
+    scheduler.alpha.kubernetes.io/defaultTolerations: '[{"key":"node-role.kubernetes.io/infra","operator":"Exists","effect":"NoSchedule"}]'
+    {{- end }}
 ---
 {{- end }}
 {{- end }}
