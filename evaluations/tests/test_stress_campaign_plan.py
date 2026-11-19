@@ -67,9 +67,13 @@ class CampaignPlan(unittest.TestCase):
         self.assertEqual(facts["overrides"], {"iterations": 7, "concurrency": 3, "duration": 120, "families": ["tools"],
                                               "drivers": ["mcp-tools-by-group", "ai-gateway-routing"]})
 
-    def test_the_standard_profile_keeps_the_agents_family(self):
-        facts, _ = plan(stress_profile="standard")
-        self.assertIn("agents", facts["families"])
+    def test_the_agents_family_is_opt_in_it_rides_the_shared_budget(self):
+        # 2026-11-19: the per-agent Jobs drained the shared ai-gateway ServiceAccount's budget (see the profiles' header)
+        for profile in ("smoke", "standard", "aggressive", "soak"):
+            facts, _ = plan(stress_profile=profile)
+            self.assertNotIn("agents", facts["families"], profile)
+        facts, _ = plan(stress_profile="standard", stress_families="agents")
+        self.assertEqual(facts["families"], ["agents"])
 
     def test_soak_is_async_and_its_deadline_covers_a_longer_duration(self):
         facts, _ = plan(stress_profile="soak")

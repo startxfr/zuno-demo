@@ -143,6 +143,7 @@ jobs:
           python3 evaluations/tests/test_stress_campaign_plan.py
           python3 evaluations/tests/test_stress_drivers.py
           python3 evaluations/tests/test_stress_mutating.py
+          python3 evaluations/tests/test_stress_budget.py
           python3 evaluations/tests/test_stress_job_files.py
           python3 evaluations/tests/test_stress_report.py
           python3 evaluations/tests/test_stress_state.py
