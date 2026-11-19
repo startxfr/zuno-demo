@@ -51,7 +51,7 @@ Nothing to do. The file reads read-only: the `EvalHub` `zuno-evalhub` in `zuno-a
 and the instance Ready), and the GrafanaDashboard `trustyai`. If one is missing, stop and tell the platform owner:
 this demo installs nothing.
 
-The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions. On 2026-11-19 the cluster session recreated that GuardrailsOrchestrator (phase `Ready`) and the DataScienceCluster read `Ready` again; the status file still does not read it.
 
 ### Check
 

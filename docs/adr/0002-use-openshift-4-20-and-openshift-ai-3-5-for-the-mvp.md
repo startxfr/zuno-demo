@@ -43,3 +43,13 @@ The OpenShift Container Platform half of this ADR's title (4.20) was already
 superseded by [ADR-0319](0319-target-openshift-4-22.md) (4.20 → 4.22) and is
 untouched here; `platform/docs/platform_profile.yaml` remains the single
 source of truth for both version targets.
+
+## Amended (2026-11-19): demo333 runs the 3.6 early access on purpose
+
+A dated note, not a rewrite: the text above stays as written. The 3.5.0 GA pin of the previous amendment is the platform
+default of the chart (`gitops/charts/openshift-ai/values.yaml`, `stable-3.5`), used by a render without Ansible. demo333
+does not run it. On the user's decision of 2026-11-05 (WP-195 step 6), demo333 runs `rhods-operator` 3.6.0-ea.2 on the
+`beta` channel, pinned by `zuno_openshift_ai_version: "3.6.0-ea.2"` in `ansible/clusters/demo333.yml`; the version pin and
+channel are resolved by `ansible/roles/openshift_ai/tasks/resolve_version_pin.yml` and `discover_channel.yml` and injected
+into the Application values. The statement above that `beta` is frozen on `3.5.0-ea.2` was true on 2026-09-03: in the
+catalog read on 2026-11-19, `beta` carries 3.6.0-ea.2, and `stable-3.5`, `stable-3.x` and `eus-3.5` carry 3.5.3.

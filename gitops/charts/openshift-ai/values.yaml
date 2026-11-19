@@ -43,6 +43,17 @@ cluster-ods:
       # (rhods-operator.3.5.0, the 3.5 GA). Was 3.5.0-ea.2 (the beta-channel
       # Early Access build ADR-0002 originally targeted) until the GA landed
       # in the catalog and the cluster was upgraded onto it.
+      #
+      # This is the PLATFORM default, used by a render without Ansible. demo333
+      # does not run it: it runs rhods-operator 3.6.0-ea.2 on the `beta` channel,
+      # on purpose (user decision 2026-11-05, WP-195 step 6), pinned by
+      # `zuno_openshift_ai_version: "3.6.0-ea.2"` in ansible/clusters/demo333.yml.
+      # ansible/roles/openshift_ai/tasks/resolve_version_pin.yml reads that pin
+      # and discover_channel.yml picks `beta` for a pre-release pin, and both are
+      # injected into the zuno-openshift-ai-d0 Application values, so this value
+      # and the channel below are overridden there. One InstallPlan only
+      # (Manual, startingCSV pinned). Catalog read 2026-11-19: beta -> 3.6.0-ea.2;
+      # stable-3.5, stable-3.x and eus-3.5 -> 3.5.3.
       version: "3.5.0"
       operator:
         # Overwritten at apply time by the channel
@@ -55,8 +66,11 @@ cluster-ods:
         #
         # stable-3.5 is the 3.5 z-stream: it serves the pinned 3.5.0 GA and
         # will serve 3.5.z patches, but never rolls to 3.6. Do NOT put 'beta'
-        # back - that channel is frozen on 3.5.0-ea.2 and would resolve to a
-        # downgrade. stable-3.x is also wrong here: it serves 3.5.0 today but
+        # here as the default: it is a moving pre-release channel (it carried
+        # 3.5.0-ea.2, which would have been a downgrade of the GA, and carries
+        # 3.6.0-ea.2 since the 3.6 early access). A cluster that wants it, like
+        # demo333, gets it from its own pin (see above), not from this default.
+        # stable-3.x is also wrong here: it serves 3.5.0 today but
         # is a moving channel that will advance past this pin.
         channel: "stable-3.5"
         name: rhods-operator
