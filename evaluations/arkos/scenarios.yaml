@@ -201,10 +201,14 @@ scenarios:
     # At least one and at most this many A2A messages to the target in one turn: a delegation that repeats
     # itself (11 calls seen on operator 0.1.52) is a defect, not a pass.
     max_a2a_calls: 3
+    # The question is one the indexed Red Hat documentation answers directly (OpenShift 4.22, "Configuring the
+    # cluster-wide proxy"; question 3 of evaluations/redhat-docs/questions.yaml). The former "Route vs Ingress" has no
+    # passage comparing the two, so Tekos declined and Arkos asked again: the WP-174 re-delegations of 2026-11-18 were
+    # retries after that non-answer (answers read from UnifAI's session store, 2026-11-19).
     message: >-
-      For the architecture testimonial I am drafting, ask the technical consultant what the difference
-      is between a Route and an Ingress on OpenShift, and include that answer in your reply.
-    expect_any: ["route", "ingress"]
+      For the architecture testimonial I am drafting, ask the technical consultant how to configure the
+      cluster-wide proxy in OpenShift 4.22, and include that answer in your reply.
+    expect_any: ["proxy"]
 
   - id: 22
     title: A code request on C3 data is served by gpt-oss-20b on the local GPUs (arkos write-code)
