@@ -16,7 +16,7 @@ import os
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator, Optional
+from typing import Iterable, Iterator, List, Optional
 
 from fastapi import Request
 from opentelemetry import context as otel_context
@@ -70,6 +70,41 @@ def init_telemetry(service_name: str = "mcp-gateway") -> None:
     )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
+
+
+# WP-313 step 5: the OTel counter exists only from its first event, so after a restart rate()/increase() miss the first
+# invocations of each label set. The known sets are created at 0 at startup: one per tool of the tool policy and per outcome
+# the code emits. Bounded: tools, their capability and server come from the loaded files, nothing from a caller.
+ZERO_INIT_ENV = "TELEMETRY_ZERO_INIT"
+INVOKE_OUTCOMES = ("allowed", "denied", "error")
+
+
+def zero_init_enabled() -> bool:
+    return os.getenv(ZERO_INIT_ENV, "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def zero_label_sets(tools: Iterable[tuple]) -> List[dict]:
+    """The label sets to create at 0 for `tools`, an iterable of (tool, capability, mcp_server). Pure, so a test can bound it."""
+    out = []
+    for tool, capability, mcp_server in sorted(set(tools)):
+        for outcome in INVOKE_OUTCOMES:
+            out.append({"tool": tool, "capability": capability or "unknown", "mcp_server": mcp_server or "unknown", "outcome": outcome})
+    return out
+
+
+def prime_zero_counters(tools: Iterable[tuple]) -> int:
+    """Creates the known tool-invocation label sets at 0 (TELEMETRY_ZERO_INIT=0 turns it off); returns how many. Never raises."""
+    if not zero_init_enabled() or _invoke_counter is None:
+        return 0
+    n = 0
+    try:
+        for labels in zero_label_sets(tools):
+            _invoke_counter.add(0, labels)
+            n += 1
+    except Exception:  # noqa: BLE001
+        logger.debug("zero-initialising the counter failed", exc_info=True)
+    logger.info("telemetry: %d tool-invocation series created at 0", n)
+    return n
 
 
 # ADR-0566 (WP-147): the W3C trace context an agent platform (UnifAI) sent with

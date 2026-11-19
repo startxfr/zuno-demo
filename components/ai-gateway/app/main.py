@@ -49,7 +49,7 @@ from app.schemas import (
 from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
 from app.circuit_breaker import breaker
 from app.model_readiness import readiness
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client, set_caller_persona, set_caller_task
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, prime_zero_counters, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client, set_caller_persona, set_caller_task
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -69,6 +69,7 @@ app = FastAPI(
 )
 
 routing_table = RoutingTable()
+prime_zero_counters(routing_table.provider_models())  # WP-313 step 5: rate() sees the first calls after a restart
 image_routing_table = ImageRoutingTable()  # ADR-0415
 model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it

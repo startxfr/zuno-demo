@@ -88,8 +88,11 @@ def finish_counters(ctx, samples):
     first, last = taken[0], taken[-1]
     if not any(last.values()):
         return [row("limitador-counters", "counters", "no-counter", "counters", False,
-                    f"Limitador returned no counter in {len(last)} namespace(s): its limits are not enforced "
-                    "(the wasm shim creates none for the last token limit of a route, ordered by limit name)")]
+                    f"Limitador returned no counter in {len(last)} namespace(s): its limits are not enforced. Known cause on demo333 "
+                    "(zuno-demo-cluster, 2026-11-19): the Kuadrant EnvoyFilter openshift-ingress/kuadrant-maas-default-gateway "
+                    "is stale (since 2026-11-05) and lacks the load and praxis limit actions, so the -load limits never count: "
+                    "re-create it from the current policies (an operational step, the owner's go). The wasm shim also creates no "
+                    "counter for the last token limit of a route, ordered by limit name")]
     moved = moved_by_identity(first, last)
     rows = []
     for identity, entry in sorted(moved.items(), key=lambda kv: -kv[1]["tokens"]):

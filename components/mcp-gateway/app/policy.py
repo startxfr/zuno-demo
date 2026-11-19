@@ -177,6 +177,10 @@ class PolicyStore:
     def get_tool(self, tool_name: str) -> Optional[ToolPolicyEntry]:
         return self._entries.get(tool_name)
 
+    def tool_servers(self) -> List[tuple]:
+        """[(tool, mcp_server)] of every policy entry (the label values of the tool-invocation metric)."""
+        return sorted({(e.tool, e.mcp_server) for e in self._entries.values()})
+
     def known_tools(self) -> List[str]:
         """Primary (legacy) tool names only - one per policy entry."""
         return sorted({entry.tool for entry in self._entries.values()})

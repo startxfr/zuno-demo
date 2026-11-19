@@ -88,6 +88,10 @@ class RoutingTable:
             if p.get("kind") == "local" and not p.get("via_maas") and p.get("model") in maas_models
         }
 
+    def provider_models(self) -> List[tuple]:
+        """[(provider name, served model)] of every provider in the file, in file order (the label values of the model metrics)."""
+        return [(p["name"], str(p.get("model") or "")) for p in self._config.get("providers") or [] if p.get("name")]
+
     def provider_config(self, name: str) -> Dict[str, Any]:
         if not self._config.get("providers"):
             return {}

@@ -300,6 +300,8 @@ jobs:
           python3 tests/test_wp250_diagram_assertion.py
           # ADR-0624 (WP-306): the stress tag is a span attribute only (SDK on, exporter at a closed port).
           OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_traffic_tag.py
+          # WP-313 step 5: the tool-invocation label sets exist at 0 from startup.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_zero_init.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -357,6 +359,8 @@ jobs:
           python3 tests/test_adapter_selection.py
           python3 tests/test_optimizer.py
           python3 tests/test_stream_telemetry.py
+          # WP-313 step 5: the model counters' known label sets exist at 0 from startup.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_telemetry_zero_init.py
           python3 tests/test_local_cost_estimation.py
           # ADR-0544: X-Zuno-Max-Tokens parsing and per-vendor forwarding,
           # including the via_maas branch structure-demo's own preferred
