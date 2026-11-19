@@ -247,12 +247,17 @@ same limits and priority. The MaaSAuthPolicy below picks the user up from the su
 {{- /*
 ADR-0624 clause 5 / WP-306: the load tests have their own ServiceAccount and their own limit per model route, so a stress
 run cannot spend the ai-gateway's counter. One subscription per local model that the ai-gateway ServiceAccount is
-subscribed to, named `<model>-stress`. Off by default (altGatewayPeers.stress.enabled).
+subscribed to, named `<model>-load`: the Kuadrant wasm shim orders the token-limit actions
+of a route by LIMIT NAME (`models_as_a_service_<model>_<subscription>_<model>_tokens`) and never creates a counter for the
+LAST one (memory kuadrant-shim-drops-trailing-limit-actions, proven 2026-10-24; seen on demo333 on 2026-11-19: no Limitador
+counter for the stress ServiceAccount, so its budget was not enforced). `load` sorts between `lightspeed` and `ocp-*`; the
+`sales` subscription stays last, as before. Keep any new subscription name away from the end of the alphabet.
+Off by default (altGatewayPeers.stress.enabled).
 */}}
 {{- if and $.Values.altGatewayPeers.stress.enabled (ne (toString .modelRefKind) "ExternalModel") }}
 {{- range .subscriptions }}
 {{- if and .user (hasSuffix ":ai-gateway" .user) }}
-{{- $subs = append $subs (dict "name" (printf "%s-stress" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- $subs = append $subs (dict "name" (printf "%s-load" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
 {{- end }}
 {{- end }}
 {{- end }}
