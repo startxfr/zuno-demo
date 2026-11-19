@@ -195,6 +195,8 @@ def fake_api(objects: dict, denied=()):
         "/apis/apps/v1": [{"name": "deployments", "kind": "Deployment", "namespaced": True}, {"name": "statefulsets", "kind": "StatefulSet", "namespaced": True}],
         "/apis/cert-manager.io/v1": [{"name": "clusterissuers", "kind": "ClusterIssuer", "namespaced": False}, {"name": "certificates", "kind": "Certificate", "namespaced": True}],
         "/apis/argoproj.io/v1alpha1": [{"name": "applications", "kind": "Application", "namespaced": True}],
+        "/apis/batch/v1": [{"name": "jobs", "kind": "Job", "namespaced": True}],
+        "/apis/kagent.dev/v1alpha2": [{"name": "agents", "kind": "Agent", "namespaced": True}],
     }
     seen = []
 
@@ -248,6 +250,19 @@ class Evaluation(unittest.TestCase):
         self.assertIn("certificates secret-one", rows[1].detail)
         self.assertEqual(sr.row_status(rows[2]), 404)
         self.assertFalse(any(r.passed for r in rows))
+
+    def test_a_gone_job_and_a_later_phase_object_are_skipped_not_failed(self):
+        k, _ = kube({"/apis/batch/v1/namespaces/n/jobs/failed-one": {"status": {"conditions": [{"type": "Failed", "status": "True"}]}}})
+        job = {"type": "cr", "api_version": "batch/v1", "kind": "Job", "namespace": "n", "condition": "Complete"}
+        agent = {"type": "cr", "api_version": "kagent.dev/v1alpha2", "kind": "Agent", "name": "zuno-diagnose-praxis", "namespace": "zuno-kagent"}
+        rows = run(ds.evaluate(k, "multi-gateway-state", [dict(job, name="gone-one"), dict(job, name="failed-one"), agent]))
+        self.assertEqual([r.passed for r in rows[:1]], [True])
+        self.assertIn("skipped", rows[0].detail)
+        self.assertFalse(rows[1].passed)  # an existing Job that did not complete still fails
+        self.assertTrue(rows[2].passed)
+        self.assertIn("Phase 58", rows[2].detail)
+        other = run(ds.evaluate(k, "other-state", [agent]))
+        self.assertFalse(other[0].passed)  # the same object missing in another demo is a real 404
 
     def test_workloads_are_read_by_name_in_their_namespace(self):
         k, _ = kube({"/apis/apps/v1/namespaces/zuno-ai-run/deployments/ai-gateway": {"spec": {"replicas": 2}, "status": {"readyReplicas": 2}},

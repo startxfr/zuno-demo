@@ -155,6 +155,22 @@ def refused(status: int, resource: str, name: str) -> str:
 # -- the evaluation -----------------------------------------------------------------------------------------------------
 
 
+# What a 404 does not mean: a one-shot Job is garbage-collected after its TTL (a Job that EXISTS and failed still fails the row),
+# and some demos name objects that a later phase of the roadmap delivers. Listed by (driver, kind, name); delete the entry
+# when the phase is rolled out so the row judges for real again.
+NOT_YET = {
+    ("agents-alt-gateway-state", "Agent", "zuno-diagnose-praxis"): "Phase 58 (WP-297/WP-304, kagent agent on Praxis) is not rolled out",
+    ("multi-gateway-state", "Agent", "zuno-diagnose-praxis"): "Phase 58 (WP-297/WP-304, kagent agent on Praxis) is not rolled out",
+}
+
+
+def not_expected_yet(driver: str, a: dict) -> str:
+    """The reason a missing object is not a failure, else ''."""
+    if a.get("kind") == "Job":
+        return "the one-shot Job is gone (its TTL passed); only an existing failed Job fails"
+    return NOT_YET.get((driver, a.get("kind", ""), a.get("name", "")), "")
+
+
 async def _cr(kube, driver: str, a: dict):
     ns, label = a.get("namespace", ""), a.get("name") or a["name_prefix"] + "*"
     rid = f"{a['kind'].lower()}/{ns or '-'}/{label}"
@@ -162,7 +178,8 @@ async def _cr(kube, driver: str, a: dict):
     if status in (401, 403):
         return row(driver, "state", rid, "custom-resource", False, refused(status, resource or a["kind"], label))
     if status == 404 and "name" in a:
-        return row(driver, "state", rid, "custom-resource", False, f"status=404 not found")
+        why = "" if isinstance(body, dict) and body.get("error") == "kind not served" else not_expected_yet(driver, a)
+        return row(driver, "state", rid, "custom-resource", bool(why), f"status=404 skipped: {why}" if why else "status=404 not found")
     if status != 200:
         return row(driver, "state", rid, "custom-resource", False, f"status={status} {str(body)[:120]}")
     if "name" in a:
