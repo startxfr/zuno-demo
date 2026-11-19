@@ -1218,11 +1218,11 @@ Blender and world-model.
 | WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
 | WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Done | none |
 | WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Done | none |
-| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
+| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: UnifAI objects (the demo333 entry in ansible/clusters/demo333.yml, `make d1 install unifai`, the Tempo trace, zuno-demo-reorg told) |
 | WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
-| WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: OpenClaw personas |
+| WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: OpenClaw personas (the proxy pod labels `app: claw-proxy` are not read from a live pod, the demo333 entry, the roll, zuno-demo-reorg told) |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
-| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: world-model web roll |
+| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: world-model web roll (the demo333 entry, the image build and roll, zuno-demo-reorg told) |
 | WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Operator pending | the three pages exist; `claude-code-sovereign` rehearsed (5 min) with its GIF on 2026-11-19 (75b05ec9); left: `multi-gateway` and `agents-alt-gateway` not rehearsed, owner's go: one live play of each scenario |
 | WP-305 | [wp-305](work-packages/wp-305-build-the-stress-runner-core-and-profiles.md) | 0624 | none | Repo work in review | owner's go: the smoke run of WP-307 |
 | WP-306 | [wp-306](work-packages/wp-306-give-the-stress-runs-their-own-identity-and-budget.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: a zuno-demo-agents release defining `loadtest`, the gateway image rolls, the stress subscriptions and the persona pool |
