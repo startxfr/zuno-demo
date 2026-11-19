@@ -3,7 +3,7 @@
 # gitops/charts/mesh-monitoring deploys its OWN, unrelated Prometheus
 # (monitoring.rhobs/v1 MonitoringStack, scoped to zuno-mesh, never scraped
 # by prometheus-k8s) carrying Istio/Envoy telemetry
-# (podmonitor-istio-proxy.yaml/servicemonitor-istiod.yaml). Same in-cluster
+# (the cluster-prometheus values of gitops/charts/mesh-monitoring/values.yaml). Same in-cluster
 # URL and no-auth style gitops/charts/kiali/templates/kiali.yaml already
 # uses for its own Prometheus integration.
 apiVersion: grafana.integreatly.org/v1beta1

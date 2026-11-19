@@ -68,3 +68,80 @@ monitoring:
     storageClassName: ""   # empty = the cluster default class
 
 meshNamespace: zuno-mesh
+
+# The chart cluster-prometheus (helm-repository 21.3.372) renders what templates/ used to: one MonitoringStack, one ServiceMonitor
+# (istiod) and one PodMonitor (Envoy sidecars). A subchart's values cannot be templated from this chart, so the namespace
+# (= meshNamespace) and the retention / storage (= monitoring.retention / monitoring.storage above, now documentation of
+# the values below) are written here; change both places together.
+cluster-prometheus:
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: mesh-monitoring
+    app: mesh-monitoring
+  project:
+    project:
+      name: zuno-mesh
+  monitoringStacks:
+    enabled: true
+    list:
+      - name: mesh-monitoring
+        namespace: zuno-mesh
+        labels:
+          zuno.io/managed-by: argocd
+        annotations:
+          argocd.argoproj.io/sync-wave: "20"
+        spec:
+          logLevel: info
+          retention: 7d
+          prometheusConfig:
+            persistentVolumeClaim:
+              resources:
+                requests:
+                  storage: 10Gi
+          resourceSelector:
+            matchLabels:
+              zuno.io/mesh-monitoring: "true"
+          namespaceSelector: {}
+  serviceMonitors:
+    enabled: true
+    list:
+      - name: istiod-monitor
+        namespace: zuno-mesh
+        labels:
+          zuno.io/managed-by: argocd
+          zuno.io/mesh-monitoring: "true"
+        annotations:
+          argocd.argoproj.io/sync-wave: "20"
+        spec:
+          selector:
+            matchLabels:
+              istio: pilot
+          namespaceSelector:
+            matchNames:
+              - zuno-mesh
+          endpoints:
+            - port: http-monitoring
+              path: /metrics
+              interval: 15s
+  podMonitors:
+    enabled: true
+    list:
+      # Envoy sidecars are not a Service (one per meshed workload pod in every injected namespace), so a PodMonitor with
+      # namespaceSelector.any; pods without the named "http-envoy-prom" port are skipped by Prometheus, not an error.
+      - name: istio-proxy-monitor
+        namespace: zuno-mesh
+        labels:
+          zuno.io/managed-by: argocd
+          zuno.io/mesh-monitoring: "true"
+        annotations:
+          argocd.argoproj.io/sync-wave: "20"
+        spec:
+          selector: {}
+          namespaceSelector:
+            any: true
+          podMetricsEndpoints:
+            - path: /stats/prometheus
+              port: http-envoy-prom
+              interval: 15s

@@ -21,7 +21,7 @@
 # apiVersion is deliberately monitoring.rhobs/v1, the OPPOSITE choice from
 # this chart's own servicemonitor-vllm.yaml (monitoring.coreos.com/v1,
 # for prometheus-k8s) and exactly the choice
-# gitops/charts/mesh-monitoring/templates/podmonitor-istio-proxy.yaml
+# gitops/charts/mesh-monitoring/values.yaml (cluster-prometheus.podMonitors, istio-proxy-monitor)
 # already established for the same reason: one cluster, two independent
 # Prometheus-operator flavours, each bound to its own CRD group - name a
 # resource under the wrong one and it renders successfully but is scraped

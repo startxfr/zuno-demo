@@ -15,3 +15,9 @@ dependencies:
   - name: project
     version: "21.3.371"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
+  # helm-repository migration, lot 1: the MonitoringStack, the ServiceMonitor and the PodMonitor come from the helm-repository chart instead of
+  # templates of this chart. Only rendered with the d1 Application (monitoring.enabled), like the templates it replaces.
+  - name: cluster-prometheus
+    version: "21.3.372"
+    repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
+    condition: monitoring.enabled

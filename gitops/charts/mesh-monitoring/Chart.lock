@@ -5,5 +5,8 @@ dependencies:
 - name: project
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
   version: 21.3.371
-digest: sha256:894bf6f724edde4f612ff1e5502e2bd3963a73eaa3b9c2b9a1ab362e0460bc21
-generated: "2026-11-19T01:42:12.254737456+01:00"
+- name: cluster-prometheus
+  repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
+  version: 21.3.372
+digest: sha256:bcb4764e47eaab2523f19ed33f93d5b7b22cc707f72bc4c49c7eb06f30156ced
+generated: "2026-11-19T11:00:19.604350202+01:00"
