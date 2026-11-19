@@ -228,9 +228,9 @@ banner.
 flowchart LR
   USER["Browser<br/>signed-in persona"] -->|"HTTPS, route unifai-ui"| UI
   subgraph OPNS["namespace unifai-operator"]
-    OPR["unifai-operator 0.1.69<br/>OLM, catalog pinned by digest"]
+    OPR["unifai-operator<br/>OLM, catalog pinned by digest"]
   end
-  subgraph NS["namespace zuno-unifai: UnifaiStack unifai, images v0.1.69"]
+  subgraph NS["namespace zuno-unifai: UnifaiStack unifai, images pinned by digest"]
     UI["unifai-ui"]
     ID["unifai-identity<br/>teams from the token's groups<br/>(oidc-claims)"]
     MAS["unifai-multiagent-be<br/>+ temporal worker<br/>workflows, sessions"]
@@ -259,6 +259,8 @@ flowchart LR
 ```
 
 ## References
+
+The fork's own documentation: [the operator's OKF page](https://github.com/startxfr/UnifAI/blob/devel/fork/unifai-operator/docs/okf-agent-bundles.md) (what the operator does with a bundle) and [RELEASING.md](https://github.com/startxfr/UnifAI/blob/devel/fork/RELEASING.md) (versions, channels, tag policy). The format and the release of a bundle: [zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents/tree/main/docs).
 
 The decisions this page rests on:
 

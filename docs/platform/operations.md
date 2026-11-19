@@ -101,6 +101,12 @@ into **private** repositories of the internal Quay, `zuno/redhat/<path>`, and re
 
 ## Rolling a UnifAI release, and taking over a roll (WP-176, WP-178)
 
+The fork's tag policy (owner decision of 2026-11-18, [RELEASING.md](https://github.com/startxfr/UnifAI/blob/devel/fork/RELEASING.md)): the `vX.Y.Z` tags of the
+`quay.io/zuno` repositories and the git tags are immutable and kept, a fix is a new version, the images are
+`linux/amd64` only and readable without credentials, and there is no official UnifAI logo yet. The rule is the fork's, not
+a registry setting, so zuno-demo pins by **digest** taken from the `release.json` asset of the fork's [GitHub releases](https://github.com/startxfr/UnifAI/releases) (the current version is there, not in these pages), never by tag and never to `devel`
+(except the `--accept-dev` pin below, which is explicit).
+
 Operator and application images move in two separate steps, always in this order, each with the user's go and with the owner of any running measurement (stresstest, ranking set) agreeing that no UnifAI pod may restart.
 
 1. **Operator.** The release owner publishes the operator, bundle and catalog digests once its CI and canary are green. From a detached worktree on `origin/devel` with `ansible/confidential.yml` copied in: `python3 platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z --dry-run` (signatures with the release identity, then the internal Quay, WP-282, then the admission preflight; the dry run of a release not yet copied lists the three digests to copy), the same without `--dry-run` and with `--mirror-to <registry>/zuno` (push robot's `DOCKER_CONFIG`; the user's go for the copy), commit and push only that commit, then `make d2 install unifai` and `make d2 check unifai`. Only the operator controller restarts. Rolled so far on demo333: 0.1.42 to 0.1.45 and 0.1.47 (0.1.46 was never released).

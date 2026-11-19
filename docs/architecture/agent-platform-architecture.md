@@ -157,6 +157,8 @@ Status read from [docs/adr/README.md](../adr/README.md). None of the ADRs below 
 - [ADR-0584](../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) (Implemented): lifecycle states, roles, incident revocation.
 - [ADR-0585](../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) (Implemented), with [ADR-0401](../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) (Implemented): the a2a-gateway and the delegation rules.
 
+Fork documentation (read-only reference): [operator OKF page](https://github.com/startxfr/UnifAI/blob/devel/fork/unifai-operator/docs/okf-agent-bundles.md), [RELEASING.md and its tag policy](https://github.com/startxfr/UnifAI/blob/devel/fork/RELEASING.md). Agents repository: [zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents/tree/main/docs).
+
 Scenarios: [UnifAI agents](../demo/scenarios/experiences/unifai-agents.md),
 [A2A delegation with approval](../demo/scenarios/governance/a2a-delegation-approval.md),
 [OKF signed agent release](../demo/scenarios/foundation/okf-signed-agent-release.md),

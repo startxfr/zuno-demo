@@ -67,7 +67,10 @@ to roll while the mirror lacks the locked digest (`ansible/tasks/okf_mirror_hold
 
 Every reader dispatches on the document version with the same table
 ([ADR-0615](../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md) clause 5):
-profile 1.0, or legacy v0.2/v0.3 until the unifai-operator 0.2 line (WP-268). The conformance cases shipped in the corp artifact keep the readers
+profile 1.0, or legacy v0.2/v0.3 until the unifai-operator 0.2 line (WP-268). The legacy refusal is **not active yet**:
+every 0.1 operator release from 0.1.71 reads both (0.1.70 and earlier refuse profile 1.0), and the refusal of legacy
+bundles arrives with the operator line 0.2, from 2027-01-05 (R-556). The operator's side is in
+[its OKF page](https://github.com/startxfr/UnifAI/blob/devel/fork/unifai-operator/docs/okf-agent-bundles.md). The conformance cases shipped in the corp artifact keep the readers
 aligned.
 
 ## Rolling a promotion
