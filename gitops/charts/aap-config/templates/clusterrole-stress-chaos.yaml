@@ -1,0 +1,44 @@
+{{- if and .Values.aapConfig.enabled .Values.chaosRbac.enabled }}
+# ADR-0624 / WP-311: what the stress campaign's provider-cut disruption needs and the installer role (clusterrole-installer.yaml)
+# does not give: create and delete AdminNetworkPolicies. A cut denies ONE external provider's addresses to the ai-gateway pods for
+# at most five minutes (platform/testing/stress_chaos.py builds the policy: a Deny on the egress of named pods, nothing else) and
+# the task deletes it afterwards whatever happens; any left-over carries the label zuno.io/stress-chaos=true and is removed at the
+# start and at the end of every chaos stage. Deleting a pod needs nothing more: the installer role already holds it.
+#
+# AdminNetworkPolicies are cluster-scoped and take precedence over every NetworkPolicy, and Kubernetes RBAC cannot limit a CREATE
+# to one name: this is a real grant, so it is off by default and the owner decides. A workstation run with the operator's own
+# login needs none of it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-stress-chaos
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+rules:
+  - apiGroups: ["policy.networking.k8s.io"]
+    resources: ["adminnetworkpolicies"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zuno-stress-chaos
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-stress-chaos
+subjects:
+  {{- range .Values.credentials }}
+  {{- if eq .clusterRole "zuno-aap-installer" }}
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $.Values.namespace }}
+  {{- end }}
+  {{- end }}
+{{- end }}

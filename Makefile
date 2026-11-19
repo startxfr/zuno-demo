@@ -691,6 +691,7 @@ if [[ -z "$$verb" ]]; then \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
     'Run agents one at a time instead of in parallel (stresstest only, default: parallel): SEQUENTIAL=1' \
     'Stress campaign (stresstest only, ADR-0624): PROFILE=<smoke|standard|aggressive|soak>, overridden by ITERATIONS=<n> CONCURRENCY=<n> DURATION=<seconds> SHARDS=<n> FAMILIES=<a,b> DRIVERS=<id,id>' \
+    'Disruptions of a profile that lists them (aggressive; evaluations/stress/chaos.yaml, ADR-0624): CHAOS_CONFIRM=<the profile name again>, otherwise none is inflicted' \
     'Read a stress campaign (stresstest-collect only): RUN=<run id printed at launch> (default: the newest)' \
     'Agent to train (run only): AGENT=<agent> (default: comage - the only agent with a compiled pipeline version today)' \
     'Release tag (release only, REQUIRED, no default): TAG=<tag> - must already be a real, pushed git tag' \
@@ -702,6 +703,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest PROFILE=smoke   # every driver once, under a token cap' \
     'Example: make d3 stresstest PROFILE=standard CONCURRENCY=4 FAMILIES=tools,models' \
     'Example: make d3 stresstest PROFILE=soak   # async: prints a run id' \
+    'Example: make d3 stresstest PROFILE=aggressive CHAOS_CONFIRM=aggressive   # load AND one pod deleted at a time, one provider cut' \
     'Example: make d3 stresstest-collect RUN=soak-20261119-014500' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
@@ -733,7 +735,8 @@ case "$$verb" in \
       val="$${!knob:-}"; \
       if [[ -n "$$val" ]] && ! [[ "$$val" =~ ^[a-z0-9,_.-]+$$ ]]; then echo "$$knob must be a comma list of names (got '$$val')" >&2; exit 2; fi; \
     done; \
-    if [[ -z "$$profile" && -n "$${ITERATIONS:-}$${CONCURRENCY:-}$${DURATION:-}$${SHARDS:-}$${FAMILIES:-}$${DRIVERS:-}" ]]; then echo "ITERATIONS, CONCURRENCY, DURATION, SHARDS, FAMILIES and DRIVERS need PROFILE=<name>" >&2; exit 2; fi; \
+    if [[ -n "$${CHAOS_CONFIRM:-}" ]] && ! [[ "$${CHAOS_CONFIRM}" =~ ^[a-z0-9-]+$$ ]]; then echo "CHAOS_CONFIRM must be the name of the profile (it is typed twice on purpose)" >&2; exit 2; fi; \
+    if [[ -z "$$profile" && -n "$${ITERATIONS:-}$${CONCURRENCY:-}$${DURATION:-}$${SHARDS:-}$${FAMILIES:-}$${DRIVERS:-}$${CHAOS_CONFIRM:-}" ]]; then echo "ITERATIONS, CONCURRENCY, DURATION, SHARDS, FAMILIES, DRIVERS and CHAOS_CONFIRM need PROFILE=<name>" >&2; exit 2; fi; \
     stress_json=""; stress_args=""; \
     if [[ -n "$$profile" ]]; then \
       stress_json=", \"stress_profile\": \"$$profile\""; stress_args="-e stress_profile=$$profile"; \
@@ -743,6 +746,7 @@ case "$$verb" in \
       if [[ -n "$${SHARDS:-}" ]]; then stress_json="$$stress_json, \"stress_shards\": $$SHARDS"; stress_args="$$stress_args -e stress_shards=$$SHARDS"; fi; \
       if [[ -n "$${FAMILIES:-}" ]]; then stress_json="$$stress_json, \"stress_families\": \"$$FAMILIES\""; stress_args="$$stress_args -e stress_families=$$FAMILIES"; fi; \
       if [[ -n "$${DRIVERS:-}" ]]; then stress_json="$$stress_json, \"stress_drivers\": \"$$DRIVERS\""; stress_args="$$stress_args -e stress_drivers=$$DRIVERS"; fi; \
+      if [[ -n "$${CHAOS_CONFIRM:-}" ]]; then stress_json="$$stress_json, \"stress_chaos_confirm\": \"$$CHAOS_CONFIRM\""; stress_args="$$stress_args -e stress_chaos_confirm=$$CHAOS_CONFIRM"; fi; \
     fi; \
     bulk="$${BULK:-}"; \
     if [[ -z "$$bulk" ]]; then \

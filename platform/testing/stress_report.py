@@ -40,7 +40,11 @@ FAILURE_LIMIT = 20
 P95_REGRESSION = 1.5      # a p95 above this multiple of the previous run's is flagged
 ERROR_REGRESSION = 0.05   # an error rate this much higher (absolute) is flagged
 RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-SAMPLER_LAYERS = ("saturation", "counters")
+SAMPLER_LAYERS = ("saturation", "counters", "chaos")
+WINDOW_RE = re.compile(r"window=(\d+)-(\d+)")
+BEFORE_SECONDS = 120   # the load before a disruption that counts as its baseline
+GRACE_SECONDS = 60     # the load after a disruption's end that still counts as its effect
+QUIET_BUCKETS = 2      # consecutive error-free buckets that mean the load has recovered
 
 
 def parse_rows(text: str) -> List[Dict[str, Any]]:
@@ -58,6 +62,48 @@ def parse_rows(text: str) -> List[Dict[str, Any]]:
     return rows
 
 
+def combined_timeline(drivers: List[Dict[str, Any]]) -> Dict[int, List[int]]:
+    """{bucket: [iterations, failed]} over every driver of the run."""
+    out: Dict[int, List[int]] = {}
+    for d in drivers:
+        for bucket, n, err in d.get("timeline", []):
+            cell = out.setdefault(int(bucket), [0, 0])
+            cell[0] += int(n)
+            cell[1] += int(err)
+    return out
+
+
+def chaos_effects(timeline: Dict[int, List[int]], start: int, end: int) -> Dict[str, Any]:
+    """What the load saw around one disruption window [start, end] (epoch seconds): failures before, during and the time the
+    load took to run clean again after it ended. None for a part with no iteration in it."""
+    step = sr.TIMELINE_BUCKET
+
+    def totals(lo: int, hi: int) -> List[int]:
+        n = err = 0
+        for bucket, (count, failed) in timeline.items():
+            if lo <= bucket + step and bucket <= hi:
+                n += count
+                err += failed
+        return [n, err]
+
+    before = totals(start - BEFORE_SECONDS, start - 1)
+    during = totals(start, end + GRACE_SECONDS)
+    recovered = None
+    clean = 0
+    for bucket in sorted(b for b in timeline if b + step > end):
+        count, failed = timeline[bucket]
+        clean = clean + 1 if (count and not failed) else 0
+        if clean >= QUIET_BUCKETS:
+            recovered = max(0, bucket - step * (QUIET_BUCKETS - 1) - end)
+            break
+    return {"before": before, "during": during, "recovered_after_s": recovered}
+
+
+def truthy(value: Any) -> bool:
+    """A row's `passed` as a bool: an execution environment may hand the report the string "False"."""
+    return value is True or str(value).strip().lower() == "true"
+
+
 def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The report of a run. `meta`: run_id, profile, started, job_state (all optional)."""
     meta = dict(meta or {})
@@ -67,19 +113,28 @@ def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = No
     failures = [
         {"driver": r.get("agent", "?"), "id": r.get("id", "?"), "detail": str(r.get("detail", ""))[:240]}
         for r in rows
-        if not r.get("passed") and r.get("layer") not in SAMPLER_LAYERS and r.get("layer") != sr.SUMMARY_LAYER
+        if not truthy(r.get("passed")) and r.get("layer") not in SAMPLER_LAYERS and r.get("layer") != sr.SUMMARY_LAYER
         and r.get("category") != "guard"
     ]
     guards = [{"driver": r.get("agent", "?"), "detail": str(r.get("detail", ""))[:240]} for r in rows if r.get("category") == "guard"]
-    saturation = [{"signal": r.get("id", "?"), "passed": bool(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "saturation"]
-    counters = [{"id": r.get("id", "?"), "passed": bool(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "counters"]
+    saturation = [{"signal": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "saturation"]
+    counters = [{"id": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "counters"]
     saturated = [s for s in saturation if not s["passed"]]
-    attention = bool(failures or guards or saturated or any(d["err"] for d in drivers) or any(not c["passed"] for c in counters))
+    timeline = combined_timeline(drivers)
+    chaos = []
+    for r in rows:
+        if r.get("layer") != "chaos":
+            continue
+        window = WINDOW_RE.search(str(r.get("detail", "")))
+        chaos.append({"id": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", "")),
+                      "effects": chaos_effects(timeline, int(window.group(1)), int(window.group(2))) if window and timeline else None})
+    attention = bool(failures or guards or saturated or any(d["err"] for d in drivers) or any(not c["passed"] for c in counters)
+                     or any(not c["passed"] for c in chaos))
     return {
         "run_id": meta.get("run_id", ""), "profile": meta.get("profile", ""), "started": meta.get("started", ""),
         "job_state": meta.get("job_state", ""), "rows": len(rows), "drivers": drivers,
         "failures": failures[:FAILURE_LIMIT], "failure_count": len(failures), "guards": guards,
-        "saturation": saturation, "counters": counters,
+        "saturation": saturation, "counters": counters, "chaos": chaos,
         "verdict": "ATTENTION" if attention else "CLEAN",
     }
 
@@ -129,6 +184,20 @@ def _ms(value: float) -> str:
     return f"{value:.0f}ms"
 
 
+def effects_text(effects: Optional[Dict[str, Any]]) -> str:
+    """The load's view of a disruption, one clause: failures before and during, and the time to run clean again."""
+    if not effects:
+        return "no load timeline to correlate"
+
+    def rate(pair: List[int]) -> str:
+        return f"{pair[1]}/{pair[0]}" if pair[0] else "no iteration"
+
+    recovered = effects["recovered_after_s"]
+    tail = ("not clean again before the end of the run" if recovered is None
+            else "clean again " + (f"{recovered}s after the end" if recovered else "at once"))
+    return f"load failures {rate(effects['before'])} before, {rate(effects['during'])} during and the minute after; {tail}"
+
+
 def render_text(report: Dict[str, Any], diff: Optional[List[Dict[str, Any]]] = None) -> str:
     lines = [f"STRESS REPORT run={report['run_id'] or '-'} profile={report['profile'] or '-'} job={report['job_state'] or '-'} "
              f"rows={report['rows']} verdict={report['verdict']} (informational, ADR-0058)"]
@@ -144,6 +213,11 @@ def render_text(report: Dict[str, Any], diff: Optional[List[Dict[str, Any]]] = N
         lines += ["", "SATURATION"] + [f"  {'ok       ' if s['passed'] else 'SATURATED'} {s['signal']}: {s['detail']}" for s in report["saturation"]]
     if report["counters"]:
         lines += ["", "LIMITADOR COUNTERS"] + [f"  {c['id']}: {c['detail']}" for c in report["counters"]]
+    if report.get("chaos"):
+        lines += ["", "CHAOS"]
+        for c in report["chaos"]:
+            lines.append(f"  {'recovered' if c['passed'] else 'DID NOT RECOVER'} {c['id']}: {c['detail']}")
+            lines.append(f"      {effects_text(c['effects'])}")
     if diff:
         lines += ["", "TREND (against the previous run of this profile)"]
         for d in diff:
@@ -166,6 +240,7 @@ def render_markdown(report: Dict[str, Any], diff: Optional[List[Dict[str, Any]]]
         ("Failures", report["failures"], lambda f: f"- {f['driver']} `{f['id']}`: {f['detail']}"),
         ("Saturation", report["saturation"], lambda s: f"- {'ok' if s['passed'] else '**SATURATED**'} {s['signal']}: {s['detail']}"),
         ("Limitador counters", report["counters"], lambda c: f"- {c['id']}: {c['detail']}"),
+        ("Chaos", report.get("chaos", []), lambda c: f"- {'recovered' if c['passed'] else '**DID NOT RECOVER**'} {c['id']}: {c['detail']} ({effects_text(c['effects'])})"),
     ):
         if items:
             out += ["", f"## {title}", ""] + [fmt(i) for i in items]

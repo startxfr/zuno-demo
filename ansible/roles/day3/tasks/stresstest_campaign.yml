@@ -32,6 +32,22 @@
   ansible.builtin.include_tasks: stresstest_campaign_launch.yml
   when: (_stress_families | difference(['agents']) | length > 0) or (_stress_drivers | length > 0)
 
+# WP-311: the disruptions of the profile, beside the load Job that is now running; only when confirmed (see the plan).
+- name: "stress | chaos listed by the profile but not confirmed"
+  ansible.builtin.debug:
+    msg: "the profile lists {{ _stress_chaos_ids | join(', ') }} but nothing was inflicted: run again with CHAOS_CONFIRM={{ stress_profile }} to confirm"
+  when:
+    - _stress_launched | default(false)
+    - _stress_chaos_ids | length > 0
+    - not _stress_chaos_confirmed
+
+- name: "stress | chaos: inflict the disruptions beside the load"
+  ansible.builtin.include_tasks: stresstest_chaos.yml
+  when:
+    - _stress_launched | default(false)
+    - _stress_chaos_ids | length > 0
+    - _stress_chaos_confirmed
+
 - name: "stress | family agents: the per-agent Jobs"
   ansible.builtin.include_tasks: stresstest_job.yml
   vars:

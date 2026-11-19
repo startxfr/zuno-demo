@@ -43,12 +43,15 @@
   register: _stress_logs
 
 # stress_runner.py prints one JSON array per line (checkpoints and one per driver): every such line is rows.
+# WP-311: the disruptions inflicted by the same play are rows of the run (layer chaos): the report correlates their windows with the
+# load's timeline. A collect run later, in another play, has none: the disruptions are only reported by the play that ran them.
 - name: "stress-collect | the rows"
   ansible.builtin.set_fact:
     _stress_rows: >-
-      {{ _stress_logs.results | default([])
-         | map(attribute='log_lines') | map('default', []) | flatten
-         | select('match', '^\[.*\]$') | map('from_json') | list | flatten }}
+      {{ (_stress_logs.results | default([])
+          | map(attribute='log_lines') | map('default', []) | flatten
+          | select('match', '^\[.*\]$') | map('from_json') | list | flatten)
+         + (_stress_chaos_rows | default([])) }}
 
 - name: "stress-collect | the state of the Job"
   ansible.builtin.debug:

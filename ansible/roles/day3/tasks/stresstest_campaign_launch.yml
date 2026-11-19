@@ -266,6 +266,7 @@
 - name: "stress | launched"
   ansible.builtin.set_fact:
     _stress_launched: true
+    _stress_launch_epoch: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"  # the clock of the chaos plan (WP-311)
 
 - name: "stress | how to read the rows"
   ansible.builtin.debug:

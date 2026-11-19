@@ -1,0 +1,167 @@
+---
+# One disruption of stresstest_chaos.yml (loop_var _chaos). Sets one row in _stress_chaos_rows:
+#   agent chaos-<id>, layer chaos, passed = the platform was whole again within recover_within,
+#   detail "window=<start>-<end> <what happened>" (epoch seconds: the report correlates the window with the load's timeline).
+
+- name: "chaos {{ _chaos.id }} | wait for its time (+{{ _chaos.at }} s after the launch)"
+  ansible.builtin.wait_for:
+    timeout: "{{ [(_stress_launch_epoch | int) + (_chaos.at | int) - (lookup('ansible.builtin.pipe', 'date +%s') | int), 0] | max }}"
+  when: ((_stress_launch_epoch | int) + (_chaos.at | int) - (lookup('ansible.builtin.pipe', 'date +%s') | int)) > 0
+
+- name: "chaos {{ _chaos.id }} | start from a clean state"
+  ansible.builtin.set_fact:
+    _chaos_ok: false
+    _chaos_note: "did not run"
+    _chaos_start: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+    _chaos_end: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+
+# ---- delete one pod ------------------------------------------------------------------------------------------------------------
+- name: "chaos {{ _chaos.id }} | the pod to delete and the replicas the workload should have"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ _chaos.namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/name={{ _chaos.selector['app.kubernetes.io/name'] }}"
+  register: _chaos_pods
+  when: _chaos.kind == 'pod-delete'
+
+- name: "chaos {{ _chaos.id }} | the workload"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: "{{ _chaos.workload.kind }}"
+    namespace: "{{ _chaos.namespace }}"
+    name: "{{ _chaos.workload.name }}"
+  register: _chaos_workload
+  when: _chaos.kind == 'pod-delete'
+
+- name: "chaos {{ _chaos.id }} | nothing matches: say so, delete nothing"
+  ansible.builtin.set_fact:
+    _chaos_note: "no pod matches app.kubernetes.io/name={{ _chaos.selector['app.kubernetes.io/name'] }} in {{ _chaos.namespace }}{{ ' (the selector was written from the chart and never checked on a live pod)' if _chaos.labels_checked is defined and not _chaos.labels_checked else '' }}"
+  when:
+    - _chaos.kind == 'pod-delete'
+    - (_chaos_pods.resources | default([]) | length) == 0
+
+- name: "chaos {{ _chaos.id }} | delete one pod and watch the platform come back"
+  when:
+    - _chaos.kind == 'pod-delete'
+    - (_chaos_pods.resources | default([]) | length) > 0
+  block:
+    - name: "chaos {{ _chaos.id }} | the victim"
+      ansible.builtin.set_fact:
+        _chaos_victim: "{{ _chaos_pods.resources[0].metadata.name }}"
+        _chaos_desired: "{{ _chaos_workload.resources[0].spec.replicas | default(1) if (_chaos_workload.resources | default([]) | length) > 0 else 1 }}"
+        _chaos_start: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+
+    - name: "chaos {{ _chaos.id }} | delete {{ _chaos_victim }}"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: "{{ _chaos.namespace }}"
+        name: "{{ _chaos_victim }}"
+        wait: false
+
+    # The Deployment already shows its old ready count for a moment: wait for the victim to be gone, then for the workload to be whole.
+    - name: "chaos {{ _chaos.id }} | the victim is gone"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ _chaos.namespace }}"
+        name: "{{ _chaos_victim }}"
+      register: _chaos_gone
+      until: (_chaos_gone.resources | default([]) | length) == 0
+      retries: "{{ (_chaos.recover_within | int) // 5 }}"
+      delay: 5
+      ignore_errors: true
+
+    - name: "chaos {{ _chaos.id }} | the workload is whole again"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: "{{ _chaos.workload.kind }}"
+        namespace: "{{ _chaos.namespace }}"
+        name: "{{ _chaos.workload.name }}"
+      register: _chaos_back
+      until: >-
+        (_chaos_back.resources | default([]) | length) > 0 and
+        ((_chaos_back.resources[0].status.readyReplicas | default(0)) >= (_chaos_desired | int)) and
+        ((_chaos_back.resources[0].status.updatedReplicas | default(0)) >= (_chaos_desired | int))
+      retries: "{{ (_chaos.recover_within | int) // 5 }}"
+      delay: 5
+      ignore_errors: true
+
+    - name: "chaos {{ _chaos.id }} | what happened"
+      ansible.builtin.set_fact:
+        _chaos_end: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+        _chaos_ok: "{{ not (_chaos_gone.failed | default(false)) and not (_chaos_back.failed | default(false)) }}"
+        _chaos_note: >-
+          pod {{ _chaos_victim }} deleted, {{ _chaos.workload.kind }} {{ _chaos.workload.name }}
+          {{ 'whole again' if (not (_chaos_gone.failed | default(false)) and not (_chaos_back.failed | default(false))) else 'NOT whole again' }}
+          within {{ _chaos.recover_within }} s allowed ({{ _chaos_desired }} replica(s) wanted)
+
+# ---- cut one external provider -------------------------------------------------------------------------------------------------
+- name: "chaos {{ _chaos.id }} | deny {{ _chaos.host | default('') }} to the {{ _chaos.subject.selector['app.kubernetes.io/name'] | default('') }} pods"
+  when: _chaos.kind == 'provider-cut'
+  block:
+    - name: "chaos {{ _chaos.id }} | the policy, with the provider's addresses resolved now"
+      ansible.builtin.command:
+        cmd: >-
+          python3 {{ (zuno_repo_root + '/platform/testing/stress_chaos.py') | quote }} anp
+          --id {{ _chaos.id | quote }} --run-id {{ _stress_run_id | quote }}
+      register: _chaos_anp_out
+      changed_when: false
+
+    - name: "chaos {{ _chaos.id }} | the policy as text (integers stay integers through every execution environment)"
+      ansible.builtin.set_fact:
+        _chaos_anp: "{{ _chaos_anp_out.stdout | from_yaml }}"
+        _chaos_start: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+
+    - name: "chaos {{ _chaos.id }} | apply it for {{ _chaos.duration }} s, remove it whatever happens"
+      block:
+        - name: "chaos {{ _chaos.id }} | the provider is denied"
+          kubernetes.core.k8s:
+            state: present
+            definition: "{{ _chaos_anp_out.stdout | from_yaml }}"
+
+        - name: "chaos {{ _chaos.id }} | hold"
+          ansible.builtin.wait_for:
+            timeout: "{{ _chaos.duration }}"
+      always:
+        - name: "chaos {{ _chaos.id }} | the provider is allowed again"
+          kubernetes.core.k8s:
+            state: absent
+            api_version: policy.networking.k8s.io/v1alpha1
+            kind: AdminNetworkPolicy
+            name: "{{ _chaos_anp.metadata.name }}"
+          when: _chaos_anp is defined
+
+    - name: "chaos {{ _chaos.id }} | the policy is gone"
+      kubernetes.core.k8s_info:
+        api_version: policy.networking.k8s.io/v1alpha1
+        kind: AdminNetworkPolicy
+        name: "{{ _chaos_anp.metadata.name }}"
+      register: _chaos_anp_left
+      until: (_chaos_anp_left.resources | default([]) | length) == 0
+      retries: "{{ (_chaos.recover_within | int) // 5 }}"
+      delay: 5
+      ignore_errors: true
+
+    - name: "chaos {{ _chaos.id }} | what happened"
+      ansible.builtin.set_fact:
+        _chaos_end: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+        _chaos_ok: "{{ not (_chaos_anp_left.failed | default(false)) }}"
+        _chaos_note: >-
+          {{ _chaos.host }} ({{ _chaos_anp.spec.egress[0].to[0].networks | length }} address(es)) denied to {{ _chaos.subject.selector['app.kubernetes.io/name'] }}
+          for {{ _chaos.duration }} s, policy {{ 'removed' if not (_chaos_anp_left.failed | default(false)) else 'STILL PRESENT' }}
+  rescue:
+    - name: "chaos {{ _chaos.id }} | it could not be inflicted"
+      ansible.builtin.set_fact:
+        _chaos_ok: false
+        _chaos_end: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+        _chaos_note: "the provider cut failed: {{ ansible_failed_result.msg | default(ansible_failed_result.stderr | default('unknown error')) | string | truncate(160) }}"
+
+- name: "chaos {{ _chaos.id }} | the row"
+  ansible.builtin.set_fact:
+    _stress_chaos_rows: >-
+      {{ _stress_chaos_rows + [ {'agent': 'chaos-' ~ _chaos.id, 'layer': 'chaos', 'id': _chaos.id, 'category': _chaos.kind,
+                                 'passed': (_chaos_ok | bool),
+                                 'detail': 'window=' ~ _chaos_start ~ '-' ~ _chaos_end ~ ' ' ~ (_chaos_note | trim),
+                                 'duration_ms': 0} ] }}

@@ -136,6 +136,7 @@ jobs:
         run: |
           pip install -r evaluations/tekos/requirements.txt
           python3 evaluations/tests/test_stress_runner.py
+          python3 evaluations/tests/test_stress_chaos.py
           python3 evaluations/tests/test_stress_campaign_plan.py
           python3 evaluations/tests/test_stress_drivers.py
           python3 evaluations/tests/test_stress_report.py

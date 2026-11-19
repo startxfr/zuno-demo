@@ -1,0 +1,59 @@
+# The disruptions a campaign may inflict while its load runs (WP-311, ADR-0624). A profile lists the ids it wants in `chaos:`
+# (only `aggressive`), and the campaign runs them only when the operator types the profile name again (CHAOS_CONFIRM=<profile>).
+#
+# Closed on purpose, checked by platform/testing/stress_chaos.py `validate` and by a unit test:
+#   - two kinds only: delete ONE pod of an application, or deny ONE external provider's addresses to the ai-gateway pods for
+#     a bounded time (an AdminNetworkPolicy created for the disruption and deleted at its end, whatever happens);
+#   - the targets are named applications of the platform (an allow-list of `app.kubernetes.io/name` values and namespaces):
+#     never a model pod (the GPU serving pods carry no such label), never a node, never a namespace, never a Deployment scale;
+#   - `recover_within` is the time the platform has to be whole again, and the row says whether it was.
+# `labels_checked: false` marks a selector written from the chart and not yet seen on a live pod: when it matches nothing the
+# row fails and says so, it never guesses another one.
+version: 1
+disruptions:
+  - id: pod-ai-gateway
+    kind: pod-delete
+    description: "One ai-gateway pod deleted (two replicas since WP-260): the other keeps answering and the Deployment replaces it."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: ai-gateway}
+    workload: {kind: Deployment, name: ai-gateway}
+    recover_within: 240
+  - id: pod-mcp-gateway
+    kind: pod-delete
+    description: "One mcp-gateway pod deleted (two replicas)."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: mcp-gateway}
+    workload: {kind: Deployment, name: mcp-gateway}
+    recover_within: 240
+  - id: pod-a2a-gateway
+    kind: pod-delete
+    description: "The a2a-gateway pod deleted (a single replica by design, ADR-0101): the delegation path is down until it is back."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: a2a-gateway}
+    workload: {kind: Deployment, name: a2a-gateway}
+    recover_within: 240
+    labels_checked: false
+  - id: pod-praxis
+    kind: pod-delete
+    description: "The Praxis pod deleted."
+    namespace: zuno-ai-gateways
+    selector: {app.kubernetes.io/name: praxis}
+    workload: {kind: Deployment, name: praxis}
+    recover_within: 240
+  - id: pod-open-webui
+    kind: pod-delete
+    description: "The Open WebUI pod deleted."
+    namespace: zuno-openwebui
+    selector: {app.kubernetes.io/name: open-webui}
+    workload: {kind: StatefulSet, name: open-webui}
+    recover_within: 300
+    labels_checked: false
+  - id: provider-cut-mistral
+    kind: provider-cut
+    description: "The addresses of api.mistral.ai denied to the ai-gateway pods for two minutes: zuno-code must fall back to another provider."
+    host: api.mistral.ai
+    subject:
+      namespace: zuno-ai-run
+      selector: {app.kubernetes.io/name: ai-gateway}
+    duration: 120
+    recover_within: 60

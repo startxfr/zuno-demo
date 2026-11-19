@@ -376,6 +376,7 @@ class Stats:
     c5xx: int = 0
     timeouts: int = 0
     lat: List[float] = field(default_factory=list)
+    timeline: Dict[int, List[int]] = field(default_factory=dict)  # {wall-clock second // 10 * 10: [iterations, failed]} (WP-311)
 
 
 class RateLimiter:
@@ -411,8 +412,13 @@ async def _call(driver: Driver, wctx: WorkerCtx, i: int, timeout: float) -> Tupl
         return [row(driver.id, "stress", "exception", "error", False, f"{type(exc).__name__}: {str(exc)[:200]}")], False
 
 
+TIMELINE_BUCKET = 10
+TIMELINE_CAP = 2000  # buckets kept per driver and shard (five and a half hours)
+
+
 async def run_plan(plan: Plan, ctx: Ctx, guard: Guard, sink: Callable[[List[Day2Result]], None],
-                   shard_index: int = 0, clock: Callable[[], float] = time.monotonic) -> Stats:
+                   shard_index: int = 0, clock: Callable[[], float] = time.monotonic,
+                   wall: Callable[[], float] = time.time) -> Stats:
     """Runs one driver: `iterations` iterations, or a loop until `duration` seconds have passed, on `concurrency`
     workers. Rows go to `sink` as they complete; the returned Stats feed the summary row."""
     stats = Stats()
@@ -455,6 +461,9 @@ async def run_plan(plan: Plan, ctx: Ctx, guard: Guard, sink: Callable[[List[Day2
             stats.c5xx += 1 if any(s >= 500 for s in statuses) else 0
             stats.timeouts += 1 if timed_out else 0
             stats.lat.append(elapsed)
+            bucket = stats.timeline.setdefault(int(wall() // TIMELINE_BUCKET * TIMELINE_BUCKET), [0, 0])
+            bucket[0] += 1
+            bucket[1] += 0 if ok else 1
             guard.record(worst, timed_out)
             for r in rows:
                 r.id = f"s{shard_index}.i{i}/{r.id}"
@@ -481,8 +490,9 @@ def summary_row(driver: Driver, stats: Stats, guard: Guard, shard_index: int, sh
     human = (f"{mode}: n={stats.n} ok={stats.ok} err={stats.err} 429={stats.c429} 5xx={stats.c5xx} timeouts={stats.timeouts} "
              f"p50={percentile(lat, 50):.0f}ms p95={percentile(lat, 95):.0f}ms p99={percentile(lat, 99):.0f}ms"
              + (f" - BUDGET GUARD: {guard.reason}" if guard.tripped else ""))
+    timeline = [[b, v[0], v[1]] for b, v in sorted(stats.timeline.items())][-TIMELINE_CAP:]
     machine = json.dumps({"n": stats.n, "ok": stats.ok, "err": stats.err, "c429": stats.c429, "c5xx": stats.c5xx,
-                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason}, separators=(",", ":"))
+                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason, "tl": timeline}, separators=(",", ":"))
     passed = stats.n > 0 and stats.err == 0 and not guard.tripped
     return row(driver.id, SUMMARY_LAYER, f"summary:s{shard_index}of{shards}", "summary", passed, f"{human} | {machine}")
 
@@ -498,7 +508,11 @@ def merge_summaries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         except ValueError:
             continue
         m = merged.setdefault(r["agent"], {"driver": r["agent"], "n": 0, "ok": 0, "err": 0, "c429": 0, "c5xx": 0,
-                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0})
+                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0, "tl": {}})
+        for bucket, n, err in s.get("tl", []):
+            cell = m["tl"].setdefault(int(bucket), [0, 0])
+            cell[0] += int(n)
+            cell[1] += int(err)
         for key in ("n", "ok", "err", "c429", "c5xx", "timeouts"):
             m[key] += int(s.get(key, 0))
         m["lat"] += s.get("lat", [])
@@ -508,6 +522,7 @@ def merge_summaries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for m in merged.values():
         m["p50"], m["p95"], m["p99"] = (percentile(m["lat"], q) for q in (50, 95, 99))
         del m["lat"]
+        m["timeline"] = [[b, v[0], v[1]] for b, v in sorted(m.pop("tl").items())]
     return sorted(merged.values(), key=lambda m: m["driver"])
 
 
