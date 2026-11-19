@@ -674,7 +674,7 @@ rules:
 - apiGroups:
   - trustyai.opendatahub.io
   resources:
-  - nemoguardrailses
+  - nemoguardrails
   resourceNames:
   - zuno-guardrails
   verbs:

@@ -60,7 +60,8 @@ class Extraction(unittest.TestCase):
                                ("TokenRateLimitPolicy", "tokenratelimitpolicies"), ("QuayRegistry", "quayregistries"),
                                ("Gateway", "gateways"), ("OLSConfig", "olsconfigs"), ("IstioCNI", "istiocnis"),
                                ("ImageDigestMirrorSet", "imagedigestmirrorsets"), ("MaaSAuthPolicy", "maasauthpolicies"),
-                               ("Ingress", "ingresses"), ("Pod", "pods")):
+                               ("Ingress", "ingresses"), ("Pod", "pods"),
+                               ("NemoGuardrails", "nemoguardrails")):  # the CRD names its own plural
             self.assertEqual(ss.plural(kind), expected, kind)
 
     def test_split_api_version(self):
