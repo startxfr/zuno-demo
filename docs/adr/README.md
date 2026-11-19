@@ -404,6 +404,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0621](0621-run-litellm-as-an-alternative-ai-gateway.md) | Proposed | Run LiteLLM as an alternative AI gateway |
 | [ADR-0622](0622-run-agent-router-as-an-alternative-ai-gateway.md) | Proposed | Run Agent Router as an alternative AI gateway |
 | [ADR-0623](0623-run-bifrost-as-an-alternative-ai-gateway.md) | Proposed | Run Bifrost as an alternative AI gateway |
+| [ADR-0624](0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md) | Accepted | Drive the Day 3 stresstest from scenario drivers and named profiles |
 
 ## OKF v0.1
 
