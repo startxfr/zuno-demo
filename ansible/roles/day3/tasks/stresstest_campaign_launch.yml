@@ -119,10 +119,12 @@
           zuno.io/managed-by: zuno-ansible
       data: "{{ _stress_cm_data }}"
 
-- name: "stress | the Indexed Job of run {{ _stress_run_id }} ({{ _stress_shards }} shard(s))"
-  kubernetes.core.k8s:
-    state: present
-    definition:
+# The manifest is rendered as text and parsed with from_yaml, so its integers are integers in both Jinja modes: the AAP
+# execution environment renders `"{{ x | int }}"` in module arguments as a string (job 1469: "cannot unmarshal string
+# into JobSpec.spec.completions"), the local ansible-core as a number (which an EnvVar value refuses).
+- name: "stress | the Job manifest of run {{ _stress_run_id }}"
+  ansible.builtin.set_fact:
+    _stress_job_text: |
       apiVersion: batch/v1
       kind: Job
       metadata:
@@ -134,10 +136,10 @@
           zuno.io/stresstest-profile: "{{ stress_profile }}"
       spec:
         completionMode: Indexed
-        completions: "{{ _stress_shards | int }}"
-        parallelism: "{{ _stress_shards | int }}"
+        completions: {{ _stress_shards | int }}
+        parallelism: {{ _stress_shards | int }}
         backoffLimit: 0
-        activeDeadlineSeconds: "{{ _stress_deadline | int }}"
+        activeDeadlineSeconds: {{ _stress_deadline | int }}
         ttlSecondsAfterFinished: 86400
         template:
           metadata:
@@ -182,7 +184,7 @@
                   - name: STRESS_PROFILE
                     value: "{{ stress_profile }}"
                   - name: STRESS_OVERRIDES
-                    value: "{{ _stress_overrides | to_json }}"
+                    value: '{{ _stress_overrides | to_json }}'
                   - name: STRESS_RUN_ID
                     value: "{{ _stress_run_id }}"
                   - name: STRESS_SHARDS
@@ -216,6 +218,11 @@
               - name: stress-ca
                 configMap:
                   name: zuno-stress-ca
+
+- name: "stress | the Indexed Job of run {{ _stress_run_id }} ({{ _stress_shards }} shard(s))"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ _stress_job_text | from_yaml }}"
 
 - name: "stress | launched"
   ansible.builtin.set_fact:
