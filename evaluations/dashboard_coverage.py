@@ -15,7 +15,8 @@ This pack is the smallest addition that leaves at least one datapoint behind for
   guardrails    one injection prompt and one fake-PII prompt through the Dify token proxy (client dify)
   quota         one dedicated test persona burns the `stresstest` token budget until the ai-gateway answers 429
   models        one ai-gateway call per task alias (auto, zuno-code, zuno-wesh), the same prompt twice for the
-                semantic cache, and one call to the Praxis gateway when it is deployed
+                semantic cache, and one call to the Praxis gateway when it is deployed (from the Dify token proxy's
+                pod: Praxis admits experience-client namespaces only)
   coverage      Prometheus (thanos-querier) and Tempo are queried for every expected series or span and a table
                 PASS or MISSING per dashboard family is printed
 
@@ -31,8 +32,9 @@ Runs from a workstation where `oc` is logged in to the cluster (not from a contr
     python3 evaluations/dashboard_coverage.py --check-only --window 3h
 
 Environment, all optional: OC_CONTEXT, COVERAGE_QUOTA_PERSONA (the persona whose `stresstest` budget is burnt, default
-eval-ai-dev-01: never a real persona, and note that eval-consultant-01 and consultant-01 share one Keycloak subject,
-hence one budget), COVERAGE_SETTLE_SECONDS (wait before the check so the scrapes land, default 75), and the variables
+stress-board-01: a stress twin on its own per-user budget, never a real persona and never ai-dev-01; note that
+eval-consultant-01 and consultant-01 share one Keycloak subject, hence one budget), COVERAGE_PRAXIS_PERSONA (the
+persona of the Praxis call, default stress-consultant-01), COVERAGE_SETTLE_SECONDS (wait before the check so the scrapes land, default 75), and the variables
 read by evaluations/golden_path_probe.py.
 """
 from __future__ import annotations
@@ -108,6 +110,23 @@ for call in plan:
 print(json.dumps({"calls": out}))
 '''
 
+_PRAXIS_SNIPPET = r'''
+import json, sys, urllib.error, urllib.request
+token = sys.stdin.readline().strip()
+req = urllib.request.Request(
+    "http://praxis.zuno-ai-gateways.svc:8080/v1/chat/completions",
+    data=json.dumps({"model": "auto", "max_tokens": 16, "stream": False,
+                     "messages": [{"role": "user", "content": "Say OK."}]}).encode(),
+    headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
+try:
+    with urllib.request.urlopen(req, timeout=120) as r:
+        print(json.dumps({"status": r.status, "note": r.read(100).decode("utf-8", "replace")}))
+except urllib.error.HTTPError as e:
+    print(json.dumps({"status": e.code, "note": e.read(100).decode("utf-8", "replace")}))
+except Exception as e:
+    print(json.dumps({"status": 0, "note": str(e)[:100]}))
+'''
+
 _RAG_SNIPPET = r'''
 import json, os, sys, httpx
 key = os.environ.get("API_KEY", "")
@@ -149,7 +168,8 @@ print(json.dumps({"statuses": statuses, "first_429": first}))
 
 
 def _pod_json(namespace: str, deploy: str, container: str, snippet: str, stdin: str, timeout: float = 600) -> Dict:
-    out = gpp.oc("-n", namespace, "exec", "-i", f"deploy/{deploy}", "-c", container, "--", "python3", "-c", snippet,
+    pick = ["-c", container] if container else []
+    out = gpp.oc("-n", namespace, "exec", "-i", f"deploy/{deploy}", *pick, "--", "python3", "-c", snippet,
                  stdin=stdin, timeout=timeout)
     data = gpp.last_json_line(out.stdout)
     if not data:
@@ -327,7 +347,7 @@ def stage_guardrails(ctx: "gpp.Context") -> List[Row]:
 
 
 def stage_quota(ctx: "gpp.Context") -> List[Row]:
-    persona = os.getenv("COVERAGE_QUOTA_PERSONA", "eval-ai-dev-01")
+    persona = os.getenv("COVERAGE_QUOTA_PERSONA", "stress-board-01")
     try:
         secret = gpp.secret_value("zuno-auth", "zuno-stresstest-client-secret", "client_secret")
     except RuntimeError as exc:
@@ -361,15 +381,20 @@ def stage_models(ctx: "gpp.Context") -> List[Row]:
     if praxis.returncode != 0:
         rows.append(Row("models", "praxis alternative gateway", SKIPPED, "deploy/praxis not found in zuno-ai-gateways"))
     else:
-        # From the ai-gateway pod: Praxis verifies the Keycloak bearer itself (audience zuno-admin-api) and injects
-        # its own MaaS or SaaS credentials, so the persona token is accepted as is.
-        url = "http://praxis.zuno-ai-gateways.svc:8080/v1/chat/completions"
-        pr = _pod_json("zuno-ai-run", "ai-gateway", "ai-gateway", _MODEL_SNIPPET,
-                       json.dumps([{"label": "praxis", "url": url, "model": "auto", "prompt": same}]) + "\n"
-                       + ctx.gateway_token() + "\n")
-        c = (pr.get("calls") or [{"status": 0, "note": str(pr.get("error", ""))}])[0]
-        rows.append(Row("models", "praxis alternative gateway", OK if c["status"] == 200 else ATTEMPTED,
-                        f"HTTP {c['status']} {c['note'][:60]}"))
+        # Praxis sits next to the ai-gateway, not behind it (ADR-0619): its NetworkPolicy admits the namespaces
+        # labelled zuno.io/experience-client=true, the unifai multiagent pods and the zuno-agent-gateway pods, not
+        # zuno-ai-run. So the call leaves the Dify token proxy's pod (an experience client), with a stress persona's
+        # token on stdin (never a real persona, never ai-dev-01); Praxis verifies the Keycloak bearer itself.
+        persona = os.getenv("COVERAGE_PRAXIS_PERSONA", "stress-consultant-01")
+        try:
+            token = ctx.persona_token(persona)
+        except RuntimeError as exc:
+            rows.append(Row("models", "praxis alternative gateway", SKIPPED, str(exc)[:120]))
+            return rows
+        pr = _pod_json("zuno-dify", "zuno-token-proxy", "", _PRAXIS_SNIPPET, token + "\n")
+        status = pr.get("status", 0)
+        rows.append(Row("models", "praxis alternative gateway", OK if status == 200 else ATTEMPTED,
+                        f"HTTP {status} {str(pr.get('note') or pr.get('error') or '')[:60]} (from zuno-dify, as {persona})"))
     return rows
 
 

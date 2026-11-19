@@ -110,6 +110,57 @@ class Queries(unittest.TestCase):
         self.assertTrue(all("[3h]" in expr for _, _, expr, _ in d.coverage_queries("3h")))
 
 
+class PraxisCall(unittest.TestCase):
+    """Praxis admits experience-client namespaces only (ADR-0619): the call must not leave the ai-gateway pod."""
+
+    def run_models(self):
+        import subprocess
+        import golden_path_probe as g
+
+        calls = []
+
+        def fake_oc(*args, stdin=None, timeout=120):
+            calls.append({"args": args, "stdin": stdin})
+            out = '{"status": 200, "note": "ok", "calls": [{"label": "x", "status": 200, "note": "ok"}]}'
+            return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
+
+        class FakeCtx:
+            def gateway_token(self):
+                return "gw-token"
+
+            def persona_token(self, username):
+                self.persona = username
+                return "persona-token"
+
+        original = g.oc
+        g.oc = fake_oc
+        try:
+            ctx = FakeCtx()
+            rows = d.stage_models(ctx)
+        finally:
+            g.oc = original
+        return ctx, rows, calls
+
+    def test_praxis_is_called_from_the_dify_token_proxy_pod_with_a_stress_persona(self):
+        ctx, rows, calls = self.run_models()
+        praxis = [c for c in calls if "zuno-token-proxy" in " ".join(c["args"]) and "exec" in c["args"]]
+        self.assertEqual(len(praxis), 1)
+        self.assertIn("zuno-dify", praxis[0]["args"])
+        self.assertNotIn("-c", praxis[0]["args"][: praxis[0]["args"].index("--")])  # no container flag: python's own -c follows
+        self.assertEqual(praxis[0]["stdin"], "persona-token\n")
+        self.assertTrue(ctx.persona.startswith("stress-"), ctx.persona)
+        self.assertEqual([r.status for r in rows if "praxis" in r.check], [d.OK])
+
+    def test_no_secret_is_on_a_command_line_and_the_ai_gateway_pod_never_calls_praxis(self):
+        _, _, calls = self.run_models()
+        for c in calls:
+            self.assertNotIn("persona-token", " ".join(c["args"]))
+            self.assertNotIn("gw-token", " ".join(c["args"]))
+            if "deploy/ai-gateway" in c["args"]:
+                self.assertNotIn("praxis", " ".join(c["args"]))
+        self.assertNotIn("praxis.zuno-ai-gateways", d._MODEL_SNIPPET)
+
+
 class Output(unittest.TestCase):
     def test_render_counts_gaps_and_stays_informational(self):
         text = d.render([d.Row("tools", "denied", d.MISSING, "x"), d.Row("tools", "allowed", d.OK, "y")])
