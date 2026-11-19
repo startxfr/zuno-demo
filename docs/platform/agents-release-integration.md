@@ -83,6 +83,20 @@ Run these after the promotion pull request is merged. Each step needs the owner'
    - every `UnifaiAgentBundle` is `Ready` on its new digest;
    - the golden path passes (ADR-0605).
 
+### Lessons from the v1.1.1 and v1.1.2 rollouts (2026-11-18 and 2026-11-19)
+
+- **Give the mirror step a throwaway `DOCKER_CONFIG`.** Use it for both `oras login` and `make d3 admit agents`, for
+  example `DOCKER_CONFIG=$(mktemp -d)`. `offline_trust()` in `platform/supply-chain/admit_okf_bundle.py` points `HOME`
+  at an empty directory, so cosign does not see `~/.docker`; a login stored there is ignored. The fix in the code is
+  deferred.
+- **`make d2 install mcp` is required even for a prompt-only release.** The gateways fetch the corp bundle at pod
+  start (the `okf-fetch` init container), so a release that changes no code still needs the pods replaced. Confirmed on
+  v1.1.1: acceptance case D9 failed until the roll.
+- **Do not run `make d2 check agents` right after a stresstest.** On 2026-11-19 at 01:12Z, MaaS answered 429 on
+  gpt-oss and the gate fell to 15 of 19 with one security case failing. At 01:27Z, after the quota window reset, the
+  same gate passed 18 of 19. A 429 in the gate is the token limit, not the release: wait for the window, then rerun.
+  A SaaS failure shows differently, see [rotating a SaaS provider key](saas-provider-key-rotation.md).
+
 ## Roll back
 
 Revert the lock commit (and its generated files), then repeat the steps above. The previous release must still be in

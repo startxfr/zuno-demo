@@ -315,3 +315,6 @@ the leader's `database` container: `patronictl edit-config --force -p 'restore_c
 --repo=1 %f "%p"'`. PGO owns that parameter: the CRD refuses it in `spec.config.parameters`, it ignores it under
 `spec.patroni.dynamicConfiguration`, and it puts its own value back at its next reconcile, so there is nothing to revert.
 
+## When a SaaS model starts failing: rotating a provider key
+
+A 401 from Mistral or Anthropic on the ai-gateway's `model_call` spans, a retired model id (404) or a 429 each have their own action. The sequence for an expired key (Vault, ExternalSecrets, pod replacement for the ai-gateway and Praxis, checks) and the inventory of keys are in [Rotating a SaaS provider key](saas-provider-key-rotation.md).

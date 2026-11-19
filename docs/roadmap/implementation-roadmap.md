@@ -1223,7 +1223,7 @@ Blender and world-model.
 | WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: OpenClaw personas |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
 | WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: world-model web roll |
-| WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Not started | owner's go: one live play of each scenario |
+| WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Operator pending | the three pages exist; `claude-code-sovereign` rehearsed (5 min) with its GIF on 2026-11-19 (75b05ec9); left: `multi-gateway` and `agents-alt-gateway` not rehearsed, owner's go: one live play of each scenario |
 | WP-305 | [wp-305](work-packages/wp-305-build-the-stress-runner-core-and-profiles.md) | 0624 | none | Repo work in review | owner's go: the smoke run of WP-307 |
 | WP-307 | [wp-307](work-packages/wp-307-launch-the-stress-campaign-as-an-indexed-job.md) | 0624 | WP-305 | Repo work in review | owner's go: the smoke run through make and AAP; an aap-config roll |
 
