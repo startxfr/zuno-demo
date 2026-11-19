@@ -1,6 +1,6 @@
 # WP-299: Give UnifAI the alternative gateways
 
-- **State:** Operator pending (2026-11-19): the shared LLM `zuno-gateway-praxis` is live on demo333 (Ready, UnifAI reaches Praxis, Praxis enforces its token); left: one C1 chat through it with a signed-in user, in the UnifAI UI
+- **State:** Done (2026-11-19): a C1 chat through `zuno-gateway-praxis` answered for consultant-01, served on Praxis's `maas` step
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md)
@@ -46,3 +46,23 @@ UnifAI: the chart renders one shared UnifaiLLM `zuno-gateway-<name>` per entry (
   goes through the UnifAI UI.
 - **Rollback:** set `zuno_unifai_alt_gateways: []` and run `make d2 install unifai` (one more multiagent roll).
 
+## 2026-11-19: Done, the C1 chat
+
+The operator test was run by zuno-demo through the API, at the owner's choice, instead of in the UI. It uses the
+same UI route and the same Keycloak form sign-in as a browser, through `evaluations/common/unifai_target.py`.
+
+- **Workflow:** a throwaway blueprint in consultant-01's personal space, `wp299-praxis-c1-probe`. It has a question
+  node, one agent on `$ref:ec25af21…` (the rid of `zuno-gateway-praxis`), and a final answer. It was deleted after the
+  run, with its session.
+- **Question (C1):** "In two sentences: what is the difference between a Kubernetes Deployment and a StatefulSet?"
+- **Result:** HTTP 200 and a correct two-sentence answer, 234 s end to end.
+- **Praxis log:** two `/v1/chat/completions` calls. Both were admitted by the `per-user` token rate limit, and both
+  ended with `sub-request complete step="maas" status=200`.
+- **Tempo:** trace `b4d4069e1012b702deb1a9d201d8a1bf` (`mas.run.id` 325cb417…) is one trace for the whole path:
+  `unifai-multiagent-temporal-worker` (`chat auto`), then `praxis` (`token_rate_limit`,
+  `filtered_subrequest step=maas`), then `maas.openshift-ingress`, then `qwen36-27b-instruct-kserve`.
+- **Finding, not a blocker:** the first model call took 213 s and streamed 1 MB, likely a long reasoning phase of
+  qwen3.6 behind `auto`. UnifAI's LLM client gave up at 200 s: the worker's sidecar span ends with status 0. UnifAI
+  then retried, and the retry answered in 33 s. A workflow on this LLM can therefore take 3 to 4 minutes on a first
+  turn. Before Praxis is shown in UnifAI at the demo, check it again, or cap or disable qwen3.6's thinking on the
+  Praxis route.
