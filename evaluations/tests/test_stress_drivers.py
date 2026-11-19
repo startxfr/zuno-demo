@@ -430,7 +430,9 @@ class SaturationSampler(unittest.TestCase):
         with mock.patch.object(load, "_query", fake_query):
             values = asyncio.run(sr.REGISTRY["saturation"].run(ctx.for_worker(0), 0))
         self.assertEqual(set(values), {name for name, _, _ in load.SIGNALS})
-        self.assertEqual(set(calls), {("https://thanos:9091", "sa-token")})
+        # the Istio sidecar series are read from the mesh's own Prometheus, with no token; the others from Thanos
+        self.assertEqual(set(calls), {("https://thanos:9091", "sa-token"), (load.MESH_PROMETHEUS_URL, "")})
+        self.assertEqual(sum(1 for base, _ in calls if base == load.MESH_PROMETHEUS_URL), len(load.MESH_SIGNALS))
         self.assertEqual(len(calls), len(load.SIGNALS))
 
     def test_the_job_ships_the_scenarios_and_the_class_variable(self):

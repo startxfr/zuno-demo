@@ -168,6 +168,9 @@ SIGNALS = (
      'destination_workload=~"ai-gateway|mcp-gateway"}[1m])))', 10000.0),
     ("postgres backends", "sum(pg_stat_database_numbackends)", 160.0),
 )
+# The Istio series live in the mesh's own Prometheus (zuno-mesh, no auth; the Grafana datasource `mesh-prometheus`), not in Thanos.
+MESH_SIGNALS = {"p95 ai-gateway and mcp-gateway at the sidecar (ms)"}
+MESH_PROMETHEUS_URL = "http://mesh-monitoring-prometheus.zuno-mesh.svc.cluster.local:9090"
 SA_TOKEN = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 
@@ -182,9 +185,9 @@ def _thanos_token(env) -> str:
 
 async def _query(client, base: str, token: str, promql: str):
     """The value of an instant query (float), None when the series does not exist; raises on a refusal."""
-    r = await client.get(f"{base}/api/v1/query", params={"query": promql}, headers={"Authorization": f"Bearer {token}"})
+    r = await client.get(f"{base}/api/v1/query", params={"query": promql}, headers={"Authorization": f"Bearer {token}"} if token else {})
     if r.status_code in (401, 403):
-        raise PermissionError(f"status={r.status_code} Thanos refused the Job's token: grant its ServiceAccount cluster-monitoring-view")
+        raise PermissionError(f"status={r.status_code} {base} refused the Job's token: grant its ServiceAccount cluster-monitoring-view")
     r.raise_for_status()
     result = (r.json().get("data") or {}).get("result") or []
     if not result:
@@ -229,7 +232,7 @@ def _finish_saturation(ctx, samples):
 
 @register("saturation", family="saturation", sampler=True, interval=15, finish=_finish_saturation,
           description="a sampler: vLLM queue and KV-cache, gateway p95 at the sidecars and Postgres backends while the load runs",
-          needs=("Thanos querier", "cluster-monitoring-view for the Job's ServiceAccount"))
+          needs=("Thanos querier", "cluster-monitoring-view for the Job's ServiceAccount", "the mesh Prometheus (zuno-mesh) for the sidecar p95"))
 async def saturation(ctx, i):
     import httpx
 
@@ -238,6 +241,7 @@ async def saturation(ctx, i):
     values = {}
     # verify=False: the querier serves the cluster's service CA, as the Grafana datasource does (tlsSkipVerify, demo scope)
     async with httpx.AsyncClient(verify=False, timeout=30) as client:  # noqa: S501
+        mesh = (ctx.env.get("MESH_PROMETHEUS_URL") or MESH_PROMETHEUS_URL).rstrip("/")
         for name, promql, _limit in SIGNALS:
-            values[name] = await _query(client, base, token, promql)
+            values[name] = await (_query(client, mesh, "", promql) if name in MESH_SIGNALS else _query(client, base, token, promql))
     return values
