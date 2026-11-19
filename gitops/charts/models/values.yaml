@@ -1102,6 +1102,9 @@ maas:
   # Empty by default: a cluster that does not pass the generated file keeps
   # only the service-identity subscriptions below.
   agentSubscriptions: {}
+  # Emergency filter (2026-11-19 plan B, see templates/maas.yaml): keep only the subscriptions whose name ends with
+  # one of these suffixes. Empty = every subscription (the normal state).
+  subscriptionAllowList: []
   # Platform policy, not agent-derived: the tier every generated
   # subscription gets (the former /agent_tekos tier). The /sales business-
   # role subscriptions stay hand-written on each local model (WP-164).

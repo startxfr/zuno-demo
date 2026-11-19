@@ -278,6 +278,27 @@ Off by default (altGatewayPeers.stress.enabled).
 {{- end }}
 {{- end }}
 {{- end }}
+{{- /*
+2026-11-19, emergency PLAN B of the kserve/mlflow window (not applied unless the owner decides): keep only the
+subscriptions whose name ends with one of maas.subscriptionAllowList (e.g. [ai-gateway, praxis]), so the Kuadrant wasm
+config of maas-default-gateway fits etcd's 1.5 MiB request limit again (about 1.0 MB with two listeners). Every other
+subscription and its MaaSAuthPolicy subject disappears: Lightspeed, the ocp-* portal keys, the stress `-load` identity
+and the persona groups LOSE their MaaS access, not only their limit. Empty list (default) = no filter.
+*/}}
+{{- with $.Values.maas.subscriptionAllowList }}
+{{- $allow := . }}
+{{- $filtered := list }}
+{{- range $subs }}
+{{- $name := .name }}
+{{- $s := . }}
+{{- range $allow }}
+{{- if hasSuffix (printf "-%s" .) $name }}
+{{- $filtered = append $filtered $s }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $subs = $filtered }}
+{{- end }}
 {{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
 {{- $subs = list }}
 {{- range .subscriptions }}

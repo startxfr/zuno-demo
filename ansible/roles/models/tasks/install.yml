@@ -74,6 +74,8 @@
         agentSubscriptions: "{{ ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/models/values.agents.generated.yaml') | from_yaml).maas.agentSubscriptions) if (zuno_maas_persona_group_subscriptions | default(true) | bool) else {} }}"
         salesSubscriptions:
           enabled: "{{ zuno_maas_sales_subscriptions | default(true) | bool }}"
+        # 2026-11-19 plan B (emergency): see the chart's maas.subscriptionAllowList. Empty = every subscription.
+        subscriptionAllowList: "{{ zuno_maas_subscription_allowlist | default([]) }}"
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights
