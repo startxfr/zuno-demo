@@ -111,6 +111,11 @@ def register(id: str, family: str, description: str = "", needs: Iterable[str] =
     return wrap
 
 
+# A driver module that cannot be imported (a missing helper in the Job's file set, a typo) must not kill the run: the
+# modules that did import still run, and each failure becomes one failing row (main emits them): {module name: exception}.
+LOAD_FAILURES: Dict[str, str] = {}
+
+
 def load_drivers(directory: pathlib.Path) -> List[str]:
     """Import every driver_*.py of `directory` (each registers its drivers on import); returns the file names.
     Drivers import `from stress_runner import register`: when this file runs as a script it is the module
@@ -129,9 +134,22 @@ def load_drivers(directory: pathlib.Path) -> List[str]:
         spec = importlib.util.spec_from_file_location(path.stem, path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[path.stem] = module
-        spec.loader.exec_module(module)
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:  # noqa: BLE001 - one broken module must not stop the others
+            sys.modules.pop(path.stem, None)
+            LOAD_FAILURES[path.stem] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            print(f"[stress] cannot import {path.name}: {LOAD_FAILURES[path.stem]}", file=sys.stderr, flush=True)
+            continue
+        LOAD_FAILURES.pop(path.stem, None)
         loaded.append(path.name)
     return loaded
+
+
+def load_failure_rows() -> List[Day2Result]:
+    """One failing row per driver module that could not be imported (driver = the module name)."""
+    return [row(module, "stress", "driver-import", "guard", False, f"status=500 cannot import the driver module: {why}")
+            for module, why in sorted(LOAD_FAILURES.items())]
 
 
 def row(driver: str, layer: str, id: str, category: str, passed: bool, detail: str = "", ms: float = 0.0) -> Day2Result:
@@ -738,6 +756,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     personas = _as_list(overrides.get("personas")) or _as_list(profile.get("personas"))
     ctx = Ctx(personas=personas or None)
     print(f"[stress] run {ctx.run_id} profile {profile['name']} shard {index}/{shards}: {len(plans)} driver(s)", file=sys.stderr, flush=True)
+    if index == 0 and LOAD_FAILURES:  # reported once, not once per shard
+        _emit(load_failure_rows())
     asyncio.run(run_all(plans, ctx, profile, overrides, index, shards, float(os.environ.get("STRESS_FLUSH_SECONDS", "300"))))
     return 0
 
