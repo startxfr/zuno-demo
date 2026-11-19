@@ -1,6 +1,6 @@
 # WP-301: Give OpenClaw the alternative gateways
 
-- **State:** Not started
+- **State:** Repo work merged (2026-11-19): the chart renders one custom provider per entry in each Claw and a NetworkPolicy `alt-gateways-proxy-egress` per persona to zuno-ai-gateways:8080; the role default `zuno_openclaw_alt_gateways: []` is combined into the Application values only when not empty, and the role now loads the cluster variables first. The live steps wait for the owner's go
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
@@ -16,6 +16,10 @@ Each OpenClaw persona has a custom provider per alternative gateway next to `zun
 1. `gitops/charts/openclaw/templates/claw.yaml`: one more `credentials[]` entry (matched by domain) and one more `customProviders[]` entry per alternative gateway.
 2. A NetworkPolicy that lets the operator's proxy reach `zuno-ai-gateways:8080`. Check what the operator generates first (`docs/roadmap/evidence/wp-182-openclaw-spike.md`).
 3. Live, with the owner's go.
+
+## Repo work (2026-11-19)
+
+OpenClaw: the chart renders one custom provider per entry in each Claw and a NetworkPolicy `alt-gateways-proxy-egress` per persona to zuno-ai-gateways:8080; the role default `zuno_openclaw_alt_gateways: []` is combined into the Application values only when not empty, and the role now loads the cluster variables first. Proofs offline: `helm template` with `altGateways` empty is identical to the chart before the change (0 diff lines) and, with the Praxis entry `{name: praxis, label: Praxis, url: http://praxis.zuno-ai-gateways.svc:8080/v1, models: [auto]}`, adds only the objects above; the role's values expression renders without the key for an empty list and with `altGateways` only for a non-empty one (rendered through Ansible for both); `ansible-playbook --syntax-check` of `day2_install.yml`; `check_docs.py`. The demo333 entry in `ansible/clusters/demo333.yml` is NOT added: it comes at the live step.
 
 ## Acceptance
 
