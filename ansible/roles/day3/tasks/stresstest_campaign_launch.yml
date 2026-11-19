@@ -186,7 +186,8 @@
                   - name: STRESS_RUN_ID
                     value: "{{ _stress_run_id }}"
                   - name: STRESS_SHARDS
-                    value: "{{ _stress_shards | int }}"
+                    # An EnvVar value must be a string: `| int` rendered a JSON number and the API refused the Job.
+                    value: "{{ _stress_shards | int | string }}"
                   - name: KEYCLOAK_URL
                     value: "{{ zuno_keycloak_url }}"
                   - name: EVAL_CLIENT_ID
