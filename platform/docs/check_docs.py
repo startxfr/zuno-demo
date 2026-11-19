@@ -1752,6 +1752,50 @@ def check_adr_status_paths() -> List[Finding]:
     return out
 
 
+# --- The platform map (HLD) is copied into many pages: every copy must equal the reference ------------------------------------
+# docs/architecture/README.md holds the reference diagram; the architecture README and every demo scenario page carry a copy in which only
+# the highlight (`classDef focus` and `class <NODE> focus;`) differs. A platform change is edited once, in the reference, and the copies are
+# brought back by `python3 platform/docs/sync_hld.py`; this check fails on a copy that was not.
+HLD_REFERENCE = "docs/architecture/README.md"
+HLD_SIGNATURE = 'flowchart TB\n  subgraph EXP["Experiences: clients of one governed backend"]'
+HLD_FOCUS_LINE_RE = re.compile(r"^\s*(?:classDef focus\b.*|class\s+\S+\s+focus;)\s*$")
+MERMAID_BLOCK_RE = re.compile(r"```mermaid\n(.*?)```", re.S)
+
+
+def hld_without_focus(block: str) -> str:
+    """The diagram text without its highlight lines and trailing blank lines."""
+    return "\n".join(l for l in block.split("\n") if not HLD_FOCUS_LINE_RE.match(l)).rstrip()
+
+
+def hld_blocks(text: str) -> List[str]:
+    """The mermaid blocks of a page that are a copy of the platform map (they start with the map's signature)."""
+    return [b for b in MERMAID_BLOCK_RE.findall(text) if b.startswith(HLD_SIGNATURE)]
+
+
+def hld_copy_findings(pages: dict, reference_text: str) -> List[Finding]:
+    """`pages` maps a repository path to its text. A page whose copy differs from the reference is named with the fix."""
+    refs = hld_blocks(reference_text)
+    if len(refs) != 1:
+        return [Finding("hld_copies", f"{HLD_REFERENCE} must hold exactly one platform map (a mermaid block starting with "
+                                      f"'{HLD_SIGNATURE.splitlines()[1].strip()}'), found {len(refs)}")]
+    want = hld_without_focus(refs[0])
+    out = []
+    for path in sorted(pages):
+        if path == HLD_REFERENCE:
+            continue
+        for block in hld_blocks(pages[path]):
+            if hld_without_focus(block) != want:
+                out.append(Finding("hld_copies", f"{path}: the platform map differs from the reference in {HLD_REFERENCE}; "
+                                                 f"edit the reference, then run python3 platform/docs/sync_hld.py"))
+    return out
+
+
+def check_hld_copies() -> List[Finding]:
+    docs = REPO_ROOT / "docs"
+    pages = {str(p.relative_to(REPO_ROOT)): p.read_text() for p in docs.rglob("*.md")}
+    return hld_copy_findings(pages, (REPO_ROOT / HLD_REFERENCE).read_text())
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1774,6 +1818,7 @@ def main() -> int:
         + check_model_context_windows()
         + check_stress_table()
         + check_adr_status_paths()
+        + check_hld_copies()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
@@ -1789,7 +1834,7 @@ def main() -> int:
           "model architectural roles against provider-routing.yaml/"
           "model-routing-policy.yaml, relative links and #anchors in every "
           "tracked markdown file, and model context windows against "
-          "gitops/charts/models/values.yaml, the demo README's stress table against the demos and the stress drivers, and the paths cited by the Status line of every live ADR.")
+          "gitops/charts/models/values.yaml, the demo README's stress table against the demos and the stress drivers, the paths cited by the Status line of every live ADR, and the copies of the platform map against the reference.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0
