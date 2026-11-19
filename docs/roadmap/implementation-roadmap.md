@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 50 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
+| v0.17 | 14 | 11 | 50 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1216,7 +1216,7 @@ Blender and world-model.
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
 | WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
-| WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Repo work merged | live: token-proxy rebuild and roll, kagent (owner's go 2026-11-19) |
+| WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Done | none |
 | WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Done | none |
 | WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
 | WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
@@ -1378,6 +1378,7 @@ moving.
 
 ## Change log
 
+- 2026-11-19 — WP-297 Done: kagent gets Praxis as a second gateway. Its token proxy's `/alt/praxis` route serves a new agent, `zuno-diagnose-praxis`, which answered a live diagnose question on Praxis's MaaS step. The default kagent and Dify paths are unchanged (golden-path probes PASS).
 - 2026-11-19 — WP-298 Done: Claude Code runs on the sovereign models through Praxis. The coding task passed live on 2026-11-18, the owner's take is published as the claude-code-sovereign GIF (75b05ec9), and step 4, the `claude-code` experience-client declaration, was already shipped in every agents release since v1.1.0 (zuno-demo-agents PR #62).
 - 2026-11-18 — WP-292 Done: Praxis runs on demo333 with every acceptance item met. The last open item, the first call after an idle hour getting 503, is fixed by turning off Envoy's 1 h TCP idle timeout between Praxis and Redis on both sidecars (`12669efb`, `73c45b07`), and proven live: after 65 minutes without Redis traffic, both calls got 200. The fallback was re-proven live (`26b7b2ec`), and the SaaS route refuses tools and tool results (`3d5320f0`, [ADR-0619 update of 2026-11-18](../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
 - 2026-11-17 — ADR-0619 to ADR-0623 and WP-291 to WP-304 added (Phase 58, v0.17) by the owner's decisions of the day. Alternative AI gateways run next to the Zuno ai-gateway, which stays the default and unchanged: Praxis AI first, then LiteLLM, Agent Router and Bifrost, in one shared namespace `zuno-ai-gateways`. There is one work package per gateway and one per client, each client wired once through a generic `altGateways` list. The alternatives serve sovereign models plus Claude and Codestral with the existing Vault keys. Praxis is built by an OpenShift Pipelines pipeline from the fork or the upstream source and pushed to `quay.io/zuno/praxis-ai` (ADR-0620, which amends ADR-0056 for third-party source builds only). Claude Code becomes the band's second experience, signing in by Keycloak device flow. ADR-0619 amends ADR-0587 clause 1 by a dated note. Three scenarios are planned: multi-gateway, claude-code-sovereign and agents-alt-gateway.
