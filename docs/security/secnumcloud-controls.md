@@ -6,6 +6,12 @@ files each row cites, not this file. Status values: `enforced-in-ci`
 against a live deployment, not re-derivable from the repo alone),
 `gap` (not yet closed).
 
+> **Dated evidence (2026-11-19).** Rows whose evidence is dated before 2026-10-23 name components that WP-156 retired (`agent-runtime`, the
+> per-agent frontends and BFFs, `rag-service`). The date says when the control was shown on a live cluster; the control itself now applies to the
+> components that replaced them (UnifAI, the ai-gateway, the mcp-gateway, the a2a-gateway), and the checkers named in each row are the current
+> source. The availability evidence is read with [the SLO page](../platform/slo.md), which records that the measurement at the BFF boundary was
+> that of the earlier path. Evidence dated after 2026-10-23 is current as stated.
+
 ## Deployment
 
 | Control | Status | Mechanism |

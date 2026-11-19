@@ -7,33 +7,30 @@ real execution order lives in `ansible/playbooks/day{0,1,2,3}_*.yml`, which
 differs in places (Day 0 runs `argocd` first and also installs `image-mirrors`,
 which is not an addressable component).
 
-**Day 0** — cluster prerequisites (ADR-0056/ADR-0421): `admin-context`,
-`argocd`, `namespaces`, `openshift-rbac-groups`, `vault`, `cert-manager`,
-`external-secrets`, `machines`, `postgresql`, `keycloak`, `aap`, `aap-config`.
+**Day 0**: cluster prerequisites (ADR-0056/ADR-0421): `admin-context`, `argocd`, `namespaces`, `openshift-rbac-groups`, `vault`,
+`external-secrets`, `cert-manager`, `machines`, `postgresql`, `keycloak`, `aap`, `aap-config`, `world-model-gpu`.
 Verbs: `check`, `install`, `uninstall`, `reconcile`, `all`, `reinstall`.
 
-**Day 1** — the AI-platform-operator stack (ADR-0060/ADR-0421): `smtp`, `nfd`,
-`nvidia-gpu`, `custom-metrics-autoscaler`, `nfs-provisioner`, `redis`, `observability`,
-`service-mesh`, `mesh-monitoring`, `kiali`, `grafana`, `mariadb`, `tempo`,
-`openshift-oauth`, `connectivity-link`, `lws`, `jobset`, `kueue`,
-`openshift-ai`, `lightspeed`, `rhtas`, `aiagent-operator`. Buildable:
-`ai-gateway`, `supply-chain-signer`, `aiagent-operator`,
-`aap-execution-environment`. Verbs: `check`, `install`, `build`, `uninstall`,
-`reconcile`, `all`, `reinstall`.
+**Day 1**: the AI-platform-operator stack (ADR-0060/ADR-0421): `smtp`, `nfd`, `nvidia-gpu`, `custom-metrics-autoscaler`, `nfs-provisioner`,
+`redis`, `observability`, `service-mesh`, `mesh-monitoring`, `kiali`, `grafana`, `perses`, `mariadb`, `tempo`, `openshift-oauth`,
+`connectivity-link`, `lws`, `jobset`, `kueue`, `openshift-ai`, `lightspeed`, `rhtas`, `rhtas-config`, `openshift-pipelines`. Buildable:
+`ai-gateway`, `supply-chain-signer`, `aap-execution-environment`. Verbs: `check`, `install`, `build`, `uninstall`, `reconcile`, `all`,
+`reinstall`.
 
-**Day 2** — AI infrastructure and agents (ADR-0060; the RAG and its ingestion are
-UnifAI's since ADR-0568): `namespaces`, `llm`, `models`, `mcp`, `agents`, `mlops`,
-`trustyai-config`, `mlflow`, `lightspeed-config`, `unifai`, `open-webui`,
-`openclaw`, `dify`, `kagent` (both stubs until WP-204/WP-207), `supply-chain`
-(check-only — it has no install path). Buildable: `mcp`, `mlops`,
-`trustyai-eval`, `token-proxy`. Verbs: `check`, `install`, `build`,
-`uninstall`, `all`, `reinstall`, and `reconcile` for `models` only.
+**Day 2**: AI infrastructure, agents and experiences (ADR-0060; the RAG and its ingestion are UnifAI's since ADR-0568): `namespaces`, `llm`,
+`models`, `quay-registry`, `mcp`, `agents`, `mlops`, `trustyai-config`, `mlflow`, `lightspeed-config`, `unifai`, `open-webui`, `openclaw`,
+`dify`, `kagent`, `world-model`, `praxis`, and `supply-chain` (check-only, it has no install path). Buildable: `mcp`, `mlops`,
+`trustyai-eval`, `token-proxy`, `dify-knowledge`, `world-model`, `praxis`. Verbs: `check`, `install`, `build`, `uninstall`, `all`,
+`reinstall`, and `reconcile` for `models` only.
 
-**Day 3** — operations (ADR-0057/ADR-0058): `test` and `sign` take `agents`
-(`test` also `platform`), `backup`/`restore` take `postgresql`, and
-`lightspeed`, `lightspeed-config`, `trustyai-config`, `mlflow` are check-only.
-Verbs: `test`, `stresstest`, `backup`, `restore`, `check`, `sign`,
-`scenario-failover-node`.
+**Day 3**: operations (ADR-0057/ADR-0058, ADR-0624): `test` takes `agents` and `platform`; `backup` and `restore` take `postgresql`, `unifai`
+and `quay-registry`; `check` also takes the check-only components `lightspeed`, `lightspeed-config`, `trustyai-config`, `mlflow`, `operators`,
+`drift` and `recovery`; `admit` takes `agents`; `run` takes `mlops`; `release` takes `supply-chain`. Verbs: `test`, `stresstest`,
+`stresstest-collect`, `backup`, `restore`, `check`, `admit`, `run`, `release`, `scenario-failover-node`
+([stresstest runbook](stresstest.md)).
+
+These lists were copied from the Makefile on 2026-11-19 (`DAY0_COMPONENTS` to `DAY3_*`); `make help` prints the current ones and is the
+reference when they differ.
 
 `make dN <verb> [component]` applies one or all components in controlled order;
 `uninstall` walks each list in reverse. `make help` prints the current lists and

@@ -1,45 +1,39 @@
-# RAG Data Flow: Training/Ingestion Workflow
+# RAG Data Flow
 
-Source -> acquire -> normalize -> classify -> chunk -> embed locally when required -> index -> retrieve -> authorize/filter -> rank -> cite -> answer.
+From a source to a cited answer, as it runs today in the UnifAI stack ([ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)).
+The earlier KFP `rag-ingestion` pipeline (fetch, detect changes, normalize, chunk, embed, write to pgvector) was retired with it; its diagram and
+the history of its decisions ([ADR-0330](../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md), [ADR-0519](../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md),
+[ADR-0046](../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md)) are in the ADRs, which are marked Superseded.
 
-This page expands that one-line flow into the full RAG corpus training/ingestion pipeline, from a source change to the AI Gateway consuming the refreshed index.
+```mermaid
+flowchart LR
+    UP["Upload<br/>Personal workspace"] --> DOC[docling-serve<br/>file to text]
+    SRC["Shared sources<br/>Confluence page trees, Git"] --> CEL[rag-celery<br/>sync and ingest]
+    DOC --> CEL
+    CEL --> CH["Chunk, then embed<br/>qwen3-embedding-0.6b via KServe"]
+    CH --> Q[("Qdrant<br/>one collection per domain")]
+    USER["Persona token"] --> RAGS[unifai-rag-server]
+    RAGS -->|"hybrid search<br/>fail-closed acl_groups filter"| Q
+    RAGS --> MAS["Agent workflow<br/>cited answer"]
+```
 
-![Full RAG training workflow in Zuno / OpenShift AI](../assets/img/Workflow-trainingRAG.png)
+1. **Sources.** A person uploads files in the Personal workspace (private to them); shared sources are page trees synced from Confluence or
+   repositories, readable by the groups listed on each source. The platform-wide domains and which agents may read them are in the signed
+   agents release.
+2. **Ingestion.** docling converts a file to text, the rag-celery worker chunks it, and the embeddings are computed by
+   `qwen3-embedding-0.6b` on OpenShift AI. The chunks are written to Qdrant, one collection per knowledge domain.
+3. **Retrieval.** The agent workflow calls `unifai-rag-server` with the user's token; hybrid search runs with a fail-closed `acl_groups` filter taken
+   from the caller's groups, so a person finds only their own uploads and the sources their groups allow.
+4. **Answer.** The model call goes through the ai-gateway; the answer cites the sources it used ([agent request workflow](../agents/request-workflow.md)).
+5. **Observability.** Each turn carries a run id and one trace in Tempo; UnifAI's incremental sync exposes no lag metric
+   ([SLO](../platform/slo.md)).
 
-The diagram shows the platform's **target end-to-end shape**. The sections below say which parts run in production today and which are conceptual/future extensions of the same pipeline.
+## Evaluation
 
-## 1. Sources and triggers — live today
+Evaluation of the RAG corpora runs through TrustyAI and EvalHub ([ADR-0534](../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md),
+[evaluation scenario](../demo/scenarios/rhoai/evaluation-trustyai-evalhub.md)). The blue/green corpus promotion of the earlier target design was
+never built and is not part of the UnifAI RAG.
 
-Documentary sources: Red Hat product documentation and persona-scoped Confluence spaces ([ADR-0330](../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)). Triggers: a scheduled KFP recurring run (cron); a manual pipeline run is also possible. Per-source configuration (collections, chunking, access-control tagging, embedding model) lives in `gitops/charts/rag-ingestion/values.yaml`.
+## Related
 
-## 2. RAG ingestion pipeline — live today, with real optimizations
-
-`components/rag-ingestion/src/rag_ingestion.py` runs as an OpenShift AI Pipelines (KFP) job with one stage per pipeline step: fetch → detect-changes (sha256 manifest diff) → normalize (HTML cleanup) → chunk (tiktoken token-aware splitting) → embed → index-pgvector → validate. State round-trips through S3 between stages since each runs in its own pod.
-
-- [ADR-0330](../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) (Implemented) — the pipeline itself, the dedicated `rag-tech` PostgreSQL database, the `embeddings` InferenceService (BAAI/bge-small-en-v1.5, 384-dim, vLLM/KServe), and Confluence ACL tagging (`document_embeddings.metadata.acl_groups`) enforced at query time by [ADR-0046](../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md).
-- [ADR-0519](../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) (Implemented) — the concrete concurrency mechanism behind the diagram's "parallel ingestion": `ThreadPoolExecutor` fetch concurrency plus conditional-GET (`ETag`/`If-None-Match`) for Red Hat docs, and a checksum short-circuit plus parallel S3 writes for the SXA MariaDB dump. Live-verified 2026-08-25: the SXA fetch stage went from 127+ minutes (incomplete) to 35m27s.
-
-**What the diagram adds beyond current code:** Kueue-admitted `JobSet`/`LeaderWorkerSet` workers distributing embedding generation across multiple GPU nodes. Today's pipeline parallelizes I/O (fetch/write) with thread pools inside single-pod KFP stages — it does not yet distribute embedding computation itself across a Kueue-managed multi-worker job. Kueue/`TrainJob` distributed compute is live elsewhere in the platform for LoRA fine-tuning ([ADR-0538](../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md), [ADR-0539](../adr/0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md), both Implemented) but has not been applied to RAG embedding generation.
-
-## 3. Validation, indexing and promotion — partially live
-
-- Ingestion writes and updates `document_embeddings` directly (index build/update, chunk metadata) — live.
-- A normalized documentary metadata store (source/version/processing history tracking) — live, as ingestion manifest state in S3 plus `document_embeddings` metadata columns.
-- RAG quality evaluation (retrieval recall/precision@k, groundedness) exists as a platform capability via TrustyAI/LMEval ([ADR-0534](../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md), Implemented) rather than as an automated gate wired into this specific ingestion pipeline run.
-- **Not yet implemented:** an optional human-in-the-loop approval step, and a blue/green "active corpus alias" promotion model (`corpus_version`, atomic switch, rollback on failure). Today's pipeline writes directly into the live table; there is no alias indirection or staged rollback in `rag-ingestion`'s current code.
-
-## 4. Runtime consumption by the AI Gateway / agents — live today
-
-Same shared pipeline as [Agent Request Workflow](../agents/request-workflow.md): Keycloak issues the OIDC token, the Gateway API/Authorino/Limitador enforce identity and quota, and the AI Gateway's Retriever queries pgvector filtered by agent/project/C1-C3 classification and by the caller's `acl_groups` intersection ([ADR-0046](../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md)) before the Prompt Builder merges results into the model call.
-
-## Tracing and observability
-
-OpenTelemetry traces/logs/metrics correlate a run end to end via `request_id`/`trace_id`/`pipeline_run_id`/`corpus_version`, covering ingestion (chunk counts, embedding cost, retries) and runtime retrieval (latency per stage, tokens consumed). Example backends: Grafana, Tempo, Loki, Prometheus.
-
-## Related ADRs
-
-- [ADR-0330](../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) — RAG ingestion pipeline as a Day 1 component (Implemented)
-- [ADR-0519](../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) — parallelized/short-circuited fetch stages (Implemented)
-- [ADR-0046](../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md) — metadata-aware, ACL-filtered retrieval (Implemented)
-- [ADR-0204](../adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) — multi-domain RAG platform
-- [ADR-0538](../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) / [ADR-0539](../adr/0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) — Kueue/TrainJob distributed compute (Implemented for LoRA training, not yet applied to RAG embedding generation)
+[Vector data model](vector-data-model.md), [data architecture](../architecture/data-architecture.md), [live RAG scenario](../demo/unifai-live-rag.md).
