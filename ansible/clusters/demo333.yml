@@ -556,6 +556,15 @@ zuno_dify_alt_gateways:
 # user's token. Only the local alias: UnifAI's agents carry tools, which Praxis refuses on its SaaS models.
 zuno_unifai_alt_gateways:
   - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
+# WP-301 (owner's go 2026-11-19): each OpenClaw persona gets a custom provider `praxis` next to `zuno`, through its
+# claw proxy with the persona's own client token. Only the local alias: OpenClaw carries the Zuno MCP tools, which
+# Praxis refuses on its SaaS models.
+zuno_openclaw_alt_gateways:
+  - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
+# WP-303 (owner's choice 2026-11-19): world-model's prompt enhancement may name Praxis, with the user's own token. Inert
+# while zuno_world_model_enabled is false: it takes effect, and is proven live, the next time world-model is switched on.
+zuno_world_model_alt_gateways:
+  - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

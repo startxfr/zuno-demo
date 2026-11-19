@@ -289,3 +289,21 @@ the same leg passed on earlier days. Nothing in v1.1.1 touches it.
 The check now adds to its failure detail the URLs the answer cited, the leg's tool calls and the answer's length
 (`evaluations/tekos/run_scenarios.py`). The next failure will then say whether the retriever's sources or the
 model's citation were missing.
+
+## 2026-11-19: agents v1.1.5 on demo333
+
+v1.1.5 carries Tekos 1.0.3 (the paragraph on building a comparison from passages that each describe one side) and
+Arkos 1.0.4 (text only). zuno-demo-cluster rolled it. Its `make d2 check agents` passed 18/19 after the MaaS quota reset
+(#11 still flaky). The first run had failed on MaaS 429, because a stress campaign drained the shared gpt-oss-20b
+budget.
+
+- **Tekos alone**, with the exact first query Arkos sent on 11-18 (Route vs Ingress), 3 runs: 2 full answers (a
+  Route/Ingress table, about 3,300 characters, 11 to 13 s) and 1 non-answer. On 11-18 it was 0 answers out of 4. Two of
+  the three runs show no retriever call, so one of the two answers is not grounded in the corpus.
+- **Scenario 21**, 4 runs: 3 PASS.
+  - `send_message` to Tekos per session: 2, 1, 0 and 1, where every session had 2 on 11-18.
+  - `delegate_task` calls: 2, 2 (one of them failed), 0 and 1.
+- **The FAIL** (session 03d786b9…, trace 33f3ed4d…): Arkos's orchestrator model, gpt-oss-20b, emitted the tool name
+  `iem_delegate_task<|channel|>commentary`, three times. A Harmony control token leaked into the name, so no tool
+  matched and nothing was delegated. The same shape very likely explains session 38021eeb of 11-18. unifai-main fixed
+  it in the fork (c3925ef1d, `restore_tool_names` cuts the name at the first `<|`), for the 0.1.73 canary.

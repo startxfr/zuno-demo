@@ -1,6 +1,6 @@
 # WP-303: Give world-model the alternative gateways
 
-- **State:** Repo work merged (2026-11-19): the web tier reads ALT_GATEWAYS and PROMPT_GATEWAY and sends the prompt enhancement through the gateway a request names; the role default `zuno_world_model_alt_gateways: []` is combined into the Application values only when not empty. The live steps wait for the owner's go
+- **State:** Operator pending (2026-11-19): the Praxis entry is committed and the web image rebuilt; the live proof waits for the next switch-on of world-model (owner's choice)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0604](../../adr/0604-introduce-an-interactive-generative-world-model-experience.md)
@@ -26,3 +26,19 @@ world-model: the web tier reads ALT_GATEWAYS and PROMPT_GATEWAY and sends the pr
 - With `altGateways` empty, the rendered chart is identical to before (`helm template` diff), and the client's existing golden-path probe passes.
 - With the Praxis entry, the alternative connection is listed in the client and answers a C1 question; a trace of the call is in Tempo under the Praxis service.
 - `zuno-demo-reorg` is told before the client rolls, so its offline walkthrough suite is re-run for this client.
+
+## 2026-11-19: prepared on demo333, proof at the next switch-on (owner's choice)
+
+world-model is off on demo333 (`zuno_world_model_enabled: false`). Switching it on means an on-demand g7e GPU node. The
+owner chose not to switch it on for this test alone.
+- **Entry:** `zuno_world_model_alt_gateways` with the Praxis entry (`models: [auto]`) is in `ansible/clusters/demo333.yml`
+  (29aeeba5). It renders nothing while world-model is off.
+- **Image:** the web image, built alone (`make d2 build world-model` with `world_model_build_target=web`, CPU only),
+  is build `world-model-web-6`, from commit 29aeeba5, which contains 01d98512. Before it, the newest web image dated
+  from 2026-11-09. The GPU runtime image was not rebuilt.
+- **Left for Done, at the next switch-on (for example the demo rehearsal):**
+  - one prompt enhancement with `gateway: praxis` by a signed-in user;
+  - a 200 on Praxis's `maas` step in its log, and the trace in Tempo;
+  - the `world-model` golden-path probe still passes on the default road.
+  The web tier sends the user's own world-model token to Praxis. Praxis requires the audience `zuno-admin-api`, so
+  check that the token carries it at that time.
