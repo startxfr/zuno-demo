@@ -13,6 +13,7 @@ import pathlib
 import sys
 import time
 import unittest
+from unittest import mock
 
 import httpx
 import yaml
@@ -258,6 +259,86 @@ class BudgetGuard(unittest.TestCase):
         self.assertIn(("after", "token-budget"), ids)
         self.assertTrue(any(r.layer == sr.SUMMARY_LAYER and r.agent == "l" and not r.passed for r in rows))
         self.assertTrue(emitted)
+
+
+class Samplers(unittest.TestCase):
+    """WP-309: a sampler is a measurement beside the load, reported once at the end."""
+
+    def sampler(self, finish=None, run=None, interval=0.03):
+        async def sample(ctx, i):
+            return {"n": i}
+
+        return sr.Driver(id="sat", family="saturation", run=run or sample, sampler=True, interval=interval,
+                         finish=finish if finish is not None else (lambda ctx, samples: [sr.row("sat", "saturation", "count", "saturation", True, f"samples={len(samples)}")]))
+
+    def slow_load(self, seconds=0.25):
+        async def run(ctx, i):
+            await asyncio.sleep(seconds)
+            return [sr.row("load", "f", "x", "c", True, "status=200")]
+
+        return fake("load", fn=run)
+
+    def run_all(self, plans, shard=0, shards=1):
+        emitted = []
+        rows = asyncio.run(sr.run_all(plans, sr.Ctx(env={}), {"name": "t"}, {}, shard, shards, emit=emitted.append))
+        return rows, emitted
+
+    def test_the_sampler_runs_beside_the_load_and_reports_once(self):
+        rows, _ = self.run_all([plan_of(self.sampler()), plan_of(self.slow_load(), iterations=1)])
+        count = next(r for r in rows if r.id.endswith("count"))
+        n = int(count.detail.split("=")[1])
+        self.assertTrue(4 <= n <= 14, n)  # one at once, one every 30 ms for 250 ms, one at the end
+        self.assertEqual([r.agent for r in rows if r.layer == sr.SUMMARY_LAYER], ["load"])  # no load summary for a sampler
+
+    def test_a_run_of_only_a_sampler_still_samples_twice(self):
+        rows, _ = self.run_all([plan_of(self.sampler())])
+        self.assertGreaterEqual(int(rows[0].detail.split("=")[1]), 2)
+
+    def test_only_shard_zero_samples(self):
+        rows, _ = self.run_all([plan_of(self.sampler()), plan_of(self.slow_load(0.05), iterations=1)], shard=1, shards=2)
+        self.assertFalse([r for r in rows if r.agent == "sat"])
+
+    def test_a_failing_sample_is_kept_as_a_sample_not_a_crash(self):
+        seen = {}
+
+        def finish(ctx, samples):
+            seen["errors"] = [s for s in samples if isinstance(s, Exception)]
+            return [sr.row("sat", "saturation", "count", "saturation", False, f"errors={len(seen['errors'])}")]
+
+        async def boom(ctx, i):
+            raise ValueError("thanos down")
+
+        rows, _ = self.run_all([plan_of(self.sampler(finish=finish, run=boom))])
+        self.assertTrue(seen["errors"] and "thanos down" in str(seen["errors"][0]))
+        self.assertFalse(rows[0].passed)
+
+    def test_a_sampler_without_finish_or_with_a_broken_one_is_a_failing_row(self):
+        rows, _ = self.run_all([plan_of(sr.Driver(id="sat", family="saturation", run=lambda ctx, i: {}, sampler=True, interval=0.02))])
+        self.assertIn("finish", rows[0].detail)
+        def bad(ctx, samples):
+            raise RuntimeError("kaput")
+        rows, _ = self.run_all([plan_of(self.sampler(finish=bad))])
+        self.assertIn("RuntimeError: kaput", rows[0].detail)
+
+    def test_a_sync_sampler_works(self):
+        rows, _ = self.run_all([plan_of(self.sampler(run=lambda ctx, i: {"n": i}))])
+        self.assertTrue(rows[0].passed)
+
+    def test_a_profile_may_name_the_persona_pool(self):
+        seen = {}
+
+        async def fake_run_all(plans, ctx, *a, **k):
+            seen["personas"] = ctx.personas
+            return []
+
+        with mock.patch.object(sr, "run_all", fake_run_all):
+            sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
+            self.assertEqual(seen["personas"], [f"stress-load-{n:02d}" for n in range(1, 9)])
+            with mock.patch.dict("os.environ", {"STRESS_OVERRIDES": '{"personas": ["p9"]}'}):
+                sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
+            self.assertEqual(seen["personas"], ["p9"])
+            sr.main(["--dir", str(STRESS_DIR), "--profile", "smoke"])
+            self.assertEqual(seen["personas"], ["stress-consultant-01"])
 
 
 class Summaries(unittest.TestCase):

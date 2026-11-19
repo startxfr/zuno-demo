@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 46 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-313 |
+| v0.17 | 14 | 11 | 47 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1228,6 +1228,7 @@ Blender and world-model.
 | WP-306 | [wp-306](work-packages/wp-306-give-the-stress-runs-their-own-identity-and-budget.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: a zuno-demo-agents release defining `loadtest`, the gateway image rolls, the stress subscriptions and the persona pool |
 | WP-307 | [wp-307](work-packages/wp-307-launch-the-stress-campaign-as-an-indexed-job.md) | 0624 | WP-305 | Repo work in review | owner's go: the smoke run through make and AAP; an aap-config roll |
 | WP-308 | [wp-308](work-packages/wp-308-replay-the-demo-scenarios-as-stress-drivers.md) | 0624 | WP-305, WP-306, WP-307 | Repo work in review | owner's go: the zuno-ai-run egress to open-webui, ai-gateway and praxis, the token-proxy stressClients switch, the workstation entries |
+| WP-309 | [wp-309](work-packages/wp-309-push-the-platform-with-concurrent-load-and-read-its-saturation.md) | 0624 | WP-305, WP-306, WP-307, WP-308 | Repo work in review | owner's go: `cluster-monitoring-view` for the acceptance-gate ServiceAccount, the persona pool, a first aggressive run |
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
 
 ### OKF stream phases

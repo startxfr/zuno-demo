@@ -29,6 +29,7 @@ import stress_runner as sr  # noqa: E402
 sr.load_drivers(STRESS_DIR)
 
 import driver_experiences as exp  # noqa: E402
+import driver_load as load  # noqa: E402
 import driver_network as net  # noqa: E402
 import driver_unifai as uni  # noqa: E402
 
@@ -261,6 +262,181 @@ class ExperienceDrivers(unittest.TestCase):
         rows = self.proxy("kagent", lambda r: httpx.Response(403, text="denied"))
         self.assertFalse(rows[0].passed)
         self.assertEqual(sr.row_status(rows[0]), 403)
+
+
+class LoadDrivers(unittest.TestCase):
+    def setUp(self):
+        load._CORPUS.clear()
+
+    def test_the_corpus_is_the_message_bearing_scenarios_of_the_active_agents(self):
+        corpus = load.scenario_corpus({})
+        agents = {agent for agent, _ in corpus}
+        self.assertEqual(agents, {"tekos", "arkos", "comage"})
+        self.assertTrue(all(message.strip() for _, message in corpus))
+        self.assertGreater(len(corpus), 10)
+        placeholder = load.scenario_corpus({"STRESS_LOAD_AGENTS": "naveo"})
+        self.assertTrue(placeholder and {a for a, _ in placeholder} == {"naveo"})
+
+    def test_the_corpus_is_read_flat_in_the_job(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pathlib.Path(tmp, "tekos-scenarios.yaml").write_text("scenarios:\n  - {id: 1, message: 'hello'}\n  - {id: 2, title: no message}\n")
+            self.assertEqual(load.scenario_corpus({"STRESS_DIR": tmp, "STRESS_LOAD_AGENTS": "tekos"}), [("tekos", "hello")])
+
+    def test_pick_is_round_robin_and_offset_by_the_worker(self):
+        corpus = [("a", "1"), ("a", "2"), ("b", "3")]
+        self.assertEqual([load.pick(corpus, i)[1] for i in range(4)], ["1", "2", "3", "1"])
+        self.assertNotEqual(load.pick(corpus, 0, 0), load.pick(corpus, 0, 1))
+        self.assertIsNone(load.pick([], 0))
+
+    def test_load_unifai_scenarios_replays_a_scenario_as_the_workers_persona(self):
+        seen = {}
+
+        def turn(ctx, persona, agent, message):
+            seen.update(persona=persona, agent=agent, message=message)
+            return run_of(reply="answer")
+
+        with mock.patch.object(load, "_agent_turn", side_effect=turn):
+            rows = one("load-unifai-scenarios", ctx_with(lambda r: httpx.Response(500)))
+        self.assertTrue(rows[0].passed, rows[0].detail)
+        self.assertEqual(seen["persona"], "stress-load-01")
+        self.assertIn(seen["agent"], {"tekos", "arkos", "comage"})
+        self.assertIn(f"agent={seen['agent']}", rows[0].detail)
+        with mock.patch.object(load, "_agent_turn", return_value=run_of(status=599, reply="")):
+            self.assertEqual(sr.row_status(one("load-unifai-scenarios", ctx_with(lambda r: httpx.Response(500)))[0]), 599)
+
+    def test_load_unifai_scenarios_says_so_when_there_is_no_corpus(self):
+        rows = one("load-unifai-scenarios", ctx_with(lambda r: httpx.Response(500), {"STRESS_LOAD_AGENTS": "nobody"}))
+        self.assertFalse(rows[0].passed)
+        self.assertIn("no message-bearing scenario", rows[0].detail)
+
+    def gateway(self, handler, env=None):
+        return ctx_with(handler, env)
+
+    def test_load_ai_gateway_varies_the_prompt_asks_the_configured_class_and_counts_tokens(self):
+        seen = []
+
+        def handler(request):
+            seen.append((request.headers.get("x-zuno-quota-class"), request.content.decode()))
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}], "usage": {"total_tokens": 30}})
+
+        ctx = self.gateway(handler)
+        for i in range(3):
+            self.assertTrue(one("load-ai-gateway", ctx, i)[0].passed)
+        self.assertEqual({cls for cls, _ in seen}, {"stresstest"})  # the default: the small class
+        self.assertEqual(len({body for _, body in seen}), 3)
+        self.assertEqual(ctx.tokens_used, 90)
+        seen.clear()
+        one("load-ai-gateway", self.gateway(handler, {"STRESS_QUOTA_CLASS": "loadtest"}))
+        self.assertEqual(seen[0][0], "loadtest")
+        seen.clear()
+        one("load-ai-gateway", self.gateway(handler, {"STRESS_QUOTA_CLASS": ""}))
+        self.assertIsNone(seen[0][0])  # empty: no header, the persona's group decides
+
+    def test_load_ai_gateway_reports_a_429_with_its_status(self):
+        rows = one("load-ai-gateway", self.gateway(lambda r: httpx.Response(429, text="quota")))
+        self.assertFalse(rows[0].passed)
+        self.assertEqual(sr.row_status(rows[0]), 429)
+
+    def test_load_mcp_gateway_varies_the_query(self):
+        queries = []
+
+        def handler(request):
+            queries.append(request.content.decode())
+            return httpx.Response(200, json={"mcp_server": "confluence", "result": {"results": [{"id": 1}]}})
+
+        ctx = self.gateway(handler)
+        rows = [one("load-mcp-gateway", ctx, i)[0] for i in range(3)]
+        self.assertTrue(all(r.passed for r in rows), [r.detail for r in rows])
+        self.assertEqual(len(set(queries)), 3)
+        self.assertFalse(one("load-mcp-gateway", self.gateway(lambda r: httpx.Response(403, text="no")))[0].passed)
+
+    def test_the_load_drivers_stay_out_of_the_functional_profiles(self):
+        for name in ("smoke", "standard", "soak"):
+            families = {p.driver.family for p in sr.build_plan(sr.load_profile(name, STRESS_DIR), {}, sr.REGISTRY)[0]}
+            self.assertNotIn("load", families, name)
+        plans = sr.build_plan(sr.load_profile("aggressive", STRESS_DIR), {}, sr.REGISTRY, 0, 2)[0]
+        ids = {p.driver.id for p in plans}
+        self.assertTrue({"load-unifai-scenarios", "load-ai-gateway", "load-mcp-gateway", "saturation"} <= ids)
+        by_id = {p.driver.id: p for p in plans}
+        self.assertEqual(by_id["load-ai-gateway"].iterations * 2, 400)
+        self.assertLessEqual(by_id["load-unifai-scenarios"].concurrency * 2, 4)  # a UnifAI turn is a whole agent run
+
+
+class SaturationSampler(unittest.TestCase):
+    def test_it_is_a_sampler_of_its_own_family(self):
+        d = sr.REGISTRY["saturation"]
+        self.assertTrue(d.sampler and d.finish is not None)
+        self.assertEqual((d.family, d.interval), ("saturation", 15.0))
+        for profile in ("standard", "aggressive", "soak"):
+            plans = sr.build_plan(sr.load_profile(profile, STRESS_DIR), {}, sr.REGISTRY)[0]
+            self.assertIn("saturation", [p.driver.id for p in plans], profile)
+
+    def test_every_signal_names_a_series_the_dashboards_plot(self):
+        dashboards = "".join(p.read_text() for p in (REPO / "gitops/charts/grafana/templates").glob("dashboard-*.yaml"))
+        for name, promql, limit in load.SIGNALS:
+            metric = next(m for m in ("vllm:num_requests_waiting", "vllm:num_requests_running", "vllm:kv_cache_usage_perc",
+                                      "istio_request_duration_milliseconds_bucket", "pg_stat_database_numbackends") if m in promql)
+            self.assertIn(metric.split("_numbackends")[0] if "numbackends" in metric else metric, dashboards, f"{name}: no dashboard plots {metric}")
+
+    def test_summarise_flags_a_crossed_limit_and_ignores_errors(self):
+        samples = [{"vllm requests waiting": 1.0, "vllm kv-cache usage": 0.5}, RuntimeError("x"),
+                   {"vllm requests waiting": 6.0, "vllm kv-cache usage": 0.6}, {"vllm requests waiting": None}]
+        got = {name: (top, mean, count, saturated) for name, top, mean, count, _limit, saturated in load.summarise_signals(samples)}
+        self.assertEqual(got["vllm requests waiting"], (6.0, 3.5, 2, True))
+        self.assertEqual(got["vllm kv-cache usage"][3], False)
+        self.assertEqual(got["postgres backends"], (None, None, 0, False))
+
+    def test_the_report_rows(self):
+        rows = load._finish_saturation(None, [{"vllm requests waiting": 8.0, "vllm kv-cache usage": 0.4}])
+        by_id = {r.id: r for r in rows}
+        self.assertFalse(by_id["vllm requests waiting"].passed)
+        self.assertIn("SATURATED (limit 4)", by_id["vllm requests waiting"].detail)
+        self.assertTrue(by_id["vllm kv-cache usage"].passed)
+        self.assertIn("no series", by_id["postgres backends"].detail)
+
+    def test_a_refusal_is_one_failing_row_that_says_what_to_grant(self):
+        rows = load._finish_saturation(None, [PermissionError("status=403 Thanos refused the Job's token: grant its ServiceAccount cluster-monitoring-view")] * 3)
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(rows[0].passed)
+        self.assertIn("cluster-monitoring-view", rows[0].detail)
+
+    def query(self, handler):
+        async def go():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                return await load._query(client, "https://thanos", "tok", "up")
+
+        return asyncio.run(go())
+
+    def test_query(self):
+        ok = lambda r: httpx.Response(200, json={"data": {"result": [{"value": [0, "0.93"]}]}})
+        self.assertEqual(self.query(ok), 0.93)
+        self.assertIsNone(self.query(lambda r: httpx.Response(200, json={"data": {"result": []}})))
+        self.assertIsNone(self.query(lambda r: httpx.Response(200, json={"data": {"result": [{"value": [0, "NaN"]}]}})))
+        with self.assertRaises(PermissionError):
+            self.query(lambda r: httpx.Response(403))
+        with self.assertRaises(httpx.HTTPStatusError):
+            self.query(lambda r: httpx.Response(500))
+
+    def test_the_sampler_queries_every_signal_with_the_job_token(self):
+        calls = []
+
+        async def fake_query(client, base, token, promql):
+            calls.append((base, token))
+            return 1.0
+
+        ctx = ctx_with(lambda r: httpx.Response(500), {"THANOS_URL": "https://thanos:9091/", "THANOS_TOKEN": "sa-token"})
+        with mock.patch.object(load, "_query", fake_query):
+            values = asyncio.run(sr.REGISTRY["saturation"].run(ctx.for_worker(0), 0))
+        self.assertEqual(set(values), {name for name, _, _ in load.SIGNALS})
+        self.assertEqual(set(calls), {("https://thanos:9091", "sa-token")})
+        self.assertEqual(len(calls), len(load.SIGNALS))
+
+    def test_the_job_ships_the_scenarios_and_the_class_variable(self):
+        launch = (REPO / "ansible/roles/day3/tasks/stresstest_campaign_launch.yml").read_text()
+        self.assertIn("-scenarios.yaml", launch)
+        self.assertIn("name: STRESS_QUOTA_CLASS", launch)
 
 
 class NetworkDrivers(unittest.TestCase):

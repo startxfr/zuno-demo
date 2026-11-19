@@ -84,6 +84,15 @@
     patterns: ["driver_*.py", "profile_*.yaml"]
   register: _stress_found
 
+# WP-309: the scenarios the load drivers replay, as <agent>-scenarios.yaml (46 KB for the six agents).
+- name: "stress | find the scenario files"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/evaluations"
+    patterns: ["scenarios.yaml"]
+    recurse: true
+    depth: 2
+  register: _stress_scenarios
+
 - name: "stress | the file set of the scripts ConfigMap"
   ansible.builtin.set_fact:
     _stress_files: >-
@@ -94,7 +103,9 @@
            'unifai_target.py': zuno_repo_root + '/evaluations/common/unifai_target.py',
            'device_login.py': zuno_repo_root + '/evaluations/blender/device_login.py',
            'requirements.txt': zuno_repo_root + '/evaluations/tekos/requirements.txt'
-         } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path')))) }}
+         } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path'))))
+           | combine(dict(_stress_scenarios.files | map(attribute='path') | map('dirname') | map('basename') | map('regex_replace', '$', '-scenarios.yaml')
+                          | zip(_stress_scenarios.files | map(attribute='path')))) }}
 
 - name: "stress | read the files"
   ansible.builtin.set_fact:
@@ -214,6 +225,10 @@
                     value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
                   - name: UNIFAI_VERIFY_TLS
                     value: "1"
+                  # WP-309: the quota class the load drivers ask for (honoured only for the zuno-stresstest client). `stresstest`
+                  # is the small fail-closed one; `loadtest` once the policy of WP-306 defines it.
+                  - name: STRESS_QUOTA_CLASS
+                    value: "{{ stress_quota_class | default('stresstest') }}"
                   - name: STRESS_PERSONAS
                     value: "{{ stress_personas | default('stress-consultant-01') }}"
                 volumeMounts:

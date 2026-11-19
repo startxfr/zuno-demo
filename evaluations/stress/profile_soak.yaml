@@ -2,7 +2,7 @@
 # read later with `make d3 stresstest-collect RUN=<id>`. First values, tuned after the first runs.
 name: soak
 description: 2 requests a minute per driver for 4 hours, async
-families: [tools, models]
+families: [tools, models, saturation]
 defaults:
   duration: 14400
   rate: 0.033

@@ -2,7 +2,7 @@
 # First values, to be tuned after the first runs (WP-309 adds the load drivers and the duration phase).
 name: standard
 description: agents family + every driver x3, concurrency 2, under 45 minutes
-families: [agents, tools, models, unifai, guardrails, experiences]
+families: [agents, tools, models, unifai, guardrails, experiences, saturation]
 defaults:
   iterations: 3
   concurrency: 2

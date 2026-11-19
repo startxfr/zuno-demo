@@ -13,6 +13,11 @@ for a number of iterations or for a duration, at a concurrency and an optional r
 Informational only (ADR-0058): the runner exits 0 whatever the rows say; a failing driver is a row, never a crash.
 Exit 2 is a runner error (unknown profile, bad overrides).
 
+A *sampler* driver (`register(..., sampler=True, finish=...)`, WP-309) is a measurement, not a load: it is called every
+`interval` seconds, beside the other drivers, from the start of the run to its end (shard 0 only), and its `finish(ctx,
+samples)` turns what it collected into the final rows (the saturation signals of a load run: queue depth, cache
+pressure, p95, connections). Its samples are not rows; a sampler error is one failing row.
+
 A *budget guard* protects the shared model budgets: a driver stops after `max_consecutive_failures` consecutive
 429/5xx answers (or timeouts), after `max_429` rejected calls in all, and the whole run stops once the drivers have
 reported `max_tokens` tokens through `ctx.add_tokens()`. A tripped guard is a failing row that says so.
@@ -84,16 +89,22 @@ class Driver:
     description: str = ""
     needs: Tuple[str, ...] = ()  # what must be deployed for it to mean anything, shown by --list
     mutating: bool = False       # changes cluster state: skipped unless the profile sets allow_mutating
+    sampler: bool = False        # a measurement taken every `interval` seconds beside the load (WP-309), not a load
+    interval: float = 15.0       # seconds between two samples of a sampler
+    finish: Optional[Callable[..., Any]] = None  # (ctx, samples) -> rows, once, when the run ends (a sampler's report)
 
 
 REGISTRY: Dict[str, Driver] = {}
 
 
-def register(id: str, family: str, description: str = "", needs: Iterable[str] = (), mutating: bool = False):
-    """Decorator for a driver function `run(ctx, i) -> List[Day2Result]` (sync or async)."""
+def register(id: str, family: str, description: str = "", needs: Iterable[str] = (), mutating: bool = False,
+             sampler: bool = False, interval: float = 15.0, finish: Optional[Callable[..., Any]] = None):
+    """Decorator for a driver function `run(ctx, i) -> List[Day2Result]` (sync or async). For a sampler, `run` returns
+    the sample (any value) and `finish(ctx, samples)` the rows."""
 
     def wrap(fn: Callable[..., Any]) -> Callable[..., Any]:
-        REGISTRY[id] = Driver(id=id, family=family, run=fn, description=description, needs=tuple(needs), mutating=mutating)
+        REGISTRY[id] = Driver(id=id, family=family, run=fn, description=description, needs=tuple(needs), mutating=mutating,
+                              sampler=sampler, interval=float(interval), finish=finish)
         return fn
 
     return wrap
@@ -242,7 +253,7 @@ class Ctx:
         self.ai_gateway = self.env.get("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.mcp_gateway = self.env.get("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.keycloak = self.env.get("KEYCLOAK_URL", "").rstrip("/")
-        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]
+        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]  # a profile's pool is passed in
         self._client = client
         self._tokens: Dict[str, Tuple[str, float]] = {}
         self.tokens_used = 0
@@ -511,6 +522,43 @@ def _emit(rows: List[Day2Result]) -> None:
         print(json.dumps([asdict(r) for r in rows], separators=(",", ":")), flush=True)
 
 
+async def _sample_loop(driver: Driver, ctx: Ctx, stop: "asyncio.Event") -> List[Any]:
+    """Call a sampler at once, then every `interval` seconds, until the run ends; one last sample is taken at the end.
+    Returns the samples; an exception raised by a sample is kept as the sample (the report says so)."""
+    wctx = ctx.for_worker(0)
+    samples: List[Any] = []
+
+    async def take() -> None:
+        try:
+            if asyncio.iscoroutinefunction(driver.run):
+                samples.append(await driver.run(wctx, len(samples)))
+            else:
+                samples.append(await asyncio.get_running_loop().run_in_executor(None, driver.run, wctx, len(samples)))
+        except Exception as exc:  # noqa: BLE001
+            samples.append(exc)
+
+    await take()
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(driver.interval, 0.01))
+        except asyncio.TimeoutError:
+            await take()
+    await take()
+    return samples
+
+
+async def _finish_sampler(driver: Driver, ctx: Ctx, samples: List[Any]) -> List[Day2Result]:
+    if driver.finish is None:
+        return [row(driver.id, "stress", "sampler", "sampler", False, "a sampler needs a finish(ctx, samples) function")]
+    try:
+        rows = driver.finish(ctx, samples)
+        if asyncio.iscoroutine(rows):
+            rows = await rows
+        return list(rows or [])
+    except Exception as exc:  # noqa: BLE001
+        return [row(driver.id, "stress", "sampler", "sampler", False, f"{type(exc).__name__}: {str(exc)[:200]}")]
+
+
 async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], overrides: Dict[str, Any],
                   shard_index: int, shards: int, flush_seconds: float = 300.0,
                   emit: Callable[[List[Day2Result]], None] = _emit) -> List[Day2Result]:
@@ -519,6 +567,10 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
     out: List[Day2Result] = []
     pending: List[Day2Result] = []
     last_flush = [time.monotonic()]
+    samplers = [p for p in plans if p.driver.sampler] if shard_index == 0 else []  # one sampler per run, not per shard
+    plans = [p for p in plans if not p.driver.sampler]
+    stop = asyncio.Event()
+    sampling = {p.driver.id: ([], asyncio.ensure_future(_sample_loop(p.driver, ctx, stop))) for p in samplers}
 
     def sink(rows: List[Day2Result]) -> None:
         out.extend(rows)
@@ -550,6 +602,17 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
         emit(list(pending))
         pending.clear()
         last_flush[0] = time.monotonic()
+    stop.set()
+    for plan in samplers:
+        samples, task = sampling[plan.driver.id]
+        try:
+            samples.extend(await asyncio.wait_for(task, timeout=max(plan.timeout, 30)))
+        except Exception as exc:  # noqa: BLE001 - a stuck sampler is a row, the load rows are already out
+            task.cancel()
+            samples.append(exc)
+        sink(await _finish_sampler(plan.driver, ctx, samples))
+        emit(list(pending))
+        pending.clear()
     if ctx._client is not None and hasattr(ctx._client, "aclose"):
         await ctx._client.aclose()
     return out
@@ -604,7 +667,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                   f"duration={p.duration:g} rate={p.rate:g} ramp={p.ramp:g} timeout={p.timeout:g}")
         print(f"profile={profile['name']} shard={index}/{shards} drivers={len(plans)}")
         return 0
-    personas = _as_list(overrides.get("personas"))
+    personas = _as_list(overrides.get("personas")) or _as_list(profile.get("personas"))
     ctx = Ctx(personas=personas or None)
     print(f"[stress] run {ctx.run_id} profile {profile['name']} shard {index}/{shards}: {len(plans)} driver(s)", file=sys.stderr, flush=True)
     asyncio.run(run_all(plans, ctx, profile, overrides, index, shards, float(os.environ.get("STRESS_FLUSH_SECONDS", "300"))))
