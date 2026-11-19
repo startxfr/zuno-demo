@@ -176,15 +176,15 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | ai-gateway-routing | `ai-gateway-routing`, `ai-gateway-routing-state` | replayed (one `zuno-code` call, routing decision read back) |
 | ai-gateway-sovereignty | `ai-gateway-sovereignty`, `ai-gateway-sovereignty-state` | replayed (Arkos kept local at C3, Tekos control call) |
 | guardrails | `guardrails`, `guardrails-state` | replayed (the DAN prompt, its span read in Tempo) |
-| identity-personas | `identity-personas-state` | state only |
+| identity-personas | `identity-personas`, `identity-personas-state` | replayed in part: the stress persona's Keycloak token, with its issuer, client, expiry and number of groups read (the signature is checked by the gateways, not here) |
 | mcp-tools-by-group | `mcp-tools-by-group`, `mcp-tools-by-group-state`, `load-mcp-gateway` | replayed (`search_confluence` through the REST path; the load driver varies the queries) |
-| multi-gateway | `multi-gateway-state` | state only; pending Phase 58 (clients of the alternative gateways, WP-297 to WP-303) |
+| multi-gateway | `multi-gateway`, `multi-gateway-state` | replayed in part: one short question through the ai-gateway and one through Praxis (device sign-in of the public client `claude-code`), one row each; the state check stays pending Phase 58 for the kagent agent on Praxis (WP-297 to WP-303) |
 | quotas | `quotas`, `quotas-state` | state check in the profiles; the `quotas` driver is mutating (it spends a stress persona's budget until a 429) and is in no profile |
 | evaluation-trustyai-evalhub | `evaluation-trustyai-evalhub-state` | state only |
 | external-models | `external-models-state` | state only |
 | genai-playground | `genai-playground-state` | state only |
 | lora-pipeline-mlflow-kueue | `lora-pipeline-mlflow-kueue-state` | state only |
-| maas-portal-api-keys | `maas-portal-api-keys-state` | state only |
+| maas-portal-api-keys | `maas-portal-api-keys`, `maas-portal-api-keys-state` | replayed in part: the MaaS entry must refuse a `/v1/models` call without an API key (the 2:15 step); needs egress to the MaaS route |
 | model-catalog-registry | `model-catalog-registry-state` | state only (demo333 has no ModelRegistry instance) |
 | model-serving-llmd-mig | `model-serving-llmd-mig-state` | state only; the model path itself is loaded by `load-ai-gateway` and watched by the `saturation` sampler |
 | five-experiences, three-experiences | the drivers of the experience scenarios they list | composition: no driver of their own |
