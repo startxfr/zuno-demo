@@ -433,11 +433,16 @@ spotWorkers:
 infraPlacement:
   registry: true   # P2 step 1, 2026-11-13
   userWorkloadMonitoring: true   # WP-260 P2 step 4, 2026-11-13
-  # Storage + retention of the user-workload Prometheus (2026-11-19). Without it
-  # the TSDB is an emptyDir with 24h retention: every restart wipes the metrics.
-  # size empty = unchanged behaviour. storageClassName empty = cluster default.
-  userWorkloadMonitoringStorage:
-    size: 20Gi
-    retention: 7d
-    storageClassName: ""
   gitops: true   # WP-260 P2 step 5, 2026-11-13
+
+# Storage + retention of the user-workload Prometheus (2026-11-19), used by the
+# userWorkloadMonitoring singleton above. Without it the TSDB is an emptyDir
+# with 24h retention: every restart wipes the metrics. size empty = unchanged
+# behaviour. storageClassName empty = cluster default. Kept OUT of
+# infraPlacement: every key there is a singleton switch that other Applications
+# must turn off (platform/gitops/tests/test_world_model_gpu_singletons.py, the
+# world_model_gpu role's guard), and a settings map is not a switch.
+userWorkloadMonitoringStorage:
+  size: 20Gi
+  retention: 7d
+  storageClassName: ""

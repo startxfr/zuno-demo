@@ -39,7 +39,7 @@ metadata:
     zuno.io/managed-by: argocd
 data:
   config.yaml: |
-    {{- $uwmStorage := .Values.infraPlacement.userWorkloadMonitoringStorage | default dict }}
+    {{- $uwmStorage := .Values.userWorkloadMonitoringStorage | default dict }}
     {{- range list "prometheusOperator" "prometheus" "thanosRuler" "alertmanager" }}
     {{ . }}:
       nodeSelector:
