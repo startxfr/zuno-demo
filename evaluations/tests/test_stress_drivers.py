@@ -31,6 +31,7 @@ sr.load_drivers(STRESS_DIR)
 import driver_experiences as exp  # noqa: E402
 import driver_load as load  # noqa: E402
 import driver_network as net  # noqa: E402
+import driver_demos as demos  # noqa: E402
 import driver_unifai as uni  # noqa: E402
 
 ENV = {"KEYCLOAK_URL": "https://kc", "DEMO_PERSONA_PASSWORD": "pw", "CLUSTER_BASE_DOMAIN": "apps.test"}
@@ -56,7 +57,8 @@ def run_of(status=200, reply="Hello from Tekos", session="sid-1", routing=None):
 
 class Registry(unittest.TestCase):
     NEW = ("unifai-agents", "observability-trace", "guardrails", "open-webui", "open-webui-zuno-code", "open-webui-zuno-wesh",
-           "dify", "kagent", "blender-3d", "claude-code-sovereign", "quotas")
+           "dify", "kagent", "blender-3d", "claude-code-sovereign", "quotas",
+           "maas-portal-api-keys", "identity-personas", "multi-gateway")
 
     def test_every_new_driver_is_registered_under_a_demo_id_with_a_family_and_needs(self):
         for driver_id in self.NEW:
@@ -78,7 +80,7 @@ class Registry(unittest.TestCase):
         for name in ("standard", "aggressive"):
             plans = sr.build_plan(sr.load_profile(name, STRESS_DIR), {}, sr.REGISTRY)[0]
             experiences = [p for p in plans if p.driver.family == "experiences"]
-            self.assertEqual(len(experiences), 7, name)
+            self.assertEqual(len(experiences), 10, name)
             for p in experiences:
                 self.assertEqual(p.concurrency, 1, (name, p.driver.id))
                 self.assertGreaterEqual(p.timeout, 240, (name, p.driver.id))
@@ -91,6 +93,59 @@ class Registry(unittest.TestCase):
         self.assertTrue((REPO / "evaluations/blender/device_login.py").is_file())
         for env in ("UNIFAI_URL", "UNIFAI_VERIFY_TLS", "CLUSTER_BASE_DOMAIN"):
             self.assertIn(f"name: {env}", launch)
+
+
+class DemoDrivers(unittest.TestCase):
+    """WP-310 batch 2: the three HTTP drivers of demos that had no probe."""
+
+    def setUp(self):
+        net._DEVICE_TOKENS.clear()
+
+    def jwt(self, claims):
+        import base64
+        import json as _j
+        body = base64.urlsafe_b64encode(_j.dumps(claims).encode()).decode().rstrip("=")
+        return f"h.{body}.s"
+
+    def test_the_maas_gate_must_refuse_a_call_without_a_key(self):
+        for status, passed in ((401, True), (403, True), (200, False), (500, False)):
+            rows = one("maas-portal-api-keys", ctx_with(lambda r, s=status: httpx.Response(s)))
+            self.assertEqual(rows[0].passed, passed, status)
+        seen = []
+        one("maas-portal-api-keys", ctx_with(lambda r: (seen.append(str(r.url)), httpx.Response(401))[1]))
+        self.assertEqual(seen, ["https://maas.apps.test/zuno-ai-run/gpt-oss-20b/v1/models"])
+
+    def test_the_identity_row_judges_the_token_the_persona_got(self):
+        import time as _t
+        now = _t.time()
+        good = {"preferred_username": "stress-load-01", "azp": "zuno-stresstest", "iss": "https://kc/realms/zuno", "exp": now + 100,
+                "groups": ["/a", "/b"]}
+        self.assertTrue(demos.judge_identity(good, "stress-load-01", "zuno-stresstest", now)[0])
+        self.assertIn("groups=2", demos.judge_identity(good, "stress-load-01", "zuno-stresstest", now)[1])
+        for field, value in (("preferred_username", "someone-else"), ("azp", "other"), ("iss", "https://kc/realms/master"), ("exp", now - 1)):
+            self.assertFalse(demos.judge_identity(dict(good, **{field: value}), "stress-load-01", "zuno-stresstest", now)[0], field)
+        self.assertFalse(demos.judge_identity({}, "p", "c", now)[0])
+        self.assertEqual(demos.token_claims("not-a-jwt"), {})
+        self.assertEqual(demos.token_claims(self.jwt({"a": 1})), {"a": 1})
+
+    def test_multi_gateway_gives_one_row_per_door(self):
+        def handler(request):
+            if request.url.path == "/v1/messages":
+                return httpx.Response(200, json={"content": [{"type": "text", "text": "OK"}], "usage": {"input_tokens": 3, "output_tokens": 1}})
+            return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}], "usage": {"total_tokens": 9}})
+        with mock.patch.object(net, "device_access_token", return_value="cc"):
+            rows = one("multi-gateway", ctx_with(handler))
+        self.assertEqual([(r.id, r.passed) for r in rows], [("zuno-ai-gateway", True), ("praxis", True)])
+
+    def test_one_door_down_fails_only_its_row(self):
+        def handler(request):
+            if request.url.path == "/v1/messages":
+                return httpx.Response(502, text="bad gateway")
+            return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
+        with mock.patch.object(net, "device_access_token", return_value="cc"):
+            rows = one("multi-gateway", ctx_with(handler))
+        self.assertEqual([r.passed for r in rows], [True, False])
+        self.assertEqual(sr.row_status(rows[1]), 502)
 
 
 class UnifaiDrivers(unittest.TestCase):

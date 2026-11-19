@@ -26,6 +26,9 @@ drivers:
   kagent: {timeout: 240, concurrency: 1, iterations: 5}
   blender-3d: {timeout: 240, concurrency: 1, iterations: 5}
   claude-code-sovereign: {timeout: 240, concurrency: 1, iterations: 5}
+  maas-portal-api-keys: {timeout: 240, concurrency: 1, iterations: 5}
+  identity-personas: {timeout: 240, concurrency: 1, iterations: 5}
+  multi-gateway: {timeout: 240, concurrency: 1, iterations: 5}
   unifai-agents: {timeout: 240, concurrency: 2, iterations: 10}
   observability-trace: {timeout: 240, concurrency: 2, iterations: 10}
 # One pass of each demo's state checks (the `state` drivers, read-only over the Kubernetes API): they need the stress reader role

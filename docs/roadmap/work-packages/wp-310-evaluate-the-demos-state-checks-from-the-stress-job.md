@@ -1,6 +1,6 @@
 # WP-310: Evaluate the demos' state checks from the stress Job, and the drivers that remain
 
-- **State:** Repo work in review (2026-11-19, batch 1 of 2: the state drivers and their read-only role; committed in the `wp306-coder` worktree on branch `wp312-coder`, not pushed). Batch 2, the new and the mutating drivers, is not started
+- **State:** Repo work in review (2026-11-19, batch 1 of 2: the state drivers and their read-only role; committed in the `wp306-coder` worktree on branch `wp312-coder`, not pushed). Batch 2: three HTTP drivers done offline, the rest decided or waiting (below)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-305](wp-305-build-the-stress-runner-core-and-profiles.md), [WP-307](wp-307-launch-the-stress-campaign-as-an-indexed-job.md)
 - **Related:** WP-308, WP-309, WP-312
@@ -29,6 +29,16 @@ Offline, done: `python3 evaluations/tests/test_stress_state.py` (27: the plural 
 
 Live, with the owner's go: `zuno_stress_reader_enabled: true` and `make d1 install namespaces` (announced), then `make d3 stresstest PROFILE=standard FAMILIES=state`. Every state row should match what `make demo check <id>` reports for the same demo; a row that differs is a bug of this port, not of the platform.
 
-## Batch 2 (not started)
+## Batch 2 (three drivers done offline, the rest decided)
 
-New drivers for the demos with no probe and no check list of their own to reuse: `maas-portal-api-keys`, `genai-playground`, `evaluation-trustyai-evalhub`, `identity-personas`, `multi-gateway` and `agents-alt-gateway` (Praxis only); and, as mutating drivers on a dedicated persona, `delegation-approval` and `unifai-live-rag` (they change a persona's state through UnifAI's approval and library APIs). A signed-image verification for `image-signing-admission` also belongs here: its state half is covered by batch 1, the proof that an unsigned image is refused needs an admission request the reader role must not make.
+Done (`evaluations/stress/driver_demos.py`, family `experiences`, throttled to one request at a time in `standard` and `aggressive`, 14 offline tests in `test_stress_drivers.py`):
+
+- `maas-portal-api-keys`: `GET https://maas.<domain>/zuno-ai-run/gpt-oss-20b/v1/models` WITHOUT a key must answer 401/403 (the demo's 2:15 step); a 200 is an open gate and fails. It needs the zuno-ai-run egress to `maas.<domain>`, which is not in the allow-list yet (`MAAS_URL` overrides the URL). It does not create or revoke a key: that is the portal's UI.
+- `identity-personas`: the stress persona's password-grant token read without signature check: `preferred_username`, `azp` (the stress client), the `zuno` realm issuer, expiry, and the number of groups (reported, not asserted: whether the stress personas carry groups is not known from the repository).
+- `multi-gateway`: one short question through the Zuno ai-gateway (persona token) and through Praxis (device sign-in of `claude-code`), one row per door, so a difference between the two shows. It spends the Praxis budget like `claude-code-sovereign`.
+
+Decided not to build, and why:
+
+- `genai-playground` and `evaluation-trustyai-evalhub`: their steps are web-UI moves (Playground, EvalHub profile pages) plus `oc get`, which batch 1 already covers; there is no HTTP contract a Job can replay without a browser. They stay with their state drivers.
+- `agents-alt-gateway`: waits for Phase 58 (kagent agent `zuno-diagnose-praxis`); its state driver already skips that object.
+- `delegation-approval` and `unifai-live-rag` (mutating, a dedicated persona, UnifAI's approval and library APIs) and the unsigned-image refusal (an admission request the read-only role must not make): not started. They each need the owner's go on the persona or the right, and a live look at the UnifAI APIs that I cannot take from here.
