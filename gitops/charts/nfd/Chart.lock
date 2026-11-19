@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-nfd
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.371
-digest: sha256:3d33f6fc85deb975f95b368d9e80d6eafc99cad6b321f986c1e5bd38ebbf7f14
-generated: "2026-11-19T01:42:45.164122497+01:00"
+  version: 21.3.377
+digest: sha256:82bcef8cca824ea076df8ba9318e2680306439d071d83e1cb0c22d6627937beb
+generated: "2026-11-19T14:22:21.699439082+01:00"
