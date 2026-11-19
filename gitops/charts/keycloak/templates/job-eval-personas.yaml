@@ -44,6 +44,12 @@ spec:
       containers:
         - name: kcadm
           image: {{ .Values.clientReconcile.image | quote }}
+          # Requests only (best-practices audit, lot 2, step 1): this hook Job had none, so the namespace LimitRange supplied both a
+          # request and a limit. The request is now explicit and small; the limit still comes from the LimitRange.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

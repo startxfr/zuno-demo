@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "gitops/charts/ai-gateway values",
+  "description": "Structure only, on purpose (best-practices audit, lot 2): a key that holds a map by default stays a map (or null), a key that holds a list stays a list (or null). Scalars are NOT typed: Ansible renders integers and booleans as text in the AAP execution environment, and a typed scalar would turn that into a failed render. Every other key is allowed (additionalProperties), so a subchart's own values and a new value never need a schema change first. Tighten key by key, never loosen.",
+  "type": "object",
+  "properties": {
+    "namespace": {},
+    "image": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "replicas": {},
+    "podDisruptionBudget": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "topologySpreadConstraints": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "resources": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "clusterBaseDomain": {},
+    "keycloakIssuer": {},
+    "keycloakJwksUrl": {},
+    "jwtAudience": {},
+    "jwtAudienceRequired": {},
+    "jwtAllowedClients": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "agentChain": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "localModelEndpoint": {},
+    "localModelName": {},
+    "providerRoutingConfigMap": {},
+    "providerSecrets": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "maasAdapter": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "quotaLedger": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "maxTokensDefault": {},
+    "modelRouting": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "classification": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "trustedPlatformClients": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "quotaStresstestGroup": {},
+    "quotaLoadtestGroup": {},
+    "experienceClients": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "workstationEntry": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "personaClaimClients": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "semanticCache": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "unifaiNamespace": {},
+    "availability": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "guardrails": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "meteredPaths": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "toolMarker": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "gitops/charts/namespaces values",
+  "description": "Structure only, on purpose (best-practices audit, lot 2): a key that holds a map by default stays a map (or null), a key that holds a list stays a list (or null). Scalars are NOT typed: Ansible renders integers and booleans as text in the AAP execution environment, and a typed scalar would turn that into a failed render. Every other key is allowed (additionalProperties), so a subchart's own values and a new value never need a schema change first. Tighten key by key, never loosen.",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "policy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "stressReader": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "stressImageProof": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "clusterBaseDomain": {},
+    "keycloakHost": {},
+    "redisExternal": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "mesh": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "platformNamespaces": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "openshiftAi": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": true
+}
