@@ -68,7 +68,9 @@ class Registry(unittest.TestCase):
             self.assertTrue(d.family and d.needs and d.description, driver_id)
 
     def test_only_quotas_changes_cluster_state_and_the_default_profiles_skip_it(self):
-        self.assertEqual([d.id for d in sr.REGISTRY.values() if d.mutating], ["quotas"])
+        # quotas (WP-308) and the three of WP-310 batch 2, which only the `mutating` profile (allow_mutating) runs
+        self.assertEqual(sorted(d.id for d in sr.REGISTRY.values() if d.mutating),
+                         ["delegation-approval", "image-signing-refusal", "quotas", "unifai-live-rag"])
         for name in ("smoke", "standard", "aggressive", "soak"):
             plans, warnings = sr.build_plan(sr.load_profile(name, STRESS_DIR), {}, sr.REGISTRY)
             self.assertNotIn("quotas", [p.driver.id for p in plans], name)

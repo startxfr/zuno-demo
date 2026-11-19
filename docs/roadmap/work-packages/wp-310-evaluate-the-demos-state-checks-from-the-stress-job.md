@@ -1,6 +1,6 @@
 # WP-310: Evaluate the demos' state checks from the stress Job, and the drivers that remain
 
-- **State:** Repo work in review (2026-11-19, batch 1 of 2: the state drivers and their read-only role; committed in the `wp306-coder` worktree on branch `wp312-coder`, not pushed). Batch 2: three HTTP drivers done offline, the rest decided or waiting (below)
+- **State:** Repo work in review (2026-11-19, batch 1 of 2: the state drivers and their read-only role; committed in the `wp306-coder` worktree on branch `wp312-coder`, not pushed). Batch 2: three HTTP drivers and the three mutating drivers (approved by the owner 2026-11-19) done offline, none run live (below)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-305](wp-305-build-the-stress-runner-core-and-profiles.md), [WP-307](wp-307-launch-the-stress-campaign-as-an-indexed-job.md)
 - **Related:** WP-308, WP-309, WP-312
@@ -41,4 +41,28 @@ Decided not to build, and why:
 
 - `genai-playground` and `evaluation-trustyai-evalhub`: their steps are web-UI moves (Playground, EvalHub profile pages) plus `oc get`, which batch 1 already covers; there is no HTTP contract a Job can replay without a browser. They stay with their state drivers.
 - `agents-alt-gateway`: waits for Phase 58 (kagent agent `zuno-diagnose-praxis`); its state driver already skips that object.
-- `delegation-approval` and `unifai-live-rag` (mutating, a dedicated persona, UnifAI's approval and library APIs) and the unsigned-image refusal (an admission request the read-only role must not make): not started. They each need the owner's go on the persona or the right, and a live look at the UnifAI APIs that I cannot take from here.
+- the three mutating drivers below were first held back, then approved by the owner (2026-11-19) with the conditions written there.
+
+## Batch 2b: the three mutating drivers (`evaluations/stress/driver_mutating.py`, family `mutating`)
+
+Owner's conditions (relayed by zuno-demo-assist, 2026-11-19): a dedicated persona, all three disabled by default, the image proof in a dedicated test namespace with its RBAC written down and behind its own switch (default off), every driver cleans up what it creates. The owner is shown the grants before anything is enabled.
+
+**Disabled by default, twice.** Each driver is registered `mutating` (the runner skips it unless the profile sets `allow_mutating`), and only the new profile `evaluations/stress/profile_mutating.yaml` sets it; no other profile has the family `mutating` or the key. The one deliberate way to run them is `make d3 stresstest PROFILE=mutating` (or `DRIVERS=<id> ` on a profile that allows it).
+
+**One persona, a constant.** `stress-mutate-01`, a new `evalPersonas` entry of the keycloak chart: `copyOf: consultant-01` (the persona both scenarios run as, so it holds exactly the groups they need, no `/zuno-loadtest`), joined to `/zuno-evaluation` like every evaluation persona. The drivers never read `ctx.persona` (a test fails if the source does). It is created by the eval-personas Job (create-only; deadline 1800 s since 1586ee86), so the keycloak chart must be rolled and the Job run before the first use. The copy is not narrower than consultant-01: narrowing it to the minimum set of groups needs a live look at which group each scenario really reads.
+
+| Driver | What it changes | Cleanup | Row |
+|---|---|---|---|
+| `delegation-approval` | one UnifAI session as `stress-mutate-01` asking Arkos to have Tekos launch a cluster audit (a delegated write); the pending approval is **rejected, never approved** (an approval would start a real AAP job) | the session is cancelled then deleted in a `finally`; the stale and a made-up request id must both answer 409 `approval_not_pending` | `reject-and-stale` |
+| `unifai-live-rag` | one small uniquely named document (`stress-rag-<run>-<i>-<hex>.md`) in the persona's Personal library, indexed until DONE | deleted by exact name in a `finally`, then listed to prove it is gone; indexing and cleanup are two rows so a leftover is never hidden by a pass | `upload-indexed`, `cleanup` |
+| `image-signing-refusal` | nothing: an unsigned, tag-referenced image offered as a **dry-run** pod create to the namespace `zuno-stress-admission` | none needed (dry run stores nothing) | `unsigned-refused` |
+
+**RBAC the image proof needs (written down first).** A pod create that the image-signing webhook must refuse needs one verb on one resource in one namespace, and nothing the read-only stress role may have:
+
+- namespace `zuno-stress-admission`, labelled `policy.rhtas.com/include=true` (the label the PolicyController's `namespaceSelector` requires, `gitops/charts/rhtas-config/templates/policycontroller.yaml`); nothing else is deployed in it;
+- `Role stress-image-proof` in that namespace: `pods` -> `create`; `RoleBinding` of it to the ServiceAccount `zuno-ai-run/zuno-stress-reader` (the identity of the campaign Job); no ClusterRole, no other verb, no other namespace;
+- rendered by `gitops/charts/namespaces/templates/stress-image-proof.yaml` only when `policy.enabled` and `stressReader.enabled` and `stressImageProof.enabled`; the switch is `zuno_stress_image_proof_enabled` (default false, `ansible/roles/namespaces/tasks/install_d1.yml`), so the default render is unchanged (diff of `helm template`: 0 lines).
+
+What the proof can and cannot say: the webhook refuses an image referenced by tag unconditionally ("must be referenced by digest", whatever the policy `mode`), so this row proves the webhook is wired to the namespace, not that a signature is verified: while the ClusterImagePolicy is in `warn` mode an unsigned image referenced BY DIGEST would be admitted with a warning, and this driver does not test that. The `unifai-live-rag` driver proves the upload-to-DONE path and the cleanup, not an answer from the document (that costs model tokens and a question the demo's page already covers).
+
+Offline, done: `python3 evaluations/tests/test_stress_mutating.py` (19: registration and the profile gate, the persona constant, the approval flow with a scripted UnifAI (reject only, stale probes, session cancelled and deleted with or without a request), the RAG cycle (delete after a failed indexing, one name end to end), the admission judge, the dry run sent only to the dedicated namespace, the grant rendered off by default and as one verb on pods when on), the other stress suites, `helm template` of the namespaces chart unchanged by default, `check_docs.py`. Not run live: nothing here has touched UnifAI, Keycloak or the cluster.

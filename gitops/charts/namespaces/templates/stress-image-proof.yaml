@@ -1,0 +1,52 @@
+{{- if and .Values.policy.enabled .Values.stressReader.enabled .Values.stressImageProof.enabled }}
+# ADR-0624 / WP-310 batch 2: what the stress driver `image-signing-refusal` needs and the read-only stress role must never have.
+# The driver offers an UNSIGNED, tag-referenced image to this namespace as a DRY-RUN pod create and expects the image-signing
+# admission webhook to refuse it (nothing is stored). That is one verb on one resource in ONE namespace:
+#
+#   Role stress-image-proof (namespace {{ .Values.stressImageProof.namespace }}): pods -> create
+#   bound to the ServiceAccount {{ .Values.stressReader.namespace }}/{{ .Values.stressReader.serviceAccount }} (the identity of the campaign Job)
+#
+# Nothing cluster-wide, no other verb, no other namespace. The namespace carries policy.rhtas.com/include=true, the label the
+# webhook's namespaceSelector requires, and nothing else is deployed in it. Off by default: the render is then the one of before.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.stressImageProof.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    policy.rhtas.com/include: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-61"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: stress-image-proof
+  namespace: {{ .Values.stressImageProof.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: stress-image-proof
+  namespace: {{ .Values.stressImageProof.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-59"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: stress-image-proof
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.stressReader.serviceAccount }}
+    namespace: {{ .Values.stressReader.namespace }}
+{{- end }}

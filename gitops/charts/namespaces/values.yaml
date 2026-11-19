@@ -19,6 +19,14 @@ stressReader:
   serviceAccount: zuno-stress-reader
   monitoringView: false
 
+# ADR-0624 / WP-310 batch 2: the grant of the stress driver `image-signing-refusal`, apart from `stressReader` on purpose. It
+# renders a dedicated test namespace (label policy.rhtas.com/include=true, so the image-signing webhook covers it) and a
+# Role that lets the stress ServiceAccount CREATE pods there and nowhere else (the driver sends a dry run: nothing is
+# stored). Needs stressReader.enabled. Off by default: the render is then the one of before. The owner decides.
+stressImageProof:
+  enabled: false
+  namespace: zuno-stress-admission
+
 # ADR-0602 / WP-224: the cluster's apps domain, for the EgressFirewall rules
 # that name Keycloak's public host and this cluster's own Routes
 # (templates/egressfirewall-namespace.yaml). The d1 Application passes

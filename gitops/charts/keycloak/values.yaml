@@ -242,6 +242,12 @@ evalPersonas:
   # (STRESS_PERSONAS), one per concurrent worker: a budget is keyed by persona (ADR-0593/WP-190), so N concurrent streams
   # want N personas. Each copies consultant-01's groups, joins /zuno-evaluation like every evaluation persona and
   # /zuno-loadtest, which puts it under the `loadtest` quota class. Own budgets: a load run never touches a demo persona's.
+  # ADR-0624 / WP-310 batch 2: the ONE persona of the three mutating stress drivers (delegation-approval, unifai-live-rag and
+  # nothing else: image-signing-refusal needs no user). A copy of consultant-01, the persona those scenarios run as, so it holds
+  # exactly the groups they need and no other persona may be used by them; /zuno-evaluation puts it under the `evaluation`
+  # quota class. Its Personal library and its sessions are its own, and the drivers delete what they create.
+  - username: stress-mutate-01
+    copyOf: consultant-01
   - username: stress-load-01
     copyOf: consultant-01
     extraGroups:

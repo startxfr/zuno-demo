@@ -105,7 +105,7 @@ class ShippedProfiles(unittest.TestCase):
     def test_every_profile_is_valid_and_names_known_things(self):
         known_families = {d.family for d in sr.REGISTRY.values()} | {"agents"}
         profiles = sorted(STRESS_DIR.glob("profile_*.yaml"))
-        self.assertEqual([p.stem for p in profiles], ["profile_aggressive", "profile_smoke", "profile_soak", "profile_standard"])
+        self.assertEqual([p.stem for p in profiles], ["profile_aggressive", "profile_mutating", "profile_smoke", "profile_soak", "profile_standard"])
         for path in profiles:
             data = yaml.safe_load(path.read_text())
             self.assertEqual(data["name"], path.stem.replace("profile_", ""))

@@ -142,6 +142,7 @@ jobs:
           python3 evaluations/tests/test_stress_chaos.py
           python3 evaluations/tests/test_stress_campaign_plan.py
           python3 evaluations/tests/test_stress_drivers.py
+          python3 evaluations/tests/test_stress_mutating.py
           python3 evaluations/tests/test_stress_report.py
           python3 evaluations/tests/test_stress_state.py
           python3 evaluations/tests/test_dashboard_coverage.py
