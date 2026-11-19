@@ -1,5 +1,7 @@
 # Operations architecture
 
+Last reviewed: 2026-11-19
+
 Zuno is installed and operated from one entry point: `make`, then a day, a verb and a component. Ansible runs the verb;
 for each component a role applies two Argo CD Applications, `<component>-d0` (operator, cluster-scoped objects) then
 `<component>-d1` (the service). From then on Argo CD keeps the cluster equal to the branch the Applications follow

@@ -1,5 +1,7 @@
 # Platform SLO (ADR-0102)
 
+Last reviewed: 2026-11-19
+
 99.9% monthly availability is the industrialized objective for the user-facing agent path. This page defines the SLO, how it is
 measured, the error-budget policy and the failover timings measured on demo333. [ADR-0102](../adr/0102-target-99-9-percent-platform-availability.md)
 is `Implemented` only because the SLO is defined, measured and alerted on a live cluster; read its status line for what was proven when.

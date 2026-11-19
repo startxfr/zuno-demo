@@ -1,5 +1,7 @@
 # Gateways Architecture
 
+Last reviewed: 2026-11-19
+
 Every experience reaches models and tools through gateways that own policy. The experiences never choose a provider or call a tool server directly. This page covers the gateways and the model-access plane behind them. The agents and the A2A gateway are in [agent-platform-architecture.md](agent-platform-architecture.md).
 
 The highlighted box is the ai-gateway. Plain arrows carry requests, dotted arrows carry identity, policy or telemetry.

@@ -1,5 +1,7 @@
 # Zuno Demo Documentation
 
+Last reviewed: 2026-11-19
+
 This directory is the canonical documentation set for the Zuno Demo platform: what it is, how it is built, how to run it, how to demonstrate
 it, and why each decision was taken.
 

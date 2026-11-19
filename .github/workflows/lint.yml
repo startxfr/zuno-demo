@@ -96,6 +96,9 @@ jobs:
       # check_docs: every copy of the platform map (HLD) equals the reference in docs/architecture/README.md.
       - name: HLD copies tests
         run: python3 platform/docs/tests/test_hld_copies.py
+      # check_docs: the non-blocking freshness warnings (Last reviewed: YYYY-MM-DD).
+      - name: Freshness tests
+        run: python3 platform/docs/tests/test_freshness.py
       # ADR-0616 (WP-270, WP-271): the demo pages parse into steps, the read-only allowlist of the steps, the guards
       # and the session, and the pages agree with ansible/demos/ (every row its step file, every Do command covered,
       # no read-only unit changing anything, no stale `make demo` verb in the docs), and the GIF cut of a recording

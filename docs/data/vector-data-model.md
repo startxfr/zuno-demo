@@ -1,5 +1,7 @@
 # Vector Data Model
 
+Last reviewed: 2026-11-19
+
 Knowledge vectors live in **Qdrant inside the UnifAI stack**, not in PostgreSQL. [ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 (Implemented 2026-11-05) replaced the earlier design, which held chunks in PostgreSQL with pgvector and full-text search through a
 `rag-service` and a `rag-ingestion` pipeline; neither exists in `gitops/charts` any more. The data layout as a whole is in

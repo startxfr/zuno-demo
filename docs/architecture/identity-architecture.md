@@ -1,5 +1,7 @@
 # Identity Architecture
 
+Last reviewed: 2026-11-19
+
 Keycloak (realm `zuno`) is the one identity provider. Its groups drive four things: which agent a user may use, which tools and data a business role may reach, which quota a persona spends, and which OpenShift, Argo CD and AAP rights an operator gets. The diagrams are adapted from the scenarios [identity and personas](../demo/scenarios/governance/identity-personas.md) and [OpenClaw](../demo/scenarios/experiences/openclaw.md).
 
 ## Where this sits in the platform

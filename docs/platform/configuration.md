@@ -1,5 +1,7 @@
 # Platform Configuration
 
+Last reviewed: 2026-11-19
+
 The `Makefile` is the source of truth for what each day installs and in what
 order (ADR-0323); `platform/docs/check_docs.py` validates this page's commands
 against it. The lists below are the component *names* the verbs accept — the

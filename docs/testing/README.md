@@ -1,5 +1,7 @@
 # Testing and Evaluation
 
+Last reviewed: 2026-11-19
+
 How the platform is tested, from a unit test to a stress campaign. Each layer says what it proves and how to run it.
 
 | Layer | What it proves | How to run it |

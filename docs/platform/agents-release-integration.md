@@ -1,5 +1,7 @@
 # Agents release integration: how zuno-demo consumes zuno-demo-agents
 
+Last reviewed: 2026-11-19
+
 Agent definitions and the corp policies live in
 [startxfr/zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents), as signed releases in the Zuno OKF
 profile 1.0 ([ADR-0615](../adr/0615-align-the-zuno-okf-profile-with-upstream-okf-0-2-and-freeze-it-as-profile-1-0.md)).

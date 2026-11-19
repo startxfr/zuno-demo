@@ -1,5 +1,7 @@
 # Logical Architecture
 
+Last reviewed: 2026-11-19
+
 The reusable platform services and their responsibilities. What users and agents see is in
 [functional-architecture.md](functional-architecture.md); where each service runs is in
 [physical-architecture.md](physical-architecture.md).

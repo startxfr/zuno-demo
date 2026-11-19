@@ -1,5 +1,7 @@
 # Agent Request Workflow
 
+Last reviewed: 2026-11-19
+
 How a user request reaches an agent and comes back as an answer. This page is the reader's view; the step-by-step sequences with every
 participant are in [sequence flows](../architecture/sequence-flows.md) ("A Tekos turn through UnifAI", "An approved A2A delegation") and the
 components in [agent platform architecture](../architecture/agent-platform-architecture.md). The per-agent pages are

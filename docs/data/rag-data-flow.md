@@ -1,5 +1,7 @@
 # RAG Data Flow
 
+Last reviewed: 2026-11-19
+
 From a source to a cited answer, as it runs today in the UnifAI stack ([ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)).
 The earlier KFP `rag-ingestion` pipeline (fetch, detect changes, normalize, chunk, embed, write to pgvector) was retired with it; its diagram and
 the history of its decisions ([ADR-0330](../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md), [ADR-0519](../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md),

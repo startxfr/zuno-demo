@@ -1,5 +1,7 @@
 # World model
 
+Last reviewed: 2026-11-19
+
 The interactive generative world-model experience of ADR-0604: a browser demo in which a visitor describes a place, walks into it
 and changes it while inside, on one RTX PRO 6000 Blackwell that exists only while the demo is on. This page is the one-screen map;
 the decisions, their reasons and the gates are in

@@ -1,5 +1,7 @@
 # Security Architecture
 
+Last reviewed: 2026-11-19
+
 Security rests on explicit identity propagation, least privilege and policy intersection, with secrets, certificates and signatures each owned by one component. Diagrams are adapted from the scenarios [Vault and PKI](../demo/scenarios/foundation/vault-pki.md) and [image signing and admission](../demo/scenarios/foundation/image-signing-admission.md).
 
 ## Where this sits in the platform

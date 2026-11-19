@@ -1,5 +1,7 @@
 # Experiences Architecture
 
+Last reviewed: 2026-11-19
+
 An experience is a client of the platform: the screen a person uses. Zuno admits several, and all of them reach the
 same governed backend: models through the ai-gateway, tools through the mcp-gateway, with the person's own Keycloak
 identity, one per-persona quota and one telemetry stream. The client holds no model key, no policy and no tool

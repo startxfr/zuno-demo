@@ -1,5 +1,7 @@
 # AI Architecture
 
+Last reviewed: 2026-11-19
+
 Red Hat OpenShift AI 3.5 is the primary AI platform (the platform default; demo333 runs the 3.6.0-ea.2 early access on the `beta` channel on purpose, WP-195 step 6, pinned in `ansible/clusters/demo333.yml`). The design separates agent orchestration (UnifAI, see [agent-platform-architecture.md](agent-platform-architecture.md)) from inference governance (the ai-gateway, see [gateways-architecture.md](gateways-architecture.md)). This page covers what sits behind the gateway: model roles, serving, MaaS, external models, evaluation and the OpenShift AI tools around them. Training and the registry are in [mlops-architecture.md](mlops-architecture.md).
 
 ```mermaid

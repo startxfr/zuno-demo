@@ -1,5 +1,7 @@
 # Data Documentation
 
+Last reviewed: 2026-11-19
+
 The data layout of the platform (PostgreSQL, MariaDB, Redis, Qdrant, S3 buckets and backups) is in
 [data architecture](../architecture/data-architecture.md). The pages here describe the data models and their rules.
 

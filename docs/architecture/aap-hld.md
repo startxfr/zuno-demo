@@ -1,5 +1,7 @@
 # AAP High Level Design
 
+Last reviewed: 2026-11-19
+
 Ansible Automation Platform 2.7 runs as a Day 0 component (ADR-0354 added it as Day 1; ADR-0421 moved it to Day 0 with
 PostgreSQL and Keycloak) and is the execution and audit surface for the `make` operations of Day 0 to Day 3 (ADR-0418).
 This document describes the topology declared by `gitops/charts/aap`, `gitops/charts/aap-config` and

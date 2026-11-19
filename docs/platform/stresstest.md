@@ -1,5 +1,7 @@
 # Running the stresstest
 
+Last reviewed: 2026-11-19
+
 [ADR-0624](../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md) (work packages WP-305 to
 WP-313). The Day 3 stresstest is a **campaign** of drivers that replay the demo scenarios, combined by a named profile,
 run as in-cluster Jobs under their own identity and budget. It extends the per-agent stresstest of

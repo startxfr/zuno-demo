@@ -1796,6 +1796,50 @@ def check_hld_copies() -> List[Finding]:
     return hld_copy_findings(pages, (REPO_ROOT / HLD_REFERENCE).read_text())
 
 
+# --- Freshness: a "Last reviewed" line on the pages people read to operate or understand the platform ----------------------------
+# Not blocking: a page that nobody has looked at for a while is made visible, never a failed run. The line is `Last reviewed: YYYY-MM-DD`
+# on a line of its own, near the top. It is set by the person who re-read the page against the code, not by a tool.
+FRESHNESS_DIRS = ("architecture", "platform", "security", "data", "testing", "agents", "demo")
+FRESHNESS_ROOT_PAGES = ("README.md", "overview.md")
+FRESHNESS_MAX_DAYS = 90
+LAST_REVIEWED_RE = re.compile(r"^Last reviewed: (\d{4}-\d{2}-\d{2})\s*$", re.M)
+
+
+def freshness_scope(path: str) -> bool:
+    """docs/<dir>/**.md for the directories above, and the two root pages; ADRs and the roadmap are dated records and are not covered."""
+    parts = path.split("/")
+    if len(parts) == 2:
+        return parts[1] in FRESHNESS_ROOT_PAGES
+    return len(parts) > 2 and parts[1] in FRESHNESS_DIRS and path.endswith(".md")
+
+
+def freshness_warnings(pages: dict, today) -> List[str]:
+    """Warnings for pages whose `Last reviewed` date is older than FRESHNESS_MAX_DAYS, then one line for the pages that carry none."""
+    import datetime as _dt
+    stale, undated = [], 0
+    for path in sorted(p for p in pages if freshness_scope(p)):
+        m = LAST_REVIEWED_RE.search(pages[path])
+        if not m:
+            undated += 1
+            continue
+        try:
+            age = (today - _dt.date.fromisoformat(m.group(1))).days
+        except ValueError:
+            stale.append(f"{path}: 'Last reviewed' is not a valid date ({m.group(1)})")
+            continue
+        if age > FRESHNESS_MAX_DAYS:
+            stale.append(f"{path}: last reviewed {m.group(1)}, {age} days ago (limit {FRESHNESS_MAX_DAYS}); re-read it against the code, then update the date")
+    if undated:
+        stale.append(f"{undated} page(s) of the covered directories carry no 'Last reviewed: YYYY-MM-DD' line yet")
+    return stale
+
+
+def check_freshness() -> List[str]:
+    import datetime as _dt
+    pages = {str(p.relative_to(REPO_ROOT)): p.read_text() for p in (REPO_ROOT / "docs").rglob("*.md")}
+    return freshness_warnings(pages, _dt.date.today())
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1835,6 +1879,11 @@ def main() -> int:
           "model-routing-policy.yaml, relative links and #anchors in every "
           "tracked markdown file, and model context windows against "
           "gitops/charts/models/values.yaml, the demo README's stress table against the demos and the stress drivers, the paths cited by the Status line of every live ADR, and the copies of the platform map against the reference.")
+    warnings = check_freshness()
+    if warnings:
+        print(f"\n{len(warnings)} freshness warning(s), not blocking:")
+        for w in warnings:
+            print(f"  ! {w}")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

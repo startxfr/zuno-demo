@@ -1,5 +1,7 @@
 # Runbook: rotating a SaaS provider key, and what to do when a SaaS model starts failing
 
+Last reviewed: 2026-11-19
+
 The ai-gateway and Praxis call SaaS model providers directly with one API key per provider. The keys are in Vault, reach
 the pods through ExternalSecrets, and are read once, as an environment variable, when the pod starts. A new key in Vault
 therefore changes nothing until the Secret is refreshed **and** the pods are replaced. This page is the sequence, the

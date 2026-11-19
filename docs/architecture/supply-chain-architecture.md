@@ -1,5 +1,7 @@
 # Supply chain architecture
 
+Last reviewed: 2026-11-19
+
 What runs on Zuno is signed, the signer is named, and the cluster checks the signature before a pod starts. Four
 mechanisms carry this: Red Hat Trusted Artifact Signer (RHTAS) signs the images built in the cluster; a release
 ledger records every named release; an internal Red Hat Quay serves the images, so most pod starts do not depend on a

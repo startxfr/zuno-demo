@@ -1,5 +1,7 @@
 # Sequence Flows
 
+Last reviewed: 2026-11-19
+
 Five flows. The first two are the original request flows of the platform. They predate UnifAI (ADR-0561): the
 Tekos frontend, BFF and Agent Runtime they name were superseded by UnifAI, and the "Sales MCP" box has no counterpart
 under `components/mcp-servers/` today (the Salesforce server is `salesforce`). They are kept for the legs that still

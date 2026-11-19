@@ -1,5 +1,7 @@
 # Platform documentation
 
+Last reviewed: 2026-11-19
+
 Installation, operation and release runbooks for demo333. What the platform is and why is in [architecture](../architecture/README.md) and
 the [ADRs](../adr/README.md); this directory says how to install, change and run it. Every cluster change needs the owner's go.
 

@@ -1,5 +1,7 @@
 # Data Architecture
 
+Last reviewed: 2026-11-19
+
 The platform keeps four kinds of data apart: relational state of the platform products (PostgreSQL), metadata that does not belong there (MariaDB), knowledge and memory vectors (Qdrant inside the UnifAI stack), and objects (S3). Redis holds short-lived gateway state only. Everything that matters is backed up off-cluster.
 
 ```mermaid

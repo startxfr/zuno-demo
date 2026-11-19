@@ -1,5 +1,7 @@
 # Physical Architecture
 
+Last reviewed: 2026-11-19
+
 Where Zuno runs: OpenShift on AWS IPI, a fixed set of namespaces, three node pools, GPU nodes for model serving, and two image registries. Diagrams are adapted from the demo scenarios ([GitOps and Day 0-3](../demo/scenarios/foundation/gitops-day0-3.md), [image signing and admission](../demo/scenarios/foundation/image-signing-admission.md), [model serving on MIG](../demo/scenarios/rhoai/model-serving-llmd-mig.md), [OpenClaw](../demo/scenarios/experiences/openclaw.md)).
 
 ## Where this sits in the platform

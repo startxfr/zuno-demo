@@ -1,5 +1,7 @@
 # Threat Model
 
+Last reviewed: 2026-11-19
+
 What the platform defends, against whom, and which decision closes each threat. This page is the threat model that
 [ADR-0602](../adr/0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) (clause 13) asks for. It is a map from threats to
 decisions and work packages, drawn from the review of 2026-11-06 (code and charts read, nothing replayed on a cluster); it is not a

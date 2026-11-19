@@ -1,5 +1,7 @@
 # AI Security
 
+Last reviewed: 2026-11-19
+
 Controls include prompt-injection defenses, model/data classification enforcement, tool allow-lists, state-transition validation, response grounding, controlled web-search context and masked sensitive logging.
 
 Where each control lives:

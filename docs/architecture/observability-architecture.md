@@ -1,5 +1,7 @@
 # Observability architecture
 
+Last reviewed: 2026-11-19
+
 Every Zuno service sends traces and metrics over OTLP to one OpenTelemetry collector in `zuno-monitoring`. Traces are
 stored in Tempo, with a copy in OpenShift AI's own TempoStack. Metrics are scraped by the cluster's platform Prometheus
 and read by Grafana through Thanos; a third Prometheus (the mesh `MonitoringStack`) holds Istio and Envoy metrics. The

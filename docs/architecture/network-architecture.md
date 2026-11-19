@@ -1,5 +1,7 @@
 # Network Architecture
 
+Last reviewed: 2026-11-19
+
 Four layers bound traffic: NetworkPolicies (always on, coarse), OVN `EgressFirewall`s (outbound allowlists), the Istio mesh (mutual TLS and workload identity) and Kuadrant (authentication and rate limits at Gateway API entry points). Diagrams are adapted from the scenarios [service mesh and Kiali](../demo/scenarios/foundation/service-mesh-kiali.md), [OpenClaw](../demo/scenarios/experiences/openclaw.md) and [multi-gateway](../demo/scenarios/governance/multi-gateway.md).
 
 ## Where this sits in the platform

@@ -1,5 +1,7 @@
 # Agent Catalog
 
+Last reviewed: 2026-11-19
+
 The agent definitions are not in this repository. They live in
 [startxfr/zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents) as OKF bundles
 ([ADR-0576](../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)), are signed and pinned by one

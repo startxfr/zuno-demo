@@ -1,5 +1,7 @@
 # Agent Platform Architecture
 
+Last reviewed: 2026-11-19
+
 UnifAI is the agent platform of Zuno. It runs the agents, the chats, the workflows and the document library, but it
 decides nothing on its own. The agents themselves (prompts, tasks, tools, data level, who may use them) are not in this
 repository: they live in `startxfr/zuno-demo-agents` and reach the platform as a **signed release**, pinned by one

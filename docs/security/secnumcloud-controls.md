@@ -1,5 +1,7 @@
 # SecNumCloud-oriented control matrix (ADR-0111, superseded by ADR-0549)
 
+Last reviewed: 2026-11-19
+
 Derived documentation - the authoritative sources are the policy/checker
 files each row cites, not this file. Status values: `enforced-in-ci`
 (a script blocks the change on failure), `enforced-on-cluster` (verified

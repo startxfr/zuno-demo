@@ -1,5 +1,7 @@
 # MLOps Architecture
 
+Last reviewed: 2026-11-19
+
 The MLOps path turns a dataset into a served, evaluated model. KFP orchestrates, a Kubeflow TrainJob does the GPU work, MLflow tracks the run, an evaluation gate decides, and a human-reviewed Git change promotes the result to serving. The serving side is in [ai-architecture.md](ai-architecture.md).
 
 The highlighted box groups the build tools: pipelines, MLflow, Kueue and the model registry.

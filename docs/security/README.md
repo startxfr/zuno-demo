@@ -1,5 +1,7 @@
 # Security Documentation
 
+Last reviewed: 2026-11-19
+
 - [Reporting a vulnerability](../../SECURITY.md) (ADR-0603 M19)
 - [Threat model](threat-model.md)
 - [Data classification](data-classification.md)

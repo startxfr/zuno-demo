@@ -1,5 +1,7 @@
 # Functional Architecture
 
+Last reviewed: 2026-11-19
+
 What users can do with Zuno: who they are, which experience they use, which agents answer, and what those agents may read
 or call. The platform that makes this possible is in [logical-architecture.md](logical-architecture.md).
 

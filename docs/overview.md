@@ -1,5 +1,7 @@
 # Project Overview
 
+Last reviewed: 2026-11-19
+
 ## Purpose
 
 Zuno Demo is an internal demonstration of a reusable, governed agentic AI platform on Red Hat OpenShift AI. It serves business

@@ -1,5 +1,7 @@
 # Demo catalogue
 
+Last reviewed: 2026-11-19
+
 This directory holds the demonstrations of the Zuno platform:
 
 - **Scenarios**: one brick of the platform, or one feature of a brick, per page. Each page has a 5-minute and a

@@ -1,5 +1,7 @@
 # Operations
 
+Last reviewed: 2026-11-19
+
 Operational documentation will cover agent enable/disable, model health, MCP health, RAG refresh, scheduled tasks, user/session support, quotas, costs, logs and tracing.
 
 ## UnifAI image admission (ADR-0586, WP-178)
