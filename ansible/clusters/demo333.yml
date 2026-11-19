@@ -541,6 +541,10 @@ zuno_kagent_alt_gateways:
 # the local alias: Dify's agent app carries the Zuno tools, which Praxis refuses on its SaaS models.
 zuno_dify_alt_gateways:
   - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
+# WP-299 (owner's go 2026-11-19): UnifAI gets one more shared LLM, zuno-gateway-praxis, called with the signed-in
+# user's token. Only the local alias: UnifAI's agents carry tools, which Praxis refuses on its SaaS models.
+zuno_unifai_alt_gateways:
+  - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,
