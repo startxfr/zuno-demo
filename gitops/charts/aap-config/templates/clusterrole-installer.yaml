@@ -308,8 +308,11 @@ rules:
   # reaches apply_gitops_app.yml hits this. Previously deferred as an
   # "unrelated RBAC gap" in WP-100 for zuno-day2-install; also breaks
   # zuno-day3-stresstest (job 559/563) the same way. Read-only.
+  # Network.config.openshift.io/cluster too (2026-11-19): the open_webui, dify, kagent and world_model roles read
+  # its clusterNetwork and serviceNetwork for their egress NetworkPolicies; through AAP, `make d2 install
+  # open-webui` failed with 403 on it (job 1461). Read-only, cluster-wide singletons.
   - apiGroups: ["config.openshift.io"]
-    resources: ["ingresses"]
+    resources: ["ingresses", "networks"]
     verbs: ["get", "list", "watch"]
   # Amendment (2026-08-31, WP-105/ADR-0536 Part B): this file's own header
   # comment above lists "Node/MachineSet/Machine and other Day 0 `machines`-
