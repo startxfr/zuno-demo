@@ -125,6 +125,21 @@ altGatewayPeers:
     namespace: zuno-ai-gateways
     podName: praxis
     serviceAccount: praxis
+  # ADR-0624 clause 5 / WP-306: the load tests spend their OWN MaaS budget, never the ai-gateway ServiceAccount's
+  # (1,000,000 tokens an hour per route, shared by every caller of the gateway: the 2026-11-19 stresstest drained it and
+  # Open WebUI, Dify, kagent and OpenClaw got 429). With this on, every local model gets a MaaSSubscription for the
+  # dedicated ServiceAccount below (name `<model>-stress`) with the limit and priority set here, NOT a copy of the
+  # ai-gateway's, and the MaaSAuthPolicy admits it. The ai-gateway sends this ServiceAccount's token for the quota
+  # classes listed in its maasAdapter.classCredentials. Local models only: the SaaS models are not reachable by it.
+  # Off by default: the render is then the one of before.
+  stress:
+    enabled: false
+    namespace: zuno-ai-run
+    serviceAccount: ai-gateway-stress
+    tokenRateLimits:
+      - limit: 200000
+        window: 1h
+    priority: 50
 
 # WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
 # runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
@@ -1542,7 +1557,7 @@ externalModels:
     enabled: false
     endpoint: api.anthropic.com
     provider: openai-compatible
-    targetModel: claude-3-5-sonnet-latest
+    targetModel: claude-sonnet-5-5
     secretName: llm-provider-anthropic-maas
     vault:
       path: providers/anthropic

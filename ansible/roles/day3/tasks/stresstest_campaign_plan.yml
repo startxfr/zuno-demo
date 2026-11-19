@@ -1,0 +1,52 @@
+---
+# The pure half of stresstest_campaign.yml: validates the campaign knobs, reads the profile and resolves the shape of the
+# run (families, drivers, shards, overrides, deadline, run id). No cluster call, so it runs offline and is tested by
+# evaluations/tests/test_stress_campaign_plan.py. Sets _stress_profile, _stress_families, _stress_drivers,
+# _stress_shards, _stress_wait, _stress_overrides, _stress_deadline, _stress_run_id.
+
+- name: "stress | validate the campaign knobs (they end up in a path, a label and a JSON env)"
+  ansible.builtin.assert:
+    that:
+      - stress_profile is match('^[a-z0-9][a-z0-9-]*$')
+      - (stress_families | default('')) is match('^[a-z0-9,_-]*$')
+      - (stress_drivers | default('')) is match('^[a-z0-9,_.-]*$')
+      - (stress_iterations | default('') | string) is match('^[0-9]*$')
+      - (stress_concurrency | default('') | string) is match('^[0-9]*$')
+      - (stress_duration | default('') | string) is match('^[0-9]*$')
+      - (stress_shards | default('') | string) is match('^[0-9]*$')
+    fail_msg: "stress_profile must be a profile name (lowercase, digits, dashes); the other knobs are numbers or comma lists of names"
+
+- name: "stress | read the profile evaluations/stress/profile_{{ stress_profile }}.yaml"
+  ansible.builtin.set_fact:
+    _stress_profile: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/stress/profile_' + stress_profile + '.yaml') | from_yaml }}"
+
+- name: "stress | resolve the campaign shape (profile, overridden by the make variables)"
+  ansible.builtin.set_fact:
+    _stress_families: >-
+      {{ (stress_families | default('') | split(',') | map('trim') | reject('equalto', '') | list)
+         or (_stress_profile.families | default([])) }}
+    _stress_drivers: "{{ stress_drivers | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
+    _stress_shards: "{{ (stress_shards | default('') | string) | ternary(stress_shards | default(1) | int, (_stress_profile.defaults | default({})).shards | default(1) | int) }}"
+    _stress_wait: "{{ stress_wait | default((_stress_profile.job | default({})).wait | default(true)) | bool }}"
+    _stress_overrides: >-
+      {{ {}
+         | combine({'iterations': stress_iterations | int} if (stress_iterations | default('') | string) | length > 0 else {})
+         | combine({'concurrency': stress_concurrency | int} if (stress_concurrency | default('') | string) | length > 0 else {})
+         | combine({'duration': stress_duration | int} if (stress_duration | default('') | string) | length > 0 else {})
+         | combine({'families': stress_families | split(',')} if (stress_families | default('')) | length > 0 else {})
+         | combine({'drivers': stress_drivers | split(',')} if (stress_drivers | default('')) | length > 0 else {})
+         | combine({'personas': stress_personas | split(',')} if (stress_personas | default('')) | length > 0 else {}) }}
+
+- name: "stress | the Job deadline and the run id"
+  ansible.builtin.set_fact:
+    _stress_deadline: >-
+      {{ [ (_stress_profile.job | default({})).deadline_seconds | default(1800) | int,
+           ((stress_duration | default('') | string) | length > 0) | ternary((stress_duration | default(0) | int) + 900, 0) ] | max }}
+    _stress_run_id: "{{ stress_profile }}-{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%d-%H%M%S') }}"
+
+- name: "stress | the plan"
+  ansible.builtin.debug:
+    msg:
+      - "profile {{ stress_profile }}: {{ _stress_profile.description | default('') }}"
+      - "families {{ _stress_families }}; drivers {{ _stress_drivers or 'all of the families' }}; shards {{ _stress_shards }}; deadline {{ _stress_deadline }}s; wait {{ _stress_wait }}"
+      - "overrides {{ _stress_overrides }}"

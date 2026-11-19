@@ -129,6 +129,15 @@ jobs:
       # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
       - name: Golden-path probe judgement tests (ADR-0605)
         run: python3 evaluations/tests/test_golden_path_probe.py
+      # ADR-0624 (WP-305, WP-307): the stress runner (plan, scheduler, budget guard, summaries, the first drivers against
+      # an httpx mock transport), the pure half of the campaign Ansible tasks (skipped here without ansible-playbook)
+      # and the dashboard coverage pack's planning and judging. httpx and PyYAML come from the agent Jobs' own pins.
+      - name: Stress runner, campaign plan and dashboard coverage tests (ADR-0624)
+        run: |
+          pip install -r evaluations/tekos/requirements.txt
+          python3 evaluations/tests/test_stress_runner.py
+          python3 evaluations/tests/test_stress_campaign_plan.py
+          python3 evaluations/tests/test_dashboard_coverage.py
       # ADR-0616 (WP-274): how the unifai-live-rag demo's start and stop drive the UnifAI RAG API (fake client, no
       # network, no httpx).
       - name: UnifAI RAG library tests (ADR-0616)
@@ -146,6 +155,9 @@ jobs:
       # ADR-0619 (WP-292): the Praxis chart's rendered gateway configuration and policy (helm template, no cluster).
       - name: Praxis chart tests (ADR-0619)
         run: python3 platform/praxis/tests/test_praxis_chart.py
+      # ADR-0619 (update of 2026-11-19): the Open WebUI entries that keep the Zuno tools off Praxis's SaaS models.
+      - name: Open WebUI no-tools entries tests (ADR-0619)
+        run: python3 platform/praxis/tests/test_open_webui_no_tools.py
       # ADR-0608 (WP-241): how each drift check judges what `oc get` returns.
       - name: Drift check judgement tests (ADR-0608)
         run: python3 platform/drift/tests/test_check_drift.py
@@ -282,6 +294,8 @@ jobs:
           # WP-250: the caller context inside the call assertion, and generate_diagram's assertion.
           python3 tests/test_wp250_assertion_context.py
           python3 tests/test_wp250_diagram_assertion.py
+          # ADR-0624 (WP-306): the stress tag is a span attribute only (SDK on, exporter at a closed port).
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_traffic_tag.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -349,6 +363,9 @@ jobs:
           # WP-157: the default-off MaaS switches (429 pass-through, gateway
           # identity and its attested headers, per-class fail modes).
           python3 tests/test_wp157_maas_switches.py
+          # ADR-0624 (WP-306): a dedicated MaaS credential per quota class (no fallback to the shared one), the loadtest
+          # group, and the span-only zuno.traffic tag.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_wp306_stress_identity.py
           # WP-209 (ADR-0565 clause 5): effective = max(header, floor(agent, task)),
           # and the level of a header-less call (C1 shipped, C3 tested).
           python3 tests/test_wp209_classification_floor.py

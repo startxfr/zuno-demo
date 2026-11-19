@@ -80,8 +80,9 @@ saas:
   deniedClients: [claude-code]
   claude:
     name: claude
-    # claude-3-5-sonnet-latest is retired (Anthropic 404 "model: claude-3-5-sonnet-latest", live 2026-11-17).
-    targetModel: claude-opus-5-5
+    # claude-3-5-sonnet-latest is retired (Anthropic 404, live 2026-11-17). The owner chose claude-sonnet-5-5 for both
+    # gateways on 2026-11-19 (it was claude-opus-5-5 here since 11-17).
+    targetModel: claude-sonnet-5-5
     host: api.anthropic.com
     port: 443
     apiVersion: "2023-06-01"

@@ -55,6 +55,10 @@
       altGatewayPeers:
         praxis:
           enabled: "{{ zuno_praxis_enabled | default(false) | bool }}"
+        # ADR-0624 clause 5 / WP-306: a MaaSSubscription per local model for the stress ServiceAccount, with its own
+        # limit. The same switch as the llm role's maasAdapter.classCredentials (the ServiceAccount must exist).
+        stress:
+          enabled: "{{ zuno_ai_gateway_stress_credentials | default(false) | bool }}"
       # WP-157 (inventory finding 6): when true, the SaaS ExternalModels'
       # subscriptions keep only the ai-gateway ServiceAccount, dropping the
       # /agent_tekos and /sales persona grants. Per-cluster knob in

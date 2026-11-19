@@ -479,6 +479,13 @@ zuno_ai_gateway_closed_class_maas_only: true
 # its counters in the platform Redis, so a restart no longer resets the
 # budgets. Needs the image built from c5ca1b40 or later (ai-gateway-25).
 zuno_ai_gateway_quota_ledger_store: redis
+# WP-306 / ADR-0624 clause 5 (owner go 2026-11-19): the stress quota classes (stresstest, then loadtest) reach MaaS
+# with the dedicated ServiceAccount zuno-ai-run/ai-gateway-stress and its own <model>-stress subscriptions, never with
+# the ai-gateway ServiceAccount whose budget the experiences share (drained by the stresstest of 2026-11-19 00:21Z).
+# One switch for the models and llm roles. Needs the image built from 01079893 or later.
+zuno_ai_gateway_stress_credentials: true
+# The `loadtest` class group: inert until an admitted agents release defines the class.
+zuno_ai_gateway_quota_loadtest_group: zuno-loadtest
 # WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
 # the per-agent guardrail modes generated from the agents release. Needs the
 # image built from b1facfc2 or later (ai-gateway-28).

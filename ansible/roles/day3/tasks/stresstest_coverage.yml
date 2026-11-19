@@ -1,0 +1,21 @@
+---
+# Dashboard coverage pack (ADR-0058, informational only): after the per-agent aggregation, stimulate the dashboard panel
+# families the agent Jobs never reach (experience clients, tool denials, RAG, guardrails, quota, model providers, semantic
+# cache) and print a PASS/MISSING table per family from Prometheus (thanos-querier) and Tempo.
+#
+# Runs from the control node with `oc` logged in to the cluster (the same requirement as
+# evaluations/golden_path_probe.py). Where `oc` or httpx is absent (an AAP execution environment) the script prints one
+# "cannot reach the cluster" row and exits 0. It never fails the make target: failed_when is false and the script's
+# own exit code is always 0. `-e day3_stresstest_dashboard_coverage=false` skips it.
+- name: "day2-stresstest | stimulate every dashboard panel family and check the series (informational)"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/evaluations/dashboard_coverage.py"
+    chdir: "{{ zuno_repo_root }}"
+  register: _day2_stress_coverage
+  changed_when: false
+  failed_when: false
+  when: day3_stresstest_dashboard_coverage | default(true) | bool
+
+- name: "day2-stresstest | dashboard coverage table"
+  ansible.builtin.debug:
+    msg: "{{ _day2_stress_coverage.stdout_lines | default(['skipped (day3_stresstest_dashboard_coverage=false)']) }}"

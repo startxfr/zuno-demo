@@ -193,6 +193,14 @@ spec:
                 echo "created group $EVAL_GROUP"
               fi
 
+              {{- range .Values.evalPersonasExtraGroups }}
+              EXTRA_GROUP={{ . | quote }}
+              if ! $KCADM get "group-by-path$EXTRA_GROUP" -r "$KC_REALM" $CFG >/dev/null 2>&1; then
+                $KCADM create groups -r "$KC_REALM" $CFG -s "name=${EXTRA_GROUP#/}"
+                echo "created group $EXTRA_GROUP"
+              fi
+              {{- end }}
+
               created=0
               present=0
               joined=0

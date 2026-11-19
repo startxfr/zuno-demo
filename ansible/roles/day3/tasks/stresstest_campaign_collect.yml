@@ -1,0 +1,81 @@
+---
+# Collect half of the stress campaign (WP-307): wait for the Indexed Job when asked to, read the log of every shard,
+# merge the per-driver summaries and print the report. Used by stresstest_campaign.yml (after the launch) and by
+# `make d3 stresstest-collect RUN=<id>` (playbooks/day3_stresstest_collect.yml). Needs `_stress_job_name`.
+# Informational (ADR-0058): the report never fails the run.
+
+- name: "stress-collect | the Job {{ _stress_job_name }}"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: "{{ _stress_job_name }}"
+  register: _stress_job
+  until: >-
+    (not (_stress_wait | default(false) | bool)) or
+    ((_stress_job.resources | default([]) | length) > 0 and
+     ((_stress_job.resources[0].status.succeeded | default(0)) >= (_stress_job.resources[0].spec.completions | default(1)) or
+      (_stress_job.resources[0].status.failed | default(0)) > 0))
+  # The Job's own activeDeadlineSeconds ends it, so this never waits longer than the deadline (+ a margin).
+  retries: "{{ ((_stress_deadline | default(900) | int) // 15) + 12 }}"
+  delay: 15
+
+- name: "stress-collect | fail clearly when the Job does not exist (its ttl is one day)"
+  ansible.builtin.fail:
+    msg: "Job {{ _stress_job_name }} not found in zuno-ai-run (finished Jobs are removed after one day)"
+  when: (_stress_job.resources | default([]) | length) == 0
+
+- name: "stress-collect | the pods of every shard"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "controller-uid={{ _stress_job.resources[0].metadata.uid }}"
+  register: _stress_pods
+
+- name: "stress-collect | the output of every shard"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ item.metadata.name }}"
+  loop: "{{ _stress_pods.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  register: _stress_logs
+
+# stress_runner.py prints one JSON array per line (checkpoints and one per driver): every such line is rows.
+- name: "stress-collect | the rows"
+  ansible.builtin.set_fact:
+    _stress_rows: >-
+      {{ _stress_logs.results | default([])
+         | map(attribute='log_lines') | map('default', []) | flatten
+         | select('match', '^\[.*\]$') | map('from_json') | list | flatten }}
+
+- name: "stress-collect | the state of the Job"
+  ansible.builtin.debug:
+    msg: >-
+      {{ _stress_job_name }}: {{ _stress_job.resources[0].status.succeeded | default(0) }}/{{ _stress_job.resources[0].spec.completions | default(1) }}
+      shard(s) succeeded, {{ _stress_job.resources[0].status.failed | default(0) }} failed,
+      {{ _stress_job.resources[0].status.active | default(0) }} running; {{ _stress_rows | length }} row(s) so far
+
+- name: "stress-collect | merge the per-driver summaries"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/stress_runner.py --summarize -"
+    stdin: "{{ _stress_rows | to_json }}"
+  register: _stress_table
+  changed_when: false
+  failed_when: false
+
+- name: "stress-collect | the per-driver table"
+  ansible.builtin.debug:
+    msg: "{{ _stress_table.stdout_lines | default(['no summary']) }}"
+
+# Past 300 rows a load run would print thousands of identical PASS lines: print the failures and the summaries only.
+- name: "stress-collect | the report (every row up to 300, else the failures and the summaries)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+  vars:
+    day2_render_fail_inline: false
+    day2_render_component: agents
+    _day2_render_results: >-
+      {{ _stress_rows if (_stress_rows | length) <= 300 else
+         ((_stress_rows | rejectattr('passed') | list) +
+          (_stress_rows | selectattr('passed') | selectattr('layer', 'equalto', 'stress_summary') | list)) }}

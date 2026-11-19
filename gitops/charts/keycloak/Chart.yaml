@@ -8,5 +8,5 @@ version: 0.2.0
 appVersion: "n/a"
 dependencies:
   - name: operator
-    version: "21.3.370"
+    version: "21.3.371"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"

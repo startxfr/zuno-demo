@@ -135,7 +135,7 @@ DAY3_RELEASE_COMPONENTS := supply-chain
 # `make d3 sign agents` and the OKF Vault Transit chain (ADR-0578, WP-165).
 DAY3_ADMIT_COMPONENTS := agents
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check admit run release scenario-failover-node
+DAY3_VERBS := test stresstest stresstest-collect backup restore check admit run release scenario-failover-node
 
 # ADR-0616/WP-270: the presenter lifecycle of every catalogue demo, as
 # `make demo <verb> [arguments]`. The verbs run locally, never through AAP:
@@ -292,6 +292,7 @@ help:
 	  'Day 2 components (check only):    $(DAY2_CHECK_ONLY_COMPONENTS)' \
 	  'Day 2 components (build):         $(DAY2_BUILD_COMPONENTS)' \
 	  'Day 3 components (test/stresstest/check): $(DAY3_TEST_COMPONENTS)' \
+	  '  make day3|d3 stresstest PROFILE=smoke|standard|aggressive|soak   Profile-driven stress campaign (ADR-0624); stresstest-collect RUN=<id> reads one' \
 	  'Day 3 components (backup/restore):        $(DAY3_BACKUP_COMPONENTS)' \
 	  'Day 3 components (check only):            $(DAY3_CHECK_ONLY_COMPONENTS)' \
 	  'Day 3 components (release):               $(DAY3_RELEASE_COMPONENTS)' \
@@ -649,6 +650,8 @@ if [[ -z "$$verb" ]]; then \
     '' \
     '  test         Check availability only (agent bundles served by UnifAI, shared platform services'"'"' /healthz+/readyz)' \
     '  stresstest   Run every existing test layer per agent, plus an optional bulk-interaction load pass (ADR-0058)' \
+    '               PROFILE=<name> runs a profile-driven campaign instead (evaluations/stress/profile_<name>.yaml, ADR-0624)' \
+    '  stresstest-collect   Read the rows of a stress campaign launched with PROFILE= (RUN=<run id>, default the newest)' \
     '  backup       Trigger an on-demand backup' \
     '  restore      Restore from the most recent backup (fails if none exists)' \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
@@ -687,6 +690,8 @@ if [[ -z "$$verb" ]]; then \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
     'Run agents one at a time instead of in parallel (stresstest only, default: parallel): SEQUENTIAL=1' \
+    'Stress campaign (stresstest only, ADR-0624): PROFILE=<smoke|standard|aggressive|soak>, overridden by ITERATIONS=<n> CONCURRENCY=<n> DURATION=<seconds> SHARDS=<n> FAMILIES=<a,b> DRIVERS=<id,id>' \
+    'Read a stress campaign (stresstest-collect only): RUN=<run id printed at launch> (default: the newest)' \
     'Agent to train (run only): AGENT=<agent> (default: comage - the only agent with a compiled pipeline version today)' \
     'Release tag (release only, REQUIRED, no default): TAG=<tag> - must already be a real, pushed git tag' \
     '' \
@@ -694,6 +699,10 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest BULK=25' \
     'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
     'Example: make d3 stresstest SEQUENTIAL=1   # one agent at a time, like every run before ADR-0561' \
+    'Example: make d3 stresstest PROFILE=smoke   # every driver once, under a token cap' \
+    'Example: make d3 stresstest PROFILE=standard CONCURRENCY=4 FAMILIES=tools,models' \
+    'Example: make d3 stresstest PROFILE=soak   # async: prints a run id' \
+    'Example: make d3 stresstest-collect RUN=soak-20261119-014500' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
     'Example: make d3 admit agents RELEASE=v0.1.1 UPDATE_LOCK=1   # admit a zuno-demo-agents release and pin it (ADR-0580)' \
@@ -714,9 +723,32 @@ case "$$verb" in \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS); else exit $$rc; fi ;; \
   stresstest) \
     case " $(DAY3_TEST_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 stresstest component: '$$component' (expected one of: $(DAY3_TEST_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    profile="$${PROFILE:-}"; \
+    if [[ -n "$$profile" ]] && ! [[ "$$profile" =~ ^[a-z0-9][a-z0-9-]*$$ ]]; then echo "PROFILE must be a profile name: evaluations/stress/profile_<name>.yaml" >&2; exit 2; fi; \
+    for knob in ITERATIONS CONCURRENCY DURATION SHARDS; do \
+      val="$${!knob:-}"; \
+      if [[ -n "$$val" ]] && ! [[ "$$val" =~ ^[0-9]+$$ ]]; then echo "$$knob must be a number (got '$$val')" >&2; exit 2; fi; \
+    done; \
+    for knob in FAMILIES DRIVERS; do \
+      val="$${!knob:-}"; \
+      if [[ -n "$$val" ]] && ! [[ "$$val" =~ ^[a-z0-9,_.-]+$$ ]]; then echo "$$knob must be a comma list of names (got '$$val')" >&2; exit 2; fi; \
+    done; \
+    if [[ -z "$$profile" && -n "$${ITERATIONS:-}$${CONCURRENCY:-}$${DURATION:-}$${SHARDS:-}$${FAMILIES:-}$${DRIVERS:-}" ]]; then echo "ITERATIONS, CONCURRENCY, DURATION, SHARDS, FAMILIES and DRIVERS need PROFILE=<name>" >&2; exit 2; fi; \
+    stress_json=""; stress_args=""; \
+    if [[ -n "$$profile" ]]; then \
+      stress_json=", \"stress_profile\": \"$$profile\""; stress_args="-e stress_profile=$$profile"; \
+      if [[ -n "$${ITERATIONS:-}" ]]; then stress_json="$$stress_json, \"stress_iterations\": $$ITERATIONS"; stress_args="$$stress_args -e stress_iterations=$$ITERATIONS"; fi; \
+      if [[ -n "$${CONCURRENCY:-}" ]]; then stress_json="$$stress_json, \"stress_concurrency\": $$CONCURRENCY"; stress_args="$$stress_args -e stress_concurrency=$$CONCURRENCY"; fi; \
+      if [[ -n "$${DURATION:-}" ]]; then stress_json="$$stress_json, \"stress_duration\": $$DURATION"; stress_args="$$stress_args -e stress_duration=$$DURATION"; fi; \
+      if [[ -n "$${SHARDS:-}" ]]; then stress_json="$$stress_json, \"stress_shards\": $$SHARDS"; stress_args="$$stress_args -e stress_shards=$$SHARDS"; fi; \
+      if [[ -n "$${FAMILIES:-}" ]]; then stress_json="$$stress_json, \"stress_families\": \"$$FAMILIES\""; stress_args="$$stress_args -e stress_families=$$FAMILIES"; fi; \
+      if [[ -n "$${DRIVERS:-}" ]]; then stress_json="$$stress_json, \"stress_drivers\": \"$$DRIVERS\""; stress_args="$$stress_args -e stress_drivers=$$DRIVERS"; fi; \
+    fi; \
     bulk="$${BULK:-}"; \
     if [[ -z "$$bulk" ]]; then \
-      if [[ -t 0 ]]; then \
+      if [[ -n "$$profile" ]]; then \
+        bulk=0; \
+      elif [[ -t 0 ]]; then \
         read -r -p "Bulk interaction count [10]: " bulk; \
         bulk="$${bulk:-10}"; \
       else \
@@ -725,7 +757,9 @@ case "$$verb" in \
     fi; \
     cleanup="$${CLEANUP:-}"; \
     if [[ -z "$$cleanup" ]]; then \
-      if [[ -t 0 ]]; then \
+      if [[ -n "$$profile" ]]; then \
+        cleanup=1; \
+      elif [[ -t 0 ]]; then \
         read -r -p "Remove test-generated conversations after the run? [Y/n]: " cleanup_answer; \
         case "$$cleanup_answer" in [nN]*) cleanup=0 ;; *) cleanup=1 ;; esac; \
       else \
@@ -734,8 +768,13 @@ case "$$verb" in \
     fi; \
     sequential="$${SEQUENTIAL:-0}"; \
     parallel="true"; case "$$sequential" in 1|true|yes) parallel="false" ;; esac; \
-    aap_route job zuno-day3-stresstest "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\", \"bulk_interactions\": $$bulk, \"cleanup_test_data\": $$cleanup, \"day2_stresstest_parallel\": $$parallel}"; rc=$$?; \
-    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" -e "day2_stresstest_parallel=$$parallel" $(EXTRA_VARS); else exit $$rc; fi ;; \
+    aap_route job zuno-day3-stresstest "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\", \"bulk_interactions\": $$bulk, \"cleanup_test_data\": $$cleanup, \"day2_stresstest_parallel\": $$parallel$$stress_json}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" -e "day2_stresstest_parallel=$$parallel" $$stress_args $(EXTRA_VARS); else exit $$rc; fi ;; \
+  stresstest-collect) \
+    run="$${RUN:-}"; \
+    if [[ -n "$$run" ]] && ! [[ "$$run" =~ ^[a-z0-9-]+$$ ]]; then echo "RUN must be a run id such as smoke-20261119-014500 (printed when the campaign was launched)" >&2; exit 2; fi; \
+    aap_route job zuno-day3-stresstest-collect "{\"stress_run\": \"$$run\", \"report_format\": \"$$report_format\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest_collect.yml -e "stress_run=$$run" -e "report_format=$$report_format" $(EXTRA_VARS); else exit $$rc; fi ;; \
   backup) \
     case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 backup component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
     aap_route job zuno-day3-backup "{\"target_component\": \"$$component\"}"; rc=$$?; \

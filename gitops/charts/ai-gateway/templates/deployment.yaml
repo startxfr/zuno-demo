@@ -305,6 +305,19 @@ spec:
             - name: QUOTA_STRESSTEST_GROUP
               value: {{ .Values.quotaStresstestGroup | quote }}
             {{- end }}
+            {{- if .Values.quotaLoadtestGroup }}
+            - name: QUOTA_LOADTEST_GROUP
+              value: {{ .Values.quotaLoadtestGroup | quote }}
+            {{- end }}
+            {{- if .Values.maasAdapter.classCredentials.enabled }}
+            {{- /* WP-306: class -> token file, read per call by app/maas_adapter.py (no fallback to the shared identity). */}}
+            {{- $paths := dict }}
+            {{- range .Values.maasAdapter.classCredentials.classes }}
+            {{- $_ := set $paths . (printf "%s/token" $.Values.maasAdapter.classCredentials.mountPath) }}
+            {{- end }}
+            - name: MAAS_CLASS_TOKEN_PATHS
+              value: {{ toJson $paths | quote }}
+            {{- end }}
             {{- if .Values.experienceClients }}
             - name: EXPERIENCE_CLIENTS
               value: {{ join "," .Values.experienceClients | quote }}
@@ -391,6 +404,11 @@ spec:
             - name: maas-sa-token
               mountPath: /var/run/secrets/maas
               readOnly: true
+            {{- if .Values.maasAdapter.classCredentials.enabled }}
+            - name: maas-stress-token
+              mountPath: {{ .Values.maasAdapter.classCredentials.mountPath }}
+              readOnly: true
+            {{- end }}
             {{- if .Values.availability.readiness.enabled }}
             # ADR-0591: the API server's CA, for the readiness poll. The
             # token is the projected one above (audience
@@ -459,6 +477,11 @@ spec:
                   path: token
                   audience: https://kubernetes.default.svc
                   expirationSeconds: 3600
+        {{- if .Values.maasAdapter.classCredentials.enabled }}
+        - name: maas-stress-token
+          secret:
+            secretName: {{ .Values.maasAdapter.classCredentials.secretName }}
+        {{- end }}
         - name: tmp
           emptyDir: {}
         {{- if .Values.modelRouting.generated }}

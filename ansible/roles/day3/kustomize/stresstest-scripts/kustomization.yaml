@@ -59,6 +59,10 @@ configMapGenerator:
       # stresstest_job.yml's volumeMounts expect.
       - classification.yaml=../../../../../policies/data-classification/classification.yaml
       - tool-policy.yaml=../../../../../.cache/okf-release/current/policies/tools/tool-policy.yaml
+      # The delegated-write limits (delegation.allow_write, write_allowed; ADR-0406/0409), as in the acceptance gate.
+      # Without them delegation_checks assumes no listed target and fails the arkos->tekos surface check on
+      # aap.cluster.audit, which write_allowed admits with approval (false FAIL, stresstest of 2026-11-19).
+      - limits-policy.yaml=../../../../../.cache/okf-release/current/policies/limits/limits-policy.yaml
       - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
       - model-routing-policy.yaml=../../../../../.cache/okf-release/current/policies/model-routing/model-routing-policy.yaml
       # Per-agent content (genuinely per-agent, never shared) - key

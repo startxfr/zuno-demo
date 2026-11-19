@@ -60,5 +60,11 @@ operator:
 
 monitoring:
   enabled: false
+  # 2026-11-19: the mesh Prometheus had 24h retention on an emptyDir, so every
+  # restart wiped the Kiali/mesh history. storage.size empty = emptyDir as before.
+  retention: 7d
+  storage:
+    size: 10Gi
+    storageClassName: ""   # empty = the cluster default class
 
 meshNamespace: zuno-mesh

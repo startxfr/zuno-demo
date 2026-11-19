@@ -29,6 +29,7 @@ comparison this prototype exists to inform.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
@@ -164,6 +165,40 @@ def _service_account_token() -> str:
     )
 
 
+def class_token_path(quota_class: str) -> str:
+    """WP-306 (ADR-0624 clause 5): the file holding the dedicated MaaS credential of a quota class, "" when the class
+    has none and uses the pod's own identity. MAAS_CLASS_TOKEN_PATHS is a JSON object {class: path}, read per call so
+    the mapping can change with the Deployment alone. An unreadable mapping is an error, never a silent fallback."""
+    raw = os.getenv("MAAS_CLASS_TOKEN_PATHS", "").strip()
+    if not raw or not quota_class:
+        return ""
+    try:
+        mapping = json.loads(raw)
+    except ValueError as exc:
+        raise MaasAdapterError(f"MAAS_CLASS_TOKEN_PATHS is not valid JSON ({exc}); refusing to guess a credential")
+    if not isinstance(mapping, dict):
+        raise MaasAdapterError("MAAS_CLASS_TOKEN_PATHS must be a JSON object {quota class: token file}")
+    return str(mapping.get(quota_class) or "")
+
+
+def _class_token(quota_class: str) -> Optional[str]:
+    """The dedicated credential of `quota_class`, or None when the class has none. A class that HAS one but whose file
+    is missing or empty raises: the whole point is that this traffic never spends the ai-gateway ServiceAccount's
+    MaaS counter, so there is no fallback to it."""
+    path = class_token_path(quota_class)
+    if not path:
+        return None
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as fh:
+            token = fh.read().strip()
+        if token:
+            return token
+    raise MaasAdapterError(
+        f"quota class {quota_class!r} has a dedicated MaaS credential at {path!r} but none is readable - refusing to "
+        "fall back to the ai-gateway ServiceAccount, whose counter this class must never spend"
+    )
+
+
 # ---------------------------------------------------------------------------
 # WP-157 step 4 (inventory finding 4): a MaaS 429 is a quota denial, not an
 # outage. Off by default (maasAdapter.quota429Passthrough.enabled renders
@@ -221,7 +256,7 @@ def quota_exceeded_from(exc: BaseException, provider: str) -> Optional[MaasQuota
     return MaasQuotaExceeded(provider, retry_after, str(exc)[:200])
 
 
-def _maas_bearer_token(caller_bearer_token: Optional[str] = None) -> str:
+def _maas_bearer_token(caller_bearer_token: Optional[str] = None, quota_class: str = "") -> str:
     """2026-09-01 (identity-per-caller): prefers the real caller's own
     Keycloak bearer token (the one this gateway already validated for its
     own AuthN - app/auth.py's CallerIdentity.token) over the pod's fixed
@@ -245,7 +280,14 @@ def _maas_bearer_token(caller_bearer_token: Optional[str] = None) -> str:
 
     WP-157 D5: with MAAS_GATEWAY_IDENTITY on, the pod's ServiceAccount token
     always wins and the caller's token is never sent to MaaS.
+
+    WP-306 (ADR-0624 clause 5): a quota class with a dedicated credential
+    (MAAS_CLASS_TOKEN_PATHS) always sends that one, whatever the switches above
+    say - stress traffic must never spend the shared ai-gateway counter.
     """
+    dedicated = _class_token(quota_class)
+    if dedicated:
+        return dedicated
     if gateway_identity_enabled():
         return _service_account_token()
     if caller_bearer_token:
@@ -365,7 +407,7 @@ def chat_model_via_maas(
 
     return with_reasoning(ChatOpenAI)(
         base_url=endpoint,
-        api_key=_maas_bearer_token(caller_bearer_token),
+        api_key=_maas_bearer_token(caller_bearer_token, context.quota_class if context else ""),
         model=cfg.get("maas_model_ref", cfg.get("model")),
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),

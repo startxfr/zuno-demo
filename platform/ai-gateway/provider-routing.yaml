@@ -396,7 +396,7 @@ providers:
   - name: anthropic
     kind: saas
     role: general-external
-    model: claude-3-5-sonnet-latest
+    model: claude-sonnet-5-5   # claude-3-5-sonnet-latest was retired (404, live 2026-11-17); owner's choice 2026-11-19
     api_key_env: ANTHROPIC_API_KEY
     temperature: 0.2
     eligible_for: [C1, C2]

@@ -138,6 +138,12 @@ jobTemplates:
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [agents, platform]
+  # ADR-0624/WP-307: reads the rows of a stress campaign launched by zuno-day3-stresstest (Job, pod logs): read-only,
+  # so the cluster-reader credential like zuno-day3-test, not gated. No survey: it takes a run id, not a component.
+  - name: zuno-day3-stresstest-collect
+    playbook: ansible/playbooks/day3_stresstest_collect.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
   # WP-103: gated (launch-RBAC)
   - name: zuno-day3-backup
     playbook: ansible/playbooks/day3_backup.yml

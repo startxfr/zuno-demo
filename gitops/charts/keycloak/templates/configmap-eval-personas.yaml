@@ -31,6 +31,6 @@ data:
 {{- end }}
 {{- $groups = $source.groups }}
 {{- end }}
-    {{ $p.username }} {{ join " " $groups }}{{ with $.Values.evalPersonasGroup }} {{ . }}{{ end }}
+    {{ $p.username }} {{ join " " $groups }}{{ with $.Values.evalPersonasGroup }} {{ . }}{{ end }}{{ range $p.extraGroups }} {{ . }}{{ end }}
 {{- end }}
 {{- end }}

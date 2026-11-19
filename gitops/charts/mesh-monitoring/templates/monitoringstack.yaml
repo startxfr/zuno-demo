@@ -14,7 +14,19 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 spec:
   logLevel: info
-  retention: 24h
+  retention: {{ .Values.monitoring.retention | default "24h" | quote }}
+  {{- if .Values.monitoring.storage }}
+  {{- if .Values.monitoring.storage.size }}
+  prometheusConfig:
+    persistentVolumeClaim:
+      {{- if .Values.monitoring.storage.storageClassName }}
+      storageClassName: {{ .Values.monitoring.storage.storageClassName | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.monitoring.storage.size | quote }}
+  {{- end }}
+  {{- end }}
   resourceSelector:
     matchLabels:
       zuno.io/mesh-monitoring: "true"

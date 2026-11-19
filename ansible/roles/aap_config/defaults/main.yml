@@ -89,6 +89,9 @@ aap_config_job_templates:
     credential: zuno-aap-installer
     gated: true
     survey_components: [agents, platform]
+  - name: zuno-day3-stresstest-collect
+    credential: zuno-cluster-reader
+    survey_components: []
   - name: zuno-day3-backup
     credential: zuno-aap-installer
     gated: true

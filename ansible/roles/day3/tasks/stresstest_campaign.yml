@@ -1,0 +1,44 @@
+---
+# WP-307 (ADR-0624): a profile-driven stress campaign, launched from `make d3 stresstest PROFILE=<name>` or AAP's
+# zuno-day3-stresstest (extra vars stress_profile, stress_iterations, stress_concurrency, stress_duration,
+# stress_families, stress_drivers, stress_shards). Informational only (ADR-0058): nothing here fails the make target
+# because a driver or an agent check failed; every report is printed, the run exits 0.
+#
+#   family `agents`  the per-agent Jobs of stresstest_job.yml, unchanged (run when the profile or FAMILIES names it)
+#   every other      the drivers of evaluations/stress/driver_*.py, run by platform/testing/stress_runner.py in ONE
+#                    Indexed Job (completions = parallelism = shards) on python:3.12-slim + pip, like the agent Jobs;
+#                    no `oc`, no httpx on the control node: the Job reaches the gateways over in-cluster HTTP
+#
+# The drivers and profiles travel in the ConfigMap zuno-stress-scripts (rebuilt from the repo on every launch, so a new
+# driver_*.py needs no list to edit; the ConfigMap limit is 1 MiB, checked below). The Job signs in as the
+# zuno-stresstest client only: its class header is honoured only for that client (components/ai-gateway), and the
+# stresstest class is a small fail-closed budget, so a smoke run cannot drain the shared MaaS budget.
+#
+# Async: the Job has activeDeadlineSeconds and ttlSecondsAfterFinished (1 day). With wait=false (profile `job.wait` or
+# -e stress_wait=false, the soak default) the launch returns at once and prints the run id;
+# `make d3 stresstest-collect RUN=<id>` reads the rows later (stresstest_campaign_collect.yml).
+
+# Everything that only reads the make variables and the profile (no cluster call) is in stresstest_campaign_plan.yml, so
+# it can be run and tested offline (evaluations/tests/test_stress_campaign_plan.py).
+- name: "stress | validate the knobs and resolve the plan"
+  ansible.builtin.include_tasks: stresstest_campaign_plan.yml
+
+# Family `agents`: the existing per-agent Jobs, unchanged. Their own report is printed and, informational here, never
+# fails the run (day2_render_fail_inline false); the campaign below is launched first so both run at the same time.
+- name: "stress | launch the driver campaign"
+  ansible.builtin.include_tasks: stresstest_campaign_launch.yml
+  when: (_stress_families | difference(['agents']) | length > 0) or (_stress_drivers | length > 0)
+
+- name: "stress | family agents: the per-agent Jobs"
+  ansible.builtin.include_tasks: stresstest_job.yml
+  vars:
+    day2_render_fail_inline: false
+  when: "'agents' in _stress_families"
+
+- name: "stress | collect the driver campaign"
+  ansible.builtin.include_tasks: stresstest_campaign_collect.yml
+  vars:
+    _stress_job_name: "zuno-stress-{{ _stress_run_id }}"
+  when:
+    - _stress_launched | default(false)
+    - _stress_wait

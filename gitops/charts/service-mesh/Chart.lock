@@ -1,9 +1,9 @@
 dependencies:
 - name: cluster-istio
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.370
+  version: 21.3.371
 - name: cert-manager-istio-csr
   repository: https://charts.jetstack.io
   version: v0.16.0
-digest: sha256:77d8f06f8328255c2cdf2544bf919e221d995390b46244f0386b96b3d01b97ed
-generated: "2026-11-18T23:38:48.837436255+01:00"
+digest: sha256:758e372e37183dfaed95cc7aae07f8b419f51adf0483e0d1b64ed9d28f5ea525
+generated: "2026-11-19T01:46:01.501733804+01:00"

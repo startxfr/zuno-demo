@@ -253,6 +253,11 @@
   loop_control:
     loop_var: day2_stress_agent
 
+# Dashboard coverage pack: stimulates what the agent Jobs above never reach and prints a PASS/MISSING table per
+# dashboard family. Informational and never failing (see stresstest_coverage.yml).
+- name: "day2-stresstest | dashboard coverage pack"
+  ansible.builtin.include_tasks: stresstest_coverage.yml
+
 # Informational, never mandatory (ADR-0058): this exit code is never read
 # by make day1 check agents / the ADR-0053 gate - it's a separate
 # playbook nothing else invokes - but `make d2 stresstest` should still

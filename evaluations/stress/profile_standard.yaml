@@ -1,0 +1,17 @@
+# Standard: the agents family (the existing per-agent Jobs) plus every driver a few times at a low concurrency.
+# First values, to be tuned after the first runs (WP-309 adds the load drivers and the duration phase).
+name: standard
+description: agents family + every driver x3, concurrency 2, under 45 minutes
+families: [agents, tools, models]
+defaults:
+  iterations: 3
+  concurrency: 2
+  timeout: 120
+  shards: 1
+budget:
+  max_consecutive_failures: 3
+  max_429: 5
+  max_tokens: 20000
+job:
+  deadline_seconds: 2700
+  wait: true

@@ -454,7 +454,7 @@ spec:
                       name: prometheus
                     query: >-
                       histogram_quantile(0.95, sum by (le, model_name)
-                      (rate(vllm:time_per_output_token_seconds_bucket{model_name=~"$served_model"}[5m])))
+                      (rate(vllm:inter_token_latency_seconds_bucket{model_name=~"$served_model"}[5m])))
                     seriesNameFormat: "{{`{{model_name}}`}}"
       vllmE2eLatency:
         kind: Panel
@@ -527,7 +527,7 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: 'vllm:gpu_cache_usage_perc{model_name=~"$served_model"}'
+                    query: 'vllm:kv_cache_usage_perc{model_name=~"$served_model"}'
                     seriesNameFormat: "{{`{{model_name}}`}}"
       vllmCompletedByFinishReason:
         kind: Panel
@@ -568,8 +568,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_UTIL)"
-                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                    query: "100 * max by (hostname, exported_pod) (DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO)"
+                    seriesNameFormat: "{{`{{exported_pod}}`}}"
       gpuFramebuffer:
         kind: Panel
         spec:
@@ -587,8 +587,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_USED)"
-                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (used)"
+                    query: "sum by (hostname, gpu) (DCGM_FI_DEV_FB_USED_BYTES)"
+                    seriesNameFormat: "{{`{{hostname}}`}} gpu{{`{{gpu}}`}} (used)"
             - kind: TimeSeriesQuery
               spec:
                 plugin:
@@ -597,8 +597,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE)"
-                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (free)"
+                    query: "sum by (hostname, gpu) (DCGM_FI_DEV_FB_FREE_BYTES)"
+                    seriesNameFormat: "{{`{{hostname}}`}} gpu{{`{{gpu}}`}} (free)"
       gpuTemperature:
         kind: Panel
         spec:
@@ -616,8 +616,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP)"
-                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                    query: "avg by (hostname, gpu) (DCGM_FI_DEV_GPU_TEMP_CELSIUS)"
+                    seriesNameFormat: "{{`{{hostname}}`}} gpu{{`{{gpu}}`}}"
       gpuPowerDraw:
         kind: Panel
         spec:
@@ -635,8 +635,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_POWER_USAGE)"
-                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                    query: "avg by (hostname, gpu) (DCGM_FI_DEV_BOARD_POWER_WATTS)"
+                    seriesNameFormat: "{{`{{hostname}}`}} gpu{{`{{gpu}}`}}"
       tracesSlowModelCall:
         kind: Panel
         spec:

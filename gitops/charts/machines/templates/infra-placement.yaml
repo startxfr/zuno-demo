@@ -39,12 +39,27 @@ metadata:
     zuno.io/managed-by: argocd
 data:
   config.yaml: |
+    {{- $uwmStorage := .Values.infraPlacement.userWorkloadMonitoringStorage | default dict }}
     {{- range list "prometheusOperator" "prometheus" "thanosRuler" "alertmanager" }}
     {{ . }}:
       nodeSelector:
         {{- toYaml $sel | nindent 8 }}
       tolerations:
         {{- toYaml $tol | nindent 8 }}
+      {{- if and (eq . "prometheus") $uwmStorage.size }}
+      {{- /* 2026-11-19: UWM Prometheus kept its TSDB in an emptyDir with the
+      24h default retention, so every restart wiped the application metrics
+      and no panel could look back further than a day. */}}
+      retention: {{ $uwmStorage.retention | default "7d" | quote }}
+      volumeClaimTemplate:
+        spec:
+          {{- if $uwmStorage.storageClassName }}
+          storageClassName: {{ $uwmStorage.storageClassName | quote }}
+          {{- end }}
+          resources:
+            requests:
+              storage: {{ $uwmStorage.size | quote }}
+      {{- end }}
     {{- end }}
 {{- end }}
 {{- if .Values.infraPlacement.gitops }}

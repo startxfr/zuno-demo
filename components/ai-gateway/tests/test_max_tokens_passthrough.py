@@ -135,7 +135,7 @@ def test_anthropic_forwards_max_tokens() -> None:
     _reset_maas_env()
     candidate = ProviderCandidate(name="anthropic", kind="saas")
     with mock.patch("langchain_anthropic.ChatAnthropic") as chat_anthropic:
-        providers.chat_model_for(candidate, {"model": "claude-3-5-sonnet-latest"}, max_tokens=700)
+        providers.chat_model_for(candidate, {"model": "claude-sonnet-5-5"}, max_tokens=700)
     (_, kwargs) = chat_anthropic.call_args
     assert kwargs["max_tokens"] == 700
 

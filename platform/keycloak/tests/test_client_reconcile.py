@@ -458,8 +458,23 @@ def test_each_eval_persona_copies_its_source_users_groups() -> None:
         base = p["groups"] if p.get("groups") else users[p["copyOf"]]["groups"]
         expected = list(base) + (
             [values["evalPersonasGroup"]] if values.get("evalPersonasGroup") else []
-        )
+        ) + list(p.get("extraGroups") or [])
         assert lines[p["username"]] == expected
+
+
+def test_every_extra_group_of_a_persona_is_created_by_the_job() -> None:
+    """ADR-0624 clause 5 / WP-306: the load pool joins /zuno-loadtest, a group the Job must create when missing (the realm
+    import is create-only). A persona naming a group that evalPersonasExtraGroups does not list would be created without
+    that membership, silently."""
+    import yaml
+
+    values = yaml.safe_load((CHART / "values.yaml").read_text())
+    listed = set(values.get("evalPersonasExtraGroups") or [])
+    used = {g for p in values["evalPersonas"] for g in (p.get("extraGroups") or [])}
+    assert used, "no persona uses an extra group: the load pool is gone"
+    assert used <= listed, f"extraGroups not created by the Job: {sorted(used - listed)}"
+    pool = [p["username"] for p in values["evalPersonas"] if "/zuno-loadtest" in (p.get("extraGroups") or [])]
+    assert len(pool) >= 4 and all(u.startswith("stress-load-") for u in pool), pool
 
 
 def test_the_eval_personas_job_runs_after_the_client_reconcile() -> None:

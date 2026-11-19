@@ -270,3 +270,22 @@ Left for after the demo:
 - the session that did not delegate at all;
 - a stricter prompt or a cap of 1. The cap of 1 made acceptance scenario 10 flaky in November and was reverted
   (`550fa857`).
+
+### Scenario #11 of the 2026-11-18 gate (read 2026-11-19)
+
+The gate's pod log still held the full line. `11 ✗ … tool_calls=['docs_rag_retriever_tool'] names_page=True
+cites_red_hat_docs=False`: the internal-page leg (S0R42) passed, and the Red Hat documentation leg failed with no
+timeout and no error.
+
+The trace of that leg (`83609138840b99d59fbc527ff0ff5571`, 18:07:34Z) shows Tekos doing the following:
+- it called `docs_rag_retriever_tool` three times (10 results each);
+- it called `web.page.search` once. That tool answers "no web search provider is configured" on purpose: there is
+  no web search API on the platform (`components/mcp-gateway/app/handlers/web_search.py`);
+- it gave its final answer at 18:07:41Z without a `docs.redhat.com/.../openshift_container_platform/` URL.
+
+So the path works, and the model's answer did not cite the indexed documentation. The model is not consistent here:
+the same leg passed on earlier days. Nothing in v1.1.1 touches it.
+
+The check now adds to its failure detail the URLs the answer cited, the leg's tool calls and the answer's length
+(`evaluations/tekos/run_scenarios.py`). The next failure will then say whether the retriever's sources or the
+model's citation were missing.

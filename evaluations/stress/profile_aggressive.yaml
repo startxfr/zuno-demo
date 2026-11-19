@@ -1,0 +1,19 @@
+# Aggressive: ramp each driver up until the budget guard stops it, on several shards. Chaos (WP-311) is listed here
+# and run beside the load by Ansible; until then the list is empty. First values, tuned after the first runs.
+name: aggressive
+description: load ramp to saturation, stopped by the budget guard; chaos list empty until WP-311
+families: [agents, tools, models]
+defaults:
+  iterations: 60
+  concurrency: 8
+  ramp: 60
+  timeout: 180
+  shards: 2
+budget:
+  max_consecutive_failures: 5
+  max_429: 20
+  max_tokens: 100000
+chaos: []
+job:
+  deadline_seconds: 3600
+  wait: true

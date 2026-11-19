@@ -215,3 +215,13 @@ tool results to Anthropic, so the owner chose a refusal (2026-11-18).
 - In Open WebUI, `praxis.claude` and `praxis.codestral-latest` answer once the Zuno tools are off for the chat.
   Removing the tools from these two models in Open WebUI, so that the refusal never shows, needs a per-model setting
   that the chart does not have yet. It is left for after the 2026-11-24 demo.
+
+## Update 2026-11-19: the SaaS models of Praxis get no Zuno tools in Open WebUI
+
+The owner asked on 2026-11-19 for the tools to be off for these two models rather than renamed (renaming would need
+Praxis code and would undo the refusal above). The `open_webui` role now writes one Open WebUI model entry per SaaS
+model of Praxis (`praxis.claude`, `praxis.codestral-latest`), from inside the Open WebUI pod
+(`ansible/roles/open_webui/files/model_overrides.py`). The entry's `toolIds` is an empty list, which Open WebUI keeps
+over the global default. The entry stays public, and nothing else in it changes. The ids come from the SaaS names
+of the Praxis chart. The refusal stays in Praxis for every other client. The same day, the Claude model of both
+gateways became `claude-sonnet-5-5` (the ai-gateway's `claude-3-5-sonnet-latest` was retired).
