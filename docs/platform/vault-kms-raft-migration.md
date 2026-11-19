@@ -1,5 +1,7 @@
 # Vault: AWS KMS auto-unseal, raft storage, TLS (ADR-0602 clause 1, WP-223)
 
+Last reviewed: 2026-11-19
+
 What changed, what an operator prepares, and how a Vault installed before
 WP-223 is migrated with `ansible/playbooks/vault_migrate_kms_raft.yml`.
 

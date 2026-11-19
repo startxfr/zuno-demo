@@ -1,5 +1,7 @@
 # Working in parallel sessions
 
+Last reviewed: 2026-11-19
+
 Several working sessions often act on this repository and on demo333 at the same time: people, and coding agents that
 each hold their own worktree. This page holds the rules they follow ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 clause 6). The live-demonstration freeze has its own page: [freeze protocol](../demo/freeze-protocol.md).

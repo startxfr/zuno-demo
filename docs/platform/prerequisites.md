@@ -1,5 +1,7 @@
 # Platform Prerequisites
 
+Last reviewed: 2026-11-19
+
 What must be true, and what must be decided, before the first
 `make day0|d0 install` on a new cluster. Everything a Day 0/1/2 component
 installs is *not* here — that is the automation's job (ADR-0056).

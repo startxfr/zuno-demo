@@ -1,5 +1,7 @@
 # zuno-unifai EgressFirewall rehearsal plan (WP-224 rollout step 6)
 
+Last reviewed: 2026-11-19
+
 Status (2026-11-11): the rehearsal ran on 2026-11-08 and passed, see [the evidence](../roadmap/evidence/wp-224-unifai-firewall-rehearsal-2026-11-08.md).
 This file is the plan it followed. What is left is the real switch in `zuno-unifai`, which needs the user's go and a
 window, and a note: the rehearsal used the UnifAI 0.1.65 images and `zuno-unifai` now runs 0.1.68 (pinned 2026-11-11), so

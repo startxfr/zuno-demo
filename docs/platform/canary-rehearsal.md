@@ -1,5 +1,7 @@
 # Rehearsing in a canary namespace
 
+Last reviewed: 2026-11-19
+
 [ADR-0609](../adr/0609-rehearse-on-canary-namespaces-of-demo333.md). demo333 is the only cluster, so a change is
 rehearsed in a canary namespace of its own before it reaches the live stack. What a namespace cannot hold is written in
 the work package as "not rehearsed" and follows [the pre-GA upgrade routine](pre-ga-upgrade.md): backup, recorded

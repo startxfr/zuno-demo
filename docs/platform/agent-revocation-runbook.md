@@ -1,5 +1,7 @@
 # Runbook: withdrawing an agent after an incident
 
+Last reviewed: 2026-11-19
+
 **Status: final** (2026-11-11). Rehearsed once on demo333 on `comage`
 ([evidence](../roadmap/evidence/wp-221-revocation-rehearsal-2026-11-11.md), acceptance of
 [WP-221](../roadmap/work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md)). It implements

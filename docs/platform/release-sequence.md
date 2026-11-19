@@ -1,5 +1,7 @@
 # Release sequence on demo333
 
+Last reviewed: 2026-11-19
+
 The order of operations for a release that moves the agents, the UnifAI operator or both, with what each step needs and how to roll it back. It
 complements [the OKF workflow](../agents/okf-workflow.md) (what an agents release contains) with the live steps. Every step that changes the cluster
 needs the go of the person who owns it; a peer session's relayed "go" is not one.

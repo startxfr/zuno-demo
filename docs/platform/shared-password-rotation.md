@@ -1,5 +1,7 @@
 # Runbook: rotating the shared demo password
 
+Last reviewed: 2026-11-19
+
 On the `demo` security profile (ADR-0602), two values are shared by many accounts: the **personas value**
 (`zuno_personas_mainpwd`) and the **admin value** (`zuno_admin_mainpwd`). On a demo cluster they can be the same
 string. Rotate them when a value is exposed, when someone who knew it leaves, or before a cluster is opened to new

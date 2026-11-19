@@ -1,5 +1,7 @@
 # Upgrading a pre-GA dependency
 
+Last reviewed: 2026-11-19
+
 [ADR-0607](../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md). A pre-GA operator (class `tech-preview`,
 `early-access`, `alpha` or `staging` in `platform/olm/known-good-<cluster>.yaml`) moves only through this routine. OLM
 does not downgrade: a bad release is undone by a restore or a forward fix, never by moving the pin back.

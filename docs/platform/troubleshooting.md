@@ -1,5 +1,7 @@
 # Troubleshooting
 
+Last reviewed: 2026-11-19
+
 Troubleshooting procedures will be expanded as implementation proceeds. The first diagnostic entry point is `make day2|d2 check agents` (the ADR-0053 acceptance/security gate) plus component-specific Ansible role diagnostics (`make day0|d0 check [component]`, `make day1|d1 check [component]`, `make day2|d2 check [component]`). To roll back a misbehaving component, `make day0|d0 uninstall [component]` / `make day1|d1 uninstall [component]` / `make day2|d2 uninstall [component]` reverse the install in the reverse dependency order.
 
 ## A CSV keeps flapping between `Installed` and `Installing`

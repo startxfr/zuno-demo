@@ -1,5 +1,7 @@
 # Backup and recovery (ADR-0112)
 
+Last reviewed: 2026-11-19
+
 Objectives for the demo platform profile: **RPO <= 24h, RTO <= 4h**, per
 service. ADR-0112 is `Implemented` only once a restore drill has actually
 been executed and its results recorded here (see each section's "Restore
