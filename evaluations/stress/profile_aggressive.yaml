@@ -2,18 +2,49 @@
 # and run beside the load by Ansible; until then the list is empty. First values, tuned after the first runs.
 name: aggressive
 description: load ramp to saturation, stopped by the budget guard; chaos list empty until WP-311
-families: [agents, tools, models]
+# `load` pushes (UnifAI scenario replay, ai-gateway and mcp-gateway at concurrency); `saturation` is a sampler that reads the
+# signals of a saturated platform while they run (it needs cluster-monitoring-view on the Job's ServiceAccount).
+families: [agents, tools, models, unifai, guardrails, experiences, state, load, saturation, counters]
+# The load pool of WP-306: one persona per concurrent worker (a budget is keyed by persona), in the `loadtest` class once the
+# quota policy defines it. Needs the Keycloak personas Job to have run; without it the sign-in of each worker fails.
+personas: [stress-load-01, stress-load-02, stress-load-03, stress-load-04, stress-load-05, stress-load-06, stress-load-07, stress-load-08]
 defaults:
   iterations: 60
   concurrency: 8
   ramp: 60
   timeout: 180
   shards: 2
+# Real user paths and UnifAI turns (a full agent run each) are throttled even here; the gateway drivers carry the load.
+drivers:
+  load-unifai-scenarios: {timeout: 300, concurrency: 4, iterations: 40, ramp: 60}
+  load-ai-gateway: {timeout: 180, concurrency: 8, iterations: 400, ramp: 60}
+  load-mcp-gateway: {timeout: 90, concurrency: 8, iterations: 400, ramp: 30}
+  open-webui: {timeout: 240, concurrency: 1, iterations: 5}
+  open-webui-zuno-code: {timeout: 240, concurrency: 1, iterations: 5}
+  open-webui-zuno-wesh: {timeout: 240, concurrency: 1, iterations: 5}
+  dify: {timeout: 240, concurrency: 1, iterations: 5}
+  kagent: {timeout: 240, concurrency: 1, iterations: 5}
+  blender-3d: {timeout: 240, concurrency: 1, iterations: 5}
+  claude-code-sovereign: {timeout: 240, concurrency: 1, iterations: 5}
+  maas-portal-api-keys: {timeout: 240, concurrency: 1, iterations: 5}
+  identity-personas: {timeout: 240, concurrency: 1, iterations: 5}
+  multi-gateway: {timeout: 240, concurrency: 1, iterations: 5}
+  unifai-agents: {timeout: 240, concurrency: 2, iterations: 10}
+  observability-trace: {timeout: 240, concurrency: 2, iterations: 10}
+# One pass of each demo's state checks (the `state` drivers, read-only over the Kubernetes API): they need the stress reader role
+# (stressReader in the namespaces chart); without it each assertion fails with status=403 and says what to enable.
+family_defaults:
+  state: {iterations: 1, concurrency: 1, timeout: 120}
 budget:
   max_consecutive_failures: 5
   max_429: 20
   max_tokens: 100000
-chaos: []
+# WP-311: disruptions inflicted beside the load (evaluations/stress/chaos.yaml), only when the operator types the profile name
+# again (CHAOS_CONFIRM=aggressive). The first at +5 minutes, then each 150 s after the previous one ends.
+chaos: [pod-ai-gateway, pod-mcp-gateway, pod-praxis, provider-cut-mistral, pod-a2a-gateway, pod-open-webui]
+chaos_start: 300
+chaos_spacing: 150
 job:
+  coverage: true   # the dashboard coverage of the campaign window, as the last stage of the collect
   deadline_seconds: 3600
   wait: true

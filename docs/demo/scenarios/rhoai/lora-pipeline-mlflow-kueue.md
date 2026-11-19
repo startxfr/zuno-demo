@@ -51,7 +51,7 @@ Nothing to do. The file reads the DSPA `mlops-dspa` in `zuno-mlops` (condition `
 and `jobset-controller-manager` in `openshift-jobset-operator`. All three controllers were 0/1 on 2026-11-13: tell
 the platform owner and do not start a run. If something else is missing, stop: this demo installs nothing.
 
-The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions.
+The DataScienceCluster shows `Ready=False` overall (`TrustyAIReady=False`, "Some modules are not ready: trustyai"). The file does not read it. The cause is the parked GuardrailsOrchestrator (zuno-guardrails-smoke), in phase `Error` since 2026-11-07. It is not a failure for this demo: the status file checks the demo's own conditions. On 2026-11-19 the cluster session recreated that GuardrailsOrchestrator (phase `Ready`) and the DataScienceCluster read `Ready` again; the status file still does not read it.
 
 ### Check
 

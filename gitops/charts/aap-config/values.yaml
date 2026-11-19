@@ -5,6 +5,12 @@
 aapConfig:
   enabled: false
 
+# ADR-0624 / WP-311: lets the installer credential create and delete AdminNetworkPolicies, which the stress campaign's provider-cut
+# disruption needs when it runs through AAP (clusterrole-stress-chaos.yaml says what that grants). Off by default: the render is
+# then the one of before.
+chaosRbac:
+  enabled: false
+
 # Namespace the CRs and their supporting objects live in - the AAP
 # resource operator (part of the aap operator bundle) only watches its
 # own namespace (OwnNamespace install mode).

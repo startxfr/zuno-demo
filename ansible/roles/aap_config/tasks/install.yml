@@ -270,6 +270,11 @@
 
 # --- The CRs themselves -----------------------------------------------------
 
+# ADR-0624 / WP-311: zuno_stress_chaos_rbac_enabled (ansible/clusters/<cluster>.yml) renders the chart's chaosRbac
+# ClusterRole: the installer credential may create and delete AdminNetworkPolicies for the stress provider-cut.
+- name: "aap-config | load this cluster's non-secret variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "aap-config | apply the aap-config GitOps Application (d1: Project/Inventory/Credential/JobTemplate CRs)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -286,7 +291,9 @@
       {{ {'aapConfig': {'enabled': true}}
          | combine({'project': {'branch': zuno_gitops_target_revision}}
                    if zuno_gitops_target_revision is defined else {},
-                   recursive=True) }}
+                   recursive=True)
+         | combine({'chaosRbac': {'enabled': true}}
+                   if (zuno_stress_chaos_rbac_enabled | default(false) | bool) else {}) }}
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 

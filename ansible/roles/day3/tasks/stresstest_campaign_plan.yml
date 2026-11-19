@@ -10,6 +10,7 @@
       - stress_profile is match('^[a-z0-9][a-z0-9-]*$')
       - (stress_families | default('')) is match('^[a-z0-9,_-]*$')
       - (stress_drivers | default('')) is match('^[a-z0-9,_.-]*$')
+      - (stress_chaos_confirm | default('')) is match('^[a-z0-9-]*$')
       - (stress_iterations | default('') | string) is match('^[0-9]*$')
       - (stress_concurrency | default('') | string) is match('^[0-9]*$')
       - (stress_duration | default('') | string) is match('^[0-9]*$')
@@ -44,9 +45,19 @@
            ((stress_duration | default('') | string) | length > 0) | ternary((stress_duration | default(0) | int) + 900, 0) ] | max }}
     _stress_run_id: "{{ stress_profile }}-{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%d-%H%M%S') }}"
 
+# WP-311: the disruptions a profile lists run only when the operator types the profile name again (stress_chaos_confirm, make's
+# CHAOS_CONFIRM) and has not switched them off (-e stress_chaos=false).
+- name: "stress | the disruptions of the profile and whether they are confirmed"
+  ansible.builtin.set_fact:
+    _stress_chaos_ids: "{{ (_stress_profile.chaos | default([])) if (stress_chaos | default(true) | bool) else [] }}"
+    _stress_chaos_confirmed: "{{ (stress_chaos_confirm | default('')) == stress_profile }}"
+    _stress_chaos_start: "{{ _stress_profile.chaos_start | default(300) | int }}"
+    _stress_chaos_spacing: "{{ _stress_profile.chaos_spacing | default(150) | int }}"
+
 - name: "stress | the plan"
   ansible.builtin.debug:
     msg:
       - "profile {{ stress_profile }}: {{ _stress_profile.description | default('') }}"
       - "families {{ _stress_families }}; drivers {{ _stress_drivers or 'all of the families' }}; shards {{ _stress_shards }}; deadline {{ _stress_deadline }}s; wait {{ _stress_wait }}"
       - "overrides {{ _stress_overrides }}"
+      - "chaos {{ _stress_chaos_ids or 'none' }}{{ (' (confirmed)' if _stress_chaos_confirmed else ' (NOT confirmed: type CHAOS_CONFIRM=' ~ stress_profile ~ ' to run them)') if _stress_chaos_ids else '' }}"

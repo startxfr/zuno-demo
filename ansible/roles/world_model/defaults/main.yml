@@ -18,3 +18,8 @@ world_model_s3_prefix_suffix: world-model
 # Two models load and compile kernels before the runtime is ready: 25 minutes.
 world_model_wait_retries: 100
 world_model_wait_delay: 15
+
+# ADR-0619 clause 5 / WP-303: the alternative gateways the world-model prompt enhancement may use, each {name, label, url, models}
+# (name = the route name, e.g. praxis; url = http://<name>.zuno-ai-gateways.svc:8080/v1). Set per cluster in
+# ansible/clusters/<cluster>.yml. Empty (the default): not added to the Application values, so they are the ones of before.
+zuno_world_model_alt_gateways: []

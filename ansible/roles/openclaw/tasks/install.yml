@@ -1,6 +1,10 @@
 ---
 # ADR-0589/0590 (WP-183): one OpenClaw assistant per persona, deployed by a
 # claw-operator per persona namespace from a catalog pinned by digest.
+# The committed per-cluster file carries zuno_openclaw_alt_gateways: loaded first, like the other roles.
+- name: "openclaw | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "openclaw | load the chart values"
   ansible.builtin.include_tasks: load_values.yml
 
@@ -61,10 +65,11 @@
     gitops_component_name: "openclaw"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-openclaw-d1"
-    gitops_app_extra_helm_values:
-      clusterBaseDomain: "{{ cluster_base_domain }}"
-      assistants:
-        enabled: true
+    # altGateways (WP-301): one custom provider per entry in each Claw and the proxy pods' egress to zuno-ai-gateways;
+    # added only when zuno_openclaw_alt_gateways is not empty, so the values are the ones of before without it.
+    gitops_app_extra_helm_values: >-
+      {{ {'clusterBaseDomain': cluster_base_domain, 'assistants': {'enabled': true}}
+         | combine({'altGateways': zuno_openclaw_alt_gateways} if (zuno_openclaw_alt_gateways | length) > 0 else {}) }}
 
 # ArgoCD has no health check for Claw: wait on the operator's Ready condition.
 - name: "openclaw | wait for each Claw to be Ready"

@@ -36,14 +36,14 @@ its own identity and MaaS budget, and stays informational.**
 
 1. **One driver per demo scenario.** A driver replays the scenario's real calls (the golden-path moment, its API calls,
    its read-only state checks) over in-cluster HTTP with Keycloak tokens, without `oc`, and returns rows in the
-   `Day2Result` shape (platform/testing/day2_report.py). Drivers live in evaluations/stress/drivers/ and reuse the
+   `Day2Result` shape (platform/testing/day2_report.py). Drivers live in evaluations/stress/driver_*.py and reuse the
    probes' `judge_*` functions. Workstation clients (Blender, Claude Code) are replayed by their network path. A driver
    for a scenario that is not deployed (world model) ships disabled; the multi-gateway and agents-alt-gateway drivers
    stay pending until their clients exist (WP-297 to WP-303). WP-308, WP-310.
 2. **Four families of stress.** `functional` (every driver once), `load` (concurrency, iterations or duration, ramp,
    rate cap), `chaos` (disruptions beside a load run), `soak` (a low steady rate for hours). WP-305, WP-309, WP-311,
    WP-312.
-3. **Named profiles with overrides.** `smoke`, `standard`, `aggressive` and `soak` (evaluations/stress/profiles/) set
+3. **Named profiles with overrides.** `smoke`, `standard`, `aggressive` and `soak` (evaluations/stress/profile_<name>.yaml) set
    families, drivers, iterations, concurrency, duration, rate, persona pool and chaos actions. Make variables
    `PROFILE`, `ITERATIONS`, `CONCURRENCY`, `DURATION`, `FAMILIES` and `DRIVERS` override them and travel as AAP extra
    variables. The existing per-agent Jobs become the family `agents`. WP-305, WP-307.
@@ -51,7 +51,8 @@ its own identity and MaaS budget, and stays informational.**
    runner (platform/testing/stress_runner.py); the launch is asynchronous and `make d3 stresstest-collect` reads the
    rows. This amends ADR-0555's 40-minute synchronous wait. WP-307.
 5. **A dedicated identity and budget.** A quota class `loadtest`, a pool of stress personas, and a dedicated MaaS
-   ServiceAccount with its own MaaSSubscription per model route. The ai-gateway chooses its MaaS credential by quota
+   ServiceAccount with its own MaaSSubscription per model route (`<model>-load`; first named `<model>-stress`, renamed
+   2026-11-19). The ai-gateway chooses its MaaS credential by quota
    class, so stresstest traffic never touches the ai-gateway ServiceAccount's counter (F2). Praxis is a second MaaS
    consumer with its own ServiceAccount and subscriptions: Praxis drivers sign in as stress personas and their MaaS
    traffic uses the dedicated identity as well. A runner budget guard stops
@@ -88,3 +89,12 @@ its own identity and MaaS budget, and stays informational.**
 The stress personas and the dedicated MaaS identity have their own credentials, kept in Vault and read by the Job from a
 Secret, never on a command line. The traffic tag is a span attribute, not an authorization input. The chaos actions are
 limited to the list in clause 6.
+
+## Notes
+
+- 2026-11-19, live finding (WP-306): the `<model>-load` limits are not counted by Limitador. The Kuadrant operator
+  cannot write the EnvoyFilter `openshift-ingress/kuadrant-maas-default-gateway` any more: the desired wasm config is
+  3.9 MB, over the 3 MiB API request limit ("Request entity too large"), so the data plane has served the config of
+  2026-11-05 since then, while the TokenRateLimitPolicies report Enforced. Every MaaS subscription added after that
+  date is not enforced. Clause 5's isolation holds (stress traffic never spends the ai-gateway ServiceAccount's
+  counter, proven the same day); the stress budget is capped by the ai-gateway quota ledger until the filter fits.

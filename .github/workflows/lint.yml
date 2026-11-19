@@ -87,6 +87,9 @@ jobs:
       # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
       - name: Markdown link and anchor tests (doc_links)
         run: python3 platform/docs/tests/test_doc_links.py
+      # ADR-0624: the stress table of docs/demo/README.md against the demos and the stress drivers.
+      - name: Stress table tests
+        run: python3 platform/docs/tests/test_stress_table.py
       # ADR-0616 (WP-270, WP-271): the demo pages parse into steps, the read-only allowlist of the steps, the guards
       # and the session, and the pages agree with ansible/demos/ (every row its step file, every Do command covered,
       # no read-only unit changing anything, no stale `make demo` verb in the docs), and the GIF cut of a recording
@@ -136,7 +139,12 @@ jobs:
         run: |
           pip install -r evaluations/tekos/requirements.txt
           python3 evaluations/tests/test_stress_runner.py
+          python3 evaluations/tests/test_stress_chaos.py
           python3 evaluations/tests/test_stress_campaign_plan.py
+          python3 evaluations/tests/test_stress_drivers.py
+          python3 evaluations/tests/test_stress_mutating.py
+          python3 evaluations/tests/test_stress_report.py
+          python3 evaluations/tests/test_stress_state.py
           python3 evaluations/tests/test_dashboard_coverage.py
       # ADR-0616 (WP-274): how the unifai-live-rag demo's start and stop drive the UnifAI RAG API (fake client, no
       # network, no httpx).
@@ -296,6 +304,8 @@ jobs:
           python3 tests/test_wp250_diagram_assertion.py
           # ADR-0624 (WP-306): the stress tag is a span attribute only (SDK on, exporter at a closed port).
           OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_traffic_tag.py
+          # WP-313 step 5: the tool-invocation label sets exist at 0 from startup.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_zero_init.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -353,6 +363,8 @@ jobs:
           python3 tests/test_adapter_selection.py
           python3 tests/test_optimizer.py
           python3 tests/test_stream_telemetry.py
+          # WP-313 step 5: the model counters' known label sets exist at 0 from startup.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_telemetry_zero_init.py
           python3 tests/test_local_cost_estimation.py
           # ADR-0544: X-Zuno-Max-Tokens parsing and per-vendor forwarding,
           # including the via_maas branch structure-demo's own preferred

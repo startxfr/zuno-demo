@@ -3,12 +3,18 @@
 name: smoke
 description: every functional driver x1, concurrency 1, under 15 minutes and 1500 tokens
 # `agents` is the family of the existing per-agent Jobs (scenario, security, gate, token quota): it is not in smoke.
-families: [tools, models]
+# unifai and guardrails need nothing the platform lacks. `experiences` (Open WebUI, the token proxies, Blender and Claude
+# Code) needs the egress and NetworkPolicy openings of WP-308 and spends the shared experience budgets: it joins standard.
+families: [tools, models, unifai, guardrails]
 defaults:
   iterations: 1
   concurrency: 1
   timeout: 120
   shards: 1
+# A UnifAI turn is a full agent run (up to 150 s), longer than the default iteration timeout.
+drivers:
+  unifai-agents: {timeout: 240}
+  observability-trace: {timeout: 240}
 budget:
   max_consecutive_failures: 2
   max_429: 2

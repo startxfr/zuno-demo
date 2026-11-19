@@ -13,6 +13,11 @@ for a number of iterations or for a duration, at a concurrency and an optional r
 Informational only (ADR-0058): the runner exits 0 whatever the rows say; a failing driver is a row, never a crash.
 Exit 2 is a runner error (unknown profile, bad overrides).
 
+A *sampler* driver (`register(..., sampler=True, finish=...)`, WP-309) is a measurement, not a load: it is called every
+`interval` seconds, beside the other drivers, from the start of the run to its end (shard 0 only), and its `finish(ctx,
+samples)` turns what it collected into the final rows (the saturation signals of a load run: queue depth, cache
+pressure, p95, connections). Its samples are not rows; a sampler error is one failing row.
+
 A *budget guard* protects the shared model budgets: a driver stops after `max_consecutive_failures` consecutive
 429/5xx answers (or timeouts), after `max_429` rejected calls in all, and the whole run stops once the drivers have
 reported `max_tokens` tokens through `ctx.add_tokens()`. A tripped guard is a failing row that says so.
@@ -46,6 +51,7 @@ import os
 import pathlib
 import re
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
@@ -84,16 +90,22 @@ class Driver:
     description: str = ""
     needs: Tuple[str, ...] = ()  # what must be deployed for it to mean anything, shown by --list
     mutating: bool = False       # changes cluster state: skipped unless the profile sets allow_mutating
+    sampler: bool = False        # a measurement taken every `interval` seconds beside the load (WP-309), not a load
+    interval: float = 15.0       # seconds between two samples of a sampler
+    finish: Optional[Callable[..., Any]] = None  # (ctx, samples) -> rows, once, when the run ends (a sampler's report)
 
 
 REGISTRY: Dict[str, Driver] = {}
 
 
-def register(id: str, family: str, description: str = "", needs: Iterable[str] = (), mutating: bool = False):
-    """Decorator for a driver function `run(ctx, i) -> List[Day2Result]` (sync or async)."""
+def register(id: str, family: str, description: str = "", needs: Iterable[str] = (), mutating: bool = False,
+             sampler: bool = False, interval: float = 15.0, finish: Optional[Callable[..., Any]] = None):
+    """Decorator for a driver function `run(ctx, i) -> List[Day2Result]` (sync or async). For a sampler, `run` returns
+    the sample (any value) and `finish(ctx, samples)` the rows."""
 
     def wrap(fn: Callable[..., Any]) -> Callable[..., Any]:
-        REGISTRY[id] = Driver(id=id, family=family, run=fn, description=description, needs=tuple(needs), mutating=mutating)
+        REGISTRY[id] = Driver(id=id, family=family, run=fn, description=description, needs=tuple(needs), mutating=mutating,
+                              sampler=sampler, interval=float(interval), finish=finish)
         return fn
 
     return wrap
@@ -108,6 +120,12 @@ def load_drivers(directory: pathlib.Path) -> List[str]:
     sys.path.insert(0, str(directory))
     loaded = []
     for path in sorted(directory.glob("driver_*.py")):
+        known = sys.modules.get(path.stem)
+        if known is not None and getattr(known, "__file__", None) == str(path):
+            # Already loaded: running the file again would register new function objects under the same ids while every
+            # holder of the first module (a test, a patch) keeps the old ones.
+            loaded.append(path.name)
+            continue
         spec = importlib.util.spec_from_file_location(path.stem, path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[path.stem] = module
@@ -167,11 +185,13 @@ def _as_list(value: Any) -> List[str]:
     return [str(v) for v in (value or [])]
 
 
-def settings(profile: Dict[str, Any], overrides: Dict[str, Any], driver_id: str = "") -> Dict[str, Any]:
-    """The effective knobs of one driver: DEFAULTS < profile.defaults < profile.drivers[<id>] < overrides."""
+def settings(profile: Dict[str, Any], overrides: Dict[str, Any], driver_id: str = "", family: str = "") -> Dict[str, Any]:
+    """The effective knobs of one driver: DEFAULTS < profile.defaults < budget < profile.family_defaults[<family>] <
+    profile.drivers[<id>] < overrides."""
     merged = dict(DEFAULTS)
     merged.update(profile.get("defaults") or {})
     merged.update(profile.get("budget") or {})
+    merged.update((profile.get("family_defaults") or {}).get(family) or {})
     merged.update((profile.get("drivers") or {}).get(driver_id) or {})
     for key in ("iterations", "concurrency", "duration", "rate", "ramp", "timeout", "shards", "max_tokens"):
         if key in overrides:
@@ -215,7 +235,7 @@ def build_plan(profile: Dict[str, Any], overrides: Dict[str, Any], registry: Dic
     drivers, warnings = select_drivers(profile, overrides, registry)
     plans = []
     for d in drivers:
-        s = settings(profile, overrides, d.id)
+        s = settings(profile, overrides, d.id, d.family)
         k = int(shards if shards is not None else s["shards"])
         conc = max(1, math.ceil(int(s["concurrency"]) / max(k, 1)))
         plans.append(Plan(
@@ -242,7 +262,7 @@ class Ctx:
         self.ai_gateway = self.env.get("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.mcp_gateway = self.env.get("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.keycloak = self.env.get("KEYCLOAK_URL", "").rstrip("/")
-        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]
+        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]  # a profile's pool is passed in
         self._client = client
         self._tokens: Dict[str, Tuple[str, float]] = {}
         self.tokens_used = 0
@@ -312,6 +332,49 @@ class WorkerCtx:
         return await self._base.token(persona or self.persona)
 
 
+# -- blocking sign-ins shared by the drivers (WP-311 follow-up) ---------------------------------------------------
+# Keycloak's brute-force protection counts every failed or concurrent sign-in of ONE user: many drivers and per-agent Jobs
+# signing in as the same persona at once get refused for a minute. A driver caches the session it gets, signs in under a lock
+# per (persona, client), and retries once after a pause before the row fails.
+SIGNIN_ATTEMPTS = 2
+SIGNIN_BACKOFF = 8.0  # seconds, plus up to the same again of jitter
+_SIGNIN_LOCKS: Dict[Any, threading.Lock] = {}
+_SIGNIN_GUARD = threading.Lock()
+
+
+def signin_lock(key: Any) -> threading.Lock:
+    with _SIGNIN_GUARD:
+        return _SIGNIN_LOCKS.setdefault(key, threading.Lock())
+
+
+def retry_signin(fn: Callable[[], Any], attempts: int = SIGNIN_ATTEMPTS, backoff: float = SIGNIN_BACKOFF,
+                 sleep: Callable[[float], None] = time.sleep, jitter: Callable[[], float] = lambda: __import__("random").random()) -> Any:
+    """Calls the blocking sign-in `fn`; on an exception waits (backoff + jitter) and tries again, up to `attempts`. Blocking."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception:  # noqa: BLE001 - the last attempt re-raises, whatever the sign-in raised
+            if attempt == attempts:
+                raise
+            sleep(backoff * (1 + jitter()))
+
+
+def cached_signin(cache: Dict[Any, Tuple[Any, float]], key: Any, ttl: float, fn: Callable[[], Any],
+                  now: Callable[[], float] = time.time, **retry: Any) -> Any:
+    """The cached session of `key`, else one sign-in (`fn`, with retry) under the key's lock: concurrent callers of one persona
+    wait for that sign-in and reuse it instead of each signing in. Blocking."""
+    hit = cache.get(key)
+    if hit and hit[1] > now():
+        return hit[0]
+    with signin_lock(key):
+        hit = cache.get(key)
+        if hit and hit[1] > now():
+            return hit[0]
+        value = retry_signin(fn, **retry)
+        cache[key] = (value, now() + ttl)
+        return value
+
+
 # -- the budget guard --------------------------------------------------------------------------------------------
 
 
@@ -357,6 +420,7 @@ class Stats:
     c5xx: int = 0
     timeouts: int = 0
     lat: List[float] = field(default_factory=list)
+    timeline: Dict[int, List[int]] = field(default_factory=dict)  # {wall-clock second // 10 * 10: [iterations, failed]} (WP-311)
 
 
 class RateLimiter:
@@ -392,8 +456,13 @@ async def _call(driver: Driver, wctx: WorkerCtx, i: int, timeout: float) -> Tupl
         return [row(driver.id, "stress", "exception", "error", False, f"{type(exc).__name__}: {str(exc)[:200]}")], False
 
 
+TIMELINE_BUCKET = 10
+TIMELINE_CAP = 2000  # buckets kept per driver and shard (five and a half hours)
+
+
 async def run_plan(plan: Plan, ctx: Ctx, guard: Guard, sink: Callable[[List[Day2Result]], None],
-                   shard_index: int = 0, clock: Callable[[], float] = time.monotonic) -> Stats:
+                   shard_index: int = 0, clock: Callable[[], float] = time.monotonic,
+                   wall: Callable[[], float] = time.time) -> Stats:
     """Runs one driver: `iterations` iterations, or a loop until `duration` seconds have passed, on `concurrency`
     workers. Rows go to `sink` as they complete; the returned Stats feed the summary row."""
     stats = Stats()
@@ -436,6 +505,9 @@ async def run_plan(plan: Plan, ctx: Ctx, guard: Guard, sink: Callable[[List[Day2
             stats.c5xx += 1 if any(s >= 500 for s in statuses) else 0
             stats.timeouts += 1 if timed_out else 0
             stats.lat.append(elapsed)
+            bucket = stats.timeline.setdefault(int(wall() // TIMELINE_BUCKET * TIMELINE_BUCKET), [0, 0])
+            bucket[0] += 1
+            bucket[1] += 0 if ok else 1
             guard.record(worst, timed_out)
             for r in rows:
                 r.id = f"s{shard_index}.i{i}/{r.id}"
@@ -462,8 +534,9 @@ def summary_row(driver: Driver, stats: Stats, guard: Guard, shard_index: int, sh
     human = (f"{mode}: n={stats.n} ok={stats.ok} err={stats.err} 429={stats.c429} 5xx={stats.c5xx} timeouts={stats.timeouts} "
              f"p50={percentile(lat, 50):.0f}ms p95={percentile(lat, 95):.0f}ms p99={percentile(lat, 99):.0f}ms"
              + (f" - BUDGET GUARD: {guard.reason}" if guard.tripped else ""))
+    timeline = [[b, v[0], v[1]] for b, v in sorted(stats.timeline.items())][-TIMELINE_CAP:]
     machine = json.dumps({"n": stats.n, "ok": stats.ok, "err": stats.err, "c429": stats.c429, "c5xx": stats.c5xx,
-                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason}, separators=(",", ":"))
+                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason, "tl": timeline, "fam": driver.family}, separators=(",", ":"))
     passed = stats.n > 0 and stats.err == 0 and not guard.tripped
     return row(driver.id, SUMMARY_LAYER, f"summary:s{shard_index}of{shards}", "summary", passed, f"{human} | {machine}")
 
@@ -479,7 +552,12 @@ def merge_summaries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         except ValueError:
             continue
         m = merged.setdefault(r["agent"], {"driver": r["agent"], "n": 0, "ok": 0, "err": 0, "c429": 0, "c5xx": 0,
-                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0})
+                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0, "tl": {}, "family": ""})
+        m["family"] = s.get("fam") or m["family"]
+        for bucket, n, err in s.get("tl", []):
+            cell = m["tl"].setdefault(int(bucket), [0, 0])
+            cell[0] += int(n)
+            cell[1] += int(err)
         for key in ("n", "ok", "err", "c429", "c5xx", "timeouts"):
             m[key] += int(s.get(key, 0))
         m["lat"] += s.get("lat", [])
@@ -489,6 +567,7 @@ def merge_summaries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for m in merged.values():
         m["p50"], m["p95"], m["p99"] = (percentile(m["lat"], q) for q in (50, 95, 99))
         del m["lat"]
+        m["timeline"] = [[b, v[0], v[1]] for b, v in sorted(m.pop("tl").items())]
     return sorted(merged.values(), key=lambda m: m["driver"])
 
 
@@ -511,6 +590,43 @@ def _emit(rows: List[Day2Result]) -> None:
         print(json.dumps([asdict(r) for r in rows], separators=(",", ":")), flush=True)
 
 
+async def _sample_loop(driver: Driver, ctx: Ctx, stop: "asyncio.Event") -> List[Any]:
+    """Call a sampler at once, then every `interval` seconds, until the run ends; one last sample is taken at the end.
+    Returns the samples; an exception raised by a sample is kept as the sample (the report says so)."""
+    wctx = ctx.for_worker(0)
+    samples: List[Any] = []
+
+    async def take() -> None:
+        try:
+            if asyncio.iscoroutinefunction(driver.run):
+                samples.append(await driver.run(wctx, len(samples)))
+            else:
+                samples.append(await asyncio.get_running_loop().run_in_executor(None, driver.run, wctx, len(samples)))
+        except Exception as exc:  # noqa: BLE001
+            samples.append(exc)
+
+    await take()
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=max(driver.interval, 0.01))
+        except asyncio.TimeoutError:
+            await take()
+    await take()
+    return samples
+
+
+async def _finish_sampler(driver: Driver, ctx: Ctx, samples: List[Any]) -> List[Day2Result]:
+    if driver.finish is None:
+        return [row(driver.id, "stress", "sampler", "sampler", False, "a sampler needs a finish(ctx, samples) function")]
+    try:
+        rows = driver.finish(ctx, samples)
+        if asyncio.iscoroutine(rows):
+            rows = await rows
+        return list(rows or [])
+    except Exception as exc:  # noqa: BLE001
+        return [row(driver.id, "stress", "sampler", "sampler", False, f"{type(exc).__name__}: {str(exc)[:200]}")]
+
+
 async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], overrides: Dict[str, Any],
                   shard_index: int, shards: int, flush_seconds: float = 300.0,
                   emit: Callable[[List[Day2Result]], None] = _emit) -> List[Day2Result]:
@@ -519,6 +635,10 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
     out: List[Day2Result] = []
     pending: List[Day2Result] = []
     last_flush = [time.monotonic()]
+    samplers = [p for p in plans if p.driver.sampler] if shard_index == 0 else []  # one sampler per run, not per shard
+    plans = [p for p in plans if not p.driver.sampler]
+    stop = asyncio.Event()
+    sampling = {p.driver.id: ([], asyncio.ensure_future(_sample_loop(p.driver, ctx, stop))) for p in samplers}
 
     def sink(rows: List[Day2Result]) -> None:
         out.extend(rows)
@@ -529,7 +649,7 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
             last_flush[0] = time.monotonic()
 
     for plan in plans:
-        s = settings(profile, overrides, plan.driver.id)
+        s = settings(profile, overrides, plan.driver.id, plan.driver.family)
         ctx.max_tokens = int(s["max_tokens"])
         guard = Guard(s["max_consecutive_failures"], s["max_429"])
         if ctx.token_budget_spent:
@@ -550,6 +670,17 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
         emit(list(pending))
         pending.clear()
         last_flush[0] = time.monotonic()
+    stop.set()
+    for plan in samplers:
+        samples, task = sampling[plan.driver.id]
+        try:
+            samples.extend(await asyncio.wait_for(task, timeout=max(plan.timeout, 30)))
+        except Exception as exc:  # noqa: BLE001 - a stuck sampler is a row, the load rows are already out
+            task.cancel()
+            samples.append(exc)
+        sink(await _finish_sampler(plan.driver, ctx, samples))
+        emit(list(pending))
+        pending.clear()
     if ctx._client is not None and hasattr(ctx._client, "aclose"):
         await ctx._client.aclose()
     return out
@@ -604,7 +735,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                   f"duration={p.duration:g} rate={p.rate:g} ramp={p.ramp:g} timeout={p.timeout:g}")
         print(f"profile={profile['name']} shard={index}/{shards} drivers={len(plans)}")
         return 0
-    personas = _as_list(overrides.get("personas"))
+    personas = _as_list(overrides.get("personas")) or _as_list(profile.get("personas"))
     ctx = Ctx(personas=personas or None)
     print(f"[stress] run {ctx.run_id} profile {profile['name']} shard {index}/{shards}: {len(plans)} driver(s)", file=sys.stderr, flush=True)
     asyncio.run(run_all(plans, ctx, profile, overrides, index, shards, float(os.environ.get("STRESS_FLUSH_SECONDS", "300"))))

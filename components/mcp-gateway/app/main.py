@@ -33,7 +33,7 @@ from app.policy import (
     evaluate_without_declaration,
 )
 from app import downstream, mcp_frontdoor, promql_scope, signed_chain
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, tool_invoke_span
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, prime_zero_counters, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("mcp_gateway")
@@ -53,6 +53,18 @@ policy_store = PolicyStore()
 agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
 binding_registry = BindingRegistry()  # ADR-0116: capability -> physical backend
 delegation_limits = DelegationLimits()  # ADR-0406: corp ceiling and the delegated-write flag
+
+
+def _primed_tools():
+    """(tool, capability, mcp_server) of every tool of the policy: the label sets WP-313 creates at 0."""
+    out = []
+    for tool, server in policy_store.tool_servers():
+        binding = binding_registry.resolve(tool)
+        out.append((tool, binding.capability if binding else "unknown", server))
+    return out
+
+
+prime_zero_counters(_primed_tools())  # WP-313 step 5: rate() sees the first invocations after a restart
 
 
 DEFAULT_MAX_BATCH_SIZE = 20

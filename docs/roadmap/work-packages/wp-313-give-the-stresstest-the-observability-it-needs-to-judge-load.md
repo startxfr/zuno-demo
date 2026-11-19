@@ -1,6 +1,6 @@
 # WP-313: Give the stresstest the observability it needs to judge load
 
-- **State:** Repo work in review (2026-11-19: dashboards and the Authorino ServiceMonitor done; the Limitador counter reader and the zero-initialised counters remain)
+- **State:** Repo work in review (2026-11-19: dashboards, the Authorino ServiceMonitor, the Limitador counter reader and the zero-initialised counters are in the repo; the image rebuild and roll that ships step 5 is the reviewer's)
 - **ADRs:** ADR-0624 (clause 9)
 - **Depends on:** none
 - **Related:** WP-306, WP-312
@@ -28,9 +28,25 @@ are visible, and a counter does not read zero after a restart.
 4. A Limitador counter reader for the stress report: the per-limit counters are not exported as metrics, so the report
    reads `/counters/<namespace>` of the Limitador HTTP API before and after a run (the proof of WP-306 that a load run
    leaves the ai-gateway ServiceAccount's MaaS counter unchanged). To do.
-5. Zero-initialised counters in the ai-gateway (and the mcp-gateway): the OTel counters are created at their first event,
-   so after a restart `rate()`/`increase()` miss the first events of each label set. Pre-create the known label sets at
-   0. Ships with the WP-306 image roll. To do.
+5. Zero-initialised counters in the ai-gateway and the mcp-gateway: the OTel counters are created at their first event,
+   so after a restart `rate()`/`increase()` miss the first events of each label set. At startup
+   (`prime_zero_counters`, `app/telemetry.py` of both) the known label sets are added at 0, behind
+   `TELEMETRY_ZERO_INIT` (default on, `0` turns it off). ai-gateway: `zuno.model_calls`, `model_tokens` (prompt,
+   completion), `model_cost_usd`, the `_by_group` pair, `semantic_cache_lookups`, `guardrails_evaluations`,
+   `model_candidates_skipped`, `model_empty_responses`, for every provider and served model of
+   `provider-routing.yaml` (`RoutingTable.provider_models()`), the outcomes `success`/`error`, and the clients =
+   the exact `EXPERIENCE_CLIENTS` entries plus `other` and empty (a `prefix*` entry such as `openclaw-*` is per
+   persona and is never primed; no per-user label exists). 1,874 series on the 14 providers and 7 declared clients
+   (224 per model counter, 448 per token counter). mcp-gateway: `zuno.tool_invocations` for each tool of the
+   tool policy (its capability from the bindings, its server from the policy) and each of allowed/denied/error.
+   Limits, stated: only the series with an empty `agent` and an empty `group` are primed (the ones every non-agent
+   call uses); a series carrying an agent name or a group is born at its first call, and `zuno.guardrails_detections`
+   is not primed (its detection names are the detector's own vocabulary). Tests: `components/ai-gateway/tests/
+   test_telemetry_zero_init.py` (6) and `components/mcp-gateway/tests/test_zero_init.py` (4), both in the lint
+   workflow. It ships with the next ai-gateway and mcp-gateway image roll.
+6. The counters sampler's failing row names the known cause of "no counter" on demo333: the Kuadrant EnvoyFilter
+   `openshift-ingress/kuadrant-maas-default-gateway` is stale since 2026-11-05 and lacks the load and praxis limit
+   actions (zuno-demo-cluster, 2026-11-19). The fix is operational and waits for the owner's go.
 
 ## Acceptance
 

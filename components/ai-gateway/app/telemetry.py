@@ -223,6 +223,85 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
 
 
+# WP-313 step 5: an OTel counter exists only from its first event, so after a restart rate()/increase() miss the first
+# events of each label set. These are the label sets the dashboards sum, created at 0 at startup. Bounded on purpose: the
+# providers and models of provider-routing.yaml, the outcomes and kinds the code emits, the EXACT experience clients
+# (a `prefix*` entry is per persona: never primed) plus "other" and "" (no client). Series with an `agent` or a `group`
+# value are born at their first call, only the empty-agent / empty-group series are primed (the ones every non-agent call uses).
+ZERO_INIT_ENV = "TELEMETRY_ZERO_INIT"
+MODEL_OUTCOMES = ("success", "error")
+TOKEN_KINDS = ("prompt", "completion")
+CACHE_OUTCOMES = ("hit", "miss", "unavailable")
+GUARDRAILS_OUTCOMES = ("clean", "detected", "unavailable")
+SKIP_REASONS = ("not_ready", "circuit_open")
+
+
+def primed_clients() -> List[str]:
+    """The `client` values primed: the exact declared experience clients, "other" and ""."""
+    exact = [c for c in experience_clients() if not c.endswith("*")]
+    return sorted(set(exact)) + ["other", ""]
+
+
+def zero_init_enabled() -> bool:
+    return os.getenv(ZERO_INIT_ENV, "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def zero_label_sets(provider_models: Iterable[tuple], clients: Optional[List[str]] = None) -> Dict[str, List[Dict[str, str]]]:
+    """{counter name: [label sets]} to create at 0. Pure, so a test can bound it."""
+    clients = primed_clients() if clients is None else clients
+    pm = sorted(set(provider_models))
+    models = sorted({m for _, m in pm if m})
+    out: Dict[str, List[Dict[str, str]]] = {
+        "calls": [], "cost": [], "tokens": [], "calls_by_group": [], "tokens_by_group": [], "cache": [],
+        "guardrails": [], "skipped": [], "empty": [],
+    }
+    for provider, model in pm:
+        for client in clients:
+            for outcome in MODEL_OUTCOMES:
+                base = {"provider": provider, "model": model, "outcome": outcome, "agent": "", "client": client}
+                out["calls"].append(base)
+                out["cost"].append(base)
+                out["calls_by_group"].append({**base, "group": ""})
+                for kind in TOKEN_KINDS:
+                    out["tokens"].append({**base, "kind": kind})
+                    out["tokens_by_group"].append({**base, "group": "", "kind": kind})
+            for reason in SKIP_REASONS:
+                out["skipped"].append({"provider": provider, "reason": reason, "client": client})
+        for recovered in ("true", "false"):
+            out["empty"].append({"provider": provider, "model": model, "recovered": recovered})
+    for model in models:
+        for outcome in CACHE_OUTCOMES:
+            out["cache"].append({"outcome": outcome, "model": model})
+    for client in clients:
+        for outcome in GUARDRAILS_OUTCOMES:
+            out["guardrails"].append({"agent": "", "outcome": outcome, "client": client})
+    return out
+
+
+def prime_zero_counters(provider_models: Iterable[tuple]) -> int:
+    """Creates the known label sets of the model counters at 0 (switch TELEMETRY_ZERO_INIT=0 turns it off). Returns how many
+    series were primed. Never raises: metrics must not stop the gateway from starting."""
+    if not zero_init_enabled():
+        return 0
+    counters = {"calls": _model_call_counter, "cost": _cost_counter, "tokens": _token_counter,
+                "calls_by_group": _model_call_by_group_counter, "tokens_by_group": _token_by_group_counter,
+                "cache": _cache_lookup_counter, "guardrails": _guardrails_eval_counter,
+                "skipped": _candidates_skipped_counter, "empty": _empty_response_counter}
+    n = 0
+    try:
+        for name, label_sets in zero_label_sets(provider_models).items():
+            counter = counters[name]
+            if counter is None:
+                continue
+            for labels in label_sets:
+                counter.add(0, labels)
+                n += 1
+    except Exception:  # noqa: BLE001
+        logger.debug("zero-initialising the counters failed", exc_info=True)
+    logger.info("telemetry: %d counter series created at 0", n)
+    return n
+
+
 def record_guardrails_evaluation(agent: str, outcome: str, detections: Iterable[str] = ()) -> None:
     """`outcome` is "clean", "detected" or "unavailable"; `detections` the
     detection names of a "detected" outcome (the detector's own bounded

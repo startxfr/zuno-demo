@@ -19,6 +19,8 @@ spec:
         cluster-ods:
           DSCInitialization:
             enabled: true
+          DataScienceCluster:
+            enabled: true
         dataScienceCluster:
           enabled: true
         maasGateway:

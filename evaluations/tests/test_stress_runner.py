@@ -13,6 +13,7 @@ import pathlib
 import sys
 import time
 import unittest
+from unittest import mock
 
 import httpx
 import yaml
@@ -104,7 +105,7 @@ class ShippedProfiles(unittest.TestCase):
     def test_every_profile_is_valid_and_names_known_things(self):
         known_families = {d.family for d in sr.REGISTRY.values()} | {"agents"}
         profiles = sorted(STRESS_DIR.glob("profile_*.yaml"))
-        self.assertEqual([p.stem for p in profiles], ["profile_aggressive", "profile_smoke", "profile_soak", "profile_standard"])
+        self.assertEqual([p.stem for p in profiles], ["profile_aggressive", "profile_mutating", "profile_smoke", "profile_soak", "profile_standard"])
         for path in profiles:
             data = yaml.safe_load(path.read_text())
             self.assertEqual(data["name"], path.stem.replace("profile_", ""))
@@ -258,6 +259,98 @@ class BudgetGuard(unittest.TestCase):
         self.assertIn(("after", "token-budget"), ids)
         self.assertTrue(any(r.layer == sr.SUMMARY_LAYER and r.agent == "l" and not r.passed for r in rows))
         self.assertTrue(emitted)
+
+
+class Samplers(unittest.TestCase):
+    """WP-309: a sampler is a measurement beside the load, reported once at the end."""
+
+    def sampler(self, finish=None, run=None, interval=0.03):
+        async def sample(ctx, i):
+            return {"n": i}
+
+        return sr.Driver(id="sat", family="saturation", run=run or sample, sampler=True, interval=interval,
+                         finish=finish if finish is not None else (lambda ctx, samples: [sr.row("sat", "saturation", "count", "saturation", True, f"samples={len(samples)}")]))
+
+    def slow_load(self, seconds=0.25):
+        async def run(ctx, i):
+            await asyncio.sleep(seconds)
+            return [sr.row("load", "f", "x", "c", True, "status=200")]
+
+        return fake("load", fn=run)
+
+    def run_all(self, plans, shard=0, shards=1):
+        emitted = []
+        rows = asyncio.run(sr.run_all(plans, sr.Ctx(env={}), {"name": "t"}, {}, shard, shards, emit=emitted.append))
+        return rows, emitted
+
+    def test_the_sampler_runs_beside_the_load_and_reports_once(self):
+        rows, _ = self.run_all([plan_of(self.sampler()), plan_of(self.slow_load(), iterations=1)])
+        count = next(r for r in rows if r.id.endswith("count"))
+        n = int(count.detail.split("=")[1])
+        self.assertTrue(4 <= n <= 14, n)  # one at once, one every 30 ms for 250 ms, one at the end
+        self.assertEqual([r.agent for r in rows if r.layer == sr.SUMMARY_LAYER], ["load"])  # no load summary for a sampler
+
+    def test_a_run_of_only_a_sampler_still_samples_twice(self):
+        rows, _ = self.run_all([plan_of(self.sampler())])
+        self.assertGreaterEqual(int(rows[0].detail.split("=")[1]), 2)
+
+    def test_only_shard_zero_samples(self):
+        rows, _ = self.run_all([plan_of(self.sampler()), plan_of(self.slow_load(0.05), iterations=1)], shard=1, shards=2)
+        self.assertFalse([r for r in rows if r.agent == "sat"])
+
+    def test_a_failing_sample_is_kept_as_a_sample_not_a_crash(self):
+        seen = {}
+
+        def finish(ctx, samples):
+            seen["errors"] = [s for s in samples if isinstance(s, Exception)]
+            return [sr.row("sat", "saturation", "count", "saturation", False, f"errors={len(seen['errors'])}")]
+
+        async def boom(ctx, i):
+            raise ValueError("thanos down")
+
+        rows, _ = self.run_all([plan_of(self.sampler(finish=finish, run=boom))])
+        self.assertTrue(seen["errors"] and "thanos down" in str(seen["errors"][0]))
+        self.assertFalse(rows[0].passed)
+
+    def test_a_sampler_without_finish_or_with_a_broken_one_is_a_failing_row(self):
+        rows, _ = self.run_all([plan_of(sr.Driver(id="sat", family="saturation", run=lambda ctx, i: {}, sampler=True, interval=0.02))])
+        self.assertIn("finish", rows[0].detail)
+        def bad(ctx, samples):
+            raise RuntimeError("kaput")
+        rows, _ = self.run_all([plan_of(self.sampler(finish=bad))])
+        self.assertIn("RuntimeError: kaput", rows[0].detail)
+
+    def test_a_sync_sampler_works(self):
+        rows, _ = self.run_all([plan_of(self.sampler(run=lambda ctx, i: {"n": i}))])
+        self.assertTrue(rows[0].passed)
+
+    def test_a_profile_may_name_the_persona_pool(self):
+        seen = {}
+
+        async def fake_run_all(plans, ctx, *a, **k):
+            seen["personas"] = ctx.personas
+            return []
+
+        with mock.patch.object(sr, "run_all", fake_run_all):
+            sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
+            self.assertEqual(seen["personas"], [f"stress-load-{n:02d}" for n in range(1, 9)])
+            with mock.patch.dict("os.environ", {"STRESS_OVERRIDES": '{"personas": ["p9"]}'}):
+                sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
+            self.assertEqual(seen["personas"], ["p9"])
+            sr.main(["--dir", str(STRESS_DIR), "--profile", "smoke"])
+            self.assertEqual(seen["personas"], ["stress-consultant-01"])
+
+
+class LoadDriversTwice(unittest.TestCase):
+    def test_loading_the_same_directory_twice_keeps_the_first_modules_and_registrations(self):
+        """Every test file loads the drivers: a second load must not replace the registered functions, or a test that
+        patches the module it imported first would patch something the registry no longer calls."""
+        module = sys.modules["driver_tools"]
+        function = sr.REGISTRY["mcp-tools-by-group"].run
+        names = sr.load_drivers(STRESS_DIR)
+        self.assertIn("driver_tools.py", names)
+        self.assertIs(sys.modules["driver_tools"], module)
+        self.assertIs(sr.REGISTRY["mcp-tools-by-group"].run, function)
 
 
 class Summaries(unittest.TestCase):
@@ -433,7 +526,51 @@ class Cli(unittest.TestCase):
             self.assertEqual(sr.main(["--dir", str(STRESS_DIR), "--dry-run", "--profile", "smoke"]), 0)
         text = out.getvalue()
         self.assertIn("ai-gateway-sovereignty", text)
-        self.assertIn("profile=smoke shard=0/1 drivers=3", text)
+        expected = len(sr.build_plan(sr.load_profile("smoke", STRESS_DIR), {}, sr.REGISTRY)[0])
+        self.assertIn(f"profile=smoke shard=0/1 drivers={expected}", text)
+
+
+class SignIn(unittest.TestCase):
+    """The shared blocking sign-in helpers: one sign-in per persona, one retry after a pause."""
+
+    def test_retries_once_then_raises(self):
+        calls, pauses = [], []
+
+        def refused():
+            calls.append(1)
+            raise RuntimeError("refused")
+        with self.assertRaises(RuntimeError):
+            sr.retry_signin(refused, attempts=2, backoff=5, sleep=pauses.append, jitter=lambda: 0.0)
+        self.assertEqual((len(calls), pauses), (2, [5]))
+
+    def test_second_attempt_can_succeed(self):
+        state = {"n": 0}
+
+        def flaky():
+            state["n"] += 1
+            if state["n"] == 1:
+                raise RuntimeError("bounced")
+            return "token"
+        self.assertEqual(sr.retry_signin(flaky, sleep=lambda s: None, jitter=lambda: 0.0), "token")
+
+    def test_concurrent_callers_share_one_sign_in(self):
+        import threading
+        import time as _t
+        cache, calls = {}, []
+
+        def slow():
+            calls.append(1)
+            _t.sleep(0.05)
+            return "tok"
+        out = []
+        threads = [threading.Thread(target=lambda: out.append(sr.cached_signin(cache, ("p", "c"), 60, slow))) for _ in range(6)]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
+        self.assertEqual((out, len(calls)), (["tok"] * 6, 1))
+
+    def test_expired_entry_signs_in_again(self):
+        cache = {("p",): ("old", 5.0)}
+        self.assertEqual(sr.cached_signin(cache, ("p",), 60, lambda: "new", now=lambda: 10.0), "new")
 
 
 if __name__ == "__main__":

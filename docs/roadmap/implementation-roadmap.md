@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 45 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-313 |
+| v0.17 | 14 | 11 | 50 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-299, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1216,17 +1216,22 @@ Blender and world-model.
 | WP-294 | [wp-294](work-packages/wp-294-deploy-agent-router-as-an-alternative-gateway.md) | 0622 | WP-292 | Not started | owner's decision on ADR-0622 clause 1 first |
 | WP-295 | [wp-295](work-packages/wp-295-deploy-bifrost-as-an-alternative-gateway.md) | 0623 | WP-292 | Not started | owner's decision on ADR-0623 clause 1 first |
 | WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
-| WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Not started | owner's go: token-proxy rebuild and roll, kagent |
-| WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Operator pending | step 4 (the claude-code client in an agents release) |
-| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: UnifAI objects |
-| WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
-| WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: OpenClaw personas |
+| WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Done | none |
+| WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Done | none |
+| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Operator pending | one C1 chat through zuno-gateway-praxis in the UnifAI UI |
+| WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Done | none |
+| WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: OpenClaw personas (the proxy pod labels `app: claw-proxy` are not read from a live pod, the demo333 entry, the roll, zuno-demo-reorg told) |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
-| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: world-model web roll |
+| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: world-model web roll (the demo333 entry, the image build and roll, zuno-demo-reorg told) |
 | WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Operator pending | the three pages exist; `claude-code-sovereign` rehearsed (5 min) with its GIF on 2026-11-19 (75b05ec9); left: `multi-gateway` and `agents-alt-gateway` not rehearsed, owner's go: one live play of each scenario |
 | WP-305 | [wp-305](work-packages/wp-305-build-the-stress-runner-core-and-profiles.md) | 0624 | none | Repo work in review | owner's go: the smoke run of WP-307 |
 | WP-306 | [wp-306](work-packages/wp-306-give-the-stress-runs-their-own-identity-and-budget.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: a zuno-demo-agents release defining `loadtest`, the gateway image rolls, the stress subscriptions and the persona pool |
 | WP-307 | [wp-307](work-packages/wp-307-launch-the-stress-campaign-as-an-indexed-job.md) | 0624 | WP-305 | Repo work in review | owner's go: the smoke run through make and AAP; an aap-config roll |
+| WP-308 | [wp-308](work-packages/wp-308-replay-the-demo-scenarios-as-stress-drivers.md) | 0624 | WP-305, WP-306, WP-307 | Repo work in review | owner's go: the zuno-ai-run egress to open-webui, ai-gateway and praxis, the token-proxy stressClients switch, the workstation entries |
+| WP-309 | [wp-309](work-packages/wp-309-push-the-platform-with-concurrent-load-and-read-its-saturation.md) | 0624 | WP-305, WP-306, WP-307, WP-308 | Repo work in review | owner's go: `cluster-monitoring-view` for the acceptance-gate ServiceAccount, the persona pool, a first aggressive run |
+| WP-310 | [wp-310](work-packages/wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: the stress reader role (cluster-wide read), batch 2 not started |
+| WP-311 | [wp-311](work-packages/wp-311-inflict-bounded-disruptions-beside-the-stress-load.md) | 0624 | WP-305, WP-307, WP-312 | Repo work in review | owner's go: the AdminNetworkPolicy grant for the AAP installer (optional), a first aggressive run with CHAOS_CONFIRM |
+| WP-312 | [wp-312](work-packages/wp-312-report-the-campaigns-and-read-the-limitador-counters.md) | 0624 | WP-307, WP-309 | Repo work in review | owner's go: a first standard run and its report |
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
 
 ### OKF stream phases
@@ -1373,6 +1378,9 @@ moving.
 
 ## Change log
 
+- 2026-11-19 — WP-300 Done: Dify gets a model `praxis-auto` on its token proxy's Praxis route; its registration call reached Praxis's MaaS step with 200, and the default Dify path is unchanged (golden-path probe PASS). The install needs confidential.yml (Dify's S3 values), so it ran locally, not through AAP.
+- 2026-11-19 — WP-297 Done: kagent gets Praxis as a second gateway. Its token proxy's `/alt/praxis` route serves a new agent, `zuno-diagnose-praxis`, which answered a live diagnose question on Praxis's MaaS step. The default kagent and Dify paths are unchanged (golden-path probes PASS).
+- 2026-11-19 — WP-298 Done: Claude Code runs on the sovereign models through Praxis. The coding task passed live on 2026-11-18, the owner's take is published as the claude-code-sovereign GIF (75b05ec9), and step 4, the `claude-code` experience-client declaration, was already shipped in every agents release since v1.1.0 (zuno-demo-agents PR #62).
 - 2026-11-18 — WP-292 Done: Praxis runs on demo333 with every acceptance item met. The last open item, the first call after an idle hour getting 503, is fixed by turning off Envoy's 1 h TCP idle timeout between Praxis and Redis on both sidecars (`12669efb`, `73c45b07`), and proven live: after 65 minutes without Redis traffic, both calls got 200. The fallback was re-proven live (`26b7b2ec`), and the SaaS route refuses tools and tool results (`3d5320f0`, [ADR-0619 update of 2026-11-18](../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
 - 2026-11-17 — ADR-0619 to ADR-0623 and WP-291 to WP-304 added (Phase 58, v0.17) by the owner's decisions of the day. Alternative AI gateways run next to the Zuno ai-gateway, which stays the default and unchanged: Praxis AI first, then LiteLLM, Agent Router and Bifrost, in one shared namespace `zuno-ai-gateways`. There is one work package per gateway and one per client, each client wired once through a generic `altGateways` list. The alternatives serve sovereign models plus Claude and Codestral with the existing Vault keys. Praxis is built by an OpenShift Pipelines pipeline from the fork or the upstream source and pushed to `quay.io/zuno/praxis-ai` (ADR-0620, which amends ADR-0056 for third-party source builds only). Claude Code becomes the band's second experience, signing in by Keycloak device flow. ADR-0619 amends ADR-0587 clause 1 by a dated note. Three scenarios are planned: multi-gateway, claude-code-sovereign and agents-alt-gateway.
 - 2026-11-17 — WP-290 Done: the owner chose "Clore WP-290 et lever le gel" (12:50:28 CET, as relayed). Six of six demos are published, each on a named go; the limits and declared effects are written in the brief; every open item stays open where it is recorded (the sprint's close-out, in [the afternoon evidence](evidence/wp-289-gif-afternoon-2026-11-16.md)). The freeze is lifted as the sprint's operating rule only.

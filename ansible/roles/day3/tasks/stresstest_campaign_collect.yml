@@ -1,6 +1,6 @@
 ---
 # Collect half of the stress campaign (WP-307): wait for the Indexed Job when asked to, read the log of every shard,
-# merge the per-driver summaries and print the report. Used by stresstest_campaign.yml (after the launch) and by
+# print the campaign report (platform/testing/stress_report.py, WP-312). Used by stresstest_campaign.yml (after the launch) and by
 # `make d3 stresstest-collect RUN=<id>` (playbooks/day3_stresstest_collect.yml). Needs `_stress_job_name`.
 # Informational (ADR-0058): the report never fails the run.
 
@@ -43,12 +43,15 @@
   register: _stress_logs
 
 # stress_runner.py prints one JSON array per line (checkpoints and one per driver): every such line is rows.
+# WP-311: the disruptions inflicted by the same play are rows of the run (layer chaos): the report correlates their windows with the
+# load's timeline. A collect run later, in another play, has none: the disruptions are only reported by the play that ran them.
 - name: "stress-collect | the rows"
   ansible.builtin.set_fact:
     _stress_rows: >-
-      {{ _stress_logs.results | default([])
-         | map(attribute='log_lines') | map('default', []) | flatten
-         | select('match', '^\[.*\]$') | map('from_json') | list | flatten }}
+      {{ (_stress_logs.results | default([])
+          | map(attribute='log_lines') | map('default', []) | flatten
+          | select('match', '^\[.*\]$') | map('from_json') | list | flatten)
+         + (_stress_chaos_rows | default([])) }}
 
 - name: "stress-collect | the state of the Job"
   ansible.builtin.debug:
@@ -57,17 +60,60 @@
       shard(s) succeeded, {{ _stress_job.resources[0].status.failed | default(0) }} failed,
       {{ _stress_job.resources[0].status.active | default(0) }} running; {{ _stress_rows | length }} row(s) so far
 
-- name: "stress-collect | merge the per-driver summaries"
+- name: "stress-collect | the labels and the state of the run"
+  ansible.builtin.set_fact:
+    _stress_run_label: "{{ _stress_job.resources[0].metadata.labels['zuno.io/stresstest-run'] | default('') }}"
+    _stress_profile_label: "{{ _stress_job.resources[0].metadata.labels['zuno.io/stresstest-profile'] | default('') }}"
+    _stress_job_state: >-
+      {{ _stress_job.resources[0].status.succeeded | default(0) }}/{{ _stress_job.resources[0].spec.completions | default(1) }} succeeded,
+      {{ _stress_job.resources[0].status.failed | default(0) }} failed, {{ _stress_job.resources[0].status.active | default(0) }} running
+
+# WP-312: ONE report of the campaign (platform/testing/stress_report.py, stdlib only, so it also runs in the AAP execution
+# environment): the per-driver table, the failures, the guard, the saturation and counter rows, and the trend against the
+# previous run of the same profile when a trend directory holds one. The trend file is written next to the other Day 2
+# reports (evaluations/day2-reports/stress/, a checkout path: kept on a workstation, lost with the AAP job's checkout).
+# -e stress_evidence=true also writes docs/roadmap/evidence/stress-<run id>.md for a person to review and commit.
+- name: "stress-collect | the campaign report"
   ansible.builtin.command:
-    cmd: "python3 {{ zuno_repo_root }}/platform/testing/stress_runner.py --summarize -"
+    cmd: >-
+      python3 {{ (zuno_repo_root + '/platform/testing/stress_report.py') | quote }} --rows -
+      --run-id {{ _stress_run_label | quote }} --profile {{ _stress_profile_label | quote }}
+      --started {{ _stress_job.resources[0].metadata.creationTimestamp | string | quote }} --job-state {{ _stress_job_state | trim | quote }}
+      --trend-dir {{ (stress_trend_dir | default(zuno_repo_root + '/evaluations/day2-reports/stress')) | quote }}
+      {{ ('--evidence-dir ' + ((zuno_repo_root + '/docs/roadmap/evidence') | quote)) if (stress_evidence | default(false) | bool) else '' }}
     stdin: "{{ _stress_rows | to_json }}"
-  register: _stress_table
+  register: _stress_report
   changed_when: false
   failed_when: false
 
-- name: "stress-collect | the per-driver table"
+- name: "stress-collect | the report"
   ansible.builtin.debug:
-    msg: "{{ _stress_table.stdout_lines | default(['no summary']) }}"
+    msg: "{{ (_stress_report.stdout_lines | default(['no report'])) + (_stress_report.stderr_lines | default([])) }}"
+
+# The profile says whether the dashboard coverage of the campaign window is the last stage (job.coverage); -e stress_coverage
+# overrides it. It needs `oc` and httpx where it runs (a workstation; the AAP execution environment prints one "cannot reach
+# the cluster" row), and never fails the run.
+- name: "stress-collect | the profile of the run"
+  ansible.builtin.set_fact:
+    _stress_run_profile: >-
+      {{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/stress/profile_' + _stress_profile_label + '.yaml') | from_yaml
+         if (_stress_profile_label is match('^[a-z0-9][a-z0-9-]*$')) else {} }}
+
+- name: "stress-collect | the dashboard coverage of the campaign window (last stage)"
+  ansible.builtin.command:
+    cmd: >-
+      python3 {{ (zuno_repo_root + '/evaluations/dashboard_coverage.py') | quote }} --check-only
+      --window {{ [(((lookup('ansible.builtin.pipe', 'date +%s') | int) - ((_stress_job.resources[0].metadata.creationTimestamp | to_datetime('%Y-%m-%dT%H:%M:%SZ')) - ('1970-01-01' | to_datetime('%Y-%m-%d'))).total_seconds() | int) // 60 + 10), 10] | max }}m
+    chdir: "{{ zuno_repo_root }}"
+  register: _stress_coverage_out
+  changed_when: false
+  failed_when: false
+  when: stress_coverage | default((_stress_run_profile.job | default({})).coverage | default(false)) | bool
+
+- name: "stress-collect | the coverage table"
+  ansible.builtin.debug:
+    msg: "{{ _stress_coverage_out.stdout_lines }}"
+  when: _stress_coverage_out.stdout_lines is defined
 
 # Past 300 rows a load run would print thousands of identical PASS lines: print the failures and the summaries only.
 - name: "stress-collect | the report (every row up to 300, else the failures and the summaries)"

@@ -69,7 +69,11 @@
         # ADR-0581 clause 2 (WP-164): the persona-group subscriptions, derived
         # from the admitted agents release by platform/okf/generate_stack_config.py
         # (promotion PRs regenerate it; lint.yml checks it), never hand-written.
-        agentSubscriptions: "{{ (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/models/values.agents.generated.yaml') | from_yaml).maas.agentSubscriptions }}"
+        # 2026-11-19: zuno_maas_persona_group_subscriptions false drops them (and zuno_maas_sales_subscriptions false
+        # the /sales ones) to keep the maas-default-gateway wasm config under the 3 MiB API request limit.
+        agentSubscriptions: "{{ ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/models/values.agents.generated.yaml') | from_yaml).maas.agentSubscriptions) if (zuno_maas_persona_group_subscriptions | default(true) | bool) else {} }}"
+        salesSubscriptions:
+          enabled: "{{ zuno_maas_sales_subscriptions | default(true) | bool }}"
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights

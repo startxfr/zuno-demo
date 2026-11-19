@@ -51,6 +51,16 @@ altGateways: []
 # Pods of the client namespace allowed to call the proxy (empty = every pod of the namespace).
 clientPodSelector: {}
 
+# ADR-0624 / WP-308: the stress campaign Job (pods labelled app.kubernetes.io/name=acceptance-gate in zuno-ai-run) replays the
+# experience client's own path through this proxy. Off by default: the render is then the one of before. Turning it on admits
+# those pods on the proxy port; the proxy still answers as its own Keycloak client, so what a Job can do through it is what
+# the client can do.
+stressClients:
+  enabled: false
+  namespace: zuno-ai-run
+  podLabels:
+    app.kubernetes.io/name: acceptance-gate
+
 egress:
   # The two gateways' namespace and pod port (WP-179 ingress peers).
   gatewayNamespace: zuno-ai-run

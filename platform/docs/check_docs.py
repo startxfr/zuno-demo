@@ -1621,6 +1621,75 @@ def check_jinja_newline_in_block_scalars() -> List[Finding]:
     return findings
 
 
+# --- docs/demo/README.md "Stress and coverage" table against the demos and the stress drivers (ADR-0624) -------------------
+STRESS_TABLE_HEADING = "## Stress and coverage"
+STRESS_README = "docs/demo/README.md"
+# `register("id", ...)` and the helpers that wrap it (`_register_open_webui("open-webui", ...)`, `_register_proxy("dify", ...)`)
+STRESS_DRIVER_RE = re.compile(r"""\b_?register(?:_\w+)?\(\s*["']([a-z0-9][a-z0-9-]*)["']""")
+BACKTICK_ID_RE = re.compile(r"`(-?[a-z0-9][a-z0-9-]*)`")
+
+
+def stress_table_section(readme_text: str) -> str:
+    """The text of the "Stress and coverage" section (up to the next `## `), '' when the heading is missing."""
+    start = readme_text.find(STRESS_TABLE_HEADING)
+    if start < 0:
+        return ""
+    rest = readme_text[start + len(STRESS_TABLE_HEADING):]
+    end = re.search(r"^## ", rest, re.M)
+    return rest[: end.start()] if end else rest
+
+
+def stress_table_findings(readme_text: str, demo_ids: List[str], driver_ids: List[str]) -> List[Finding]:
+    """The table must name every demo, cite every registered driver id and cite no driver that does not exist.
+    A demo is named by its id in the first column (a cell may list several ids, comma separated); a driver is cited as a
+    backticked id in the second column, and `-state` after a demo's own id stands for `<id>-state`."""
+    section = stress_table_section(readme_text)
+    if not section:
+        return [Finding("stress-table", f"{STRESS_README} has no '{STRESS_TABLE_HEADING}' section: restore it (ADR-0624)")]
+    rows = [[c.strip() for c in line.strip().strip("|").split("|")] for line in section.splitlines() if line.startswith("|")]
+    rows = [r for r in rows if len(r) >= 2 and not set(r[0]) <= set("-: ") and r[0] != "Demo id"]
+    named, cited = set(), set()
+    prose = {t for t in BACKTICK_ID_RE.findall(section) if not t.startswith("-")}  # drivers the text names outside a row (samplers, load-ai-gateway)
+    for first, drivers in ((r[0], r[1]) for r in rows):
+        # "five-experiences, three-experiences" and "agentic-ai, ... (workshops)": ids before any parenthesis, comma separated
+        ids = [i.strip() for i in re.sub(r"\(.*?\)", "", first).split(",") if i.strip()]
+        named.update(ids)
+        for token in BACKTICK_ID_RE.findall(drivers):
+            cited.add(f"{ids[0]}{token}" if token.startswith("-state") and ids else token)
+    findings: List[Finding] = []
+    for demo in sorted(set(demo_ids) - named):
+        findings.append(Finding("stress-table", f"demo '{demo}' (ansible/demos/{demo}) is not in the '{STRESS_TABLE_HEADING}' table of "
+                                                f"{STRESS_README}: add a row for it"))
+    for driver in sorted(set(driver_ids) - cited - prose):
+        findings.append(Finding("stress-table", f"stress driver '{driver}' is registered in evaluations/stress/ but is not cited as `{driver}` "
+                                                f"in the '{STRESS_TABLE_HEADING}' table of {STRESS_README}: add it to the row of its demo"))
+    for driver in sorted(cited - set(driver_ids)):
+        findings.append(Finding("stress-table", f"`{driver}` is cited in the '{STRESS_TABLE_HEADING}' table of {STRESS_README} but no stress "
+                                                f"driver of that id is registered in evaluations/stress/: fix or remove it in {STRESS_README}"))
+    return findings
+
+
+def _registered_stress_driver_ids() -> List[str]:
+    """Every driver id of evaluations/stress/driver_*.py: the `register("<id>", ...)` names, plus `<demo>-state` for each demo
+    whose status/check files hold assertions (what driver_state.py registers)."""
+    ids = set()
+    for path in sorted((REPO_ROOT / "evaluations" / "stress").glob("driver_*.py")):
+        ids.update(STRESS_DRIVER_RE.findall(path.read_text()))
+    sys.path.insert(0, str(REPO_ROOT / "platform" / "testing"))
+    try:
+        import stress_state
+        ids.update(f"{demo}-state" for demo in stress_state.extract()["demos"])
+    finally:
+        sys.path.pop(0)
+    return sorted(i for i in ids if i and i != "{driver_id}")
+
+
+def check_stress_table() -> List[Finding]:
+    readme = REPO_ROOT / STRESS_README
+    demos = sorted(p.name for p in (REPO_ROOT / "ansible" / "demos").iterdir() if p.is_dir() and p.name != "_lib")
+    return stress_table_findings(readme.read_text(), demos, _registered_stress_driver_ids())
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1641,6 +1710,7 @@ def main() -> int:
         + check_model_roles()
         + check_doc_links()
         + check_model_context_windows()
+        + check_stress_table()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
@@ -1656,7 +1726,7 @@ def main() -> int:
           "model architectural roles against provider-routing.yaml/"
           "model-routing-policy.yaml, relative links and #anchors in every "
           "tracked markdown file, and model context windows against "
-          "gitops/charts/models/values.yaml.")
+          "gitops/charts/models/values.yaml, and the demo README's stress table against the demos and the stress drivers.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

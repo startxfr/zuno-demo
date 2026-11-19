@@ -148,6 +148,48 @@ shows what it will change and asks you to type the demo id.
 
 Leave 10 minutes for questions between two workshops.
 
+## Stress and coverage
+
+The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenarios with drivers in `evaluations/stress/`. A bare id is the golden moment of the scenario, `<id>-state` its read-only state check (the assertions of `ansible/demos/<id>/{status,check}.yml`, read from a Job over the Kubernetes API), `load-*` a load driver. The scenario pages are not changed by the stresstest. Status as of 2026-11-19, read from the drivers: the repository work is in review, the live runs are not made yet. `load-ai-gateway` (chat completions straight on the ai-gateway, no UI) serves no single scenario; the samplers `saturation` and `limitador-counters` serve all of them.
+
+| Demo id | Stress drivers | Status |
+|---|---|---|
+| claude-code-sovereign | `claude-code-sovereign`, `-state` | replayed (Praxis workstation entry; spends the Praxis budget, one request at a time; needs the egress opening of WP-308) |
+| dify | `dify`, `dify-state` | replayed (through its token proxy) |
+| kagent | `kagent`, `kagent-state` | replayed (through its token proxy) |
+| lightspeed | `lightspeed-state` | state only; not replayed: the assistant needs an OpenShift token a Job does not have |
+| openclaw | `openclaw-state` | state only; not replayed: its path is the operator's egress proxy inside each persona's pod |
+| open-webui | `open-webui`, `open-webui-zuno-code`, `open-webui-zuno-wesh`, `open-webui-state` | replayed (Open WebUI's API as a stress persona) |
+| unifai-agents | `unifai-agents`, `unifai-agents-state`, `load-unifai-scenarios` | replayed; the load driver replays the active agents' scenarios as concurrent turns |
+| unifai-live-rag | `unifai-live-rag`, `unifai-live-rag-state` | state check in the profiles; the `unifai-live-rag` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it uploads one small, uniquely named document to the persona's Personal library, waits until it is indexed, then deletes it and checks it is gone |
+| blender-3d | `blender-3d`, `blender-3d-state` | replayed (device sign-in, then the workstation entry); skipped when the entry is off |
+| world-model | `world-model-state` | state only (one assertion); not deployed on demand, no replay driver |
+| aap-audited-operations | `aap-audited-operations-state` | state only |
+| gitops-day0-3 | `gitops-day0-3-state` | state only |
+| image-signing-admission | `image-signing-admission-state`, `image-signing-refusal` | state check in the profiles; `image-signing-refusal` is opt-in (profile `mutating`) and stores nothing: it offers an unsigned, tag-referenced image as a dry-run pod create to the namespace `zuno-stress-admission`, and the admission webhook must refuse it. The namespace and its one pod-create grant exist only when `stressImageProof.enabled` is set (default off) |
+| observability-trace | `observability-trace`, `observability-trace-state` | replayed (a Tekos turn, then its trace read in Tempo by run id) |
+| okf-signed-agent-release | `okf-signed-agent-release-state` | state only |
+| service-mesh-kiali | `service-mesh-kiali-state` | state only |
+| vault-pki | `vault-pki-state` | state only |
+| a2a-delegation-approval | `delegation-approval`, `a2a-delegation-approval-state` | state check in the profiles; the `delegation-approval` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it asks Arkos for a delegated write, rejects the pending approval (never approves it), checks that a stale request id answers 409, and cancels and deletes its session |
+| agents-alt-gateway | `agents-alt-gateway-state` | state only; pending Phase 58 (the kagent agent on Praxis is not rolled out, so that object is not judged) |
+| ai-gateway-routing | `ai-gateway-routing`, `ai-gateway-routing-state` | replayed (one `zuno-code` call, routing decision read back) |
+| ai-gateway-sovereignty | `ai-gateway-sovereignty`, `ai-gateway-sovereignty-state` | replayed (Arkos kept local at C3, Tekos control call) |
+| guardrails | `guardrails`, `guardrails-state` | replayed (the DAN prompt, its span read in Tempo) |
+| identity-personas | `identity-personas`, `identity-personas-state` | replayed in part: the stress persona's Keycloak token, with its issuer, client, expiry and number of groups read (the signature is checked by the gateways, not here) |
+| mcp-tools-by-group | `mcp-tools-by-group`, `mcp-tools-by-group-state`, `load-mcp-gateway` | replayed (`search_confluence` through the REST path; the load driver varies the queries) |
+| multi-gateway | `multi-gateway`, `multi-gateway-state` | replayed in part: one short question through the ai-gateway and one through Praxis (device sign-in of the public client `claude-code`), one row each; the state check stays pending Phase 58 for the kagent agent on Praxis (WP-297 to WP-303) |
+| quotas | `quotas`, `quotas-state` | state check in the profiles; the `quotas` driver is mutating (it spends a stress persona's budget until a 429) and is in no profile |
+| evaluation-trustyai-evalhub | `evaluation-trustyai-evalhub-state` | state only |
+| external-models | `external-models-state` | state only |
+| genai-playground | `genai-playground-state` | state only |
+| lora-pipeline-mlflow-kueue | `lora-pipeline-mlflow-kueue-state` | state only |
+| maas-portal-api-keys | `maas-portal-api-keys`, `maas-portal-api-keys-state` | replayed in part: the MaaS entry must refuse a `/v1/models` call without an API key (the 2:15 step); needs egress to the MaaS route |
+| model-catalog-registry | `model-catalog-registry-state` | state only (demo333 has no ModelRegistry instance) |
+| model-serving-llmd-mig | `model-serving-llmd-mig-state` | state only; the model path itself is loaded by `load-ai-gateway` and watched by the `saturation` sampler |
+| five-experiences, three-experiences | the drivers of the experience scenarios they list | composition: no driver of their own |
+| agentic-ai, rhoai-end-to-end, sovereign-governed-ai, trusted-platform-ops (workshops) | none | compositions of scenarios: no driver of their own |
+
 ## Personas
 
 The demonstrations sign in with fictional role accounts of the Keycloak realm `zuno`
@@ -190,4 +232,5 @@ Other identities, never signed in on stage:
 - [Golden path](golden-path.md): the automated probes and the screens to check before a live session.
 - [Freeze protocol](freeze-protocol.md): what stops changing before a demonstration day.
 - [Rollback](rollback.md): how to roll back an experience or a gateway.
+- [Stresstest](../platform/stresstest.md): the profile-driven campaign that replays the scenarios (the table above says which driver replays which).
 - [Demo day 2026-11-09](demo-day-2026-11-09.md): the runbook of that day, kept as a record and as an example.

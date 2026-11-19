@@ -43,6 +43,17 @@ cluster-ods:
       # (rhods-operator.3.5.0, the 3.5 GA). Was 3.5.0-ea.2 (the beta-channel
       # Early Access build ADR-0002 originally targeted) until the GA landed
       # in the catalog and the cluster was upgraded onto it.
+      #
+      # This is the PLATFORM default, used by a render without Ansible. demo333
+      # does not run it: it runs rhods-operator 3.6.0-ea.2 on the `beta` channel,
+      # on purpose (user decision 2026-11-05, WP-195 step 6), pinned by
+      # `zuno_openshift_ai_version: "3.6.0-ea.2"` in ansible/clusters/demo333.yml.
+      # ansible/roles/openshift_ai/tasks/resolve_version_pin.yml reads that pin
+      # and discover_channel.yml picks `beta` for a pre-release pin, and both are
+      # injected into the zuno-openshift-ai-d0 Application values, so this value
+      # and the channel below are overridden there. One InstallPlan only
+      # (Manual, startingCSV pinned). Catalog read 2026-11-19: beta -> 3.6.0-ea.2;
+      # stable-3.5, stable-3.x and eus-3.5 -> 3.5.3.
       version: "3.5.0"
       operator:
         # Overwritten at apply time by the channel
@@ -55,8 +66,11 @@ cluster-ods:
         #
         # stable-3.5 is the 3.5 z-stream: it serves the pinned 3.5.0 GA and
         # will serve 3.5.z patches, but never rolls to 3.6. Do NOT put 'beta'
-        # back - that channel is frozen on 3.5.0-ea.2 and would resolve to a
-        # downgrade. stable-3.x is also wrong here: it serves 3.5.0 today but
+        # here as the default: it is a moving pre-release channel (it carried
+        # 3.5.0-ea.2, which would have been a downgrade of the GA, and carries
+        # 3.6.0-ea.2 since the 3.6 early access). A cluster that wants it, like
+        # demo333, gets it from its own pin (see above), not from this default.
+        # stable-3.x is also wrong here: it serves 3.5.0 today but
         # is a moving channel that will advance past this pin.
         channel: "stable-3.5"
         name: rhods-operator
@@ -194,189 +208,189 @@ cluster-ods:
             # run platform/gitops/argocd_drift.py against the Application.
             retention: 48h0m0s
 
-  # Superseded by the top-level dataScienceCluster key below, rendered by this
-  # chart's own templates/datasciencecluster.yaml instead (see that file for
-  # why the vendored template can't be used). Hardcoded false, not toggled by
-  # Ansible, so the vendored template never also renders a second CR.
+  # The DataScienceCluster, rendered by the chart since 21.3.371 (it used to be this chart's own template). Enabled by the
+  # d1 Application (zuno-openshift-ai-d1), next to the top-level dataScienceCluster.enabled that still gates ogxserver.yaml.
+  # apiVersion v2 is the chart's default. The wave is 0, as the object had before (the chart's own default is 15);
+  # DSCInitialization stays at -10. Spec deliberately overridden in full: kserve RawDeployment rather than Serverless,
+  # which would need the Service Mesh, Serverless and cert-manager operators this repo doesn't install.
+  # applicationsNamespace must match DSCInitialization's (redhat-ods-applications, ADR-0331). The chart takes `spec` as a
+  # YAML STRING (a map fails the render) and a string is not merged: this one replaces the chart's default whole.
   DataScienceCluster:
     enabled: false
+    name: zuno-dsc
+    labels:
+      app.kubernetes.io/name: datasciencecluster
+    annotations:
+      argocd.argoproj.io/sync-wave: "0"
+    spec: |
+      applicationsNamespace: redhat-ods-applications
+      components:
+        ogx:
+          managementState: Managed
+        sparkoperator:
+          managementState: Managed
+        kserve:
+          # modelCache is Removed (the CRD's own default). It was Managed, but
+          # nothing ever used it: no LocalModelCache/LocalModelNode CR was ever
+          # created, /var/lib/kserve stayed at 0 bytes, and all served models
+          # pull from S3 into an emptyDir (ADR-0521). Left on, it costs a
+          # permanent reconcile loop: the RHOAI operator re-applies
+          # kserve-localmodelnode-pv without a claimRef while the kube PV binder
+          # re-binds it, ~35 writes/min on one object with a third of them 409ing,
+          # continuously since the PV was created. Re-enabling means restoring
+          # cacheSize/nodeSelector below AND creating the LocalModelCache CRs that
+          # actually populate it - the loop is upstream behaviour and would return.
+          modelCache:
+            managementState: Removed
+            # cacheSize: "140Gi"
+            # nodeSelector:
+            #   matchExpressions:
+            #     - values:
+            #         - 'true'
+            #       key: nvidia.com/gpu.present
+            #       operator: In
+          modelsAsService:
+            managementState: Managed
+          nim:
+            airGapped: false
+            managementState: Managed
+          rawDeploymentServiceConfig: Headless
+          wva:
+            managementState: Managed
+          managementState: Managed
+        modelregistry:
+          # RHOAI's own true default (distinct from applicationsNamespace) -
+          # ADR-0331.
+          registriesNamespace: rhoai-model-registries
+          managementState: Managed
+        feastoperator:
+          managementState: Managed
+        # Shared configuration surface for two ADRs (ADR-0534's Operational
+        # considerations, WP-107): eval.lmeval backs ADR-0108/WP-10's
+        # LMEvalJob model-benchmarking gate (Implemented), and
+        # mcpGuardrailsMode is the flag ADR-0534/WP-108 flips to true once
+        # WP-107's baseline verification is green. TrustyAI itself needs no
+        # separate operator install - it is already Managed here, inside
+        # this Day 1 component; the new work both ADRs describe lives in the
+        # Day 2 `trustyai-config` component instead.
+        trustyai:
+          # No `eval.lmeval` block (WP-195 step 6, 2026-11-05): RHOAI 3.6.0-ea.2
+          # copies the DSC's string enum ("deny") into the TrustyAI module CR,
+          # whose CRD now types permitOnline/permitCodeExecution as boolean, so
+          # provisioning fails ("expected boolean, got deny"). With the block
+          # absent nothing is defaulted on the DSC, and the module CRD's own
+          # defaults apply: false/false, which is the same as the old deny/deny.
+          # Do not put the block back while the two schemas disagree.
+          # MUST stay false (ADR-0534/WP-108, live-proven 2026-09-02): on
+          # this operand version `true` is NOT "enable guardrails" - it
+          # redeploys the operator with `--enable-services NEMO_GUARDRAILS`
+          # ONLY, killing the LMEvalJob controller (ADR-0108 regression),
+          # EvalHub, TAS and GuardrailsOrchestrator. At `false` the operator
+          # already runs TAS,LMES,GORCH,NEMO_GUARDRAILS,EVALHUB - the
+          # guardrails capability was never off. Flipped true and reverted
+          # the same hour; ReplicaSet args evidence in the WP-108 brief.
+          # Note: ArgoCD ignores DSC /spec (ignoreDifferences), so changing
+          # this line needs a manual `oc patch` to reach the live cluster.
+          mcpGuardrailsMode: false
+          managementState: Managed
+        aipipelines:
+          argoWorkflowsControllers:
+            managementState: Managed
+          managementState: Managed
+        # Re-enabled by ADR-0331: was Removed because kuberay-operator's pod
+        # was rejected by every SCC on the cluster under the custom
+        # zuno-ai-platform applicationsNamespace (RHOAI 3.5 EA2's namespace-
+        # specific SCC/RBAC bindings only exist for the product's default
+        # redhat-ods-applications namespace) - reverting applicationsNamespace
+        # to the default resolves it. Nothing in this repository submits a Ray
+        # job yet - revisit alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT + MLOps
+        # pipelines), the actual future consumer.
+        ray:
+          managementState: Managed
+        kueue:
+          defaultClusterQueueName: default
+          defaultLocalQueueName: default
+          managementState: Unmanaged
+        workbenches:
+          workbenchNamespace: zuno-ai-build
+          managementState: Managed
+        # mlflow-operator-controller-manager was the pod whose
+        # CrashLoopBackOff surfaced this whole bug class
+        # (manager Deployment hardcodes --namespace=redhat-ods-applications;
+        # its generated ClusterRole grants no list/watch on Secret/
+        # ServiceAccount/ConfigMap/Deployment/Job/CronJob/Service/PVC/
+        # ServiceMonitor in any namespace, so its controller-runtime cache
+        # never syncs). Left Managed throughout - fixed by ADR-0331 reverting
+        # applicationsNamespace to the default, not by toggling this flag.
+        mlflowoperator:
+          managementState: Managed
+        # Re-enabled by ADR-0331: was Removed because it failed with "unable
+        # to get: zuno-monitoring/dashboard-perses-access because of unknown
+        # namespace for the cache" - that references monitoring.namespace
+        # (custom zuno-monitoring), not applicationsNamespace. RHOAI 3.5 EA2's
+        # dashboard/observability reconciliation doesn't derive its watched
+        # namespaces from DSCInitialization.spec.monitoring.namespace - the
+        # actual fix is monitoring.namespace: redhat-ods-monitoring above, not
+        # the applicationsNamespace revert (an earlier version of this comment
+        # wrongly credited applicationsNamespace alone).
+        dashboard:
+          managementState: Managed
+          # WP-220 pilot 2 (RHOAI 3.6.0-ea.2): MaaS consumer portal, a
+          # self-service page for API-key issue/list/revoke, served by the MaaS
+          # gateway under /maas-portal. Revert by setting this to Removed.
+          maasConsumerPortal:
+            managementState: Managed
+        # Re-enabled by ADR-0331: was Removed because the ClusterTrainingRuntime
+        # this component seeds failed validation - its ValidatingWebhookConfiguration
+        # (RHOAI's own bundled manifest, not rendered by this chart) hardcodes
+        # kubeflow-trainer-controller-manager.redhat-ods-applications.svc as
+        # the webhook target regardless of applicationsNamespace - reverting
+        # applicationsNamespace to the default makes that hardcoded target
+        # correct again. Nothing in this repository schedules a distributed
+        # training run yet - revisit alongside ADR-0301/ADR-0302.
+        trainer:
+          managementState: Managed
+        # ADR-0322 v0 migration scope: the deprecated Llama Stack component
+        # (superseded by `ogx` above) is removed entirely - not merely set
+        # to an inactive management state - per the ADR's own acceptance
+        # criterion that it be "absent from the rendered DataScienceCluster":
+        # the literal key, not just an inactive value. `oc get
+        # datasciencecluster zuno-dsc` shows `status.conditions` carrying
+        # `type: OGXReady, status:
+        # "True"` and `status.components.ogx.managementState: Managed`,
+        # while the deprecated component's own status entry is already an
+        # empty object (no managementState/releases) even before this key's
+        # removal from spec - i.e. the operand itself was already inactive;
+        # this change only makes the *declared* spec match that already-true
+        # state. RESIDUAL VERIFICATION (operator, not yet performed): confirm
+        # a `make d1 reconcile openshift-ai` after this change leaves the
+        # deprecated component's operand still absent/inactive, rather than
+        # the operator treating an omitted managementState differently from
+        # an explicit Removed - the CRD schema documents no default for that
+        # field (`oc explain` its `spec.components` entry for the exact
+        # field name, deliberately not repeated here so this comment doesn't
+        # itself trip the WP-06 acceptance grep for the removed component's
+        # name). If reconciliation differs, restore an explicit
+        # `managementState: Removed` for it and treat this ADR's acceptance
+        # criterion as satisfied by that instead.
+        aigateway:
+          batchGateway:
+            managementState: Managed
+          managementState: Managed
+          # WP-195 step 6 (2026-11-05): RHOAI 3.6 defaults this to Removed and
+          # tears MaaS down, which deletes maas-gateway-auth and leaves the
+          # MaaS gateway open without authentication, even though
+          # kserve.modelsAsService (under kserve) is still Managed. It must be Managed
+          # explicitly. maas-api then runs in redhat-ai-gateway-infra.
+          modelsAsAService:
+            managementState: Managed
+        trainingoperator:
+          managementState: Managed
 
-# Rendered by templates/datasciencecluster.yaml, not the vendored chart (see
-# that file's comment for why). Spec deliberately overridden in full: uses
-# kserve RawDeployment rather than Serverless, which would require the Service
-# Mesh, Serverless and cert-manager operators this repo doesn't install.
-# applicationsNamespace here must match cluster-ods.DSCInitialization's above
-# (redhat-ods-applications, ADR-0331 - reverted from ADR-0328's custom
-# zuno-ai-platform namespace) since they describe the same operand namespace.
+# Gates the resources of this chart that need the DataScienceCluster (ogxserver.yaml): the CR itself is
+# cluster-ods.DataScienceCluster above, and the d1 Application turns both on.
 dataScienceCluster:
   enabled: false
-  name: zuno-dsc
-  labels:
-    app.kubernetes.io/name: datasciencecluster
-  spec: |
-    applicationsNamespace: redhat-ods-applications
-    components:
-      ogx:
-        managementState: Managed
-      sparkoperator:
-        managementState: Managed
-      kserve:
-        # modelCache is Removed (the CRD's own default). It was Managed, but
-        # nothing ever used it: no LocalModelCache/LocalModelNode CR was ever
-        # created, /var/lib/kserve stayed at 0 bytes, and all served models
-        # pull from S3 into an emptyDir (ADR-0521). Left on, it costs a
-        # permanent reconcile loop: the RHOAI operator re-applies
-        # kserve-localmodelnode-pv without a claimRef while the kube PV binder
-        # re-binds it, ~35 writes/min on one object with a third of them 409ing,
-        # continuously since the PV was created. Re-enabling means restoring
-        # cacheSize/nodeSelector below AND creating the LocalModelCache CRs that
-        # actually populate it - the loop is upstream behaviour and would return.
-        modelCache:
-          managementState: Removed
-          # cacheSize: "140Gi"
-          # nodeSelector:
-          #   matchExpressions:
-          #     - values:
-          #         - 'true'
-          #       key: nvidia.com/gpu.present
-          #       operator: In
-        modelsAsService:
-          managementState: Managed
-        nim:
-          airGapped: false
-          managementState: Managed
-        rawDeploymentServiceConfig: Headless
-        wva:
-          managementState: Managed
-        managementState: Managed
-      modelregistry:
-        # RHOAI's own true default (distinct from applicationsNamespace) -
-        # ADR-0331.
-        registriesNamespace: rhoai-model-registries
-        managementState: Managed
-      feastoperator:
-        managementState: Managed
-      # Shared configuration surface for two ADRs (ADR-0534's Operational
-      # considerations, WP-107): eval.lmeval backs ADR-0108/WP-10's
-      # LMEvalJob model-benchmarking gate (Implemented), and
-      # mcpGuardrailsMode is the flag ADR-0534/WP-108 flips to true once
-      # WP-107's baseline verification is green. TrustyAI itself needs no
-      # separate operator install - it is already Managed here, inside
-      # this Day 1 component; the new work both ADRs describe lives in the
-      # Day 2 `trustyai-config` component instead.
-      trustyai:
-        # No `eval.lmeval` block (WP-195 step 6, 2026-11-05): RHOAI 3.6.0-ea.2
-        # copies the DSC's string enum ("deny") into the TrustyAI module CR,
-        # whose CRD now types permitOnline/permitCodeExecution as boolean, so
-        # provisioning fails ("expected boolean, got deny"). With the block
-        # absent nothing is defaulted on the DSC, and the module CRD's own
-        # defaults apply: false/false, which is the same as the old deny/deny.
-        # Do not put the block back while the two schemas disagree.
-        # MUST stay false (ADR-0534/WP-108, live-proven 2026-09-02): on
-        # this operand version `true` is NOT "enable guardrails" - it
-        # redeploys the operator with `--enable-services NEMO_GUARDRAILS`
-        # ONLY, killing the LMEvalJob controller (ADR-0108 regression),
-        # EvalHub, TAS and GuardrailsOrchestrator. At `false` the operator
-        # already runs TAS,LMES,GORCH,NEMO_GUARDRAILS,EVALHUB - the
-        # guardrails capability was never off. Flipped true and reverted
-        # the same hour; ReplicaSet args evidence in the WP-108 brief.
-        # Note: ArgoCD ignores DSC /spec (ignoreDifferences), so changing
-        # this line needs a manual `oc patch` to reach the live cluster.
-        mcpGuardrailsMode: false
-        managementState: Managed
-      aipipelines:
-        argoWorkflowsControllers:
-          managementState: Managed
-        managementState: Managed
-      # Re-enabled by ADR-0331: was Removed because kuberay-operator's pod
-      # was rejected by every SCC on the cluster under the custom
-      # zuno-ai-platform applicationsNamespace (RHOAI 3.5 EA2's namespace-
-      # specific SCC/RBAC bindings only exist for the product's default
-      # redhat-ods-applications namespace) - reverting applicationsNamespace
-      # to the default resolves it. Nothing in this repository submits a Ray
-      # job yet - revisit alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT + MLOps
-      # pipelines), the actual future consumer.
-      ray:
-        managementState: Managed
-      kueue:
-        defaultClusterQueueName: default
-        defaultLocalQueueName: default
-        managementState: Unmanaged
-      workbenches:
-        workbenchNamespace: zuno-ai-build
-        managementState: Managed
-      # mlflow-operator-controller-manager was the pod whose
-      # CrashLoopBackOff surfaced this whole bug class
-      # (manager Deployment hardcodes --namespace=redhat-ods-applications;
-      # its generated ClusterRole grants no list/watch on Secret/
-      # ServiceAccount/ConfigMap/Deployment/Job/CronJob/Service/PVC/
-      # ServiceMonitor in any namespace, so its controller-runtime cache
-      # never syncs). Left Managed throughout - fixed by ADR-0331 reverting
-      # applicationsNamespace to the default, not by toggling this flag.
-      mlflowoperator:
-        managementState: Managed
-      # Re-enabled by ADR-0331: was Removed because it failed with "unable
-      # to get: zuno-monitoring/dashboard-perses-access because of unknown
-      # namespace for the cache" - that references monitoring.namespace
-      # (custom zuno-monitoring), not applicationsNamespace. RHOAI 3.5 EA2's
-      # dashboard/observability reconciliation doesn't derive its watched
-      # namespaces from DSCInitialization.spec.monitoring.namespace - the
-      # actual fix is monitoring.namespace: redhat-ods-monitoring above, not
-      # the applicationsNamespace revert (an earlier version of this comment
-      # wrongly credited applicationsNamespace alone).
-      dashboard:
-        managementState: Managed
-        # WP-220 pilot 2 (RHOAI 3.6.0-ea.2): MaaS consumer portal, a
-        # self-service page for API-key issue/list/revoke, served by the MaaS
-        # gateway under /maas-portal. Revert by setting this to Removed.
-        maasConsumerPortal:
-          managementState: Managed
-      # Re-enabled by ADR-0331: was Removed because the ClusterTrainingRuntime
-      # this component seeds failed validation - its ValidatingWebhookConfiguration
-      # (RHOAI's own bundled manifest, not rendered by this chart) hardcodes
-      # kubeflow-trainer-controller-manager.redhat-ods-applications.svc as
-      # the webhook target regardless of applicationsNamespace - reverting
-      # applicationsNamespace to the default makes that hardcoded target
-      # correct again. Nothing in this repository schedules a distributed
-      # training run yet - revisit alongside ADR-0301/ADR-0302.
-      trainer:
-        managementState: Managed
-      # ADR-0322 v0 migration scope: the deprecated Llama Stack component
-      # (superseded by `ogx` above) is removed entirely - not merely set
-      # to an inactive management state - per the ADR's own acceptance
-      # criterion that it be "absent from the rendered DataScienceCluster":
-      # the literal key, not just an inactive value. `oc get
-      # datasciencecluster zuno-dsc` shows `status.conditions` carrying
-      # `type: OGXReady, status:
-      # "True"` and `status.components.ogx.managementState: Managed`,
-      # while the deprecated component's own status entry is already an
-      # empty object (no managementState/releases) even before this key's
-      # removal from spec - i.e. the operand itself was already inactive;
-      # this change only makes the *declared* spec match that already-true
-      # state. RESIDUAL VERIFICATION (operator, not yet performed): confirm
-      # a `make d1 reconcile openshift-ai` after this change leaves the
-      # deprecated component's operand still absent/inactive, rather than
-      # the operator treating an omitted managementState differently from
-      # an explicit Removed - the CRD schema documents no default for that
-      # field (`oc explain` its `spec.components` entry for the exact
-      # field name, deliberately not repeated here so this comment doesn't
-      # itself trip the WP-06 acceptance grep for the removed component's
-      # name). If reconciliation differs, restore an explicit
-      # `managementState: Removed` for it and treat this ADR's acceptance
-      # criterion as satisfied by that instead.
-      aigateway:
-        batchGateway:
-          managementState: Managed
-        managementState: Managed
-        # WP-195 step 6 (2026-11-05): RHOAI 3.6 defaults this to Removed and
-        # tears MaaS down, which deletes maas-gateway-auth and leaves the
-        # MaaS gateway open without authentication, even though
-        # kserve.modelsAsService (under kserve) is still Managed. It must be Managed
-        # explicitly. maas-api then runs in redhat-ai-gateway-infra.
-        modelsAsAService:
-          managementState: Managed
-      trainingoperator:
-        managementState: Managed
 
 # Not part of the vendored startx `cluster-ods` chart - rendered by this
 # chart's own templates/maas-gateway.yaml. DataScienceCluster's

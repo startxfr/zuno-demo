@@ -130,7 +130,7 @@ spec:
 # reconciles for real (owned by DataScienceCluster zuno-dsc -> Config
 # default -> this object, all Ready=True) - it is auto-created once when
 # spec.components.kserve.modelsAsService.managementState is set to
-# Managed in gitops/charts/openshift-ai/templates/datasciencecluster.yaml,
+# Managed in gitops/charts/openshift-ai/values.yaml (cluster-ods.DataScienceCluster.spec),
 # but that DSC field is a bare managementState toggle with no externalOIDC
 # passthrough, so this object has to be addressed directly. We only ever
 # declare the two fields we actually need to change (externalOIDC below,
@@ -226,6 +226,23 @@ its service-identity (`user:`) subscriptions - the ai-gateway ServiceAccount -
 and drops the persona-group ones. Off by default (current behaviour).
 */}}
 {{- $subs := .subscriptions }}
+{{- /*
+2026-11-19 (owner decision): the gateway wasm config Kuadrant builds for maas-default-gateway grew past the 3 MiB API
+request limit (desired EnvoyFilter 3.9 MB: one action set per route rule and per listener hostname, about 3.9 KB per
+limit pair), so the operator cannot write it and the data plane kept the config of 2026-11-05. maas.salesSubscriptions
+.enabled false drops the hand-written /sales entries (and their MaaSAuthPolicy subjects); the generated persona-group
+`<model>-agents` entries are dropped by passing an empty maas.agentSubscriptions (ansible models role). Default true:
+the render is then the one of before.
+*/}}
+{{- if not (dig "salesSubscriptions" "enabled" true $.Values.maas) }}
+{{- $kept := list }}
+{{- range $subs }}
+{{- if ne (toString .group) "/sales" }}
+{{- $kept = append $kept . }}
+{{- end }}
+{{- end }}
+{{- $subs = $kept }}
+{{- end }}
 {{- $generated := index $.Values.maas.agentSubscriptions .publishedName }}
 {{- if and $generated (ne (toString .modelRefKind) "ExternalModel") }}
 {{- $tier := $.Values.maas.agentSubscriptionTier }}
@@ -247,12 +264,17 @@ same limits and priority. The MaaSAuthPolicy below picks the user up from the su
 {{- /*
 ADR-0624 clause 5 / WP-306: the load tests have their own ServiceAccount and their own limit per model route, so a stress
 run cannot spend the ai-gateway's counter. One subscription per local model that the ai-gateway ServiceAccount is
-subscribed to, named `<model>-stress`. Off by default (altGatewayPeers.stress.enabled).
+subscribed to, named `<model>-load`: the Kuadrant wasm shim orders the token-limit actions
+of a route by LIMIT NAME (`models_as_a_service_<model>_<subscription>_<model>_tokens`) and never creates a counter for the
+LAST one (memory kuadrant-shim-drops-trailing-limit-actions, proven 2026-10-24; seen on demo333 on 2026-11-19: no Limitador
+counter for the stress ServiceAccount, so its budget was not enforced). `load` sorts between `lightspeed` and `ocp-*`; the
+`sales` subscription stays last, as before. Keep any new subscription name away from the end of the alphabet.
+Off by default (altGatewayPeers.stress.enabled).
 */}}
 {{- if and $.Values.altGatewayPeers.stress.enabled (ne (toString .modelRefKind) "ExternalModel") }}
 {{- range .subscriptions }}
 {{- if and .user (hasSuffix ":ai-gateway" .user) }}
-{{- $subs = append $subs (dict "name" (printf "%s-stress" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- $subs = append $subs (dict "name" (printf "%s-load" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
 {{- end }}
 {{- end }}
 {{- end }}

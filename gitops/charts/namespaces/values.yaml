@@ -7,6 +7,26 @@ namespace:
 policy:
   enabled: false
 
+# ADR-0624 / WP-310: the identity of the stress campaign Job's `state` drivers, which evaluate the demos' state checks over the
+# Kubernetes API (evaluations/stress/driver_state.py). A ServiceAccount and a get-only ClusterRole GENERATED from those checks
+# (files/stress-reader-rules.yaml: `get` by resource name, a `list` only for the kinds read by name prefix, no secrets, no
+# write). Off by default: the render is then the one of before. Turning it on is a cluster-wide READ of the named platform
+# objects and is the owner's decision. `monitoringView` also binds the built-in cluster-monitoring-view to it, which the
+# saturation sampler needs (WP-309). The Job runs as this ServiceAccount when zuno_stress_reader_enabled is set.
+stressReader:
+  enabled: false
+  namespace: zuno-ai-run
+  serviceAccount: zuno-stress-reader
+  monitoringView: false
+
+# ADR-0624 / WP-310 batch 2: the grant of the stress driver `image-signing-refusal`, apart from `stressReader` on purpose. It
+# renders a dedicated test namespace (label policy.rhtas.com/include=true, so the image-signing webhook covers it) and a
+# Role that lets the stress ServiceAccount CREATE pods there and nowhere else (the driver sends a dry run: nothing is
+# stored). Needs stressReader.enabled. Off by default: the render is then the one of before. The owner decides.
+stressImageProof:
+  enabled: false
+  namespace: zuno-stress-admission
+
 # ADR-0602 / WP-224: the cluster's apps domain, for the EgressFirewall rules
 # that name Keycloak's public host and this cluster's own Routes
 # (templates/egressfirewall-namespace.yaml). The d1 Application passes
@@ -544,6 +564,15 @@ platformNamespaces:
           reason: Acceptance-gate Jobs drive UnifAI through its UI Route (UNIFAI_URL).
         - name: quay-quay-zuno-registry
           reason: okf-fetch of both gateways pulls the OKF release from the internal Quay through its route (ADR-0612 addendum; the Service certificate does not cover the Service name).
+        # ADR-0624 / WP-308: the stress campaign Job (zuno-stress-*) replays the network paths of the experience clients.
+        - name: open-webui
+          reason: The stress campaign's open-webui drivers sign in through Keycloak and chat through Open WebUI's API (WP-308).
+        - name: ai-gateway
+          reason: The stress campaign's blender-3d driver replays the Blender add-on on the ai-gateway workstation entry (WP-308); idle while the entry is off.
+        - name: praxis
+          reason: The stress campaign's claude-code-sovereign driver replays Claude Code on the Praxis workstation entry (WP-308); idle while the entry is off.
+        - name: maas
+          reason: The stress campaign's maas-portal-api-keys driver checks that the public MaaS entry refuses a call without an API key (WP-310 batch 2).
       # S3 answers each name lookup with other addresses out of a pool of hundreds; a name rule holds only the few it
       # resolved, so the storage-initializer of a recreated model pod stalled on blocked connections (embeddings-predictor
       # down 2026-11-08 02:30 to 14:30, found by the RAG pilot). The published eu-west-2 S3 ranges (syncToken 1794088025,

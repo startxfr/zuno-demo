@@ -29,6 +29,19 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    {{- if .Values.stressClients.enabled }}
+    # ADR-0624 / WP-308: the stress campaign Job, by namespace AND pod label (a bare namespace would admit every pod of zuno-ai-run).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.stressClients.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.stressClients.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    {{- end }}
     - from:
         - namespaceSelector:
             matchLabels:

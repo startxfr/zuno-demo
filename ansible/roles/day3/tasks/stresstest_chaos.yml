@@ -1,0 +1,56 @@
+---
+# WP-311 (ADR-0624): the disruptions of a stress campaign, run beside its load Job. Only for a profile that lists `chaos:` (the
+# aggressive one) AND when the operator typed the profile name again (CHAOS_CONFIRM=<profile> / -e stress_chaos_confirm=<profile>):
+# the campaign launch already started the Job, this file waits for each disruption's time (seconds after the launch), inflicts it,
+# watches the platform come back, and records one row per disruption (layer `chaos`) that the report correlates with what the
+# load saw. Informational (ADR-0058): a disruption that did not recover is a row, never a failed run.
+#
+# What it can do is what platform/testing/stress_chaos.py lets through: delete ONE pod of an allow-listed application, or deny
+# one external provider's addresses to the ai-gateway pods with an AdminNetworkPolicy that is deleted at the end whatever
+# happens. Never a model pod, a node, a namespace, a scale. A left-over policy of an earlier run (label zuno.io/stress-chaos) is
+# removed before and after.
+#
+# Needs: delete on pods and create/delete on adminnetworkpolicies for the identity running Ansible (a workstation's own kube
+# login does; through AAP see the chaosRbac switch of the aap-config chart).
+- name: "chaos | the catalogue is within the allow-list"
+  ansible.builtin.command:
+    cmd: "python3 {{ (zuno_repo_root + '/platform/testing/stress_chaos.py') | quote }} validate"
+  changed_when: false
+
+- name: "chaos | the ordered plan of {{ _stress_chaos_ids | join(', ') }}"
+  ansible.builtin.command:
+    cmd: >-
+      python3 {{ (zuno_repo_root + '/platform/testing/stress_chaos.py') | quote }} plan
+      --ids {{ (_stress_chaos_ids | join(',')) | quote }} --start {{ _stress_chaos_start }} --spacing {{ _stress_chaos_spacing }}
+  register: _stress_chaos_plan_out
+  changed_when: false
+
+- name: "chaos | start with no policy of an earlier run left"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: policy.networking.k8s.io/v1alpha1
+    kind: AdminNetworkPolicy
+    label_selectors:
+      - zuno.io/stress-chaos=true
+  failed_when: false
+
+- name: "chaos | the rows start empty"
+  ansible.builtin.set_fact:
+    _stress_chaos_plan: "{{ _stress_chaos_plan_out.stdout | from_json }}"
+    _stress_chaos_rows: []
+
+- name: "chaos | {{ _stress_chaos_plan | length }} disruption(s), the first {{ _stress_chaos_start }} s after the launch"
+  ansible.builtin.include_tasks: stresstest_chaos_one.yml
+  loop: "{{ _stress_chaos_plan }}"
+  loop_control:
+    loop_var: _chaos
+    label: "{{ _chaos.id }} at +{{ _chaos.at }}s"
+
+- name: "chaos | end with no policy left"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: policy.networking.k8s.io/v1alpha1
+    kind: AdminNetworkPolicy
+    label_selectors:
+      - zuno.io/stress-chaos=true
+  failed_when: false

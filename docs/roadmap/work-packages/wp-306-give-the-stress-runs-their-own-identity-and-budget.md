@@ -20,7 +20,7 @@ A load run spends a budget of its own, on a MaaS identity of its own, and its tr
    - `telemetry.py`: the optional header `X-Zuno-Traffic: stresstest` becomes the span attribute `zuno.traffic` on `model_call` and `guardrails_observe`. It is read once per request by `adopt_incoming_trace_context` (already on every endpoint), only the value `stresstest` is kept, and it is never a metric label. Query it in Tempo with `{ span.zuno.traffic = "stresstest" }`.
 3. **The mcp-gateway** (`components/mcp-gateway/app/telemetry.py`): the same tag on `tool_invoke`.
 4. **Charts, all off by default** (the default render is identical to before for the ai-gateway and models charts):
-   - `models`: `altGatewayPeers.stress` renders a `<model>-stress` MaaSSubscription per local model for the ServiceAccount `zuno-ai-run/ai-gateway-stress`, with its own limit (200,000 tokens an hour, priority 50, not a copy of the ai-gateway's), and the MaaSAuthPolicy admits it;
+   - `models`: `altGatewayPeers.stress` renders a `<model>-load` MaaSSubscription per local model for the ServiceAccount `zuno-ai-run/ai-gateway-stress`, with its own limit (200,000 tokens an hour, priority 50, not a copy of the ai-gateway's), and the MaaSAuthPolicy admits it;
    - `ai-gateway`: `maasAdapter.classCredentials` renders that ServiceAccount and a `kubernetes.io/service-account-token` Secret (filled in by the token controller, nothing committed), mounts it at `/var/run/secrets/maas-stress` and sets `MAAS_CLASS_TOKEN_PATHS` for the listed classes (`loadtest`, `stresstest`); `quotaLoadtestGroup` sets `QUOTA_LOADTEST_GROUP`;
    - `keycloak`: the pool `stress-load-01` to `stress-load-08` (copies of consultant-01, in `/zuno-evaluation` like every evaluation persona, plus `/zuno-loadtest` through the new `extraGroups`); the Job creates the groups listed in `evalPersonasExtraGroups`.
 5. **Ansible**: one switch, `zuno_ai_gateway_stress_credentials` (the llm and models roles), and `zuno_ai_gateway_quota_loadtest_group` (the llm role). Neither is set in `ansible/clusters/demo333.yml`: turning them on is the roll below.
@@ -34,14 +34,14 @@ Live, with the owner's go, in this order (each roll announced to zuno-demo-clust
 
 1. zuno-demo-agents: a release defining `loadtest`; promote it, regenerate, commit the generated files.
 2. Rebuild and roll the ai-gateway and mcp-gateway images (a code change in both).
-3. `make d1 install`/`make d2 install models` with `zuno_ai_gateway_stress_credentials: true`: the `<model>-stress` subscriptions appear and the MaaS gateway admits the ServiceAccount (`oc get maassubscription -n models-as-a-service | grep stress`).
+3. `make d1 install`/`make d2 install models` with `zuno_ai_gateway_stress_credentials: true`: the `<model>-load` subscriptions appear and the MaaS gateway admits the ServiceAccount (`oc get maassubscription -n models-as-a-service | grep stress`).
 4. The Keycloak personas Job (create-only: the pool and `/zuno-loadtest` appear, nothing is removed).
 5. `make d2 install llm` with the same switch and `zuno_ai_gateway_quota_loadtest_group: zuno-loadtest`: the second ServiceAccount, its token Secret and `MAAS_CLASS_TOKEN_PATHS` appear; the Secret gets its `token` key from the token controller (check `oc get secret ai-gateway-stress-token -o jsonpath='{.data.token}'` is not empty; the gateway raises and answers 502 on a mapped class if it is).
-6. **Isolation proof**: read the counters of the ai-gateway ServiceAccount's MaaS subscription before and after a `make d3 stresstest PROFILE=standard` run on the pool, and show them unchanged while the `<model>-stress` ones moved. Limitador's per-limit counters are what carry this (its admin API lists a namespace's counters with their remaining quota: confirm the route on this Limitador build; WP-313 owns a permanent reader). Cross-check in Tempo: the run's spans carry `zuno.traffic = stresstest`, and the Authorino metrics or the MaaS gateway access log show requests as `ai-gateway-stress`, none as `ai-gateway`. Then run the golden-path probes of Open WebUI, Dify and kagent during the run: none may answer 429.
+6. **Isolation proof**: read the counters of the ai-gateway ServiceAccount's MaaS subscription before and after a `make d3 stresstest PROFILE=standard` run on the pool, and show them unchanged while the `<model>-load` ones moved. Limitador's per-limit counters are what carry this (its admin API lists a namespace's counters with their remaining quota: confirm the route on this Limitador build; WP-313 owns a permanent reader). Cross-check in Tempo: the run's spans carry `zuno.traffic = stresstest`, and the Authorino metrics or the MaaS gateway access log show requests as `ai-gateway-stress`, none as `ai-gateway`. Then run the golden-path probes of Open WebUI, Dify and kagent during the run: none may answer 429.
 
 ## Open points
 
-- The numbers of the `loadtest` class (proposal below) are a decision of the owner; the ADR gives none. The MaaS side is capped independently by the `<model>-stress` limit of the models chart.
+- The numbers of the `loadtest` class (proposal below) are a decision of the owner; the ADR gives none. The MaaS side is capped independently by the `<model>-load` limit of the models chart.
 - Praxis is a second MaaS consumer with its own ServiceAccount and subscriptions (`altGatewayPeers.praxis`). It injects its own credential whatever token the caller sends, so stress traffic through Praxis spends the Praxis budget, not the stress one. Until Praxis can pick a credential by caller, the Praxis drivers of WP-308 stay low rate and behind the budget guard.
 - The token Secret of the second ServiceAccount is a long-lived token; rotate it by deleting the Secret. A Vault-backed variant (ExternalSecret) fits the same mount if the owner prefers it.
 
@@ -67,3 +67,5 @@ Proposed block for `policies/quotas/quota-policy.yaml` of zuno-demo-agents (to h
       group:   { budget: 1000000, window: 1h }
       project: { budget: 500000,  window: 1h }
 ```
+
+2026-11-19 (live, demo333): the first live proof showed the isolation of the ai-gateway side but no Limitador counter for the stress ServiceAccount on any route: the subscriptions were first named `<model>-stress`, whose limit names sort last, and the Kuadrant wasm shim never creates a counter for the last token-limit action of a route (ordered by limit name). They are renamed `<model>-load`, which sorts between `lightspeed` and `ocp-*`; `sales` stays last as before. Do not name a new subscription so that it sorts after `sales`.

@@ -114,18 +114,19 @@
         # the default 5 minutes failed the first live install although everything was on its way up.
         gitops_app_wait_retries: "{{ world_model_wait_retries }}"
         gitops_app_wait_delay: "{{ world_model_wait_delay }}"
-        gitops_app_extra_helm_values:
-          global:
-            zuno:
-              clusterBaseDomain: "{{ cluster_base_domain }}"
-              routeHost: "world-model.{{ cluster_base_domain }}"
-          egress:
-            clusterCIDRs: "{{ _world_model_cluster_cidrs }}"
-          modelStorage:
-            bucket: "{{ zuno_models_s3_bucket | default('zuno-demo-sources') }}"
-            prefix: "{{ zuno_models_s3_prefix | default('models') }}/{{ world_model_s3_prefix_suffix }}"
-            region: "{{ zuno_models_s3_region | default('eu-west-2') }}"
-          presets: "{{ _world_model_presets }}"
+        # altGateways (WP-303): the web tier may send the prompt enhancement through one of them; added only when
+        # zuno_world_model_alt_gateways is not empty, so the values are the ones of before without it.
+        gitops_app_extra_helm_values: >-
+          {{ {
+               'global': {'zuno': {'clusterBaseDomain': cluster_base_domain, 'routeHost': 'world-model.' ~ cluster_base_domain}},
+               'egress': {'clusterCIDRs': _world_model_cluster_cidrs},
+               'modelStorage': {
+                 'bucket': zuno_models_s3_bucket | default('zuno-demo-sources'),
+                 'prefix': (zuno_models_s3_prefix | default('models')) ~ '/' ~ world_model_s3_prefix_suffix,
+                 'region': zuno_models_s3_region | default('eu-west-2')
+               },
+               'presets': _world_model_presets
+             } | combine({'altGateways': zuno_world_model_alt_gateways} if (zuno_world_model_alt_gateways | length) > 0 else {}) }}
 
     - name: "world-model | wait for the Deployments to be available (the runtime loads two models)"
       kubernetes.core.k8s_info:

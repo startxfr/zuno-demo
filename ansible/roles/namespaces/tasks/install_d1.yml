@@ -4,12 +4,29 @@
 # day1_install.yml, which special-cases this role's tasks_from to
 # "install_d1" (same pattern day1_check.yml already uses for `agents`'
 # "check") since `namespaces` is otherwise a Day 0 component.
+- name: "namespaces | load this cluster's non-secret variables (ADR-0624 switches: zuno_stress_reader_*, zuno_stress_image_proof_enabled)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "namespaces | apply the namespaces GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "namespaces"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    # ADR-0624 / WP-310: the read-only identity of the stress campaign's state drivers (default off). A cluster-wide read
+    # of the named platform objects: the owner's decision (2026-11-19).
+    # apply_gitops_app.yml REPLACES the Application's whole `values` with gitops_app_extra_helm_values, so the values of
+    # gitops/apps/namespaces/application-d1.yaml are read here and the switch is merged into them. Passing only the
+    # switch (or `{}` when it is off) rendered an empty chart, and Argo CD refused the auto-sync ("auto-sync will wipe
+    # out all resources", 2026-11-19 04:50Z).
+    gitops_app_extra_helm_values: >-
+      {{ ((lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/apps/namespaces/application-d1.yaml') | from_yaml)
+            .spec.source.helm['values'] | replace('apps.mycluster.example.com', cluster_base_domain) | from_yaml)
+         | combine({'stressReader': {'enabled': true,
+                                     'monitoringView': (zuno_stress_reader_monitoring_view | default(false) | bool)}}
+                   if (zuno_stress_reader_enabled | default(false) | bool) else {})
+         | combine({'stressImageProof': {'enabled': true}}
+                   if ((zuno_stress_reader_enabled | default(false) | bool) and (zuno_stress_image_proof_enabled | default(false) | bool)) else {}) }}
 
 - name: "namespaces | prepare summary (d1)"
   ansible.builtin.debug:

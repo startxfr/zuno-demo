@@ -116,6 +116,42 @@ spec:
           - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
           - predicate: "'x-zuno-project-id' in request.headers"
     {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      loadtest-user:
+        rates:
+          - limit: 250000
+            window: 1h
+        counters:
+          - expression: "request.headers['x-zuno-user-sub']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'loadtest' : false)"
+          - predicate: "'x-zuno-user-sub' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      loadtest-group:
+        rates:
+          - limit: 1000000
+            window: 1h
+        counters:
+          - expression: "request.headers['x-zuno-groups']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'loadtest' : false)"
+          - predicate: "'x-zuno-groups' in request.headers"
+    {{- end }}
+    {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
+      loadtest-project:
+        rates:
+          - limit: 500000
+            window: 1h
+        counters:
+          - expression: "request.headers['x-zuno-project-id']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'loadtest' : false)"
+          - predicate: "'x-zuno-project-id' in request.headers"
+    {{- end }}
       standard-user:
         rates:
           - limit: 10000000
