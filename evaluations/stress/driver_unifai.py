@@ -27,6 +27,7 @@ sys.path.insert(0, str(_EVALUATIONS / "common"))
 
 import golden_path_probe as gpp  # noqa: E402
 import unifai_target as ut  # noqa: E402
+import stress_runner as sr  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
 TEMPO_DEFAULT = "http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200"
@@ -46,9 +47,12 @@ def _turn(ctx, persona: str):
     target = ut.UnifaiTarget(ctx.env.get("DEMO_PERSONA_PASSWORD", ""), ui_url=_unifai_url(ctx), agent="tekos",
                              team_name=ctx.env.get("UNIFAI_TEAM_NAME", "agent-tekos"))
     try:
-        return target.run(persona, gpp.PROMPT, timeout=150)
+        # the UnifAI sign-in sits inside the run: one retry after a pause when Keycloak bounced it (brute-force window);
+        # a turn answers with a status, only a failed sign-in raises
+        return sr.retry_signin(lambda: target.run(persona, gpp.PROMPT, timeout=150))
     finally:
         target.cleanup()
+
 
 
 def _turn_rows(driver: str, run, ms: float, extra: str = ""):

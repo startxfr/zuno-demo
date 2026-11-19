@@ -51,6 +51,7 @@ import os
 import pathlib
 import re
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
@@ -329,6 +330,49 @@ class WorkerCtx:
 
     async def token(self, persona: Optional[str] = None) -> str:
         return await self._base.token(persona or self.persona)
+
+
+# -- blocking sign-ins shared by the drivers (WP-311 follow-up) ---------------------------------------------------
+# Keycloak's brute-force protection counts every failed or concurrent sign-in of ONE user: many drivers and per-agent Jobs
+# signing in as the same persona at once get refused for a minute. A driver caches the session it gets, signs in under a lock
+# per (persona, client), and retries once after a pause before the row fails.
+SIGNIN_ATTEMPTS = 2
+SIGNIN_BACKOFF = 8.0  # seconds, plus up to the same again of jitter
+_SIGNIN_LOCKS: Dict[Any, threading.Lock] = {}
+_SIGNIN_GUARD = threading.Lock()
+
+
+def signin_lock(key: Any) -> threading.Lock:
+    with _SIGNIN_GUARD:
+        return _SIGNIN_LOCKS.setdefault(key, threading.Lock())
+
+
+def retry_signin(fn: Callable[[], Any], attempts: int = SIGNIN_ATTEMPTS, backoff: float = SIGNIN_BACKOFF,
+                 sleep: Callable[[float], None] = time.sleep, jitter: Callable[[], float] = lambda: __import__("random").random()) -> Any:
+    """Calls the blocking sign-in `fn`; on an exception waits (backoff + jitter) and tries again, up to `attempts`. Blocking."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception:  # noqa: BLE001 - the last attempt re-raises, whatever the sign-in raised
+            if attempt == attempts:
+                raise
+            sleep(backoff * (1 + jitter()))
+
+
+def cached_signin(cache: Dict[Any, Tuple[Any, float]], key: Any, ttl: float, fn: Callable[[], Any],
+                  now: Callable[[], float] = time.time, **retry: Any) -> Any:
+    """The cached session of `key`, else one sign-in (`fn`, with retry) under the key's lock: concurrent callers of one persona
+    wait for that sign-in and reuse it instead of each signing in. Blocking."""
+    hit = cache.get(key)
+    if hit and hit[1] > now():
+        return hit[0]
+    with signin_lock(key):
+        hit = cache.get(key)
+        if hit and hit[1] > now():
+            return hit[0]
+        value = retry_signin(fn, **retry)
+        cache[key] = (value, now() + ttl)
+        return value
 
 
 # -- the budget guard --------------------------------------------------------------------------------------------

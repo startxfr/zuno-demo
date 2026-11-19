@@ -26,6 +26,7 @@ _EVALUATIONS = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_EVALUATIONS))
 
 import golden_path_probe as gpp  # noqa: E402
+import stress_runner as sr  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
 CODE_PROMPT = "Write a one-line Python function that adds two numbers."
@@ -83,11 +84,9 @@ def _register_open_webui(driver_id: str, want: str, prompt: str, moment: str):
     async def run(ctx, i):
         started = time.monotonic()
         persona = ctx.persona
-        cached = _TOKENS.get(persona)
-        if not cached or cached[1] < time.time():
-            token = await asyncio.to_thread(owui_login, _open_webui_url(ctx), persona, ctx.env.get("DEMO_PERSONA_PASSWORD", ""))
-            _TOKENS[persona] = (token, time.time() + TOKEN_TTL)
-        token = _TOKENS[persona][0]
+        token = await asyncio.to_thread(
+            sr.cached_signin, _TOKENS, persona, TOKEN_TTL,
+            lambda: owui_login(_open_webui_url(ctx), persona, ctx.env.get("DEMO_PERSONA_PASSWORD", "")))
         status, model, content, served_by, ids = await asyncio.to_thread(owui_chat, _open_webui_url(ctx), token, want, prompt)
         if status in (401, 403):
             _TOKENS.pop(persona, None)  # the next iteration signs in again

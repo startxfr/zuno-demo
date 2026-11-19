@@ -25,6 +25,7 @@ sys.path.insert(0, str(_EVALUATIONS))
 sys.path.insert(0, str(_EVALUATIONS / "blender"))
 
 import golden_path_probe as gpp  # noqa: E402
+import stress_runner as sr  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
 TOKEN_TTL = 4 * 60
@@ -37,15 +38,10 @@ def _domain(ctx) -> str:
 
 def device_access_token(issuer: str, persona: str, password: str, client_id: str) -> str:
     """The access token of a device sign-in of `persona` on `client_id`, cached for four minutes. Blocking."""
-    key = (persona, client_id)
-    cached = _DEVICE_TOKENS.get(key)
-    if cached and cached[1] > time.time():
-        return cached[0]
     from device_login import device_token
 
-    token = device_token(issuer, persona, password, timeout=90, client_id=client_id)["access_token"]
-    _DEVICE_TOKENS[key] = (token, time.time() + TOKEN_TTL)
-    return token
+    return sr.cached_signin(_DEVICE_TOKENS, (persona, client_id), TOKEN_TTL,
+                            lambda: device_token(issuer, persona, password, timeout=90, client_id=client_id)["access_token"])
 
 
 async def _device(ctx, client_id: str) -> str:

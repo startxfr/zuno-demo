@@ -530,5 +530,48 @@ class Cli(unittest.TestCase):
         self.assertIn(f"profile=smoke shard=0/1 drivers={expected}", text)
 
 
+class SignIn(unittest.TestCase):
+    """The shared blocking sign-in helpers: one sign-in per persona, one retry after a pause."""
+
+    def test_retries_once_then_raises(self):
+        calls, pauses = [], []
+
+        def refused():
+            calls.append(1)
+            raise RuntimeError("refused")
+        with self.assertRaises(RuntimeError):
+            sr.retry_signin(refused, attempts=2, backoff=5, sleep=pauses.append, jitter=lambda: 0.0)
+        self.assertEqual((len(calls), pauses), (2, [5]))
+
+    def test_second_attempt_can_succeed(self):
+        state = {"n": 0}
+
+        def flaky():
+            state["n"] += 1
+            if state["n"] == 1:
+                raise RuntimeError("bounced")
+            return "token"
+        self.assertEqual(sr.retry_signin(flaky, sleep=lambda s: None, jitter=lambda: 0.0), "token")
+
+    def test_concurrent_callers_share_one_sign_in(self):
+        import threading
+        import time as _t
+        cache, calls = {}, []
+
+        def slow():
+            calls.append(1)
+            _t.sleep(0.05)
+            return "tok"
+        out = []
+        threads = [threading.Thread(target=lambda: out.append(sr.cached_signin(cache, ("p", "c"), 60, slow))) for _ in range(6)]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
+        self.assertEqual((out, len(calls)), (["tok"] * 6, 1))
+
+    def test_expired_entry_signs_in_again(self):
+        cache = {("p",): ("old", 5.0)}
+        self.assertEqual(sr.cached_signin(cache, ("p",), 60, lambda: "new", now=lambda: 10.0), "new")
+
+
 if __name__ == "__main__":
     unittest.main()
