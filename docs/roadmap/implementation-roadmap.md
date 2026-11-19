@@ -1218,7 +1218,7 @@ Blender and world-model.
 | WP-296 | [wp-296](work-packages/wp-296-give-open-webui-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
 | WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Done | none |
 | WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Done | none |
-| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: UnifAI objects (the demo333 entry in ansible/clusters/demo333.yml, `make d1 install unifai`, the Tempo trace, zuno-demo-reorg told) |
+| WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Operator pending | one C1 chat through zuno-gateway-praxis in the UnifAI UI |
 | WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Done | none |
 | WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: OpenClaw personas (the proxy pod labels `app: claw-proxy` are not read from a live pod, the demo333 entry, the roll, zuno-demo-reorg told) |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
