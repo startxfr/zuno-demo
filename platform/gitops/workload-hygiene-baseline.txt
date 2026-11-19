@@ -6,9 +6,6 @@ kagent/templates/front-door.yaml securityContext
 openclaw/templates/front-door.yaml securityContext
 postgresql/templates/job-monitoring-role.yaml securityContext
 postgresql/templates/job-schema-grants.yaml securityContext
-trustyai-config/templates/job-garak-security.yaml securityContext
-trustyai-config/templates/job-garak-smoke.yaml securityContext
-trustyai-config/templates/job-ragas-eval.yaml securityContext
 world-model/templates/front-door.yaml securityContext
 world-model/templates/runtime.yaml securityContext
 world-model/templates/web.yaml securityContext

@@ -50,6 +50,15 @@ spec:
       containers:
         - name: ragas
           image: {{ .Values.ragasEval.image }}
+          # What the restricted-v2 SCC already applies to this pod on OpenShift (read on the live pod, 2026-11-19), declared so the
+          # manifest says it and a cluster without that SCC does the same. readOnlyRootFilesystem is NOT set: the job writes to /tmp.
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: UNIFAI_RAG_URL
               value: {{ .Values.ragasEval.unifaiRagUrl | quote }}
