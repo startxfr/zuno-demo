@@ -1697,8 +1697,11 @@ def check_stress_table() -> List[Finding]:
 ADR_STATUS_LIVE = re.compile(r"^(Implemented|Accepted)\b")
 ADR_STATUS_PATH_RE = re.compile(r"`([^`\s]+)`")
 ADR_AMENDED_RE = re.compile(r"^## Amend(?:ed|ment) \(", re.M)
-# agents/ and policies/ live in zuno-demo-agents since the split; tests/ is relative to a component's own test directory;
-# evaluations/benchmarks/ holds generated artifacts of one run.
+# Why each prefix is skipped:
+#   agents/                  moved to zuno-demo-agents by WP-165, so the file is not in this tree on purpose;
+#   policies/                the same move (the corp policies are carried by zuno-demo-agents);
+#   tests/                   relative to a component's own test directory, not to the repository root;
+#   evaluations/benchmarks/  an artifact of one benchmark run, not a maintained file.
 ADR_PATH_SKIP_PREFIXES = ("agents/", "policies/", "tests/", "evaluations/benchmarks/")
 
 
