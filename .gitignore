@@ -54,6 +54,8 @@ evaluations/benchmarks/*.json
 # verified per locked digest by platform/okf/release_cache.py.
 .cache/
 
+.claude/worktrees
+
 # ADR-0617/WP-284: a demo recording is never published; only its GIF, after the
 # owner's go. Recordings live under ~/.cache/zuno/demo/recordings/.
 *.webm
