@@ -496,6 +496,12 @@ zuno_stress_reader_monitoring_view: true
 # aggressive profile's provider-cut runs through AAP too. A real grant: an ANP outranks every NetworkPolicy, and RBAC
 # cannot limit a create to one name.
 zuno_stress_chaos_rbac_enabled: true
+# 2026-11-19 (owner decision): the maas-default-gateway wasm config is over the 3 MiB API request limit (desired 3.9 MB),
+# so Kuadrant has not been able to update it since 2026-11-05 and no subscription created after that date is enforced.
+# Dropping the persona-group (<model>-agents, 4) and /sales (4) subscriptions brings it to about 2.8 MiB; ocp-* (MaaS
+# portal demo) and <model>-load (stress isolation) stay. Direct MaaS keys for agent_* and sales groups stop working.
+zuno_maas_persona_group_subscriptions: false
+zuno_maas_sales_subscriptions: false
 # WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
 # the per-agent guardrail modes generated from the agents release. Needs the
 # image built from b1facfc2 or later (ai-gateway-28).

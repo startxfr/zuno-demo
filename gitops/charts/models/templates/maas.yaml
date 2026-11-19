@@ -226,6 +226,23 @@ its service-identity (`user:`) subscriptions - the ai-gateway ServiceAccount -
 and drops the persona-group ones. Off by default (current behaviour).
 */}}
 {{- $subs := .subscriptions }}
+{{- /*
+2026-11-19 (owner decision): the gateway wasm config Kuadrant builds for maas-default-gateway grew past the 3 MiB API
+request limit (desired EnvoyFilter 3.9 MB: one action set per route rule and per listener hostname, about 3.9 KB per
+limit pair), so the operator cannot write it and the data plane kept the config of 2026-11-05. maas.salesSubscriptions
+.enabled false drops the hand-written /sales entries (and their MaaSAuthPolicy subjects); the generated persona-group
+`<model>-agents` entries are dropped by passing an empty maas.agentSubscriptions (ansible models role). Default true:
+the render is then the one of before.
+*/}}
+{{- if not (dig "salesSubscriptions" "enabled" true $.Values.maas) }}
+{{- $kept := list }}
+{{- range $subs }}
+{{- if ne (toString .group) "/sales" }}
+{{- $kept = append $kept . }}
+{{- end }}
+{{- end }}
+{{- $subs = $kept }}
+{{- end }}
 {{- $generated := index $.Values.maas.agentSubscriptions .publishedName }}
 {{- if and $generated (ne (toString .modelRefKind) "ExternalModel") }}
 {{- $tier := $.Values.maas.agentSubscriptionTier }}
