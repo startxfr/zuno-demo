@@ -7,3 +7,4 @@
 - [Secrets management](secrets-management.md)
 - [AI security](ai-security.md)
 - [SecNumCloud-oriented control matrix](secnumcloud-controls.md) (ADR-0111)
+- [Access intent matrix](access-intent-matrix.md) (derived output, not an authorization source)
