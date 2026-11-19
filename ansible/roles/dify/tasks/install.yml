@@ -98,7 +98,8 @@
            'mcpHeaders': dify_mcp_headers,
            'inboundAuth': {'enabled': dify_token_proxy_inbound_auth | bool},
            'egress': {'clusterCIDRs': _dify_cluster_cidrs}
-         } | combine({'altGateways': zuno_dify_alt_gateways} if (zuno_dify_alt_gateways | length) > 0 else {}) }}
+         } | combine({'altGateways': zuno_dify_alt_gateways} if (zuno_dify_alt_gateways | length) > 0 else {})
+           | combine({'stressClients': {'enabled': true}} if (zuno_stress_clients_enabled | default(false) | bool) else {}) }}
 
 - name: "dify | apply the External Knowledge adapter Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

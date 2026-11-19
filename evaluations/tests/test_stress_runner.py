@@ -433,7 +433,8 @@ class Cli(unittest.TestCase):
             self.assertEqual(sr.main(["--dir", str(STRESS_DIR), "--dry-run", "--profile", "smoke"]), 0)
         text = out.getvalue()
         self.assertIn("ai-gateway-sovereignty", text)
-        self.assertIn("profile=smoke shard=0/1 drivers=3", text)
+        expected = len(sr.build_plan(sr.load_profile("smoke", STRESS_DIR), {}, sr.REGISTRY)[0])
+        self.assertIn(f"profile=smoke shard=0/1 drivers={expected}", text)
 
 
 if __name__ == "__main__":

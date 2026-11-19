@@ -91,6 +91,8 @@
            'stress_runner.py': zuno_repo_root + '/platform/testing/stress_runner.py',
            'day2_report.py': zuno_repo_root + '/platform/testing/day2_report.py',
            'golden_path_probe.py': zuno_repo_root + '/evaluations/golden_path_probe.py',
+           'unifai_target.py': zuno_repo_root + '/evaluations/common/unifai_target.py',
+           'device_login.py': zuno_repo_root + '/evaluations/blender/device_login.py',
            'requirements.txt': zuno_repo_root + '/evaluations/tekos/requirements.txt'
          } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path')))) }}
 
@@ -204,6 +206,14 @@
                       secretKeyRef:
                         name: zuno-stress-credentials
                         key: demo-persona-password
+                  # WP-308: the routes and Services the experience drivers call (each driver derives its own URL
+                  # from the domain when its own variable is absent). UnifAI's route is verified with the internal CA.
+                  - name: CLUSTER_BASE_DOMAIN
+                    value: "{{ cluster_base_domain }}"
+                  - name: UNIFAI_URL
+                    value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
+                  - name: UNIFAI_VERIFY_TLS
+                    value: "1"
                   - name: STRESS_PERSONAS
                     value: "{{ stress_personas | default('stress-consultant-01') }}"
                 volumeMounts:

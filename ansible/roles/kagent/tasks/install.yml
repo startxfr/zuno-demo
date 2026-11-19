@@ -55,14 +55,17 @@
     gitops_component_name: "token-proxy-kagent"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-token-proxy-kagent-d1"
-    gitops_app_extra_helm_values:
-      namespace: "{{ kagent_namespace }}"
-      clientId: kagent
-      clusterBaseDomain: "{{ cluster_base_domain }}"
-      aiHeaders: "{{ kagent_ai_headers }}"
-      mcpHeaders: "{{ kagent_mcp_headers }}"
-      egress:
-        clusterCIDRs: "{{ _kagent_cluster_cidrs }}"
+    # ADR-0624 / WP-308: zuno_stress_clients_enabled admits the stress campaign Job to the proxy (off: the values are the
+    # ones of before).
+    gitops_app_extra_helm_values: >-
+      {{ {
+           'namespace': kagent_namespace,
+           'clientId': 'kagent',
+           'clusterBaseDomain': cluster_base_domain,
+           'aiHeaders': kagent_ai_headers,
+           'mcpHeaders': kagent_mcp_headers,
+           'egress': {'clusterCIDRs': _kagent_cluster_cidrs}
+         } | combine({'stressClients': {'enabled': true}} if (zuno_stress_clients_enabled | default(false) | bool) else {}) }}
 
 - name: "kagent | apply the kagent Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

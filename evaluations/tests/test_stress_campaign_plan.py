@@ -53,7 +53,7 @@ def plan(**extra_vars):
 class CampaignPlan(unittest.TestCase):
     def test_smoke_takes_everything_from_the_profile(self):
         facts, _ = plan(stress_profile="smoke")
-        self.assertEqual(facts["families"], ["tools", "models"])
+        self.assertEqual(facts["families"], ["tools", "models", "unifai", "guardrails"])
         self.assertEqual((facts["shards"], facts["wait"], facts["deadline"]), (1, True, 900))
         self.assertEqual(facts["overrides"], {})
         self.assertRegex(facts["run_id"], r"^smoke-\d{8}-\d{6}$")

@@ -2,12 +2,24 @@
 # First values, to be tuned after the first runs (WP-309 adds the load drivers and the duration phase).
 name: standard
 description: agents family + every driver x3, concurrency 2, under 45 minutes
-families: [agents, tools, models]
+families: [agents, tools, models, unifai, guardrails, experiences]
 defaults:
   iterations: 3
   concurrency: 2
   timeout: 120
   shards: 1
+# The experience drivers are the real user paths of Open WebUI, Dify, kagent, Blender and Claude Code: they spend the
+# experience clients' own shared budgets (Praxis's for claude-code-sovereign), so they stay at one request at a time.
+drivers:
+  open-webui: {timeout: 240, concurrency: 1, iterations: 2}
+  open-webui-zuno-code: {timeout: 240, concurrency: 1, iterations: 2}
+  open-webui-zuno-wesh: {timeout: 240, concurrency: 1, iterations: 2}
+  dify: {timeout: 240, concurrency: 1, iterations: 2}
+  kagent: {timeout: 240, concurrency: 1, iterations: 2}
+  blender-3d: {timeout: 240, concurrency: 1, iterations: 2}
+  claude-code-sovereign: {timeout: 240, concurrency: 1, iterations: 2}
+  unifai-agents: {timeout: 240, concurrency: 1, iterations: 2}
+  observability-trace: {timeout: 240, concurrency: 1, iterations: 2}
 budget:
   max_consecutive_failures: 3
   max_429: 5
