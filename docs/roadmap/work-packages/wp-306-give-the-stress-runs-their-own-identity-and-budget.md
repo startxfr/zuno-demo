@@ -49,8 +49,8 @@ Live, with the owner's go, in this order (each roll announced to zuno-demo-clust
 
 The standard run of 2026-11-19 left the shared ai-gateway ServiceAccount's MaaS counter at 1,002,556 / 1,000,000 and broke `make d2 check agents`: the per-agent Jobs (family `agents`, signing in as the `stress-<persona>` twins) and the experience drivers ride that counter. What changed (commit 8a5c6b90 and its follow-up):
 
-- the five stress twins join `/zuno-loadtest` (keycloak chart, `extraGroups`), so the per-agent Jobs run under `loadtest` on the `ai-gateway-stress` identity. Live only after a keycloak roll and the eval-personas Job;
-- until that is verified live, `agents` is in no profile (opt-in with `FAMILIES=agents`);
+- the five stress twins join `/zuno-loadtest` (keycloak chart, `extraGroups`), so the per-agent Jobs run under `loadtest` on the `ai-gateway-stress` identity. Live on demo333 since 2026-11-19 17:02Z (keycloak synced, eval-personas Job 188 memberships, the five twins in `/zuno-loadtest`);
+- until the agents family is verified riding `ai-gateway-stress` (the full demo check planned for 2026-11-22), `agents` is in no profile (opt-in with `FAMILIES=agents`);
 - the experience drivers are capped at 1 iteration and the profiles' `shared_budget_guard` skips a driver of the families experiences, unifai and guardrails when the shared counter is already 50% spent; an unreadable Limitador is one `shared-budget-unknown` WARNING row (the guard is skipped, the run goes on);
 - the isolation row of the counters report warns when the shared account moved more than 10% of its window budget.
 

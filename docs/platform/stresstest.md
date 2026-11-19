@@ -184,6 +184,7 @@ fails and says so, it never guesses another one.
 - Until the Mistral Codestral key is renewed, the C1 code path falls back to a local model; the report counts it as a
   known state ([key rotation](saas-provider-key-rotation.md)).
 - The profile values are first values, tuned after the first runs.
-- The five stress twin personas (`stress-consultant-01` and four more) join `/zuno-loadtest` in the Keycloak chart since 2026-11-19 (owner's go), so
-  the per-agent Jobs of the `agents` family run under the `loadtest` quota class. That is live only after a Keycloak roll and the eval-personas Job;
-  until then the twins stay in the `stresstest` class.
+- The five stress twin personas (`stress-consultant-01`, `stress-sale-01`, `stress-adv-01`, `stress-finance-01` and `stress-board-01`) are in
+  `/zuno-loadtest` on demo333 since 2026-11-19 (commit 6fe9ffb7; Keycloak synced, the eval-personas Job reported 188 memberships against 183 before).
+  What is not proven yet is the `agents` family riding the `ai-gateway-stress` identity: that is the full demo check planned for 2026-11-22, and
+  until then `agents` stays opt-in (`FAMILIES=agents`).
