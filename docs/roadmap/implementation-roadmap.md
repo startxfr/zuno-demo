@@ -1222,7 +1222,7 @@ Blender and world-model.
 | WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Done | none |
 | WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Done | none |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
-| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: world-model web roll (the demo333 entry, the image build and roll, zuno-demo-reorg told) |
+| WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Operator pending | live proof at the next world-model switch-on (entry and web image ready) |
 | WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Operator pending | the three pages exist; `claude-code-sovereign` rehearsed (5 min) with its GIF on 2026-11-19 (75b05ec9); left: `multi-gateway` and `agents-alt-gateway` not rehearsed, owner's go: one live play of each scenario |
 | WP-305 | [wp-305](work-packages/wp-305-build-the-stress-runner-core-and-profiles.md) | 0624 | none | Repo work in review | owner's go: the smoke run of WP-307 |
 | WP-306 | [wp-306](work-packages/wp-306-give-the-stress-runs-their-own-identity-and-budget.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: a zuno-demo-agents release defining `loadtest`, the gateway image rolls, the stress subscriptions and the persona pool |
@@ -1378,6 +1378,7 @@ moving.
 
 ## Change log
 
+- 2026-11-19 — WP-303 prepared: world-model's demo333 entry lists Praxis and the web image is rebuilt (`world-model-web-6`); world-model stays off, so the live proof runs at its next switch-on (owner's choice).
 - 2026-11-19 — WP-301 Done: each OpenClaw persona (consultant-02, sale-01) gets a `praxis` provider next to `zuno`, through its claw proxy and its own `openclaw-<persona>` token; a C1 call from each assistant was served on Praxis's `maas` step (200, traces in Tempo), and the default OpenClaw road still passes its golden-path probe.
 - 2026-11-19 — WP-299 Done: UnifAI's shared LLM `zuno-gateway-praxis` answered a C1 question for consultant-01 (throwaway workflow through the UI route, deleted afterwards); the one Tempo trace runs UnifAI → Praxis (`maas` step, 200) → MaaS → qwen3.6-27b. The first model call outlived UnifAI's 200 s LLM timeout and was retried (33 s).
 - 2026-11-19 — WP-300 Done: Dify gets a model `praxis-auto` on its token proxy's Praxis route; its registration call reached Praxis's MaaS step with 200, and the default Dify path is unchanged (golden-path probe PASS). The install needs confidential.yml (Dify's S3 values), so it ran locally, not through AAP.
