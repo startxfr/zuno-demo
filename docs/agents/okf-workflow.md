@@ -11,3 +11,15 @@ now the Zuno OKF profile 1.0
   [zuno-demo-agents documentation](https://github.com/startxfr/zuno-demo-agents/tree/main/docs).
 - How the UnifAI operator turns a bundle into running agents:
   [operator page](https://github.com/startxfr/UnifAI/blob/devel/fork/unifai-operator/docs/okf-agent-bundles.md).
+
+## Earlier diagrams (history)
+
+Two images from before the agents moved to their own repository and signing became keyless. They are kept as history and no longer describe how an
+agents release is signed or consumed (see [agents release integration](../platform/agents-release-integration.md)):
+
+- [Signing chain with Vault Transit and the agent-runtime](../assets/img/archi-schema-okf-sign-chain.png): the bundle was signed through the
+  Vault Transit key `zuno-platform-signer` and verified by the agent-runtime before load (as the image says); the keyless GitHub OIDC signature of
+  [ADR-0578](../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) replaced it.
+- [OKF workflow infographic](../assets/img/Workflow-OKF.png) (French, from the early design): from a rule change in the agent code to its use by the
+  AI Gateway.
+

@@ -36,6 +36,10 @@ Evaluation of the RAG corpora runs through TrustyAI and EvalHub ([ADR-0534](../a
 [evaluation scenario](../demo/scenarios/rhoai/evaluation-trustyai-evalhub.md)). The blue/green corpus promotion of the earlier target design was
 never built and is not part of the UnifAI RAG.
 
+## Earlier target design
+
+The [full RAG training workflow diagram](../assets/img/Workflow-trainingRAG.png) of the retired pipeline is kept as history; it showed a target shape, not what runs.
+
 ## Related
 
 [Vector data model](vector-data-model.md), [data architecture](../architecture/data-architecture.md), [live RAG scenario](../demo/unifai-live-rag.md).
