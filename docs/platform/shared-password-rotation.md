@@ -98,7 +98,7 @@ the Keycloak Jobs cannot sign in. They retry past the 30-failure limit and lock 
 | `zuno-ai-run/demo-persona-probe-credentials` | `make demo check` (after `make demo use <id> 5\|15`; also `make demo golden-path`) |
 | Stress-test and failover credentials | Refreshed by their next run; stale until then |
 | OpenClaw Control UI (`openclaw/<persona>`, field `ui_password`) | `vault kv patch` only that field (the path also holds `cookie_secret`), refresh the ExternalSecret, then **delete the assistant pod**: the value is read as an env var |
-| Dify admin | Change it in Dify first: `flask reset-password` in the `api` container of the pod labelled `app.kubernetes.io/name=dify,component=api`. Then `vault kv patch zuno/dify/admin`. Nothing else changes it, and `make d2 configure dify` signs in with the Vault value |
+| Dify admin | Change it in Dify first: `flask reset-password` in the `api` container of the pod labelled `app.kubernetes.io/name=dify,component=api`. Then `vault kv patch zuno/dify/admin`. Nothing else changes it, and `make d2 install dify` (its configure step) signs in with the Vault value |
 
 Restart workloads by **deleting their pods**. `oc rollout restart` is reverted by Argo CD selfHeal.
 

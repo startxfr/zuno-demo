@@ -7,7 +7,7 @@ drill" placeholder) — not when the mechanism merely exists.
 
 | Service | Mechanism | Schedule | RPO | RTO target | Restore drill executed? |
 |---|---|---|---|---|---|
-| PostgreSQL (`zuno-postgresql`) | pgBackRest via Crunchy PGO (`gitops/charts/postgresql`) | full weekly (Sun 02:00) + differential daily (02:00) | <= 24h | <= 4h | Not yet — operator follow-up |
+| PostgreSQL (`zuno-postgresql`) | pgBackRest via Crunchy PGO (`gitops/charts/postgresql`) | full weekly (Sun 02:00) + differential daily (02:00) | <= 24h | <= 4h | Yes (2026-08-18, 203 s to a Ready restored cluster; see "Restore drill executed" below) |
 | Vault (`zuno-vault`) | `vault operator raft snapshot` CronJob to a dedicated PVC + CSI VolumeSnapshot of the data PVC (`gitops/charts/vault`, ADR-0602/WP-223) | daily (04:30 raft, 04:00 CSI) | <= 24h | <= 4h | Yes on file storage (2026-08-18, 2026-08-25); raft snapshot restore not yet drilled |
 | Declarative configuration (GitOps: charts, ADRs, policy) | None needed — Git is the source of truth (ADR-0022) | N/A | 0 (every commit is a recovery point) | Time to `argocd app sync` from a known-good revision | N/A — no data to restore, only re-apply |
 
@@ -256,6 +256,19 @@ in `zuno-vault`, same minimal file-storage HCL as the first drill:
   ≤ 4h met with a wide margin.
 
 The scratch pod/PVC/ConfigMap were deleted after verification.
+
+## Other stores (added 2026-11-19)
+
+The three stores below appeared after the drills above and have no drill recorded on this page. Their mechanisms are in
+[data architecture](../architecture/data-architecture.md#s3-buckets-and-backups); no restore drill is claimed for them here.
+
+| Store | Mechanism | Where |
+|---|---|---|
+| MariaDB (`zuno-data`: the `mlops` and `trillian` databases) | `PhysicalBackup` every 6 hours, 168 hours retention, to the `mariadb/` prefix of the cluster's backups bucket | the S3 backups are off in the chart defaults and switched on per cluster by an Ansible variable |
+| UnifAI (Qdrant snapshots and a MongoDB dump) | `UnifaiStack` `spec.backup`, default schedule `0 2 * * *`, retention 7, to the `unifai/` prefix; on demand with `make d3 backup unifai` | the same bucket |
+| Quay registry metadata (`quay-db`) | pgBackRest on a PVC (`repo1`): full weekly (Sunday 04:00 UTC), differential daily; on demand with `make d3 backup quay-registry`. The image blobs are in the S3 bucket and are not covered by this backup | `gitops/charts/quay-registry/values.yaml`, `ansible/roles/quay_registry/tasks/backup.yml` |
+
+PostgreSQL itself also writes its WAL archive and full backups to the same bucket (`postgresql/` prefix, pgBackRest repo2).
 
 ## Declarative configuration (GitOps state)
 
