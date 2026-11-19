@@ -6,6 +6,9 @@ name: standard
 # kagent and OpenClaw) and drained it on 2026-11-19, which broke `make d2 check agents`. Opt in with FAMILIES=agents until the
 # twins are in the /zuno-loadtest group live (keycloak chart, evalPersonas extraGroups) so they run under the `loadtest` class
 # on the ai-gateway-stress identity; then add `agents` back here.
+# Caveat of the twins' move: the `loadtest` class is fail_mode closed and served only through MaaS, so a scenario that needs a SaaS
+# model (for instance tekos #21, Codestral) fails BY DESIGN once the twins are in /zuno-loadtest; the report lists those rows as
+# "skipped: SaaS under loadtest", not as failures.
 description: every driver x3, concurrency 2, under 45 minutes
 families: [tools, models, unifai, guardrails, experiences, state, saturation, counters]
 defaults:

@@ -114,6 +114,26 @@ class Guard(unittest.TestCase):
         self.assertFalse([r for r in rows if r.id == "shared-budget"])
         self.assertTrue(any(r.id.endswith("ok") and r.passed for r in rows))
 
+    def test_an_unreadable_shared_budget_is_one_warning_row_and_the_drivers_run(self):
+        ran = []
+
+        async def run(ctx, i):
+            ran.append(1)
+            return [sr.row("exp", "functional", "ok", "experiences", True, "status=200")]
+        plans = [sr.Plan(driver=sr.Driver(id=f"exp{n}", family="experiences", run=run), iterations=1, concurrency=1, duration=0.0,
+                         rate=0.0, ramp=0.0, timeout=5.0) for n in range(3)]
+        saved = list(sr.SHARED_BUDGET_PROBES)
+        sr.SHARED_BUDGET_PROBES[:] = [lambda ctx: None]
+        try:
+            rows = asyncio.run(sr.run_all(plans, sr.Ctx(env={}), dict(self.PROFILE, name="t"), {}, 0, 1, emit=lambda r: None))
+        finally:
+            sr.SHARED_BUDGET_PROBES[:] = saved
+        warnings = [r for r in rows if r.id == "shared-budget-unknown"]
+        self.assertEqual(len(warnings), 1)  # once per run, not per driver
+        self.assertFalse(warnings[0].passed)
+        self.assertIn("SKIPPED", warnings[0].detail)
+        self.assertEqual(len(ran), 3)
+
     def test_the_counters_driver_registers_its_probe(self):
         self.assertIn(cnt.shared_budget_probe, sr.SHARED_BUDGET_PROBES)
 
@@ -141,6 +161,25 @@ class Fractions(unittest.TestCase):
         self.assertFalse(loud.passed)
         self.assertTrue(loud.detail.startswith("WARNING"))
         self.assertIn("30%", loud.detail)
+
+
+class SkippedByDesign(unittest.TestCase):
+    def test_a_saas_scenario_under_a_closed_class_is_skipped_not_failed(self):
+        import stress_report as rep
+        rows = [{"agent": "tekos", "layer": "scenario", "id": "21", "category": "scenario", "passed": False, "duration_ms": 1,
+                 "detail": "status=502 mistral-codestral: not reached through MaaS, skipped for closed quota class 'loadtest'"},
+                {"agent": "tekos", "layer": "scenario", "id": "22", "category": "scenario", "passed": False, "duration_ms": 1,
+                 "detail": "status=500 a real failure"}]
+        report = rep.build_report(rows, {})
+        self.assertEqual([f["id"] for f in report["failures"]], ["22"])
+        self.assertEqual([f["id"] for f in report["skipped_by_design"]], ["21"])
+        self.assertTrue(report["skipped_by_design"][0]["detail"].startswith("skipped: SaaS under loadtest"))
+        self.assertIn("SKIPPED BY DESIGN (1)", rep.render_text(report))
+
+    def test_the_profiles_say_so(self):
+        for name in ("standard", "aggressive"):
+            text = (STRESS_DIR / f"profile_{name}.yaml").read_text()
+            self.assertIn("skipped: SaaS under loadtest", text)
 
 
 class WaitLoop(unittest.TestCase):

@@ -685,6 +685,7 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
             pending.clear()
             last_flush[0] = time.monotonic()
 
+    warned_unreadable = False
     for plan in plans:
         s = settings(profile, overrides, plan.driver.id, plan.driver.family)
         ctx.max_tokens = int(s["max_tokens"])
@@ -701,6 +702,11 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
                 except Exception as exc:  # noqa: BLE001 - an unreadable counter must not stop the run
                     print(f"[stress] shared-budget probe failed: {type(exc).__name__}: {str(exc)[:120]}", file=sys.stderr, flush=True)
                     fractions.append(None)
+            if not any(f is not None for f in fractions) and not warned_unreadable:
+                warned_unreadable = True  # one row per run, not one per driver
+                sink([row(plan.driver.id, "stress", "shared-budget-unknown", "guard", False,
+                          "WARNING: the shared ai-gateway budget could not be read (Limitador unreachable or no counter of the shared "
+                          "ServiceAccount): the guard is SKIPPED and the drivers of its families run without it")])
             why = shared_budget_verdict(profile, plan.driver.family, fractions)
             if why:
                 sink([row(plan.driver.id, "stress", "shared-budget", "guard", False, f"status=429 skipped: {why}")])
