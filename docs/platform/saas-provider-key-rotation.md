@@ -72,7 +72,7 @@ Each step that changes the cluster needs the owner's go. Never put the key on a 
      oc get pod -n zuno-ai-run -l app.kubernetes.io/name=ai-gateway
      oc delete pod -n zuno-ai-run <pod>      # wait for the new pod to be Ready, then the next one
      ```
-   - Praxis, one replica: deleting the pod costs about 30 seconds without the alternative gateway. Pick a moment when
+   - Praxis, one replica: deleting the pod costs about a minute without the alternative gateway. Pick a moment when
      no Claude Code or alternative-gateway demo is running.
 
      ```sh
@@ -83,7 +83,7 @@ Each step that changes the cluster needs the owner's go. Never put the key on a 
 
      ```sh
      oc get secret llm-provider-<provider> -n zuno-ai-run -o jsonpath='{.data.api_key}' | sha256sum
-     oc exec -n zuno-ai-run deploy/ai-gateway -- sh -c 'printf %s "$MISTRAL_CODESTRAL_API_KEY" | base64 -w0 | sha256sum'
+     oc exec -n zuno-ai-run deploy/ai-gateway -c ai-gateway -- sh -c 'printf %s "$MISTRAL_CODESTRAL_API_KEY" | base64 -w0 | sha256sum'
      ```
 
      The two digests are equal when the pod started after the refresh. Use the variable of the provider from the table
@@ -92,7 +92,7 @@ Each step that changes the cluster needs the owner's go. Never put the key on a 
      spent; the image has `python3`):
 
      ```sh
-     oc exec -n zuno-ai-run deploy/ai-gateway -- python3 -c 'import os,urllib.request as u,urllib.error as e
+     oc exec -n zuno-ai-run deploy/ai-gateway -c ai-gateway -- python3 -c 'import os,urllib.request as u,urllib.error as e
      r=u.Request("https://api.mistral.ai/v1/models",headers={"Authorization":"Bearer "+os.environ["MISTRAL_CODESTRAL_API_KEY"]})
      try: print(u.urlopen(r,timeout=15).status)
      except e.HTTPError as x: print(x.code)'
