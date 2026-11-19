@@ -474,7 +474,12 @@ def test_every_extra_group_of_a_persona_is_created_by_the_job() -> None:
     assert used, "no persona uses an extra group: the load pool is gone"
     assert used <= listed, f"extraGroups not created by the Job: {sorted(used - listed)}"
     pool = [p["username"] for p in values["evalPersonas"] if "/zuno-loadtest" in (p.get("extraGroups") or [])]
-    assert len(pool) >= 4 and all(u.startswith("stress-load-") for u in pool), pool
+    load = [u for u in pool if u.startswith("stress-load-")]
+    assert len(load) >= 4, pool
+    # 2026-11-19 (6fe9ffb7): the five stress twins run the per-agent Jobs under `loadtest` too. No other persona joins:
+    # not stress-mutate-01, and never a demo or eval persona.
+    twins = {f"stress-{role}-01" for role in ("consultant", "sale", "adv", "finance", "board")}
+    assert set(pool) - set(load) <= twins, sorted(set(pool) - set(load) - twins)
 
 
 def test_the_eval_personas_job_runs_after_the_client_reconcile() -> None:
