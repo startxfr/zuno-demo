@@ -2,7 +2,7 @@
 # First values, to be tuned after the first runs (WP-309 adds the load drivers and the duration phase).
 name: standard
 description: agents family + every driver x3, concurrency 2, under 45 minutes
-families: [agents, tools, models, unifai, guardrails, experiences, saturation, counters]
+families: [agents, tools, models, unifai, guardrails, experiences, state, saturation, counters]
 defaults:
   iterations: 3
   concurrency: 2
@@ -20,6 +20,10 @@ drivers:
   claude-code-sovereign: {timeout: 240, concurrency: 1, iterations: 2}
   unifai-agents: {timeout: 240, concurrency: 1, iterations: 2}
   observability-trace: {timeout: 240, concurrency: 1, iterations: 2}
+# One pass of each demo's state checks (the `state` drivers, read-only over the Kubernetes API): they need the stress reader role
+# (stressReader in the namespaces chart); without it each assertion fails with status=403 and says what to enable.
+family_defaults:
+  state: {iterations: 1, concurrency: 1, timeout: 120}
 budget:
   max_consecutive_failures: 3
   max_429: 5

@@ -178,11 +178,13 @@ def _as_list(value: Any) -> List[str]:
     return [str(v) for v in (value or [])]
 
 
-def settings(profile: Dict[str, Any], overrides: Dict[str, Any], driver_id: str = "") -> Dict[str, Any]:
-    """The effective knobs of one driver: DEFAULTS < profile.defaults < profile.drivers[<id>] < overrides."""
+def settings(profile: Dict[str, Any], overrides: Dict[str, Any], driver_id: str = "", family: str = "") -> Dict[str, Any]:
+    """The effective knobs of one driver: DEFAULTS < profile.defaults < budget < profile.family_defaults[<family>] <
+    profile.drivers[<id>] < overrides."""
     merged = dict(DEFAULTS)
     merged.update(profile.get("defaults") or {})
     merged.update(profile.get("budget") or {})
+    merged.update((profile.get("family_defaults") or {}).get(family) or {})
     merged.update((profile.get("drivers") or {}).get(driver_id) or {})
     for key in ("iterations", "concurrency", "duration", "rate", "ramp", "timeout", "shards", "max_tokens"):
         if key in overrides:
@@ -226,7 +228,7 @@ def build_plan(profile: Dict[str, Any], overrides: Dict[str, Any], registry: Dic
     drivers, warnings = select_drivers(profile, overrides, registry)
     plans = []
     for d in drivers:
-        s = settings(profile, overrides, d.id)
+        s = settings(profile, overrides, d.id, d.family)
         k = int(shards if shards is not None else s["shards"])
         conc = max(1, math.ceil(int(s["concurrency"]) / max(k, 1)))
         plans.append(Plan(
@@ -581,7 +583,7 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
             last_flush[0] = time.monotonic()
 
     for plan in plans:
-        s = settings(profile, overrides, plan.driver.id)
+        s = settings(profile, overrides, plan.driver.id, plan.driver.family)
         ctx.max_tokens = int(s["max_tokens"])
         guard = Guard(s["max_consecutive_failures"], s["max_429"])
         if ctx.token_budget_spent:

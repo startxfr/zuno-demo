@@ -1,0 +1,62 @@
+{{- if and .Values.policy.enabled .Values.stressReader.enabled }}
+# ADR-0624 / WP-310: the read-only identity of the stress campaign's state drivers. The rules are generated from the demos'
+# own checks by platform/testing/stress_state.py (see files/stress-reader-rules.yaml): get by resource name, no wildcard, no
+# secrets, no write. The ServiceAccount token is the one the Job mounts.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.stressReader.serviceAccount }}
+  namespace: {{ .Values.stressReader.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.stressReader.serviceAccount }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+rules:
+  {{- (.Files.Get "files/stress-reader-rules.yaml" | fromYaml).rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.stressReader.serviceAccount }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-59"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.stressReader.serviceAccount }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.stressReader.serviceAccount }}
+    namespace: {{ .Values.stressReader.namespace }}
+{{- if .Values.stressReader.monitoringView }}
+---
+# The saturation sampler (WP-309) reads Prometheus through Thanos with this token.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.stressReader.serviceAccount }}-monitoring-view
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-59"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.stressReader.serviceAccount }}
+    namespace: {{ .Values.stressReader.namespace }}
+{{- end }}
+{{- end }}

@@ -102,6 +102,7 @@
            'golden_path_probe.py': zuno_repo_root + '/evaluations/golden_path_probe.py',
            'unifai_target.py': zuno_repo_root + '/evaluations/common/unifai_target.py',
            'quota_counters_probe.py': zuno_repo_root + '/platform/testing/quota_counters_probe.py',
+           'argo_health.py': zuno_repo_root + '/platform/demo/argo_health.py',
            'device_login.py': zuno_repo_root + '/evaluations/blender/device_login.py',
            'requirements.txt': zuno_repo_root + '/evaluations/tekos/requirements.txt'
          } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path'))))
@@ -114,6 +115,18 @@
   loop: "{{ _stress_files | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
+
+# WP-310: the state assertions of the demos (cr_ready, argo_apps, workloads of ansible/demos/*/{status,check}.yml), extracted
+# here so the Job needs neither the demos nor Ansible: the state drivers evaluate them over the Kubernetes API.
+- name: "stress | the state assertions of the demos"
+  ansible.builtin.command:
+    cmd: "python3 {{ (zuno_repo_root + '/platform/testing/stress_state.py') | quote }} extract"
+  register: _stress_state
+  changed_when: false
+
+- name: "stress | add them to the ConfigMap data"
+  ansible.builtin.set_fact:
+    _stress_cm_data: "{{ _stress_cm_data | combine({'state_assertions.json': _stress_state.stdout}) }}"
 
 - name: "stress | fail before the 1 MiB ConfigMap limit"
   ansible.builtin.fail:
@@ -164,7 +177,7 @@
           spec:
             restartPolicy: Never
             priorityClassName: zuno-platform-weak
-            serviceAccountName: acceptance-gate
+            serviceAccountName: "{{ 'zuno-stress-reader' if (zuno_stress_reader_enabled | default(false) | bool) else 'acceptance-gate' }}"
             containers:
               - name: stress
                 image: "docker.io/library/python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b"

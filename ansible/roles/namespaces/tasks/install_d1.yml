@@ -10,6 +10,11 @@
     gitops_component_name: "namespaces"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    # ADR-0624 / WP-310: the read-only identity of the stress campaign's state drivers (default off: the values are the ones of
+    # before). A cluster-wide read of the named platform objects: the owner's decision.
+    gitops_app_extra_helm_values: >-
+      {{ {'stressReader': {'enabled': true, 'monitoringView': (zuno_stress_reader_monitoring_view | default(false) | bool)}}
+         if (zuno_stress_reader_enabled | default(false) | bool) else {} }}
 
 - name: "namespaces | prepare summary (d1)"
   ansible.builtin.debug:

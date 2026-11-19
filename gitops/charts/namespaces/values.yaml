@@ -7,6 +7,18 @@ namespace:
 policy:
   enabled: false
 
+# ADR-0624 / WP-310: the identity of the stress campaign Job's `state` drivers, which evaluate the demos' state checks over the
+# Kubernetes API (evaluations/stress/driver_state.py). A ServiceAccount and a get-only ClusterRole GENERATED from those checks
+# (files/stress-reader-rules.yaml: `get` by resource name, a `list` only for the kinds read by name prefix, no secrets, no
+# write). Off by default: the render is then the one of before. Turning it on is a cluster-wide READ of the named platform
+# objects and is the owner's decision. `monitoringView` also binds the built-in cluster-monitoring-view to it, which the
+# saturation sampler needs (WP-309). The Job runs as this ServiceAccount when zuno_stress_reader_enabled is set.
+stressReader:
+  enabled: false
+  namespace: zuno-ai-run
+  serviceAccount: zuno-stress-reader
+  monitoringView: false
+
 # ADR-0602 / WP-224: the cluster's apps domain, for the EgressFirewall rules
 # that name Keycloak's public host and this cluster's own Routes
 # (templates/egressfirewall-namespace.yaml). The d1 Application passes
