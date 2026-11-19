@@ -3,6 +3,9 @@
 # Order: confidential.yml S3 values, Vault paths, the token proxy (the model check of
 # the provider needs it up), then the Dify Application. The Dify side configuration (model
 # provider, MCP tool, accounts) is done by configure.yml once the pods run.
+- name: "dify | load this cluster's non-secret variables (ADR-0624 switches: zuno_stress_clients_enabled)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "dify | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
