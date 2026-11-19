@@ -532,6 +532,11 @@ zuno_praxis_workstation_entry: true
 # "Praxis", under the user's own token (system_oauth). The ai-gateway stays the first and default connection.
 open_webui_alt_gateways:
   - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
+# WP-297 (owner's go 2026-11-19): kagent gets a second agent, zuno-diagnose-praxis, on Praxis through its token
+# proxy's alternate route. Only the local alias `auto`: kagent's agents always carry tools, which Praxis refuses
+# on its SaaS models. The default zuno-diagnose stays on the ai-gateway.
+zuno_kagent_alt_gateways:
+  - {name: praxis, label: Praxis, url: "http://praxis.zuno-ai-gateways.svc:8080/v1", models: [auto]}
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

@@ -19,3 +19,10 @@ kagent_mcp_headers:
   X-Zuno-Agent: kagent
   X-Zuno-Task: diagnose
   X-Zuno-Data-Classification: C2
+# WP-297 (ADR-0619 clause 5): the alternative AI gateways kagent also gets an agent for, in the `altGateways` contract:
+# {name, label, url, models}. kagent cannot forward a user token, so each goes through its token proxy's alternate
+# route: the list is given to the zuno-token-proxy release of this namespace (ALT_GATEWAYS, the egress rule to
+# zuno-ai-gateways:8080) and to the kagent chart, which renders one ModelConfig zuno-model-<name> on
+# http://zuno-token-proxy:8080/alt/<name>/v1 and one Agent zuno-diagnose-<name> (the zuno-diagnose agent on that
+# gateway). Empty: the values are the ones of before.
+zuno_kagent_alt_gateways: []
