@@ -130,7 +130,7 @@ spec:
 # reconciles for real (owned by DataScienceCluster zuno-dsc -> Config
 # default -> this object, all Ready=True) - it is auto-created once when
 # spec.components.kserve.modelsAsService.managementState is set to
-# Managed in gitops/charts/openshift-ai/values.yaml (cluster-ods.DataScienceCluster.spec),
+# Managed in gitops/charts/openshift-ai/templates/datasciencecluster.yaml,
 # but that DSC field is a bare managementState toggle with no externalOIDC
 # passthrough, so this object has to be addressed directly. We only ever
 # declare the two fields we actually need to change (externalOIDC below,

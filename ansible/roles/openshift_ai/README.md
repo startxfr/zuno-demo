@@ -43,7 +43,7 @@ off the 3.5.0 GA.
 
 ## RawDeployment, not Serverless
 
-The `cluster-ods.DataScienceCluster.spec` of `gitops/charts/openshift-ai/values.yaml`, whose
+`gitops/charts/openshift-ai/templates/datasciencecluster.yaml`'s
 `kserve.serving.managementState` is `Removed`, not `Managed`. `Managed`
 (with a `name: knative-serving` `KNativeServing` reference) implicitly
 requires the Red Hat OpenShift Service Mesh Operator, the Red Hat

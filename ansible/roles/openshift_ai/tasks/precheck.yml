@@ -19,7 +19,7 @@
     # v2, not v1: v2 is the CRD's storage version (v1 is served but not
     # storage) - same reasoning as ansible/roles/kueue/tasks/uninstall.yml's
     # ClusterQueue lookup and gitops/charts/openshift-ai/templates/
-    # cluster-ods.DataScienceCluster (openshift-ai values), which already renders the CR at v2: reading
+    # datasciencecluster.yaml, which already renders the CR at v2: reading
     # at the storage version avoids an unnecessary conversion-webhook
     # round-trip.
     api_version: datasciencecluster.opendatahub.io/v2

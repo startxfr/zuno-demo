@@ -231,8 +231,8 @@
       kubernetes.core.k8s_info:
         # v2, not v1: v2 is the CRD's storage version - same reasoning as
         # precheck.yml's DataScienceCluster lookup and this chart's own
-        # cluster-ods.DataScienceCluster (values.yaml), which already renders
-        # the CR at v2.
+        # templates/datasciencecluster.yaml, which already renders the CR
+        # at v2.
         api_version: datasciencecluster.opendatahub.io/v2
         kind: DataScienceCluster
         name: zuno-dsc
