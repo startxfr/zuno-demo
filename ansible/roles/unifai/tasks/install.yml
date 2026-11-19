@@ -141,12 +141,16 @@
     gitops_component_name: "unifai"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-unifai-d1"
+    # altGateways (WP-299): one shared UnifaiLLM per entry and `.zuno-ai-gateways.svc` in the hosts multiagent may call;
+    # added only when zuno_unifai_alt_gateways is not empty, so the values are the ones of before without it. The
+    # Application's values are REPLACED by these, so everything the chart needs stays in this expression.
     gitops_app_extra_helm_values: >-
       {{ {'clusterBaseDomain': cluster_base_domain,
           'stack': {'enabled': true}}
          | combine(_unifai_backup_values, recursive=True)
          | combine(zuno_unifai_values | default({}), recursive=True)
-         | combine(_unifai_okf_values, recursive=True) }}
+         | combine(_unifai_okf_values, recursive=True)
+         | combine({'altGateways': zuno_unifai_alt_gateways} if (zuno_unifai_alt_gateways | length) > 0 else {}) }}
 
 # ArgoCD has no health check for UnifaiStack: zuno-unifai-d1 reports Healthy
 # while the stack is in Error (demo333, WP-151). Wait on the operator's phase.
