@@ -223,10 +223,6 @@ evalPersonas:
   - username: eval-ai-dev-01
     groups:
       - /ocp-ai-dev
-  # 2026-11-19: the twins also join /zuno-loadtest, so the per-agent stresstest Jobs run under the `loadtest` quota class
-  # and the ai-gateway sends their MaaS calls on the ai-gateway-stress identity, not the shared ai-gateway ServiceAccount
-  # (whose 1,000,000 tokens an hour they drained, breaking `make d2 check agents`). Takes effect once this chart is rolled
-  # and the eval-personas Job has run (memberships are added, never removed).
   # Stresstest twins: the day-3 stresstest Jobs sign in as these
   # (EVAL_TWIN_PREFIX=stress-), so one stresstest run - about 160 model
   # calls, close to a whole 3M-token daily user budget since the Red Hat
@@ -234,24 +230,14 @@ evalPersonas:
   # RAGAS CronJob and manual probes use on the eval-* twins.
   - username: stress-consultant-01
     copyOf: consultant-01
-    extraGroups:
-      - /zuno-loadtest
   - username: stress-sale-01
     copyOf: sale-01
-    extraGroups:
-      - /zuno-loadtest
   - username: stress-adv-01
     copyOf: adv-01
-    extraGroups:
-      - /zuno-loadtest
   - username: stress-finance-01
     copyOf: finance-01
-    extraGroups:
-      - /zuno-loadtest
   - username: stress-board-01
     copyOf: board-01
-    extraGroups:
-      - /zuno-loadtest
   # ADR-0624 clause 5 / WP-306: the load pool. The stress runner (platform/testing/stress_runner.py) signs in as these
   # (STRESS_PERSONAS), one per concurrent worker: a budget is keyed by persona (ADR-0593/WP-190), so N concurrent streams
   # want N personas. Each copies consultant-01's groups, joins /zuno-evaluation like every evaluation persona and

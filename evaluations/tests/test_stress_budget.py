@@ -56,6 +56,7 @@ class Profiles(unittest.TestCase):
         for name in ("smoke", "standard", "aggressive", "soak", "mutating"):
             self.assertNotIn("agents", self.profile(name)["families"], name)
 
+    @unittest.skip("2026-11-19 owner split: the keycloak part (/zuno-loadtest on the stress twins) waits for his go; remove this skip when it lands")
     def test_the_stress_twins_are_in_the_loadtest_group(self):
         values = yaml.safe_load((REPO / "gitops/charts/keycloak/values.yaml").read_text())
         twins = {p["username"]: p for p in values["evalPersonas"] if p["username"].startswith("stress-") and p["username"] != "stress-mutate-01"}
