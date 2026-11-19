@@ -422,6 +422,8 @@ jobs:
         run: python3 platform/gitops/tests/test_check_gitops_operator.py
       - name: only zuno-machines-d0 owns the ADR-0614 singletons (incident 2026-11-15)
         run: python3 platform/gitops/tests/test_world_model_gpu_singletons.py
+      - name: the GPU MachineSets of demo333 render as the golden file (owner's rule, never touch the GPU nodes)
+        run: python3 platform/gitops/tests/test_machines_gpu_golden.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

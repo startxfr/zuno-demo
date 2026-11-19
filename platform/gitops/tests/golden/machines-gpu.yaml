@@ -1,0 +1,319 @@
+apiVersion: autoscaling.openshift.io/v1
+kind: ClusterAutoscaler
+metadata:
+  annotations:
+    openshift.io/generated-by: startx-helm-cluster-machine
+  labels:
+    app.kubernetes.io/component: machines
+    app.kubernetes.io/instance: zuno-demo-machines-4.18.11
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: default-clusterautoscaler
+    app.kubernetes.io/part-of: machines
+    app.kubernetes.io/version: 4.18.11
+    app.startx.fr/app: machines
+    app.startx.fr/cluster: zuno-demo
+    app.startx.fr/component: machines
+    app.startx.fr/environment: demo
+    app.startx.fr/scope: zuno
+    app.startx.fr/version: 4.18.11
+    helm.sh/chart: cluster-machine
+  name: default
+spec:
+  maxNodeProvisionTime: 15m
+  podPriorityThreshold: -10
+  scaleDown:
+    delayAfterAdd: 10m
+    delayAfterDelete: 1m
+    delayAfterFailure: 30s
+    enabled: true
+    unneededTime: 10m
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  annotations:
+    openshift.io/generated-by: startx-helm-cluster-machine
+  labels:
+    app.kubernetes.io/component: machines
+    app.kubernetes.io/instance: zuno-demo-machines-4.18.11
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: zuno-gpu-burst-a-machineautoscaler
+    app.kubernetes.io/part-of: machines
+    app.kubernetes.io/version: 4.18.11
+    app.startx.fr/app: machines
+    app.startx.fr/cluster: zuno-demo
+    app.startx.fr/component: machines
+    app.startx.fr/environment: demo
+    app.startx.fr/scope: zuno
+    app.startx.fr/version: 4.18.11
+    helm.sh/chart: cluster-machine
+  name: zuno-gpu-burst-a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 1
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: zuno-gpu-burst-a
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    openshift.io/generated-by: startx-helm-cluster-machine
+  labels:
+    app.kubernetes.io/component: machines
+    app.kubernetes.io/instance: zuno-demo-machines-4.18.11
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: zuno-gpu-a-machineset
+    app.kubernetes.io/part-of: machines
+    app.kubernetes.io/version: 4.18.11
+    app.startx.fr/app: machines
+    app.startx.fr/cluster: zuno-demo
+    app.startx.fr/component: machines
+    app.startx.fr/environment: demo
+    app.startx.fr/scope: zuno
+    app.startx.fr/version: 4.18.11
+    helm.sh/chart: cluster-machine
+    machine.openshift.io/cluster-api-cluster: fixture-abcde
+    machine.openshift.io/cluster-api-machine-role: worker
+    machine.openshift.io/cluster-api-machine-type: worker
+    machine.startx.io/group: gpu
+  name: zuno-gpu-a
+  namespace: openshift-machine-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-machineset: zuno-gpu-a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: zuno-gpu-a
+        machine.startx.io/group: gpu
+        nvidia.com/mig.config: all-balanced
+    spec:
+      metadata:
+        labels:
+          machine.startx.io/group: gpu
+          node-role.kubernetes.io/gpu: ''
+          node-role.kubernetes.io/worker: ''
+          node-role.startx.io/gpu: ''
+          nvidia.com/mig.config: all-balanced
+      providerSpec:
+        value:
+          ami:
+            id: ami-fixture0000000000
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 250
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: fixture-abcde-worker-profile
+          instanceType: g7e.4xlarge
+          kind: AWSMachineProviderConfig
+          placement:
+            availabilityZone: eu-fixture-1a
+            region: eu-fixture-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-node
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-private-a
+          tags:
+          - name: kubernetes.io/cluster/fixture-abcde
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        value: 'true'
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    openshift.io/generated-by: startx-helm-cluster-machine
+  labels:
+    app.kubernetes.io/component: machines
+    app.kubernetes.io/instance: zuno-demo-machines-4.18.11
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: zuno-gpu-burst-a-machineset
+    app.kubernetes.io/part-of: machines
+    app.kubernetes.io/version: 4.18.11
+    app.startx.fr/app: machines
+    app.startx.fr/cluster: zuno-demo
+    app.startx.fr/component: machines
+    app.startx.fr/environment: demo
+    app.startx.fr/scope: zuno
+    app.startx.fr/version: 4.18.11
+    helm.sh/chart: cluster-machine
+    machine.openshift.io/cluster-api-cluster: fixture-abcde
+    machine.openshift.io/cluster-api-machine-role: worker
+    machine.openshift.io/cluster-api-machine-type: worker
+    machine.startx.io/group: gpu-burst
+  name: zuno-gpu-burst-a
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-machineset: zuno-gpu-burst-a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: zuno-gpu-burst-a
+        machine.startx.io/group: gpu-burst
+        nvidia.com/mig.config: all-disabled
+    spec:
+      metadata:
+        labels:
+          machine.startx.io/group: gpu-burst
+          node-role.kubernetes.io/gpu-burst: ''
+          node-role.kubernetes.io/worker: ''
+          node-role.startx.io/gpu-burst: ''
+          nvidia.com/mig.config: all-disabled
+      providerSpec:
+        value:
+          ami:
+            id: ami-fixture0000000000
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: fixture-abcde-worker-profile
+          instanceType: g7e.2xlarge
+          kind: AWSMachineProviderConfig
+          placement:
+            availabilityZone: eu-fixture-1a
+            region: eu-fixture-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-node
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-private-a
+          tags:
+          - name: kubernetes.io/cluster/fixture-abcde
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: zuno.io/gpu-burst
+        value: 'true'
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    openshift.io/generated-by: startx-helm-cluster-machine
+  labels:
+    app.kubernetes.io/component: machines
+    app.kubernetes.io/instance: zuno-demo-machines-4.18.11
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: zuno-gpu-c-machineset
+    app.kubernetes.io/part-of: machines
+    app.kubernetes.io/version: 4.18.11
+    app.startx.fr/app: machines
+    app.startx.fr/cluster: zuno-demo
+    app.startx.fr/component: machines
+    app.startx.fr/environment: demo
+    app.startx.fr/scope: zuno
+    app.startx.fr/version: 4.18.11
+    helm.sh/chart: cluster-machine
+    machine.openshift.io/cluster-api-cluster: fixture-abcde
+    machine.openshift.io/cluster-api-machine-role: worker
+    machine.openshift.io/cluster-api-machine-type: worker
+    machine.startx.io/group: gpu
+  name: zuno-gpu-c
+  namespace: openshift-machine-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-machineset: zuno-gpu-c
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: zuno-gpu-c
+        machine.startx.io/group: gpu
+        nvidia.com/mig.config: all-balanced
+    spec:
+      metadata:
+        labels:
+          machine.startx.io/group: gpu
+          node-role.kubernetes.io/gpu: ''
+          node-role.kubernetes.io/worker: ''
+          node-role.startx.io/gpu: ''
+          nvidia.com/mig.config: all-balanced
+      providerSpec:
+        value:
+          ami:
+            id: ami-fixture0000000000
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 250
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: fixture-abcde-worker-profile
+          instanceType: g7e.4xlarge
+          kind: AWSMachineProviderConfig
+          placement:
+            availabilityZone: eu-fixture-1c
+            region: eu-fixture-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-node
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - fixture-abcde-private-c
+          tags:
+          - name: kubernetes.io/cluster/fixture-abcde
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        value: 'true'
