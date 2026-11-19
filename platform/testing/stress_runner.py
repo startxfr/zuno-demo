@@ -119,6 +119,12 @@ def load_drivers(directory: pathlib.Path) -> List[str]:
     sys.path.insert(0, str(directory))
     loaded = []
     for path in sorted(directory.glob("driver_*.py")):
+        known = sys.modules.get(path.stem)
+        if known is not None and getattr(known, "__file__", None) == str(path):
+            # Already loaded: running the file again would register new function objects under the same ids while every
+            # holder of the first module (a test, a patch) keeps the old ones.
+            loaded.append(path.name)
+            continue
         spec = importlib.util.spec_from_file_location(path.stem, path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[path.stem] = module

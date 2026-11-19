@@ -341,6 +341,18 @@ class Samplers(unittest.TestCase):
             self.assertEqual(seen["personas"], ["stress-consultant-01"])
 
 
+class LoadDriversTwice(unittest.TestCase):
+    def test_loading_the_same_directory_twice_keeps_the_first_modules_and_registrations(self):
+        """Every test file loads the drivers: a second load must not replace the registered functions, or a test that
+        patches the module it imported first would patch something the registry no longer calls."""
+        module = sys.modules["driver_tools"]
+        function = sr.REGISTRY["mcp-tools-by-group"].run
+        names = sr.load_drivers(STRESS_DIR)
+        self.assertIn("driver_tools.py", names)
+        self.assertIs(sys.modules["driver_tools"], module)
+        self.assertIs(sr.REGISTRY["mcp-tools-by-group"].run, function)
+
+
 class Summaries(unittest.TestCase):
     def test_percentile_is_nearest_rank(self):
         self.assertEqual(sr.percentile([], 50), 0.0)
