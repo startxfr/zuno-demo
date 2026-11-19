@@ -111,6 +111,25 @@ def register(id: str, family: str, description: str = "", needs: Iterable[str] =
     return wrap
 
 
+# The shared-budget guard (2026-11-19): a driver module may register a BLOCKING probe, `probe(ctx) -> fraction of the shared
+# ai-gateway ServiceAccount's budget already spent (0..1), or None when it cannot tell`. Before each driver of the families the
+# profile lists under `shared_budget_guard`, run_all calls the probes and skips the driver when one says the spent fraction is
+# at or above `max_used`: those drivers ride the budget Open WebUI, Dify, kagent and OpenClaw share.
+SHARED_BUDGET_PROBES: List[Callable[[Any], Optional[float]]] = []
+
+
+def shared_budget_verdict(profile: Dict[str, Any], family: str, fractions: List[Optional[float]]) -> str:
+    """'' when the driver may run, else the reason it is skipped. `fractions` are the probes' answers (None = unknown)."""
+    guard = profile.get("shared_budget_guard") or {}
+    if family not in (guard.get("families") or []):
+        return ""
+    limit = float(guard.get("max_used", 0.5))
+    known = [f for f in fractions if f is not None]
+    if known and max(known) >= limit:
+        return f"the shared ai-gateway budget is {max(known):.0%} spent, the guard stops at {limit:.0%}: not draining what the other clients share"
+    return ""
+
+
 # A driver module that cannot be imported (a missing helper in the Job's file set, a typo) must not kill the run: the
 # modules that did import still run, and each failure becomes one failing row (main emits them): {module name: exception}.
 LOAD_FAILURES: Dict[str, str] = {}
@@ -666,6 +685,7 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
             pending.clear()
             last_flush[0] = time.monotonic()
 
+    warned_unreadable = False
     for plan in plans:
         s = settings(profile, overrides, plan.driver.id, plan.driver.family)
         ctx.max_tokens = int(s["max_tokens"])
@@ -674,6 +694,23 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
             sink([row(plan.driver.id, "stress", "token-budget", "guard", False,
                       f"skipped: {ctx.tokens_used} tokens already reported, cap is {ctx.max_tokens}")])
             continue
+        if SHARED_BUDGET_PROBES and plan.driver.family in ((profile.get("shared_budget_guard") or {}).get("families") or []):
+            fractions: List[Optional[float]] = []
+            for probe in SHARED_BUDGET_PROBES:
+                try:
+                    fractions.append(await asyncio.to_thread(probe, ctx))
+                except Exception as exc:  # noqa: BLE001 - an unreadable counter must not stop the run
+                    print(f"[stress] shared-budget probe failed: {type(exc).__name__}: {str(exc)[:120]}", file=sys.stderr, flush=True)
+                    fractions.append(None)
+            if not any(f is not None for f in fractions) and not warned_unreadable:
+                warned_unreadable = True  # one row per run, not one per driver
+                sink([row(plan.driver.id, "stress", "shared-budget-unknown", "guard", False,
+                          "WARNING: the shared ai-gateway budget could not be read (Limitador unreachable or no counter of the shared "
+                          "ServiceAccount): the guard is SKIPPED and the drivers of its families run without it")])
+            why = shared_budget_verdict(profile, plan.driver.family, fractions)
+            if why:
+                sink([row(plan.driver.id, "stress", "shared-budget", "guard", False, f"status=429 skipped: {why}")])
+                continue
         mode = f"{plan.duration:g}s loop" if plan.duration > 0 else f"{plan.iterations} iteration(s)"
         print(f"[stress] {plan.driver.id} ({plan.driver.family}): {mode}, concurrency {plan.concurrency}", file=sys.stderr, flush=True)
         stats = await run_plan(plan, ctx, guard, sink, shard_index)

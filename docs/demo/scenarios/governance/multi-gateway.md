@@ -277,8 +277,11 @@ Evidence: the work packages of the clients:
 
 ## Page status
 
-> **Status:** Not rehearsed. Prerequisites not checked: the alternative gateway is not deployed and the client wiring
-> is not done at the time of writing. The page depends on
+> **Status:** Not rehearsed. As of 2026-11-19 the work packages this page was written against are Done in the
+> [tracker](../../../roadmap/implementation-roadmap.md) (the alternative gateway, and the Open WebUI and kagent
+> wiring), but nobody has played the page since: its steps and checkpoints were written before they landed, so check
+> them against the live objects before showing it. The 15-minute version also needs the Blender add-on (WP-302, not
+> started) and the world model (WP-303, live proof pending). The page depends on
 > [WP-292](../../../roadmap/work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md),
 > [WP-296](../../../roadmap/work-packages/wp-296-give-open-webui-the-alternative-gateways.md) and
 > [WP-297](../../../roadmap/work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) for

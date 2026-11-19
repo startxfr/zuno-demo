@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-ods
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.377
-digest: sha256:8d2255b36d6255955aa4dbfcfb2261920c9a229f3ebe108e504be5fb36b6ba78
-generated: "2026-11-19T14:23:38.627229255+01:00"
+  version: 21.3.379
+digest: sha256:7fea8dc11c14532939d3f05e71221701fb5e56595bea8923fe0a732bb448d623
+generated: "2026-11-19T16:56:10.755208097+01:00"

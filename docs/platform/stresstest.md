@@ -41,10 +41,14 @@ Defined in `evaluations/stress/profile_<name>.yaml` (first values, to be tuned a
 | Profile | Families | Rate and size | Budget guard | Deadline |
 |---|---|---|---|---|
 | `smoke` | tools, models, unifai, guardrails | each driver once, concurrency 1, 1 shard | 2 failures in a row, 2 x 429, 1,500 tokens | 15 min, waits |
-| `standard` | agents, tools, models, unifai, guardrails, experiences, state, saturation, counters | 3 iterations at concurrency 2 (the experience drivers 2 iterations at concurrency 1), state once | 3 in a row, 5 x 429, 20,000 tokens | 45 min, waits, with the dashboard coverage |
-| `aggressive` | the standard families plus `load` | the load pool of 8 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4 | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
+| `standard` | tools, models, unifai, guardrails, experiences, state, saturation, counters (`agents` is opt-in, see below) | 3 iterations at concurrency 2; the experience drivers 1 iteration at concurrency 1; `unifai-agents` and `observability-trace` 2 iterations; state once | 3 in a row, 5 x 429, 20,000 tokens | 45 min, waits, with the dashboard coverage |
+| `aggressive` | the standard families plus `load` (also without `agents`) | the load pool of 8 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4 | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
 | `mutating` | mutating only: `delegation-approval`, `unifai-live-rag`, `image-signing-refusal` | each once, concurrency 1, as the persona `stress-mutate-01` only (the one profile that sets `allow_mutating`) | 2 failures in a row, 2 x 429, 6,000 tokens | 40 min, waits |
 | `soak` | tools, models, saturation, counters | about 2 requests a minute per driver for 4 hours (`rate` 0.033, `duration` 14400) | 5 in a row, 30 x 429, 300,000 tokens | 4 h 20 min, asynchronous: it prints a run id |
+
+The `agents` family (the per-agent Jobs of ADR-0555) is **not in `standard` or `aggressive`**: those Jobs drained the shared ai-gateway ServiceAccount's MaaS budget on 2026-11-19, so they are opt-in with `FAMILIES=agents`. A per-agent Job that no longer exists (deleted by hand or by its TTL) is terminal: the wait stops and reports `job-missing` instead of waiting its whole budget.
+
+**The shared-budget guard.** `standard` and `aggressive` carry `shared_budget_guard` (families `experiences`, `unifai` and `guardrails`, `max_used: 0.5`): before such a driver runs, the runner reads the shared ai-gateway ServiceAccount's counter, and when more than half of its window budget is spent the driver is skipped with a guard row `shared-budget`, instead of draining what Open WebUI, Dify, kagent and OpenClaw share. When the counter cannot be read (Limitador unreachable, no counter), the driver runs and one `shared-budget-unknown` WARNING row says so.
 
 `smoke` is the first thing to run after any roll. `mutating` is the one deliberate way to run the three drivers that change state: `make d3 stresstest PROFILE=mutating`. Each cleans up what it creates (the delegated write approval is rejected, never approved, and its session cancelled; the uploaded document is deleted and checked gone; the unsigned pod is a dry run). The image proof needs the namespace `zuno-stress-admission` and one pod-create grant, which exist only when `stressImageProof.enabled` is set (default off, switch `zuno_stress_image_proof_enabled`); otherwise its row says what to enable. Run it outside a demo window. `aggressive` lists six disruptions (see [Chaos](#chaos)); they run
 only when the operator types the profile name again.
@@ -113,15 +117,19 @@ These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-
 1. **The header**: run id, profile, state of the Job, rows, and a verdict, `CLEAN` or `ATTENTION` (any failure, tripped guard, saturated signal, failing counter or chaos row), which is informational.
 2. **The per-driver table**: n, ok, err, 429, 5xx, p50, p95, p99 and whether the guard tripped.
 3. **BUDGET GUARD**: which driver stopped and why.
-4. **FAILURES**: each failing row with its driver, id and detail (the first ones, then a count).
-5. **SATURATION**: one row per signal of the `saturation` sampler (vLLM queue and KV cache, gateway p95, Postgres
+4. **SKIPPED BY DESIGN**: scenarios of the agents family that ride a SaaS model of a closed quota class (`loadtest`), which
+   cannot be reached through MaaS; they are listed apart and are not failures.
+5. **FAILURES**: each failing row with its driver, id and detail (the first ones, then a count).
+6. **SATURATION**: one row per signal of the `saturation` sampler (vLLM queue and KV cache, gateway p95, Postgres
    backends): `ok` or `SATURATED`.
-6. **LIMITADOR COUNTERS**: which Limitador counters moved during the run and under which identity. The isolation proof
+7. **LIMITADOR COUNTERS**: which Limitador counters moved during the run and under which identity. The isolation proof
    is the pair of rows for `system:serviceaccount:zuno-ai-run:ai-gateway-stress` (it moves) and
    `...:ai-gateway` (it does not move because of this run; it moves with every other caller's traffic, and the row says
-   so). A limit with no counter is reported as "no counter", not zero.
-7. **CHAOS**: for each disruption, `recovered` or `DID NOT RECOVER`, with the effect on the load.
-8. **TREND**: the previous run of the same profile, read from `evaluations/day2-reports/stress/` (the file of each run
+   so). A limit with no counter is reported as "no counter", not zero. The `isolation` row fails with a WARNING when the
+   shared ServiceAccount moved more than 10% of its window budget during the run: someone spent what the experiences share
+   (the per-agent Jobs and the experience drivers ride it by design).
+8. **CHAOS**: for each disruption, `recovered` or `DID NOT RECOVER`, with the effect on the load.
+9. **TREND**: the previous run of the same profile, read from `evaluations/day2-reports/stress/` (the file of each run
    is saved there): p95 and error rate before and after, `REGRESSED` when p95 is above 1.5 times the previous run's or the error rate is 5 points higher.
 
 `-e stress_evidence=true` (AAP: the extra variable) also writes `docs/roadmap/evidence/stress-<run id>.md` for a person
@@ -163,8 +171,10 @@ fails and says so, it never guesses another one.
   2026-11-05, so the MaaS side of the isolation proof reads "no counter" for the stress ServiceAccount. The fix is
   pending the owner's go. The `<model>-load` subscriptions were renamed from `<model>-stress` because the wasm shim
   never creates a counter for the last token-limit action of a route, ordered by limit name.
-- The drivers of `multi-gateway` and `agents-alt-gateway` stay pending until their clients exist (Phase 58, WP-297 to
-  WP-303); their state rows say so.
+- `multi-gateway` is replayed in part (one question through the ai-gateway and through Praxis); `agents-alt-gateway` has
+  only its state check. Their state checks now judge the kagent agent `zuno-diagnose-praxis` for real: it was read live on
+  demo333 as Accepted and Ready on 2026-11-19, so the skip list `NOT_YET` of `driver_state.py` is empty and a missing agent
+  is a failure.
 - OpenClaw and Lightspeed are not replayed from a Job (OpenClaw's path is the operator's egress proxy inside each
   persona's pod; Lightspeed needs an OpenShift token). The world model has no driver.
 - The experience and workstation drivers need openings of the egress firewall and the NetworkPolicies (WP-308); until
@@ -172,3 +182,6 @@ fails and says so, it never guesses another one.
 - Until the Mistral Codestral key is renewed, the C1 code path falls back to a local model; the report counts it as a
   known state ([key rotation](saas-provider-key-rotation.md)).
 - The profile values are first values, tuned after the first runs.
+- The five stress twin personas (`stress-consultant-01` and four more) are **not yet** in `/zuno-loadtest`: the Keycloak part of the
+  budget fix was split off and waits for the owner's go (2026-11-19), and it is live only after a Keycloak roll and the
+  eval-personas Job. Until then the twins stay in the `stresstest` class.

@@ -40,7 +40,7 @@ Done (`evaluations/stress/driver_demos.py`, family `experiences`, throttled to o
 Decided not to build, and why:
 
 - `genai-playground` and `evaluation-trustyai-evalhub`: their steps are web-UI moves (Playground, EvalHub profile pages) plus `oc get`, which batch 1 already covers; there is no HTTP contract a Job can replay without a browser. They stay with their state drivers.
-- `agents-alt-gateway`: waits for Phase 58 (kagent agent `zuno-diagnose-praxis`); its state driver already skips that object.
+- `agents-alt-gateway`: no driver of its own beyond its state check. The kagent agent `zuno-diagnose-praxis` is live (WP-297 Done, Accepted and Ready on demo333, 2026-11-19), so its state driver no longer skips that object (`NOT_YET` in driver_state.py is empty).
 - the three mutating drivers below were first held back, then approved by the owner (2026-11-19) with the conditions written there.
 
 ## Batch 2b: the three mutating drivers (`evaluations/stress/driver_mutating.py`, family `mutating`)

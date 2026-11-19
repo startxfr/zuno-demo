@@ -45,6 +45,17 @@ Live, with the owner's go, in this order (each roll announced to zuno-demo-clust
 - Praxis is a second MaaS consumer with its own ServiceAccount and subscriptions (`altGatewayPeers.praxis`). It injects its own credential whatever token the caller sends, so stress traffic through Praxis spends the Praxis budget, not the stress one. Until Praxis can pick a credential by caller, the Praxis drivers of WP-308 stay low rate and behind the budget guard.
 - The token Secret of the second ServiceAccount is a long-lived token; rotate it by deleting the Secret. A Vault-backed variant (ExternalSecret) fits the same mount if the owner prefers it.
 
+## The per-agent Jobs and the shared budget (2026-11-19)
+
+The standard run of 2026-11-19 left the shared ai-gateway ServiceAccount's MaaS counter at 1,002,556 / 1,000,000 and broke `make d2 check agents`: the per-agent Jobs (family `agents`, signing in as the `stress-<persona>` twins) and the experience drivers ride that counter. What changed (commit 8a5c6b90 and its follow-up):
+
+- the five stress twins join `/zuno-loadtest` (keycloak chart, `extraGroups`), so the per-agent Jobs run under `loadtest` on the `ai-gateway-stress` identity. Live only after a keycloak roll and the eval-personas Job;
+- until that is verified live, `agents` is in no profile (opt-in with `FAMILIES=agents`);
+- the experience drivers are capped at 1 iteration and the profiles' `shared_budget_guard` skips a driver of the families experiences, unifai and guardrails when the shared counter is already 50% spent; an unreadable Limitador is one `shared-budget-unknown` WARNING row (the guard is skipped, the run goes on);
+- the isolation row of the counters report warns when the shared account moved more than 10% of its window budget.
+
+**Caveat, by design.** `loadtest` is `fail_mode: closed` and served only through MaaS: the ai-gateway skips every SaaS candidate ("not reached through MaaS, skipped for closed quota class 'loadtest'"). A per-agent scenario that needs a SaaS model (for instance tekos #21, Codestral) therefore fails once the twins are in the class. The report lists such rows under "SKIPPED BY DESIGN" with the label "skipped: SaaS under loadtest", not as failures. The class budget (250,000 tokens per user and 1,000,000 per group per hour) is shared by the five twins; whether the agents family fits in it is not verified.
+
 ## Progress notes
 
 Proposed block for `policies/quotas/quota-policy.yaml` of zuno-demo-agents (to hand to that session; sized so the `loadtest` pool can carry real load while the MaaS limit of the models chart stays the binding one):

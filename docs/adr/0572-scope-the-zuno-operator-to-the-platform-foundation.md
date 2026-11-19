@@ -140,3 +140,12 @@ The zuno operator does not exist yet (ADR-0556 is `Proposed`, contract only). Th
 - **Clauses 2 and 3 (the operator asserts the Application and orders its entries).** These describe operator behaviour. They stay a contract that ADR-0556 carries and takes effect with the operator. Until then the playbook order (llm, models, mcp, then unifai) is what holds.
 - **Clause 4 (no `identity.keycloak`).** Done and gated: the chart sets `identity.external` only, and `platform/supply-chain/check_unifai_identity.py` fails on a `keycloak` identity in a cluster file or in the chart templates. It runs in `.github/workflows/lint.yml`.
 - **Clause 5 (`supply_chain` widened to UnifAI artifacts).** Done by WP-176 and ADR-0586 (`verify_unifai_images.py`, `check_unifai_pins.py`).
+
+## Amendment (2026-11-19): ADR-0556 is withdrawn, clauses 2 and 3 have no operator to wait for
+
+A dated note, not a rewrite. The amendment of 2026-11-05 above says clauses 2 and 3 stay a contract carried by ADR-0556. ADR-0556
+was Deprecated on 2026-11-07 by the user's decision, with no successor record and nothing built: the UnifAI operator, the Ansible
+day roles and Argo CD cover what the zuno operator was meant to own. So clauses 2 and 3 (the operator asserts the Application and
+orders its entries) will not take effect with an operator. What holds is the order of the Ansible playbooks (llm, models, mcp, then
+unifai), as the amendment already says, and a future operator would need a new ADR. What this ADR's status covers is clauses 1, 4
+and 5, as listed above.

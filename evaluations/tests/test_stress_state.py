@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 import httpx
 import yaml
@@ -255,14 +256,19 @@ class Evaluation(unittest.TestCase):
         k, _ = kube({"/apis/batch/v1/namespaces/n/jobs/failed-one": {"status": {"conditions": [{"type": "Failed", "status": "True"}]}}})
         job = {"type": "cr", "api_version": "batch/v1", "kind": "Job", "namespace": "n", "condition": "Complete"}
         agent = {"type": "cr", "api_version": "kagent.dev/v1alpha2", "kind": "Agent", "name": "zuno-diagnose-praxis", "namespace": "zuno-kagent"}
-        rows = run(ds.evaluate(k, "multi-gateway-state", [dict(job, name="gone-one"), dict(job, name="failed-one"), agent]))
+        with mock.patch.dict(ds.NOT_YET, {("multi-gateway-state", "Agent", "zuno-diagnose-praxis"): "Phase 58 is not rolled out"}):
+            rows = run(ds.evaluate(k, "multi-gateway-state", [dict(job, name="gone-one"), dict(job, name="failed-one"), agent]))
         self.assertEqual([r.passed for r in rows[:1]], [True])
         self.assertIn("skipped", rows[0].detail)
         self.assertFalse(rows[1].passed)  # an existing Job that did not complete still fails
         self.assertTrue(rows[2].passed)
         self.assertIn("Phase 58", rows[2].detail)
-        other = run(ds.evaluate(k, "other-state", [agent]))
+        with mock.patch.dict(ds.NOT_YET, {("multi-gateway-state", "Agent", "zuno-diagnose-praxis"): "Phase 58 is not rolled out"}):
+            other = run(ds.evaluate(k, "other-state", [agent]))
         self.assertFalse(other[0].passed)  # the same object missing in another demo is a real 404
+
+    def test_nothing_is_listed_as_not_yet_any_more(self):
+        self.assertEqual(ds.NOT_YET, {})  # WP-297 is Done and the kagent agent on Praxis is live: a 404 there is a real failure
 
     def test_workloads_are_read_by_name_in_their_namespace(self):
         k, _ = kube({"/apis/apps/v1/namespaces/zuno-ai-run/deployments/ai-gateway": {"spec": {"replicas": 2}, "status": {"readyReplicas": 2}},

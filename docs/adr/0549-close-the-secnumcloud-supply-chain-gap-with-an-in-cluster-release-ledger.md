@@ -83,3 +83,14 @@ No new trust boundary: the signing/verification path is the RHTAS mechanism ADR-
 - [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) / [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) - the already-in-cluster signing mechanism this ADR reuses unchanged.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
+
+## Amended (2026-11-19): the registry sentence is superseded in part by ADR-0612
+
+A dated note, not a rewrite. The line "Registry: the existing OpenShift-native internal ImageStream registry only. No self-hosted
+Quay" states the decision of 2026-09-05. [ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md)
+(accepted 2026-11-11) installs a Red Hat Quay through `quay-operator` and serves the images by family from it. On 2026-11-19 it is
+live on demo333 for the OKF release, the UnifAI images, the public images and the large Red Hat product images (families a, c, d and
+e); family b, the first-party images, and the retirement of the ImageStream registry are not started, so the first-party images
+this ADR builds and signs still sit in the internal registry. The release ledger itself (`platform/supply-chain/pinned-releases.yaml`,
+RHTAS signatures, `check_release_ledger.py`) is unchanged by ADR-0612. Where the two disagree on which registry holds an image,
+ADR-0612 prevails, as the owner decided.

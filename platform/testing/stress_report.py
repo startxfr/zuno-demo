@@ -62,6 +62,12 @@ def parse_rows(text: str) -> List[Dict[str, Any]]:
     return rows
 
 
+# The ai-gateway skips every candidate that is not reached through MaaS for a `closed` quota class (loadtest, stresstest): a
+# scenario that needs a SaaS model (tekos #21, Codestral) then fails BY DESIGN once the stress twins are in /zuno-loadtest. Those
+# rows are listed apart, as skipped, and do not count as failures.
+BY_DESIGN_RE = re.compile(r"skipped for closed quota class|not reached through MaaS", re.I)
+
+
 def combined_timeline(drivers: List[Dict[str, Any]]) -> Dict[int, List[int]]:
     """{bucket: [iterations, failed]} over every driver of the run."""
     out: Dict[int, List[int]] = {}
@@ -131,11 +137,16 @@ def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = No
     drivers = sr.merge_summaries(rows)
     for d in drivers:
         d["err_rate"] = round(d["err"] / d["n"], 4) if d["n"] else 0.0
-    failures = [
-        {"driver": r.get("agent", "?"), "id": r.get("id", "?"), "detail": str(r.get("detail", ""))[:240]}
-        for r in rows
+    failing = [
+        r for r in rows
         if not truthy(r.get("passed")) and r.get("layer") not in SAMPLER_LAYERS and r.get("layer") != sr.SUMMARY_LAYER
         and r.get("category") != "guard"
+    ]
+    skipped = [{"driver": r.get("agent", "?"), "id": r.get("id", "?"), "detail": "skipped: SaaS under loadtest. " + str(r.get("detail", ""))[:200]}
+               for r in failing if BY_DESIGN_RE.search(str(r.get("detail", "")))]
+    failures = [
+        {"driver": r.get("agent", "?"), "id": r.get("id", "?"), "detail": str(r.get("detail", ""))[:240]}
+        for r in failing if not BY_DESIGN_RE.search(str(r.get("detail", "")))
     ]
     guards = [{"driver": r.get("agent", "?"), "detail": str(r.get("detail", ""))[:240]} for r in rows if r.get("category") == "guard"]
     saturation = [{"signal": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "saturation"]
@@ -157,7 +168,7 @@ def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = No
     return {
         "run_id": meta.get("run_id", ""), "profile": meta.get("profile", ""), "started": meta.get("started", ""),
         "job_state": meta.get("job_state", ""), "rows": len(rows), "drivers": drivers,
-        "failures": failures[:FAILURE_LIMIT], "failure_count": len(failures), "guards": guards,
+        "failures": failures[:FAILURE_LIMIT], "failure_count": len(failures), "guards": guards, "skipped_by_design": skipped,
         "saturation": saturation, "counters": counters, "chaos": chaos,
         "verdict": "ATTENTION" if attention else "CLEAN",
     }
@@ -228,6 +239,9 @@ def render_text(report: Dict[str, Any], diff: Optional[List[Dict[str, Any]]] = N
     lines.append(sr.render_table([{**d, "guard": d["guard"]} for d in report["drivers"]]))
     if report["guards"]:
         lines += ["", "BUDGET GUARD"] + [f"  {g['driver']}: {g['detail']}" for g in report["guards"]]
+    if report.get("skipped_by_design"):
+        lines += ["", f"SKIPPED BY DESIGN ({len(report['skipped_by_design'])})"] + [
+            f"  {f['driver']} {f['id']}: {f['detail']}" for f in report["skipped_by_design"]]
     if report["failures"]:
         more = report["failure_count"] - len(report["failures"])
         lines += ["", f"FAILURES ({report['failure_count']})"] + [f"  {f['driver']} {f['id']}: {f['detail']}" for f in report["failures"]]
@@ -261,6 +275,7 @@ def render_markdown(report: Dict[str, Any], diff: Optional[List[Dict[str, Any]]]
         out.append(f"| {d['driver']} | {d['n']} | {d['ok']} | {d['err']} | {d['c429']} | {d['c5xx']} | {_ms(d['p50'])} | {_ms(d['p95'])} | {_ms(d['p99'])} | {'; '.join(d['guard']) or '-'} |")
     for title, items, fmt in (
         ("Budget guard", report["guards"], lambda g: f"- {g['driver']}: {g['detail']}"),
+        ("Skipped by design", report.get("skipped_by_design", []), lambda f: f"- {f['driver']} `{f['id']}`: {f['detail']}"),
         ("Failures", report["failures"], lambda f: f"- {f['driver']} `{f['id']}`: {f['detail']}"),
         ("Saturation", report["saturation"], lambda s: f"- {'ok' if s['passed'] else '**SATURATED**'} {s['signal']}: {s['detail']}"),
         ("Limitador counters", report["counters"], lambda c: f"- {c['id']}: {c['detail']}"),

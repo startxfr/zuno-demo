@@ -28,6 +28,7 @@ _PLATFORM_TESTING = pathlib.Path(__file__).resolve().parents[2] / "platform" / "
 sys.path.insert(0, str(_PLATFORM_TESTING))
 
 import quota_counters_probe as probe  # noqa: E402
+import stress_runner as sr  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
 LIMITADOR_DEFAULT = "http://limitador-limitador.kuadrant-system.svc:8080"
@@ -78,6 +79,48 @@ def moved_by_identity(first: dict, last: dict) -> dict:
     return {identity: {"tokens": e["tokens"], "limits": sorted(e["limits"])} for identity, e in out.items()}
 
 
+SHARED_WARN_FRACTION = 0.10  # the isolation row warns when the shared ServiceAccount moved more than this share of a window budget
+
+
+def spent_fraction(counters_by_namespace: dict, identity: str = SHARED_SA):
+    """The largest share of its limit that a counter of `identity` has spent right now (0..1), None without such a counter."""
+    best = None
+    for counters in counters_by_namespace.values():
+        for counter in counters:
+            if identity_of(counter) != identity:
+                continue
+            limit = int(counter["limit"]["max_value"])
+            if limit > 0:
+                share = (limit - int(counter["remaining"])) / limit
+                best = share if best is None else max(best, share)
+    return best
+
+
+def moved_fraction(first: dict, last: dict, identity: str = SHARED_SA):
+    """The largest share of its limit that a counter of `identity` moved between two reads (0..1), None without such a counter."""
+    best = None
+    for ns, counters in last.items():
+        before = probe.consumed(first.get(ns, []))
+        for counter in counters:
+            if identity_of(counter) != identity:
+                continue
+            limit = int(counter["limit"]["max_value"])
+            if limit > 0:
+                delta = (limit - int(counter["remaining"])) - before.get(probe._key(counter), 0)
+                share = max(delta, 0) / limit
+                best = share if best is None else max(best, share)
+    return best
+
+
+def shared_budget_probe(ctx):
+    """Blocking probe of the runner's shared-budget guard: how much of the shared ai-gateway ServiceAccount's budget is spent."""
+    return spent_fraction(read_all(ctx.env.get("LIMITADOR_URL") or LIMITADOR_DEFAULT))
+
+
+if shared_budget_probe not in sr.SHARED_BUDGET_PROBES:
+    sr.SHARED_BUDGET_PROBES.append(shared_budget_probe)
+
+
 def finish_counters(ctx, samples):
     errors = [s for s in samples if isinstance(s, Exception)]
     taken = [s for s in samples if isinstance(s, dict)]
@@ -101,8 +144,13 @@ def finish_counters(ctx, samples):
                         + (" ..." if len(entry["limits"]) > 4 else "")))
     stress = moved.get(STRESS_SA, {}).get("tokens", 0)
     shared = moved.get(SHARED_SA, {}).get("tokens", 0)
-    rows.append(row("limitador-counters", "counters", "isolation", "counters", True,
-                    f"stress ServiceAccount +{stress} tokens, shared ai-gateway ServiceAccount +{shared} tokens "
+    share = moved_fraction(first, last) or 0.0
+    warn = share > SHARED_WARN_FRACTION
+    rows.append(row("limitador-counters", "counters", "isolation", "counters", not warn,
+                    ("WARNING the shared ai-gateway ServiceAccount moved " + f"{share:.0%} of its window budget during this run "
+                     f"(the warning starts at {SHARED_WARN_FRACTION:.0%}): the drivers and Jobs that ride it spend what Open WebUI, Dify, kagent "
+                     "and OpenClaw share. " if warn else "")
+                    + f"stress ServiceAccount +{stress} tokens, shared ai-gateway ServiceAccount +{shared} tokens "
                     "(the shared one also carries every other caller's traffic during the run)"
                     + ("" if stress else "; the stress counter did not move: no stress call reached MaaS, or its limit has no counter")))
     if errors:
