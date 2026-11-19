@@ -1,7 +1,7 @@
 {{- if .Values.metrics.enabled }}
 # vLLM serves its own Prometheus /metrics endpoint on the predictor's normal
 # serving port (the vllm:* series: num_requests_running/waiting,
-# time_to_first_token_seconds, gpu_cache_usage_perc, prompt/generation
+# time_to_first_token_seconds, kv_cache_usage_perc (was gpu_cache_usage_perc), prompt/generation
 # tokens, request_success_total) - entirely unscraped before this file
 # (only the MaaS LLMInferenceService backend had its own separate scrape,
 # see values.yaml's comment on metrics.enabled).

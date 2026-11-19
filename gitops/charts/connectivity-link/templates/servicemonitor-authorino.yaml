@@ -30,4 +30,9 @@ spec:
     - port: http
       path: /metrics
       interval: 30s
+    # The auth_server_* decision counters are served on a second path of the same port (2026-11-19, read inside the
+    # pod: /server-metrics returns the auth_server_* series, /metrics returns none of them). WP-313, ADR-0624 clause 9.
+    - port: http
+      path: /server-metrics
+      interval: 30s
 {{- end }}

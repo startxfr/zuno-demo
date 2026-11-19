@@ -78,7 +78,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "avg by (modelName) (DCGM_FI_DEV_GPU_UTIL{exported_namespace=\"zuno-world-model\"})",
+              "expr": "100 * avg by (modelName) (DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO{exported_namespace=\"zuno-world-model\"})",
               "legendFormat": "{{`{{modelName}}`}}",
               "refId": "A"
             }
@@ -111,7 +111,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "avg(DCGM_FI_DEV_FB_USED{exported_namespace=\"zuno-world-model\"}) / 1024",
+              "expr": "sum(DCGM_FI_DEV_FB_USED_BYTES{exported_namespace=\"zuno-world-model\"}) / 1073741824",
               "legendFormat": "used",
               "refId": "A"
             }

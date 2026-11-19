@@ -591,7 +591,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_per_output_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
+                  "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:inter_token_latency_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
                   "legendFormat": "{{`{{model_name}}`}}"
                 }
               ]
@@ -684,7 +684,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "vllm:gpu_cache_usage_perc{model_name=~\"$served_model\"}",
+                  "expr": "vllm:kv_cache_usage_perc{model_name=~\"$served_model\"}",
                   "legendFormat": "{{`{{model_name}}`}}"
                 }
               ]
@@ -759,8 +759,8 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_UTIL)",
-                  "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                  "expr": "100 * max by (hostname, exported_pod) (DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO)",
+                  "legendFormat": "{{`{{exported_pod}}`}}"
                 }
               ]
             },
@@ -780,7 +780,7 @@ spec:
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "decmbytes"
+                  "unit": "bytes"
                 }
               },
               "targets": [
@@ -789,16 +789,16 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_USED)",
-                  "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (used)"
+                  "expr": "sum by (hostname, gpu) (DCGM_FI_DEV_FB_USED_BYTES)",
+                  "legendFormat": "{{`{{hostname}}`}} gpu{{`{{gpu}}`}} (used)"
                 },
                 {
                   "datasource": {
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE)",
-                  "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (free)"
+                  "expr": "sum by (hostname, gpu) (DCGM_FI_DEV_FB_FREE_BYTES)",
+                  "legendFormat": "{{`{{hostname}}`}} gpu{{`{{gpu}}`}} (free)"
                 }
               ]
             },
@@ -827,8 +827,8 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP)",
-                  "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                  "expr": "avg by (hostname, gpu) (DCGM_FI_DEV_GPU_TEMP_CELSIUS)",
+                  "legendFormat": "{{`{{hostname}}`}} gpu{{`{{gpu}}`}}"
                 }
               ]
             },
@@ -857,8 +857,8 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_POWER_USAGE)",
-                  "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                  "expr": "avg by (hostname, gpu) (DCGM_FI_DEV_BOARD_POWER_WATTS)",
+                  "legendFormat": "{{`{{hostname}}`}} gpu{{`{{gpu}}`}}"
                 }
               ]
             }

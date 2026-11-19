@@ -345,8 +345,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)"
-                    seriesNameFormat: "{{`{{Hostname}}`}}"
+                    query: "100 * avg by (hostname) (DCGM_FI_PROF_GR_ENGINE_UTIL_RATIO)"
+                    seriesNameFormat: "{{`{{hostname}}`}}"
       cpuUsageByNamespace:
         kind: Panel
         spec:
