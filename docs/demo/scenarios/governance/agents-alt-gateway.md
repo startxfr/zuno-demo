@@ -259,8 +259,11 @@ Evidence: the work packages of the two clients:
 
 ## Page status
 
-> **Status:** Not rehearsed. Prerequisites not checked: the alternative gateway, the token proxy's alternate routes, the
-> second model setting and the Dify model do not exist at the time of writing. The page depends on
+> **Status:** Not rehearsed. As of 2026-11-19 the work packages this page was written against (the alternative gateway,
+> the kagent routes, the Dify model) are Done in the [tracker](../../../roadmap/implementation-roadmap.md), but nobody
+> has played the page since: its steps and checkpoints were written before they landed, so check them against the live
+> objects (the token proxy's alternate routes, the second model setting, the Dify model) before showing it. The page
+> depends on
 > [WP-292](../../../roadmap/work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md),
 > [WP-297](../../../roadmap/work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) and
 > [WP-300](../../../roadmap/work-packages/wp-300-give-dify-the-alternative-gateways.md).
