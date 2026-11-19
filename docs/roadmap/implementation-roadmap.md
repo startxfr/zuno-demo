@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 50 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
+| v0.17 | 14 | 11 | 50 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-299, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1219,7 +1219,7 @@ Blender and world-model.
 | WP-297 | [wp-297](work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) | 0619 | WP-292 | Done | none |
 | WP-298 | [wp-298](work-packages/wp-298-run-claude-code-on-sovereign-models-through-praxis.md) | 0619 | WP-292 | Done | none |
 | WP-299 | [wp-299](work-packages/wp-299-give-unifai-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: UnifAI objects (the demo333 entry in ansible/clusters/demo333.yml, `make d1 install unifai`, the Tempo trace, zuno-demo-reorg told) |
-| WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Not started | owner's go: Dify configure step |
+| WP-300 | [wp-300](work-packages/wp-300-give-dify-the-alternative-gateways.md) | 0619 | WP-297 | Done | none |
 | WP-301 | [wp-301](work-packages/wp-301-give-openclaw-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: OpenClaw personas (the proxy pod labels `app: claw-proxy` are not read from a live pod, the demo333 entry, the roll, zuno-demo-reorg told) |
 | WP-302 | [wp-302](work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md) | 0619 | WP-298 | Not started | owner's go: workstation entry change |
 | WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Repo work merged | owner's go: world-model web roll (the demo333 entry, the image build and roll, zuno-demo-reorg told) |
@@ -1378,6 +1378,7 @@ moving.
 
 ## Change log
 
+- 2026-11-19 — WP-300 Done: Dify gets a model `praxis-auto` on its token proxy's Praxis route; its registration call reached Praxis's MaaS step with 200, and the default Dify path is unchanged (golden-path probe PASS). The install needs confidential.yml (Dify's S3 values), so it ran locally, not through AAP.
 - 2026-11-19 — WP-297 Done: kagent gets Praxis as a second gateway. Its token proxy's `/alt/praxis` route serves a new agent, `zuno-diagnose-praxis`, which answered a live diagnose question on Praxis's MaaS step. The default kagent and Dify paths are unchanged (golden-path probes PASS).
 - 2026-11-19 — WP-298 Done: Claude Code runs on the sovereign models through Praxis. The coding task passed live on 2026-11-18, the owner's take is published as the claude-code-sovereign GIF (75b05ec9), and step 4, the `claude-code` experience-client declaration, was already shipped in every agents release since v1.1.0 (zuno-demo-agents PR #62).
 - 2026-11-18 — WP-292 Done: Praxis runs on demo333 with every acceptance item met. The last open item, the first call after an idle hour getting 503, is fixed by turning off Envoy's 1 h TCP idle timeout between Praxis and Redis on both sidecars (`12669efb`, `73c45b07`), and proven live: after 65 minutes without Redis traffic, both calls got 200. The fallback was re-proven live (`26b7b2ec`), and the SaaS route refuses tools and tool results (`3d5320f0`, [ADR-0619 update of 2026-11-18](../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)).
