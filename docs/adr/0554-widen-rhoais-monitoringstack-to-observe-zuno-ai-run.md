@@ -332,3 +332,10 @@ and retire the Ansible task in favor of that, not decided here. If RHOAI's
 `Monitoring` controller is ever observed to start owning `namespaceSelector`
 (see Operational considerations above), record that as a correction note
 here rather than silently deleting the workaround.
+
+## Amended (2026-11-19): the mesh-monitoring objects are rendered by a helm-repository chart
+
+A dated note, not a rewrite. `gitops/charts/mesh-monitoring/templates/monitoringstack.yaml`, `podmonitor-istio-proxy.yaml` and
+`servicemonitor-istiod.yaml` named above no longer exist. The same MonitoringStack (`mesh-monitoring`), ServiceMonitor
+(`istiod-monitor`) and PodMonitor (`istio-proxy-monitor`) are declared in the `cluster-prometheus:` block of
+`gitops/charts/mesh-monitoring/values.yaml` and rendered by the helm-repository chart `cluster-prometheus`. The decision is unchanged.

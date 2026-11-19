@@ -239,8 +239,10 @@ The control plane, the certificate path, where mutual TLS is enforced, and where
 `gitops/charts/service-mesh/` (`values.yaml`, `templates/istio.yaml`, `istiocni.yaml`, `clusterissuer-istio.yaml`,
 `telemetry.yaml`), `gitops/charts/namespaces/` (the `zuno-mesh` entry of `values.yaml`,
 `templates/peerauthentication-namespace.yaml`), `gitops/charts/kiali/templates/kiali.yaml`,
-`gitops/charts/mesh-monitoring/templates/` (`monitoringstack.yaml`, `podmonitor-istio-proxy.yaml`,
-`servicemonitor-istiod.yaml`), `gitops/charts/grafana/templates/dashboard-mesh-gateway.yaml`,
+the `cluster-prometheus:` block of `gitops/charts/mesh-monitoring/values.yaml` (the MonitoringStack `mesh-monitoring`, the
+ServiceMonitor `istiod-monitor` and the PodMonitor `istio-proxy-monitor`, rendered by the helm-repository chart
+`cluster-prometheus`; they were `templates/monitoringstack.yaml`, `podmonitor-istio-proxy.yaml` and
+`servicemonitor-istiod.yaml` until the migration), `gitops/charts/grafana/templates/dashboard-mesh-gateway.yaml`,
 `gitops/charts/models/templates/destinationrule-external-model-plaintext.yaml`, `platform/security/check_mesh_mtls.py`,
 the [WP-224 evidence](../../../roadmap/evidence/wp-224-live-rehearsal-2026-11-07.md), and the live objects listed under
 Page status.

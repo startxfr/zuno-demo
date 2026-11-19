@@ -98,3 +98,10 @@ limited to the list in clause 6.
   2026-11-05 since then, while the TokenRateLimitPolicies report Enforced. Every MaaS subscription added after that
   date is not enforced. Clause 5's isolation holds (stress traffic never spends the ai-gateway ServiceAccount's
   counter, proven the same day); the stress budget is capped by the ai-gateway quota ledger until the filter fits.
+
+## Amended (2026-11-19): paths as built
+
+A dated note, not a rewrite. As implemented by WP-305 to WP-313: the profiles are `evaluations/stress/profile_<name>.yaml`
+(clause 3 says `evaluations/stress/profiles/`) and the drivers are `evaluations/stress/driver_*.py` (clause 1 says
+`evaluations/stress/drivers/`). A fifth profile, `mutating`, runs the three state-changing drivers as `stress-mutate-01`. The
+runbook is [docs/platform/stresstest.md](../platform/stresstest.md).

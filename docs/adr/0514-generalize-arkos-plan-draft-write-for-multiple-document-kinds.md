@@ -81,3 +81,11 @@ fit than accepting the coupling this ADR removes.
 ADR-0342 (graph shapes), ADR-0416 (reflect self-review, C2 ceiling),
 ADR-0417 (early-exit branch precedent), ADR-0419 (prompt slots this
 extends to a second task).
+
+## Amended (2026-11-19): the Arkos runtime was removed
+
+A dated note, not a rewrite. `components/agent-runtime/` (including `app/graph/arkos_nodes.py` and its tests) was deleted by WP-156
+(commit b5c9b2bc9, 2026-10-23) when UnifAI became the agent platform ([ADR-0561](0561-adopt-unifai-as-the-agent-platform.md)),
+so the generalized `plan_draft_write` shape no longer runs in this repository. The Arkos task `workshop-presentation` lives in
+`startxfr/zuno-demo-agents` (`agents/arkos/`), where UnifAI runs it from the signed release. The decision stands as history of the
+removed runtime.
