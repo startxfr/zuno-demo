@@ -104,6 +104,27 @@ def truthy(value: Any) -> bool:
     return value is True or str(value).strip().lower() == "true"
 
 
+SHARED_SA_FAMILIES = ("experiences", "unifai", "guardrails")  # real client paths: they ride the shared ai-gateway ServiceAccount on purpose
+STRESS_SA_FAMILIES = ("load", "models")                        # the dedicated stress ServiceAccount
+
+
+def shared_path_attribution(drivers: List[Dict[str, Any]]) -> str:
+    """What moved the shared ai-gateway ServiceAccount's counter, by iterations of the drivers whose path rides it (not by tokens:
+    the Limitador counter does not say who spent them), next to the iterations of the drivers on the stress ServiceAccount."""
+    def total(families):
+        by_family: Dict[str, int] = {}
+        for d in drivers:
+            if d.get("family") in families:
+                by_family[d["family"]] = by_family.get(d["family"], 0) + d["n"]
+        return by_family
+    shared, stress = total(SHARED_SA_FAMILIES), total(STRESS_SA_FAMILIES)
+    if not shared and not stress:
+        return ""
+    fmt = lambda m: ", ".join(f"{k} {v}" for k, v in sorted(m.items())) or "none"
+    return (f"iterations that ride the shared ServiceAccount by design (real client paths): {fmt(shared)}; "
+            f"on the stress ServiceAccount: {fmt(stress)}; the per-agent Jobs of the agents family also use the shared one")
+
+
 def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The report of a run. `meta`: run_id, profile, started, job_state (all optional)."""
     meta = dict(meta or {})
@@ -119,6 +140,9 @@ def build_report(rows: List[Dict[str, Any]], meta: Optional[Dict[str, Any]] = No
     guards = [{"driver": r.get("agent", "?"), "detail": str(r.get("detail", ""))[:240]} for r in rows if r.get("category") == "guard"]
     saturation = [{"signal": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "saturation"]
     counters = [{"id": r.get("id", "?"), "passed": truthy(r.get("passed")), "detail": str(r.get("detail", ""))} for r in rows if r.get("layer") == "counters"]
+    attribution = shared_path_attribution(drivers)
+    if attribution and any(c["id"] == "isolation" for c in counters):
+        counters.append({"id": "isolation-attribution", "passed": True, "detail": attribution})
     saturated = [s for s in saturation if not s["passed"]]
     timeline = combined_timeline(drivers)
     chaos = []

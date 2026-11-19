@@ -536,7 +536,7 @@ def summary_row(driver: Driver, stats: Stats, guard: Guard, shard_index: int, sh
              + (f" - BUDGET GUARD: {guard.reason}" if guard.tripped else ""))
     timeline = [[b, v[0], v[1]] for b, v in sorted(stats.timeline.items())][-TIMELINE_CAP:]
     machine = json.dumps({"n": stats.n, "ok": stats.ok, "err": stats.err, "c429": stats.c429, "c5xx": stats.c5xx,
-                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason, "tl": timeline}, separators=(",", ":"))
+                          "timeouts": stats.timeouts, "lat": sample, "guard": guard.reason, "tl": timeline, "fam": driver.family}, separators=(",", ":"))
     passed = stats.n > 0 and stats.err == 0 and not guard.tripped
     return row(driver.id, SUMMARY_LAYER, f"summary:s{shard_index}of{shards}", "summary", passed, f"{human} | {machine}")
 
@@ -552,7 +552,8 @@ def merge_summaries(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         except ValueError:
             continue
         m = merged.setdefault(r["agent"], {"driver": r["agent"], "n": 0, "ok": 0, "err": 0, "c429": 0, "c5xx": 0,
-                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0, "tl": {}})
+                                          "timeouts": 0, "lat": [], "guard": [], "shards": 0, "tl": {}, "family": ""})
+        m["family"] = s.get("fam") or m["family"]
         for bucket, n, err in s.get("tl", []):
             cell = m["tl"].setdefault(int(bucket), [0, 0])
             cell[0] += int(n)

@@ -54,6 +54,22 @@ class Report(unittest.TestCase):
         self.assertEqual(len(report["guards"]), 1)
         self.assertEqual(report["verdict"], "ATTENTION")
 
+    def test_the_isolation_row_says_what_rides_the_shared_serviceaccount(self):
+        import json as _j
+
+        def fam(driver, family, n):
+            r = summary(driver, n, n, [10])
+            stats = _j.loads(r["detail"].split(" | ", 1)[1])
+            stats["fam"] = family
+            r["detail"] = "x | " + _j.dumps(stats)
+            return r
+        rows = [fam("open-webui", "experiences", 40), fam("load-ai-gateway", "load", 90),
+                result("limitador-counters", layer="counters", id="isolation", detail="stress +1 shared +65234")]
+        report = rep.build_report(rows)
+        line = next(c for c in report["counters"] if c["id"] == "isolation-attribution")["detail"]
+        self.assertIn("experiences 40", line)
+        self.assertIn("load 90", line)
+
     def test_a_clean_run_says_so(self):
         report = rep.build_report([result("a"), summary("a", 1, 1, [10])])
         self.assertEqual((report["verdict"], report["failure_count"], report["guards"]), ("CLEAN", 0, []))
