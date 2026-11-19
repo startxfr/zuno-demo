@@ -1,0 +1,18 @@
+# Soak: a low, steady rate for hours (about 2 requests a minute per driver). Launched without waiting; the rows are
+# read later with `make d3 stresstest-collect RUN=<id>`. First values, tuned after the first runs.
+name: soak
+description: 2 requests a minute per driver for 4 hours, async
+families: [tools, models]
+defaults:
+  duration: 14400
+  rate: 0.033
+  concurrency: 1
+  timeout: 180
+  shards: 1
+budget:
+  max_consecutive_failures: 5
+  max_429: 30
+  max_tokens: 300000
+job:
+  deadline_seconds: 15600
+  wait: false

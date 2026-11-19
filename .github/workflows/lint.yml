@@ -129,6 +129,15 @@ jobs:
       # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
       - name: Golden-path probe judgement tests (ADR-0605)
         run: python3 evaluations/tests/test_golden_path_probe.py
+      # ADR-0624 (WP-305, WP-307): the stress runner (plan, scheduler, budget guard, summaries, the first drivers against
+      # an httpx mock transport), the pure half of the campaign Ansible tasks (skipped here without ansible-playbook)
+      # and the dashboard coverage pack's planning and judging. httpx and PyYAML come from the agent Jobs' own pins.
+      - name: Stress runner, campaign plan and dashboard coverage tests (ADR-0624)
+        run: |
+          pip install -r evaluations/tekos/requirements.txt
+          python3 evaluations/tests/test_stress_runner.py
+          python3 evaluations/tests/test_stress_campaign_plan.py
+          python3 evaluations/tests/test_dashboard_coverage.py
       # ADR-0616 (WP-274): how the unifai-live-rag demo's start and stop drive the UnifAI RAG API (fake client, no
       # network, no httpx).
       - name: UnifAI RAG library tests (ADR-0616)

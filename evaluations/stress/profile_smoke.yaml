@@ -1,0 +1,18 @@
+# Smoke: every functional driver once, one request at a time, under a hard token cap (WP-305, ADR-0624).
+# Small enough that it cannot drain a shared model budget; the first thing to run after any roll.
+name: smoke
+description: every functional driver x1, concurrency 1, under 15 minutes and 1500 tokens
+# `agents` is the family of the existing per-agent Jobs (scenario, security, gate, token quota): it is not in smoke.
+families: [tools, models]
+defaults:
+  iterations: 1
+  concurrency: 1
+  timeout: 120
+  shards: 1
+budget:
+  max_consecutive_failures: 2
+  max_429: 2
+  max_tokens: 1500
+job:
+  deadline_seconds: 900
+  wait: true

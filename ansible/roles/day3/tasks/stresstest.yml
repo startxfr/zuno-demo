@@ -9,6 +9,10 @@
 # through. So every component value dispatches to the same full
 # aggregation; `platform`/`all` are accepted (for consistency with `d2
 # test`'s component set) but behave identically to `agents`.
+#
+# WP-307 (ADR-0624): with `stress_profile` set (make d3 stresstest PROFILE=<name>) the run is a profile-driven
+# CAMPAIGN (stresstest_campaign.yml): the existing per-agent Jobs become the family `agents`, and the scenario drivers
+# of evaluations/stress/ run in one Indexed Job. Without it, this file behaves exactly as before.
 - name: "day2-stresstest | note that stresstest content is agent-scoped regardless of component"
   ansible.builtin.debug:
     msg: >-
@@ -19,3 +23,8 @@
 
 - name: "day2-stresstest | run the full per-agent stresstest aggregation"
   ansible.builtin.include_tasks: stresstest_job.yml
+  when: (stress_profile | default('') | string) | length == 0
+
+- name: "day2-stresstest | run the profile-driven stress campaign (WP-307)"
+  ansible.builtin.include_tasks: stresstest_campaign.yml
+  when: (stress_profile | default('') | string) | length > 0

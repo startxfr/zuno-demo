@@ -1,0 +1,51 @@
+---
+# WP-307 (ADR-0624): `make d3 stresstest-collect [RUN=<run id>]` - read the rows of a stress campaign launched with
+# `make d3 stresstest PROFILE=<name>` (async: a soak is read hours later). Read-only on the cluster. With no RUN the
+# newest campaign Job is read. Informational (ADR-0058).
+- name: "Day 3: collect a stress campaign"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: The run id, when given, is a name (it ends up in a Job name)
+      ansible.builtin.assert:
+        that: (stress_run | default('')) is match('^[a-z0-9-]*$')
+        fail_msg: "RUN must be a run id such as smoke-20261119-014500"
+
+    - name: List the campaign Jobs
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-ai-run
+        label_selectors:
+          - zuno.io/stresstest-run
+      register: _stress_jobs
+      when: (stress_run | default('')) | length == 0
+
+    - name: Pick the newest campaign Job
+      ansible.builtin.set_fact:
+        _stress_job_name: "{{ (_stress_jobs.resources | sort(attribute='metadata.creationTimestamp') | last).metadata.name }}"
+      when:
+        - (stress_run | default('')) | length == 0
+        - (_stress_jobs.resources | default([]) | length) > 0
+
+    - name: Name the Job of the given run
+      ansible.builtin.set_fact:
+        _stress_job_name: "zuno-stress-{{ stress_run }}"
+      when: (stress_run | default('')) | length > 0
+
+    - name: Collect the campaign
+      ansible.builtin.include_role:
+        name: day3
+        tasks_from: stresstest_campaign_collect
+      vars:
+        _stress_wait: false
+      when: _stress_job_name is defined
+
+    - name: No campaign Job to read
+      ansible.builtin.debug:
+        msg: "No stress campaign Job in zuno-ai-run: launch one with `make d3 stresstest PROFILE=smoke`."
+      when: _stress_job_name is not defined

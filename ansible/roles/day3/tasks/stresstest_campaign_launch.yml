@@ -1,0 +1,227 @@
+---
+# Launch half of stresstest_campaign.yml: credentials, scripts ConfigMap and the Indexed Job. Sets _stress_launched.
+
+- name: "stress | resolve the cluster base domain and the Keycloak endpoint"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "stress | resolve the Keycloak URL the Job signs in through"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
+- name: "stress | ensure the zuno-ai-run namespace exists"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
+
+- name: "stress | read the platform's internal root CA from openshift-config"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: openshift-config
+    name: keycloak-serving-ca
+  register: _stress_ca_cm
+
+- name: "stress | fail if the internal root CA ConfigMap is missing"
+  ansible.builtin.fail:
+    msg: "openshift-config/keycloak-serving-ca not found - run `make d1 install openshift-oauth` first."
+  when: (_stress_ca_cm.resources | default([]) | length) == 0
+
+- name: "stress | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: zuno-stress-ca
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _stress_ca_cm.resources[0].data['ca.crt'] }}"
+
+- name: "stress | read the demo-persona password and the zuno-stresstest client secret from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: "{{ item }}"
+  loop: [demo-personas-password, zuno-stresstest-client-secret]
+  register: _stress_auth_secrets
+  no_log: true
+
+# No fallback to zuno-evaluations: the quota class header is honoured only for the zuno-stresstest client
+# (TRUSTED_PLATFORM_CLIENTS), and a Job signed in as another client would spend the bigger `evaluation` budget.
+- name: "stress | fail if either secret is missing"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-auth/{{ item.item }} not found - run `make d0 install keycloak` first (the zuno-stresstest client is
+      deliberately required: its small stresstest budget is what protects the shared MaaS budget).
+  loop: "{{ _stress_auth_secrets.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: (item.resources | default([]) | length) == 0
+
+- name: "stress | the credentials Secret the Job mounts"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: zuno-stress-credentials
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      data:
+        demo-persona-password: "{{ _stress_auth_secrets.results[0].resources[0].data.password }}"
+        client-secret: "{{ _stress_auth_secrets.results[1].resources[0].data.client_secret }}"
+  no_log: true
+
+# One ConfigMap, flat keys (a key cannot hold a '/'): the runner and its report row shape, the golden-path judges the
+# drivers reuse, requirements.txt (httpx, PyYAML - the agent Jobs' own), and every driver_*.py / profile_*.yaml found.
+- name: "stress | find the drivers and profiles"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/evaluations/stress"
+    patterns: ["driver_*.py", "profile_*.yaml"]
+  register: _stress_found
+
+- name: "stress | the file set of the scripts ConfigMap"
+  ansible.builtin.set_fact:
+    _stress_files: >-
+      {{ {
+           'stress_runner.py': zuno_repo_root + '/platform/testing/stress_runner.py',
+           'day2_report.py': zuno_repo_root + '/platform/testing/day2_report.py',
+           'golden_path_probe.py': zuno_repo_root + '/evaluations/golden_path_probe.py',
+           'requirements.txt': zuno_repo_root + '/evaluations/tekos/requirements.txt'
+         } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path')))) }}
+
+- name: "stress | read the files"
+  ansible.builtin.set_fact:
+    _stress_cm_data: "{{ _stress_cm_data | default({}) | combine({item.key: lookup('ansible.builtin.file', item.value)}) }}"
+  loop: "{{ _stress_files | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "stress | fail before the 1 MiB ConfigMap limit"
+  ansible.builtin.fail:
+    msg: "the stress scripts weigh {{ _stress_cm_data | to_json | length }} bytes: split them over two ConfigMaps before adding more"
+  when: (_stress_cm_data | to_json | length) > 900000
+
+- name: "stress | the scripts ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: zuno-stress-scripts
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data: "{{ _stress_cm_data }}"
+
+- name: "stress | the Indexed Job of run {{ _stress_run_id }} ({{ _stress_shards }} shard(s))"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "zuno-stress-{{ _stress_run_id }}"
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+          zuno.io/stresstest-run: "{{ _stress_run_id }}"
+          zuno.io/stresstest-profile: "{{ stress_profile }}"
+      spec:
+        completionMode: Indexed
+        completions: "{{ _stress_shards | int }}"
+        parallelism: "{{ _stress_shards | int }}"
+        backoffLimit: 0
+        activeDeadlineSeconds: "{{ _stress_deadline | int }}"
+        ttlSecondsAfterFinished: 86400
+        template:
+          metadata:
+            labels:
+              # The NetworkPolicies of the ai-gateway, mcp-gateway and a2a-gateway admit this label.
+              app.kubernetes.io/name: acceptance-gate
+              zuno.io/stresstest-run: "{{ _stress_run_id }}"
+          spec:
+            restartPolicy: Never
+            priorityClassName: zuno-platform-weak
+            serviceAccountName: acceptance-gate
+            containers:
+              - name: stress
+                image: "docker.io/library/python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b"
+                command:
+                  - sh
+                  - -c
+                  # Same certifi-append trick as the agent Jobs (every Route chains to Vault's internal root).
+                  - >-
+                    pip install --quiet --no-cache-dir -r /stress/requirements.txt &&
+                    CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
+                    cat /stress-ca/ca.crt >> "$CERTIFI" &&
+                    export SSL_CERT_FILE="$CERTIFI" &&
+                    python3 /stress/stress_runner.py
+                workingDir: /stress
+                resources:
+                  requests:
+                    cpu: 200m
+                    memory: 256Mi
+                  limits:
+                    cpu: "1"
+                    memory: 512Mi
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                  - name: HOME
+                    value: /tmp
+                  - name: PYTHONUSERBASE
+                    value: /tmp/.pyuser
+                  - name: STRESS_DIR
+                    value: /stress
+                  - name: STRESS_PROFILE
+                    value: "{{ stress_profile }}"
+                  - name: STRESS_OVERRIDES
+                    value: "{{ _stress_overrides | to_json }}"
+                  - name: STRESS_RUN_ID
+                    value: "{{ _stress_run_id }}"
+                  - name: STRESS_SHARDS
+                    value: "{{ _stress_shards | int }}"
+                  - name: KEYCLOAK_URL
+                    value: "{{ zuno_keycloak_url }}"
+                  - name: EVAL_CLIENT_ID
+                    value: zuno-stresstest
+                  - name: EVAL_CLIENT_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        name: zuno-stress-credentials
+                        key: client-secret
+                  - name: DEMO_PERSONA_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: zuno-stress-credentials
+                        key: demo-persona-password
+                  - name: STRESS_PERSONAS
+                    value: "{{ stress_personas | default('stress-consultant-01') }}"
+                volumeMounts:
+                  - name: stress
+                    mountPath: /stress
+                  - name: stress-ca
+                    mountPath: /stress-ca
+            volumes:
+              - name: stress
+                configMap:
+                  name: zuno-stress-scripts
+              - name: stress-ca
+                configMap:
+                  name: zuno-stress-ca
+
+- name: "stress | launched"
+  ansible.builtin.set_fact:
+    _stress_launched: true
+
+- name: "stress | how to read the rows"
+  ansible.builtin.debug:
+    msg:
+      - "run {{ _stress_run_id }} launched as Job zuno-stress-{{ _stress_run_id }} ({{ _stress_shards }} shard(s), deadline {{ _stress_deadline }}s)"
+      - "collect it any time with: make d3 stresstest-collect RUN={{ _stress_run_id }}"
