@@ -22,7 +22,7 @@ What the owner decides: whether the AAP installer credential may create AdminNet
 
 ## Steps
 
-1. **The closed catalogue** `evaluations/stress/chaos.yaml`, checked by `stress_chaos.py validate` and a unit test: two kinds (`pod-delete`, `provider-cut`), targets from an allow-list of application names per namespace (never a model pod, a node, a namespace or a scale), providers from a host list, `duration` at most 300 s, `recover_within` at most 600 s. Six entries: ai-gateway, mcp-gateway, a2a-gateway, praxis, open-webui pods and the Mistral cut. `labels_checked: false` marks the two selectors written from the chart and not yet seen on a live pod; a selector that matches nothing fails the row and says so.
+1. **The closed catalogue** `evaluations/stress/chaos.yaml`, checked by `stress_chaos.py validate` and a unit test: two kinds (`pod-delete`, `provider-cut`), targets from an allow-list of application names per namespace (never a model pod, a node, a namespace or a scale), providers from a host list, `duration` at most 300 s, `recover_within` at most 600 s. Six entries: ai-gateway, mcp-gateway, a2a-gateway, praxis, open-webui pods and the Mistral cut. `labels_checked: false` would mark a selector written from the chart and not yet seen on a live pod (all five were seen live 2026-11-19); a selector that matches nothing fails the row and says so.
 2. **The plan**: the profile lists `chaos:` ids with `chaos_start` (300 s) and `chaos_spacing` (150 s); each starts the spacing after the previous one's end. Only `aggressive` lists any. `CHAOS_CONFIRM=<profile>` (typed twice on purpose, refused without `PROFILE`) confirms; `-e stress_chaos=false` switches them off; without confirmation the plan prints what was *not* inflicted.
 3. **The disruptors** (`stresstest_chaos.yml`, `stresstest_chaos_one.yml`): wait until launch + `at`; pod-delete finds the pods by selector, deletes one, waits until the victim is gone and the workload is whole within `recover_within`; provider-cut resolves the host, applies the policy, holds, deletes it whatever happens and checks it is gone. Each makes one row, layer `chaos`, `window=<start>-<end>` in the detail.
 4. **The load's view**: the runner keeps a 10-second timeline (iterations, failures) per driver, merged over the shards. The report correlates each window with it: failures before, during and the minute after, and the time to run clean again; a disruption that did not recover makes the verdict `ATTENTION`.
@@ -37,5 +37,5 @@ Live, with the owner's go (and the grant above for AAP): `make d3 stresstest PRO
 
 ## Open points
 
-- The selectors of `a2a-gateway` and `open-webui` are unverified on live pods; the AdminNetworkPolicy API version (`v1alpha1`) must be the one the cluster serves.
+- Selectors and the `v1alpha1` AdminNetworkPolicy API were confirmed live by zuno-demo-assist on 2026-11-19.
 - Every live disruption is a real outage of one replica; run it outside a demo window and after the agents rollout of zuno-demo-cluster.

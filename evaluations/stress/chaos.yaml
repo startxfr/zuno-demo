@@ -32,7 +32,6 @@ disruptions:
     selector: {app.kubernetes.io/name: a2a-gateway}
     workload: {kind: Deployment, name: a2a-gateway}
     recover_within: 240
-    labels_checked: false
   - id: pod-praxis
     kind: pod-delete
     description: "The Praxis pod deleted."
@@ -45,9 +44,8 @@ disruptions:
     description: "The Open WebUI pod deleted."
     namespace: zuno-openwebui
     selector: {app.kubernetes.io/name: open-webui}
-    workload: {kind: StatefulSet, name: open-webui}
+    workload: {kind: Deployment, name: open-webui}
     recover_within: 300
-    labels_checked: false
   - id: provider-cut-mistral
     kind: provider-cut
     description: "The addresses of api.mistral.ai denied to the ai-gateway pods for two minutes: zuno-code must fall back to another provider."
