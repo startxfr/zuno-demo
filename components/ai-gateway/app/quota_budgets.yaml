@@ -52,6 +52,18 @@ classes:
       project:
         budget: 4000
         window: 5m
+  loadtest:
+    fail_mode: closed
+    tokens:
+      user:
+        budget: 250000
+        window: 1h
+      group:
+        budget: 1000000
+        window: 1h
+      project:
+        budget: 500000
+        window: 1h
 precedence:
   in_project_context:
   - project
