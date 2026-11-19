@@ -36,6 +36,15 @@ for c in commits:
     if cur and c['t']-cur[-1]['t']>gap: sess.append(cur);cur=[]
     cur.append(c)
 if cur: sess.append(cur)
+def span(g):
+    n=0;cur=None;tot=0.0
+    for c in commits:
+        if cur is None or c['t']-cur[1]>g*60:
+            if cur: tot+=(cur[1]-cur[0])/3600+lead
+            cur=[c['t'],c['t']]
+        else: cur[1]=c['t']
+    return round(tot+(cur[1]-cur[0])/3600+lead)
+sens={g:span(g) for g in(60,120,180)}
 task=collections.defaultdict(lambda:dict(ai=0.0,human_obs=0.0,commits=0,lines=0,files=0,first=None,last=None))
 week=collections.defaultdict(lambda:dict(h=0.0,c=0,ai_c=0,unattr=0.0))
 unattr=0.0;tot=0.0;obs_human=0.0
@@ -116,7 +125,7 @@ wpp=round(sum(x['wpDone'] for x in full)/len(full),1) if full else 0
 fAI=sum(r['fAI'] for r in rows if r['open']); fH=sum(r['hum'] for r in rows if r['open'])
 owner=sum(1 for r in rows if r['open'] and r['kind']=='WP' and re.search(r"owner'?s? (decision|go)",wmap[r['id']]['note'] or ''))
 eta=lambda per: (datetime.date.today()+datetime.timedelta(weeks=(fAI/per if per else 0))).isoformat() if per else None
-data=dict(rows=rows,bands=bands,weeks=wk,ratio=ratio,overall=overall,rates=R,today=datetime.date.today().isoformat(),
+data=dict(sens=sens,rows=rows,bands=bands,weeks=wk,ratio=ratio,overall=overall,rates=R,today=datetime.date.today().isoformat(),
   totals=dict(ownerWait=owner,openWp=sum(1 for r in rows if r['open'] and r['kind']=='WP'),sessionH=round(tot),unattrH=round(unattr),humanObsH=round(obs_human),commits=len(commits),aiCommits=sum(c['ai'] for c in commits),sessions=len(sess),
    humClosed=round(sum(r['hum'] for r in rows if not r['open'])),humOpen=round(fH),aiOpen=round(fAI),pace=pace,wpPace=wpp,eta=eta(pace),
    etaWp=(datetime.date.today()+datetime.timedelta(weeks=sum(1 for r in rows if r['open'] and r['kind']=='WP')/wpp)).isoformat() if wpp else None))
