@@ -87,6 +87,9 @@ jobs:
       # doc_links: relative links and #anchors in every tracked markdown file (2026-11-12 audit).
       - name: Markdown link and anchor tests (doc_links)
         run: python3 platform/docs/tests/test_doc_links.py
+      # ADR-0624: the stress table of docs/demo/README.md against the demos and the stress drivers.
+      - name: Stress table tests
+        run: python3 platform/docs/tests/test_stress_table.py
       # ADR-0616 (WP-270, WP-271): the demo pages parse into steps, the read-only allowlist of the steps, the guards
       # and the session, and the pages agree with ansible/demos/ (every row its step file, every Do command covered,
       # no read-only unit changing anything, no stale `make demo` verb in the docs), and the GIF cut of a recording
