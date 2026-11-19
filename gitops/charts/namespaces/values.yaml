@@ -571,6 +571,8 @@ platformNamespaces:
           reason: The stress campaign's blender-3d driver replays the Blender add-on on the ai-gateway workstation entry (WP-308); idle while the entry is off.
         - name: praxis
           reason: The stress campaign's claude-code-sovereign driver replays Claude Code on the Praxis workstation entry (WP-308); idle while the entry is off.
+        - name: maas
+          reason: The stress campaign's maas-portal-api-keys driver checks that the public MaaS entry refuses a call without an API key (WP-310 batch 2).
       # S3 answers each name lookup with other addresses out of a pool of hundreds; a name rule holds only the few it
       # resolved, so the storage-initializer of a recreated model pod stalled on blocked connections (embeddings-predictor
       # down 2026-11-08 02:30 to 14:30, found by the RAG pilot). The published eu-west-2 S3 ranges (syncToken 1794088025,
