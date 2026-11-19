@@ -237,7 +237,7 @@ How a span and a counter travel from a service to a screen. Drawn from
 `rbac-rhoai-traces.yaml`; `gitops/charts/tempo/templates/tempomonolithic.yaml`;
 `gitops/charts/grafana/templates/grafana.yaml`, `datasource-*.yaml` and `dashboard-*.yaml`;
 `gitops/charts/perses/templates/globaldatasource-*.yaml` and `uiplugin-dashboards.yaml`;
-`gitops/charts/mesh-monitoring/templates/monitoringstack.yaml`; `gitops/charts/service-mesh/templates/istio.yaml`
+the MonitoringStack in the `cluster-prometheus:` block of `gitops/charts/mesh-monitoring/values.yaml`; `gitops/charts/service-mesh/templates/istio.yaml`
 and `telemetry.yaml`; the `openTelemetry` value of `gitops/charts/unifai/values.yaml`; the `tracing` value of
 `gitops/charts/models/values.yaml`; and the `telemetry.py` modules of `components/ai-gateway`,
 `components/mcp-gateway` and `components/a2a-gateway`.
