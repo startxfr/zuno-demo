@@ -172,7 +172,9 @@ fails and says so, it never guesses another one.
   pending the owner's go. The `<model>-load` subscriptions were renamed from `<model>-stress` because the wasm shim
   never creates a counter for the last token-limit action of a route, ordered by limit name.
 - `multi-gateway` is replayed in part (one question through the ai-gateway and through Praxis); `agents-alt-gateway` has
-  only its state check, and the state rows of both still say that the kagent agent on Praxis is not rolled out (Phase 58).
+  only its state check. Their state checks now judge the kagent agent `zuno-diagnose-praxis` for real: it was read live on
+  demo333 as Accepted and Ready on 2026-11-19, so the skip list `NOT_YET` of `driver_state.py` is empty and a missing agent
+  is a failure.
 - OpenClaw and Lightspeed are not replayed from a Job (OpenClaw's path is the operator's egress proxy inside each
   persona's pod; Lightspeed needs an OpenShift token). The world model has no driver.
 - The experience and workstation drivers need openings of the egress firewall and the NetworkPolicies (WP-308); until

@@ -172,13 +172,13 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | service-mesh-kiali | `service-mesh-kiali-state` | state only |
 | vault-pki | `vault-pki-state` | state only |
 | a2a-delegation-approval | `delegation-approval`, `a2a-delegation-approval-state` | state check in the profiles; the `delegation-approval` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it asks Arkos for a delegated write, rejects the pending approval (never approves it), checks that a stale request id answers 409, and cancels and deletes its session |
-| agents-alt-gateway | `agents-alt-gateway-state` | state only; pending Phase 58 (the kagent agent on Praxis is not rolled out, so that object is not judged) |
+| agents-alt-gateway | `agents-alt-gateway-state` | state only; the kagent agent on Praxis is judged for real (live and Ready on demo333, 2026-11-19) |
 | ai-gateway-routing | `ai-gateway-routing`, `ai-gateway-routing-state` | replayed (one `zuno-code` call, routing decision read back) |
 | ai-gateway-sovereignty | `ai-gateway-sovereignty`, `ai-gateway-sovereignty-state` | replayed (Arkos kept local at C3, Tekos control call) |
 | guardrails | `guardrails`, `guardrails-state` | replayed (the DAN prompt, its span read in Tempo) |
 | identity-personas | `identity-personas`, `identity-personas-state` | replayed in part: the stress persona's Keycloak token, with its issuer, client, expiry and number of groups read (the signature is checked by the gateways, not here) |
 | mcp-tools-by-group | `mcp-tools-by-group`, `mcp-tools-by-group-state`, `load-mcp-gateway` | replayed (`search_confluence` through the REST path; the load driver varies the queries) |
-| multi-gateway | `multi-gateway`, `multi-gateway-state` | replayed in part: one short question through the ai-gateway and one through Praxis (device sign-in of the public client `claude-code`), one row each; the state check stays pending Phase 58 for the kagent agent on Praxis (WP-297 to WP-303) |
+| multi-gateway | `multi-gateway`, `multi-gateway-state` | replayed in part: one short question through the ai-gateway and one through Praxis (device sign-in of the public client `claude-code`), one row each; the state check judges the kagent agent on Praxis for real (live and Ready on demo333, 2026-11-19) |
 | quotas | `quotas`, `quotas-state` | state check in the profiles; the `quotas` driver is mutating (it spends a stress persona's budget until a 429) and is in no profile |
 | evaluation-trustyai-evalhub | `evaluation-trustyai-evalhub-state` | state only |
 | external-models | `external-models-state` | state only |
