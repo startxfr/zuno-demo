@@ -161,17 +161,17 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | openclaw | `openclaw-state` | state only; not replayed: its path is the operator's egress proxy inside each persona's pod |
 | open-webui | `open-webui`, `open-webui-zuno-code`, `open-webui-zuno-wesh`, `open-webui-state` | replayed (Open WebUI's API as a stress persona) |
 | unifai-agents | `unifai-agents`, `unifai-agents-state`, `load-unifai-scenarios` | replayed; the load driver replays the active agents' scenarios as concurrent turns |
-| unifai-live-rag | `unifai-live-rag-state` | state only; no replay driver |
+| unifai-live-rag | `unifai-live-rag`, `unifai-live-rag-state` | state check in the profiles; the `unifai-live-rag` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it uploads one small, uniquely named document to the persona's Personal library, waits until it is indexed, then deletes it and checks it is gone |
 | blender-3d | `blender-3d`, `blender-3d-state` | replayed (device sign-in, then the workstation entry); skipped when the entry is off |
 | world-model | `world-model-state` | state only (one assertion); not deployed on demand, no replay driver |
 | aap-audited-operations | `aap-audited-operations-state` | state only |
 | gitops-day0-3 | `gitops-day0-3-state` | state only |
-| image-signing-admission | `image-signing-admission-state` | state only |
+| image-signing-admission | `image-signing-admission-state`, `image-signing-refusal` | state check in the profiles; `image-signing-refusal` is opt-in (profile `mutating`) and stores nothing: it offers an unsigned, tag-referenced image as a dry-run pod create to the namespace `zuno-stress-admission`, and the admission webhook must refuse it. The namespace and its one pod-create grant exist only when `stressImageProof.enabled` is set (default off) |
 | observability-trace | `observability-trace`, `observability-trace-state` | replayed (a Tekos turn, then its trace read in Tempo by run id) |
 | okf-signed-agent-release | `okf-signed-agent-release-state` | state only |
 | service-mesh-kiali | `service-mesh-kiali-state` | state only |
 | vault-pki | `vault-pki-state` | state only |
-| a2a-delegation-approval | `a2a-delegation-approval-state` | state only; no replay driver for the approval flow |
+| a2a-delegation-approval | `delegation-approval`, `a2a-delegation-approval-state` | state check in the profiles; the `delegation-approval` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it asks Arkos for a delegated write, rejects the pending approval (never approves it), checks that a stale request id answers 409, and cancels and deletes its session |
 | agents-alt-gateway | `agents-alt-gateway-state` | state only; pending Phase 58 (the kagent agent on Praxis is not rolled out, so that object is not judged) |
 | ai-gateway-routing | `ai-gateway-routing`, `ai-gateway-routing-state` | replayed (one `zuno-code` call, routing decision read back) |
 | ai-gateway-sovereignty | `ai-gateway-sovereignty`, `ai-gateway-sovereignty-state` | replayed (Arkos kept local at C3, Tekos control call) |
