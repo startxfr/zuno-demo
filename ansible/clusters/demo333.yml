@@ -486,6 +486,12 @@ zuno_ai_gateway_quota_ledger_store: redis
 zuno_ai_gateway_stress_credentials: true
 # The `loadtest` class group: inert until an admitted agents release defines the class.
 zuno_ai_gateway_quota_loadtest_group: zuno-loadtest
+# ADR-0624 / WP-308 and WP-310 (owner go 2026-11-19): the stress campaign Job may reach the Dify and kagent token proxies
+# (it replays their clients' path), and runs as zuno-stress-reader: get-only on the objects the demos' checks name
+# (generated role, no Secret, no write) plus the built-in cluster-monitoring-view for the saturation sampler.
+zuno_stress_clients_enabled: true
+zuno_stress_reader_enabled: true
+zuno_stress_reader_monitoring_view: true
 # WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
 # the per-agent guardrail modes generated from the agents release. Needs the
 # image built from b1facfc2 or later (ai-gateway-28).
