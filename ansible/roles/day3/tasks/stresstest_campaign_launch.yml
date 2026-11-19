@@ -101,6 +101,7 @@
            'day2_report.py': zuno_repo_root + '/platform/testing/day2_report.py',
            'golden_path_probe.py': zuno_repo_root + '/evaluations/golden_path_probe.py',
            'unifai_target.py': zuno_repo_root + '/evaluations/common/unifai_target.py',
+           'quota_counters_probe.py': zuno_repo_root + '/platform/testing/quota_counters_probe.py',
            'device_login.py': zuno_repo_root + '/evaluations/blender/device_login.py',
            'requirements.txt': zuno_repo_root + '/evaluations/tekos/requirements.txt'
          } | combine(dict(_stress_found.files | map(attribute='path') | map('basename') | zip(_stress_found.files | map(attribute='path'))))

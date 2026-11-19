@@ -2,7 +2,7 @@
 # First values, to be tuned after the first runs (WP-309 adds the load drivers and the duration phase).
 name: standard
 description: agents family + every driver x3, concurrency 2, under 45 minutes
-families: [agents, tools, models, unifai, guardrails, experiences, saturation]
+families: [agents, tools, models, unifai, guardrails, experiences, saturation, counters]
 defaults:
   iterations: 3
   concurrency: 2
@@ -25,5 +25,6 @@ budget:
   max_429: 5
   max_tokens: 20000
 job:
+  coverage: true   # the dashboard coverage of the campaign window, as the last stage of the collect
   deadline_seconds: 2700
   wait: true

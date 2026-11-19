@@ -138,6 +138,7 @@ jobs:
           python3 evaluations/tests/test_stress_runner.py
           python3 evaluations/tests/test_stress_campaign_plan.py
           python3 evaluations/tests/test_stress_drivers.py
+          python3 evaluations/tests/test_stress_report.py
           python3 evaluations/tests/test_dashboard_coverage.py
       # ADR-0616 (WP-274): how the unifai-live-rag demo's start and stop drive the UnifAI RAG API (fake client, no
       # network, no httpx).
