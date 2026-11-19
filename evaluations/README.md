@@ -39,3 +39,23 @@ Offline tests: `pytest evaluations/tests`.
 The exploratory `stress_test.py` batteries (tekos, arkos, comage) drove the
 retired agent stack directly and were removed with it; `make d2 stresstest`
 reports that layer as not run until a UnifAI port exists.
+
+## Dashboard coverage
+
+`dashboard_coverage.py` leaves at least one metric, trace or log line behind for every dashboard panel family that
+`make d3 stresstest` does not reach on its own (the experience clients, tool denials and unknown tools, a Kubernetes read,
+RAG success and failure, guardrail detections, a quota 429, one call per model alias, the semantic cache, Praxis), then
+prints a PASS/MISSING table per family from Prometheus and Tempo. It runs at the end of the stresstest
+(`ansible/roles/day3/tasks/stresstest_coverage.yml`, skip with `-e day3_stresstest_dashboard_coverage=false`) or alone from
+a workstation where `oc` is logged in:
+
+```
+python3 evaluations/dashboard_coverage.py                    # stimulate, wait for the scrapes, print the table
+python3 evaluations/dashboard_coverage.py --check-only       # the table only, stimulate nothing
+python3 evaluations/dashboard_coverage.py --only tools,rag   # some stages (experiences, tools, rag, guardrails, quota, models)
+```
+
+Informational (ADR-0058): the exit code is 0 whatever the table says and it is in no mandatory gate. The quota stage burns
+the `stresstest` token budget of `COVERAGE_QUOTA_PERSONA` (default `eval-ai-dev-01`); never point it at a real persona,
+and remember that `eval-consultant-01` and `consultant-01` share one Keycloak subject, hence one budget. World model and
+MariaDB panels are out of scope (not deployed, no exporter).
