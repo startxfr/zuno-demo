@@ -24,6 +24,7 @@ CHARTS = REPO / "gitops" / "charts"
 BASELINE = pathlib.Path(__file__).resolve().parent / "workload-hygiene-baseline.txt"
 KIND = re.compile(r"^kind:\s*(Deployment|StatefulSet|DaemonSet|Job|CronJob)\s*$", re.M)
 RULES = ("resources", "securityContext")
+HELPER_SECURITY = re.compile(r'include\s+"[^"]*[Ss]ecurity[^"]*"')
 
 
 def offenders(charts: pathlib.Path = CHARTS) -> Set[Tuple[str, str]]:
@@ -34,7 +35,10 @@ def offenders(charts: pathlib.Path = CHARTS) -> Set[Tuple[str, str]]:
         if not KIND.search(text):
             continue
         rel = path.relative_to(charts).as_posix()
-        out.update((rel, rule) for rule in RULES if rule not in text)
+        for rule in RULES:
+            # a helper that renders the pod's security context (`include "world-model.podSecurity"`) counts as the declaration
+            if rule not in text and not (rule == "securityContext" and HELPER_SECURITY.search(text)):
+                out.add((rel, rule))
     return out
 
 

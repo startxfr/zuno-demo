@@ -36,6 +36,16 @@ spec:
       containers:
         - name: oauth2-proxy
           image: {{ $.Values.images.oauth2Proxy }}
+          # What the restricted-v2 SCC already applies on OpenShift (read on the live pod, 2026-11-19), declared in the manifest.
+          # No readOnlyRootFilesystem: not proven for this image. Declaring it changes the pod template, so the Deployment rolls
+          # once when this is synced.
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           args:
             - --provider=oidc
             - --oidc-issuer-url={{ include "openclaw.issuer" $ }}

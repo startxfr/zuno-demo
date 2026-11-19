@@ -37,6 +37,10 @@ class Hygiene(unittest.TestCase):
         found = chk.offenders(tree({"a/templates/j.yaml": NO_SC, "a/templates/c.yaml": NO_RES}))
         self.assertEqual(found, {("a/templates/j.yaml", "securityContext"), ("a/templates/c.yaml", "resources")})
 
+    def test_a_security_helper_counts_as_the_declaration(self):
+        helper = 'kind: Deployment\nspec:\n  template:\n    spec:\n      {{- include "chart.podSecurity" . | nindent 6 }}\n      containers:\n        - resources: {}\n'
+        self.assertEqual(chk.offenders(tree({"a/templates/d.yaml": helper})), set())
+
     def test_nested_template_files_are_scanned(self):
         self.assertEqual(chk.offenders(tree({"a/templates/sub/j.yaml": NO_SC})), {("a/templates/sub/j.yaml", "securityContext")})
 

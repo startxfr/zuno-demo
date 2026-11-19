@@ -83,6 +83,15 @@ spec:
       containers:
         - name: psql
           image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgres:16-bookworm
+          # What the restricted-v2 SCC already applies on OpenShift (read on the live pod, 2026-11-19), declared in the manifest.
+          # No readOnlyRootFilesystem: not proven for this image.
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           # Requests only (best-practices audit, lot 2, step 1): this hook Job had none, so the namespace LimitRange supplied both a
           # request and a limit. The request is now explicit and small; the limit still comes from the LimitRange.
           resources:
