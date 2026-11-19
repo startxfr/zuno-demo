@@ -23,7 +23,8 @@ this page.
 - **A family** groups drivers: `agents` (the per-agent Jobs of ADR-0555), `tools`, `models`, `unifai`, `guardrails`,
   `experiences`, `state`, `load`, `saturation` (a sampler: vLLM queue and KV cache, gateway p95, Postgres backends) and
   `counters` (a sampler of the Limitador counters). `quota` (the `quotas` driver) spends a persona's budget until a 429
-  and is in no profile. `chaos` is not a family: it is the disruptions of the `aggressive` profile, below.
+  and is in no profile. `mutating` is the family of the three drivers that change state, in the one profile of that
+  name. `chaos` is not a family: it is the disruptions of the `aggressive` profile, below.
 - **A campaign** is one Indexed Job `zuno-stress-<profile>-<stamp>` (for example `zuno-stress-smoke-20261119-143000`),
   one pod per shard, with a deadline and a TTL of one day, launched the same way from `make` and from AAP. The runner is
   `platform/testing/stress_runner.py`; the drivers and profiles travel in the ConfigMap `zuno-stress-scripts`, rebuilt
@@ -33,7 +34,7 @@ this page.
   429 or 5xx answers (or timeouts), after `max_429` rejected calls, and the run stops once the drivers reported
   `max_tokens` tokens. A tripped guard is a failing row that says so.
 
-## The four profiles
+## The five profiles
 
 Defined in `evaluations/stress/profile_<name>.yaml` (first values, to be tuned after the first live runs).
 
@@ -42,9 +43,10 @@ Defined in `evaluations/stress/profile_<name>.yaml` (first values, to be tuned a
 | `smoke` | tools, models, unifai, guardrails | each driver once, concurrency 1, 1 shard | 2 failures in a row, 2 x 429, 1,500 tokens | 15 min, waits |
 | `standard` | agents, tools, models, unifai, guardrails, experiences, state, saturation, counters | 3 iterations at concurrency 2 (the experience drivers 2 iterations at concurrency 1), state once | 3 in a row, 5 x 429, 20,000 tokens | 45 min, waits, with the dashboard coverage |
 | `aggressive` | the standard families plus `load` | the load pool of 8 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4 | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
+| `mutating` | mutating only: `delegation-approval`, `unifai-live-rag`, `image-signing-refusal` | each once, concurrency 1, as the persona `stress-mutate-01` only (the one profile that sets `allow_mutating`) | 2 failures in a row, 2 x 429, 6,000 tokens | 40 min, waits |
 | `soak` | tools, models, saturation, counters | about 2 requests a minute per driver for 4 hours (`rate` 0.033, `duration` 14400) | 5 in a row, 30 x 429, 300,000 tokens | 4 h 20 min, asynchronous: it prints a run id |
 
-`smoke` is the first thing to run after any roll. `aggressive` lists six disruptions (see [Chaos](#chaos)); they run
+`smoke` is the first thing to run after any roll. `mutating` is the one deliberate way to run the three drivers that change state: `make d3 stresstest PROFILE=mutating`. Each cleans up what it creates (the delegated write approval is rejected, never approved, and its session cancelled; the uploaded document is deleted and checked gone; the unsigned pod is a dry run). The image proof needs the namespace `zuno-stress-admission` and one pod-create grant, which exist only when `stressImageProof.enabled` is set (default off, switch `zuno_stress_image_proof_enabled`); otherwise its row says what to enable. Run it outside a demo window. `aggressive` lists six disruptions (see [Chaos](#chaos)); they run
 only when the operator types the profile name again.
 
 ## Launch
@@ -89,6 +91,7 @@ These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-
 - **`stress-consultant-01`**: the default persona of the runner (`STRESS_PERSONAS`), a copy of consultant-01 in
   `/zuno-evaluation`, signed in through the confidential client `zuno-stresstest`. Quota class `stresstest`
   (a cap, not a load: it proves a limit).
+- **`stress-mutate-01`**: the dedicated persona of the `mutating` profile, a copy of consultant-01 in `/zuno-evaluation`, without `/zuno-loadtest`. The mutating drivers never use another persona.
 - **`stress-load-01` to `stress-load-08`**: the load pool, in `/zuno-evaluation` and in `/zuno-loadtest`. A budget is
   keyed by persona (WP-190), so a concurrency of N wants N personas. They exist after the Keycloak personas Job has
   run; without it each worker fails to sign in. Quota class `loadtest`.
