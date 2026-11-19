@@ -1,0 +1,143 @@
+<title>Zuno History</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Concept: a plant-room atlas. Cool slate paper, engineering-drawing hairlines, one colour per platform layer reused everywhere (HLD, cards, charts). */
+:root{
+  --bg:#f3f5f7;--surface:#ffffff;--sunk:#e9edf1;--ink:#0d1b26;--ink2:#4a5966;--muted:#7d8a96;--line:#d9e0e6;--line2:#c3ccd5;--accent:#1c5cab;--accent-ink:#ffffff;
+  --good:#0a8a0a;--warn:#c98500;--crit:#d03b3b;--grey:#9aa6b1;
+  --l-fnd:#2a78d6;--l-sec:#eb6834;--l-data:#1baf7a;--l-obs:#eda100;--l-ai:#e87ba4;--l-gw:#008300;--l-exp:#6250d6;--l-ops:#e34948;
+  --shadow:0 1px 2px rgba(13,27,38,.06),0 8px 24px rgba(13,27,38,.08);
+  --fd:'Space Grotesk',system-ui,sans-serif;--fb:'Inter',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1319;--surface:#141d25;--sunk:#0f171d;--ink:#e8eef3;--ink2:#a9b6c1;--muted:#7d8a96;--line:#25323d;--line2:#33424f;--accent:#6da7ec;--accent-ink:#0c1319;
+  --good:#3fbf3f;--warn:#fab219;--crit:#ec6a6a;--grey:#5f6b76;
+  --l-fnd:#3987e5;--l-sec:#d95926;--l-data:#199e70;--l-obs:#c98500;--l-ai:#d55181;--l-gw:#2fa22f;--l-exp:#9085e9;--l-ops:#e66767;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1319;--surface:#141d25;--sunk:#0f171d;--ink:#e8eef3;--ink2:#a9b6c1;--muted:#7d8a96;--line:#25323d;--line2:#33424f;--accent:#6da7ec;--accent-ink:#0c1319;
+  --good:#3fbf3f;--warn:#fab219;--crit:#ec6a6a;--grey:#5f6b76;
+  --l-fnd:#3987e5;--l-sec:#d95926;--l-data:#199e70;--l-obs:#c98500;--l-ai:#d55181;--l-gw:#2fa22f;--l-exp:#9085e9;--l-ops:#e66767;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--fb);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--fd);margin:0;text-wrap:balance;letter-spacing:-.01em}
+.wrap{max-width:1280px;margin:0 auto}
+.mono{font-family:var(--fm);font-variant-numeric:tabular-nums}
+.eyebrow{font:500 11px var(--fm);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+/* header */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand b{font:700 20px var(--fd);letter-spacing:-.02em}
+.brand span{font:11px var(--fm);color:var(--muted)}
+nav.tabs{display:flex;gap:4px;background:var(--sunk);padding:3px;border-radius:10px}
+nav.tabs button{border:0;background:none;padding:7px 14px;border-radius:8px;font-weight:500;color:var(--ink2)}
+nav.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.icon-btn{border:1px solid var(--line2);background:var(--surface);border-radius:8px;padding:6px 10px;color:var(--ink2)}
+main{padding-block:24px 64px;display:flex;flex-direction:column;gap:28px}
+.view[hidden]{display:none}
+.view{display:flex;flex-direction:column;gap:28px}
+.sec-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sec-h h2{font-size:22px}
+.sec-h p{margin:0;color:var(--ink2);max-width:70ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.panel h3{font-size:15px;margin-bottom:2px}
+.panel .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font:600 28px var(--fd);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--muted);font-size:12px}
+.kpi .of{font:500 13px var(--fm);color:var(--muted)}
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--fm);padding:2px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--ink2);white-space:nowrap;background:var(--surface)}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--grey);display:inline-block}
+.pill.done i,.pill.implemented i{background:var(--good)}.pill.prog i,.pill.partial i{background:var(--warn)}.pill.open i,.pill.todo i{background:transparent;border:1.5px solid var(--muted)}.pill.retired i,.pill.drop i{background:var(--grey)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+td,th{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+th{font:500 10px var(--fm);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);background:var(--surface);border-radius:99px;padding:3px 10px;font-size:12px;color:var(--ink2)}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.note{font-size:12px;color:var(--muted);max-width:80ch}
+/* Zuno History: two ledgers side by side. Blue = hours observed in git sessions (AI-assisted). Amber = hours a person working alone would need, from a rate model. Amber is always labelled as an estimate. */
+.c-ai{color:var(--l-fnd)}.c-h{color:var(--l-obs)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-bottom:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.est{font:10px var(--fm);border:1px dashed var(--line2);border-radius:4px;padding:0 5px;color:var(--muted);margin-left:6px;vertical-align:2px}
+svg.ch{width:100%;height:auto;display:block}
+svg.ch text{font:10px var(--fm);fill:var(--muted)}
+.brow{display:grid;grid-template-columns:62px 1fr 130px;gap:10px;align-items:center;font:12px var(--fm)}
+.brow .tr{display:flex;flex-direction:column;gap:3px}
+.brow .tr i{display:block;height:8px;border-radius:4px;min-width:2px}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select{font:inherit;background:var(--surface);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:5px 8px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--fm)}
+</style>
+<div class="wrap">
+<header class="top"><div class="bar"><div class="brand"><b>Zuno History</b><span id="snap"></span></div></div></header>
+<main>
+<div class="kpis" id="kpis"></div>
+<section class="panel"><h3>Hours over time</h3><div class="sub">Cumulative, from the first commit. The dotted extension is the forecast to clear everything open, at the pace of the last four full weeks.</div>
+<div class="legend"><span><i style="background:var(--l-fnd)"></i>observed, AI-assisted (git sessions)</span><span><i style="background:var(--l-obs)"></i>same work done by one person alone <span class="est">estimate</span></span></div>
+<svg class="ch" id="cum" viewBox="0 0 900 300" role="img" aria-label="Cumulative hours, observed AI-assisted versus estimated human-only"></svg></section>
+<section class="panel"><h3>By version band</h3><div class="sub">Closed work only. Human-only hours are modelled; AI-assisted hours are observed and cover the share of git sessions that cite a work package or ADR.</div>
+<div class="legend"><span><i style="background:var(--l-fnd)"></i>AI-assisted, observed</span><span><i style="background:var(--l-obs)"></i>human-only <span class="est">estimate</span></span></div>
+<div class="bars" id="bands" style="display:flex;flex-direction:column;gap:8px"></div>
+<div class="tbl" style="margin-top:14px"><table id="bt"></table></div></section>
+<section class="grid g2">
+<div class="panel"><h3>Speed-up by kind of work</h3><div class="sub">Human-only estimate divided by observed AI-assisted hours, over closed tasks that have both.</div><div class="tbl"><table id="rt"></table></div></div>
+<div class="panel"><h3>What the forecast covers</h3><div class="sub">Everything still open, including the planned band.</div><div id="fc" style="display:flex;flex-direction:column;gap:8px"></div></div>
+</section>
+<section class="panel"><h3>Tasks</h3><div class="sub">Every work package and ADR with its two figures.</div>
+<div class="ctl"><label for="fb" class="note">Band</label><select id="fb"></select><label for="fs" class="note">Show</label><select id="fs"><option value="all">All</option><option value="open">Open only</option><option value="closed">Closed only</option></select><span class="note" id="cnt"></span></div>
+<div class="tbl" style="margin-top:10px;max-height:460px;overflow:auto"><table id="tt"></table></div></section>
+<section class="panel"><h3>How these numbers are made</h3><div id="how" class="note" style="max-width:80ch;display:flex;flex-direction:column;gap:6px"></div></section>
+</main></div>
+<script>
+const D=/*DATA*/null;
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const T=D.totals,f0=n=>Math.round(n).toLocaleString('en-US'),days=h=>(h/8).toFixed(0);
+$('#snap').textContent='as of '+D.today;
+$('#kpis').innerHTML=[[f0(T.sessionH),'h','observed in git sessions, AI-assisted','c-ai'],[f0(T.humClosed),'h','same closed work, one person alone (estimate)','c-h'],[D.overall.toFixed(1),'x','average speed-up on closed tasks',''],[f0(T.humOpen),'h','human-only estimate, still open',''],[f0(T.aiOpen),'h','AI-assisted forecast, still open','']].map(k=>`<div class="kpi"><b class="${k[3]}">${k[0]} <span class="of">${k[1]}</span></b><small>${k[2]}</small></div>`).join('');
+// cumulative chart
+(function(){const W=D.weeks,svg=$('#cum');let a=0,h=0;const P=W.map(w=>(a+=w.ai,h+=w.human,{w:w.w,a,h}));
+ const extra=T.pace?Math.ceil(T.aiOpen/T.pace):0,n=P.length+extra,mx=Math.max(a+T.aiOpen,h+T.humOpen)*1.05,X=i=>46+i/(n-1)*830,Y=v=>260-v/mx*240;
+ let s='';for(let k=0;k<=4;k++){const v=mx*k/4;s+=`<line x1="46" x2="876" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="40" y="${Y(v)+3}" text-anchor="end">${f0(v)}</text>`}
+ const line=(key,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2.2" points="${P.map((p,i)=>X(i)+','+Y(p[key])).join(' ')}"/>`;
+ s+=line('a','var(--l-fnd)')+line('h','var(--l-obs)');
+ const lp=P.length-1;
+ if(extra)s+=`<line x1="${X(lp)}" y1="${Y(a)}" x2="${X(n-1)}" y2="${Y(a+T.aiOpen)}" stroke="var(--l-fnd)" stroke-width="2" stroke-dasharray="4 4"/><line x1="${X(lp)}" y1="${Y(h)}" x2="${X(n-1)}" y2="${Y(h+T.humOpen)}" stroke="var(--l-obs)" stroke-width="2" stroke-dasharray="4 4"/>`;
+ s+=`<circle cx="${X(lp)}" cy="${Y(a)}" r="4" fill="var(--l-fnd)"/><circle cx="${X(lp)}" cy="${Y(h)}" r="4" fill="var(--l-obs)"/>`;
+ s+=`<text x="${X(lp)-8}" y="${Y(a)-8}" text-anchor="end">${f0(a)} h</text><text x="${X(lp)-8}" y="${Y(h)-8}" text-anchor="end">${f0(h)} h</text>`;
+ [0,Math.floor(lp/2),lp].forEach(i=>s+=`<text x="${X(i)}" y="285" text-anchor="middle">${P[i].w}</text>`);
+ if(extra)s+=`<text x="${X(n-1)}" y="285" text-anchor="end">forecast</text>`;
+ svg.innerHTML=s})();
+// bands
+const B=D.bands.filter(b=>b.closed||b.open),mxb=Math.max(...B.map(b=>b.humClosed));
+$('#bands').innerHTML=B.filter(b=>b.humClosed).map(b=>`<div class="brow"><span>${esc(b.b)}</span><div class="tr"><i style="width:${b.humClosed/mxb*100}%;background:var(--l-obs)"></i><i style="width:${Math.max(.3,b.aiClosed/mxb*100)}%;background:var(--l-fnd)"></i></div><span>${f0(b.aiClosed)} h vs ${f0(b.humClosed)} h</span></div>`).join('');
+$('#bt').innerHTML='<tr><th>Band</th><th class="n">Closed</th><th class="n">Open</th><th class="n">Commits</th><th class="n">AI h</th><th class="n">Human h<span class="est">est.</span></th><th class="n">Speed-up</th><th class="n">Open: human h</th><th class="n">Open: AI h</th></tr>'+B.map(b=>`<tr><td>${esc(b.b)}${b.planned?' <span class="pill todo"><i></i>planned</span>':''}</td><td class="n">${b.closed}</td><td class="n">${b.open}</td><td class="n">${b.commits}</td><td class="n">${f0(b.aiClosed)}</td><td class="n">${f0(b.humClosed)}</td><td class="n">${b.aiCovered?(b.humCovered/b.aiCovered).toFixed(1)+'x':'n/a'}</td><td class="n">${b.open?f0(b.humOpen):'-'}</td><td class="n">${b.open?f0(b.aiOpen):'-'}</td></tr>`).join('');
+$('#rt').innerHTML='<tr><th>Kind</th><th class="n">Tasks</th><th class="n">Speed-up</th></tr>'+Object.entries(D.ratio).map(([k,v])=>`<tr><td>${k}</td><td class="n">${D.rows.filter(r=>r.type===k&&!r.open&&r.aiH>0).length}</td><td class="n">${v?v+'x':'n/a'}</td></tr>`).join('');
+const op=D.rows.filter(r=>r.open),opw=op.filter(r=>r.kind==='WP').length;
+$('#fc').innerHTML=[`${opw} open work packages and ${op.length-opw} open ADRs`,`Human-only estimate: ${f0(T.humOpen)} h, about ${days(T.humOpen)} working days`,`AI-assisted forecast: ${f0(T.aiOpen)} h, at ${T.pace} observed h per week`,`Effort-bound finish: ${T.eta||'n/a'} by hours, ${T.etaWp||'n/a'} by work packages per week (${T.wpPace})`,`${T.ownerWait} of the ${T.openWp} open work packages wait for an owner decision or go, so the real date is later than the effort-bound one.`].map(t=>`<div style="font-size:13px">${esc(t)}</div>`).join('');
+// tasks
+const bs=['all',...D.bands.map(b=>b.b)];$('#fb').innerHTML=bs.map(b=>`<option value="${esc(b)}">${b==='all'?'All bands':esc(b)}</option>`).join('');
+function tasks(){const b=$('#fb').value,s=$('#fs').value;let L=D.rows.filter(r=>(b==='all'||r.band===b)&&(s==='all'||(s==='open')===r.open));L.sort((x,y)=>y.hum-x.hum);$('#cnt').textContent=L.length+' tasks';
+ $('#tt').innerHTML='<tr><th>Id</th><th>Title</th><th>Band</th><th>Kind</th><th class="n">Commits</th><th class="n">AI h</th><th class="n">Human h</th></tr>'+L.slice(0,300).map(r=>`<tr><td class="mono">${esc(r.id)}</td><td>${esc(r.title.slice(0,70))}</td><td>${esc(r.band)}</td><td>${r.type}</td><td class="n">${r.commits}</td><td class="n">${r.open?'~'+r.fAI:r.aiH}</td><td class="n">${r.hum}</td></tr>`).join('')}
+$('#fb').onchange=tasks;$('#fs').onchange=tasks;tasks();
+const R=D.rates;
+$('#how').innerHTML=[`AI-assisted hours are observed. Non-merge commits are ordered by time; a gap over ${R.session_gap_min} minutes starts a new session, and each session counts its span plus ${R.session_lead_h} h of lead-in. A session's hours are split over its commits, then over the WP and ADR ids each commit names (in the message, or in a path it touches). ${f0(T.unattrH)} of ${f0(T.sessionH)} h belong to commits that name none, so they are in the totals but in no task. ${T.aiCommits} of ${T.commits} commits carry a Claude co-author line; the rest are counted as human-only observed work (${f0(T.humanObsH)} h).`,
+`This is a floor on real effort: time spent reading, waiting on the cluster or deciding with no commit is not seen, and one long session counts at wall-clock.`,
+`Human-only hours are a model, not a measurement: base + per file + per thousand changed lines + per thousand characters of the brief, by kind of work, clamped to ${R.min_h}-${R.max_h} h. The rates live in rates.json in the zuno-report-history skill; change them and rerun to calibrate.`,
+`Open items use the files in their brief and the median changed lines of closed work of the same kind, and their AI-assisted forecast divides by the observed speed-up of that kind.`].map(t=>`<p style="margin:0">${esc(t)}</p>`).join('');
+</script>

@@ -1,0 +1,80 @@
+{
+ "_help": "Human-only effort model. hours = base + per_file*files + per_kline*thousand_lines + per_kchar*brief_thousand_chars, clamped to [min_h,max_h]. Edit to calibrate; every figure in the report is derived from this file. Files and lines are observed from git when the task has commits, else taken from the brief estimate. Defaults are assumptions to calibrate (a senior engineer working alone, including tests and review, no AI assistant).",
+ "session_gap_min": 120,
+ "session_lead_h": 0.33,
+ "min_h": 1,
+ "max_h": 80,
+ "types": {
+  "adr": {
+   "base": 2.5,
+   "per_file": 0,
+   "per_kline": 0,
+   "per_kchar": 0.35
+  },
+  "doc": {
+   "base": 1.5,
+   "per_file": 0.3,
+   "per_kline": 0.8,
+   "per_kchar": 0.25
+  },
+  "code": {
+   "base": 3.0,
+   "per_file": 0.5,
+   "per_kline": 1.5,
+   "per_kchar": 0.25
+  },
+  "cluster": {
+   "base": 4.0,
+   "per_file": 0.5,
+   "per_kline": 1.2,
+   "per_kchar": 0.3
+  },
+  "security": {
+   "base": 4.5,
+   "per_file": 0.6,
+   "per_kline": 1.5,
+   "per_kchar": 0.35
+  }
+ },
+ "keywords": {
+  "security": [
+   "harden",
+   "security",
+   "signing",
+   "sign ",
+   "mtls",
+   "jwt",
+   "certificate",
+   "cve",
+   "assertion",
+   "trust"
+  ],
+  "cluster": [
+   "demo333",
+   "cluster",
+   "rehearsal",
+   "live ",
+   "operator",
+   "vault",
+   "argocd",
+   "keycloak",
+   "postgres",
+   "openshift",
+   "gitops",
+   "gpu",
+   "mig"
+  ],
+  "doc": [
+   "document",
+   "write ",
+   "guide",
+   "page",
+   "scenario",
+   "readme",
+   "gif",
+   "reference",
+   "catalogue",
+   "docs"
+  ]
+ }
+}

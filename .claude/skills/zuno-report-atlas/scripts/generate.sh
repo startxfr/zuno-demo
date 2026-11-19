@@ -6,7 +6,7 @@ SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 export SKILL_DIR REPO="$(cd "${1:-$(git rev-parse --show-toplevel)}" && pwd)"
 WORK="$(mktemp -d)"; OUT="${2:-$WORK/zuno-atlas.html}"
 cd "$WORK"
-python3 "$SKILL_DIR/scripts/parse_roadmap.py"
+python3 "$SKILL_DIR/../_zuno-report-common/parse_roadmap.py"
 bash "$SKILL_DIR/scripts/collect_cluster.sh"
 python3 "$SKILL_DIR/scripts/build_comps.py"      # prints pods that match no component: add them to assets/components.py
 python3 "$SKILL_DIR/scripts/build_data.py"

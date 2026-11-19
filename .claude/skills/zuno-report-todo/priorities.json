@@ -1,0 +1,247 @@
+{
+ "ADR-0115": {
+  "tag": "P3",
+  "demo": false,
+  "why": "no open work package"
+ },
+ "ADR-0352": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0557": {
+  "tag": "P3",
+  "demo": false,
+  "why": "no open work package"
+ },
+ "ADR-0602": {
+  "tag": "P1",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0603": {
+  "tag": "P1",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0604": {
+  "tag": "P1",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0612": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0613": {
+  "tag": "P2",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0615": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0618": {
+  "tag": "P3",
+  "demo": false,
+  "why": "no open work package"
+ },
+ "ADR-0619": {
+  "tag": "P1",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0620": {
+  "tag": "P3",
+  "demo": false,
+  "why": "no open work package"
+ },
+ "ADR-0621": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0622": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0623": {
+  "tag": "P3",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "ADR-0624": {
+  "tag": "P1",
+  "demo": false,
+  "why": "best tag of its open WPs"
+ },
+ "WP-212": {
+  "tag": "P3",
+  "demo": false,
+  "why": "not started, no near date"
+ },
+ "WP-213": {
+  "tag": "P3",
+  "demo": false,
+  "why": "not started, no near date"
+ },
+ "WP-215": {
+  "tag": "P3",
+  "demo": false,
+  "why": "not started, no near date"
+ },
+ "WP-218": {
+  "tag": "P3",
+  "demo": false,
+  "why": "not started, no near date"
+ },
+ "WP-224": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-227": {
+  "tag": "P3",
+  "demo": false,
+  "why": "not started, no near date"
+ },
+ "WP-237": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-248": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-252": {
+  "tag": "P2",
+  "demo": false,
+  "why": "planned 2026-12-14"
+ },
+ "WP-253": {
+  "tag": "P2",
+  "demo": false,
+  "why": "planned 2026-12-15"
+ },
+ "WP-254": {
+  "tag": "P2",
+  "demo": false,
+  "why": "planned 2026-12-17"
+ },
+ "WP-255": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-256": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-257": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-258": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-259": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-268": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-283": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-293": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-294": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-295": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-302": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-303": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ },
+ "WP-304": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-305": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-306": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-307": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-308": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-309": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-310": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-311": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-312": {
+  "tag": "P3",
+  "demo": false,
+  "why": "waits for the owner"
+ },
+ "WP-313": {
+  "tag": "P1",
+  "demo": false,
+  "why": "work started, closing it removes an open item"
+ }
+}

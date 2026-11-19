@@ -1,9 +1,9 @@
 ---
-name: zuno-project-report
+name: zuno-report-atlas
 description: Generate "Zuno Atlas", the private HTML project report for zuno-demo (release timeline with ADR/WP per band, progress charts, platform HLD, per-component datasheets with live CPU/RAM/PVC/GPU from the cluster). Use when the user asks for the project report, atlas, roadmap overview, platform HLD page, or to refresh it.
 ---
 
-# zuno-project-report
+# zuno-report-atlas
 
 Builds one self-contained HTML page (English, light/dark themes, no external data) and publishes it as a **private Artifact**.
 Never commit the output: the repos are public and the page carries cluster consumption figures.
@@ -11,7 +11,7 @@ Never commit the output: the repos are public and the page carries cluster consu
 ## Run
 
 1. `oc whoami` must answer (read-only cluster access is enough). Do not touch the cluster otherwise.
-2. `bash .claude/skills/zuno-project-report/scripts/generate.sh "$(git rev-parse --show-toplevel)" <scratchpad>/zuno-atlas.html`
+2. `bash .claude/skills/zuno-report-atlas/scripts/generate.sh "$(git rev-parse --show-toplevel)" <scratchpad>/zuno-atlas.html`
    It prints component rows (id, pods, cpuReq, cpuUse, memReq, memUse, pvcGi, gpu) and, before them, any running pod that matches no component.
 3. Publish with the Artifact tool, file path `<scratchpad>/zuno-atlas.html`, icon `map`. Re-use the same path in the same conversation to keep the URL; from a new conversation pass the existing URL (use `action: "list"` to find "Zuno Atlas").
 4. Tell the user: data date, any new unmatched pods, and that component texts are hand-written (see below).
@@ -20,7 +20,7 @@ Never commit the output: the repos are public and the page carries cluster consu
 
 | Step | File | Source | Output |
 |---|---|---|---|
-| ADR + WP | `parse_roadmap.py` | `docs/adr/README.md` (status, band, Retired table), ADR `**Date:**`, `docs/roadmap/implementation-roadmap.md` tracker, WP briefs (`**State:**`, done date) | `raw.json` |
+| ADR + WP | `_zuno-report-common/parse_roadmap.py` (shared with zuno-report-todo and zuno-report-history) | `docs/adr/README.md` (status, band, Retired table), ADR `**Date:**`, `docs/roadmap/implementation-roadmap.md` tracker, WP briefs (`**State:**`, done date) | `raw.json` |
 | Cluster | `collect_cluster.sh` | thanos-querier (requests, 6 h CPU rate, working set, PVC) + `oc get pods/pvc -A -o json` | `m_*.json`, `p_*.json`, `pods.json`, `pvc.json` |
 | Components | `build_comps.py` | pods grouped by `assets/components.py` selectors | `comps.json` |
 | Assemble | `build_data.py` | adds git tags, commits per day, band goals, node capacity, MIG slices | `data.json` |

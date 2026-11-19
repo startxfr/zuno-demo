@@ -26,15 +26,16 @@ for l in open(R+'roadmap/implementation-roadmap.md'):
         c=[x.strip() for x in l.strip().strip('|').split('|')]
         if len(c)<5: continue
         t=re.search(r'\[([^\]]*)\]\(work-packages/([^)]*)\)',c[1]); fn=t[2] if t else ''
-        title='';date=None
+        title='';date=None;size=0;est=None
         if fn and os.path.exists(R+'roadmap/work-packages/'+fn):
-            txt=open(R+'roadmap/work-packages/'+fn).read(2500)
+            full=open(R+'roadmap/work-packages/'+fn).read(); size=len(full); txt=full[:2500]
+            e=re.search(r'\*\*Estimated files touched:\*\*\s*~?(\d+)',txt); est=int(e[1]) if e else None
             title=re.sub(r'^#\s*WP-[\w.]+\s*[:—–-]*\s*','',txt.split('\n')[0]).strip()
             d=re.search(r'\*\*State:\*\*[^\n]*?\((\d{4}-\d\d-\d\d)',txt); date=d[1] if d else None
         st=c[4].split(' (')[0].split(' —')[0].strip()
         if not date:
             d=re.search(r'(\d{4}-\d\d-\d\d)',c[4]); date=d[1] if d else None
-        wp.append(dict(id=c[0],phase=phase,title=title,adrs=re.findall(r'\d{3,4}',c[2]),state=st,date=date))
+        wp.append(dict(id=c[0],phase=phase,title=title,adrs=re.findall(r'\d{3,4}',c[2]),state=st,date=date,deps=re.findall(r'WP-[\w.]+',c[3]),note=c[5] if len(c)>5 else '',file=fn,size=size,est=est))
 print(len(adr),len(wp))
 print(collections.Counter(a['cls'] for a in adr.values()))
 print(collections.Counter(w['state'] for w in wp))
