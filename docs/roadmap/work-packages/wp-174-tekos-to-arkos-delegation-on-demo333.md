@@ -298,8 +298,11 @@ Arkos 1.0.4 (text only). zuno-demo-cluster rolled it. Its `make d2 check agents`
 budget.
 
 - **Tekos alone**, with the exact first query Arkos sent on 11-18 (Route vs Ingress), 3 runs: 2 full answers (a
-  Route/Ingress table, about 3,300 characters, 11 to 13 s) and 1 non-answer. On 11-18 it was 0 answers out of 4. Two of
-  the three runs show no retriever call, so one of the two answers is not grounded in the corpus.
+  Route/Ingress table, about 3,300 characters, 11 to 13 s) and 1 non-answer. On 11-18 it was 0 answers out of 4. Every
+  run is grounded in the same way: Tekos's workflow (`retrieve_reason_respond`) runs 3 `rag.search` calls before the
+  model (Confluence, web and git, 10 results each), so a run without a `docs_rag_retriever_tool` call still has 30
+  passages in its context. The spans do not show whether the answers cite them. Raw traces:
+  `~/.local/share/zuno/evidence/v115-tekos-alone-20261119/` on the workstation.
 - **Scenario 21**, 4 runs: 3 PASS.
   - `send_message` to Tekos per session: 2, 1, 0 and 1, where every session had 2 on 11-18.
   - `delegate_task` calls: 2, 2 (one of them failed), 0 and 1.
