@@ -29,6 +29,7 @@ import stress_runner as sr  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
 TOKEN_TTL = 4 * 60
+ENTRY_OFF = (403, 404)  # a workstation entry that is switched off answers 404, or 403 when the route exists but admits nobody
 _DEVICE_TOKENS = {}  # (persona, client) -> (access token, expiry)
 
 
@@ -63,9 +64,10 @@ async def blender_3d(ctx, i):
     token = await _device(ctx, "blender")
     auth = {"Authorization": "Bearer " + token, **ctx.trace_headers("blender-3d", i)}
     models = await ctx.http.get(f"{base}/v1/models", headers=auth, timeout=60)
-    if models.status_code == 404:
+    if models.status_code in ENTRY_OFF:
         return [row("blender-3d", "functional", "blender", "experiences", True,
-                    "status=404 skipped: the ai-gateway workstation entry is off, nothing to replay", (time.monotonic() - started) * 1000)]
+                    f"status={models.status_code} skipped: the ai-gateway workstation entry is off for this client, nothing to replay",
+                    (time.monotonic() - started) * 1000)]
     r = await ctx.http.post(f"{base}/v1/chat/completions", headers=auth, timeout=180, json={
         "model": "auto", "max_tokens": 32, "stream": False, "messages": [{"role": "user", "content": "Reply with the single word OK."}]})
     ms = (time.monotonic() - started) * 1000
@@ -86,16 +88,32 @@ async def claude_code_sovereign(ctx, i):
     token = await _device(ctx, "claude-code")
     r = await ctx.http.post(f"{base}/v1/messages", timeout=180, headers={
         "Authorization": "Bearer " + token, "anthropic-version": "2023-06-01", **ctx.trace_headers("claude-code-sovereign", i)},
-        json={"model": ctx.env.get("CLAUDE_CODE_MODEL", "qwen3.6-27b-instruct"), "max_tokens": 32,
+        json={"model": ctx.env.get("CLAUDE_CODE_MODEL", "qwen3.6-27b-instruct"), "max_tokens": 128,
               "messages": [{"role": "user", "content": "Reply with the single word OK."}]})
     ms = (time.monotonic() - started) * 1000
     body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
-    text = "".join(block.get("text", "") for block in body.get("content") or [] if isinstance(block, dict))
     usage = body.get("usage") or {}
     ctx.add_tokens((usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0))
-    passed = r.status_code == 200 and bool(text.strip())
-    return [row("claude-code-sovereign", "functional", "claude-code", "experiences", passed,
-                f"status={r.status_code} " + (f"{len(text)} chars" if passed else r.text[:160]), ms)]
+    passed, detail = judge_messages(r.status_code, body, r.text)
+    return [row("claude-code-sovereign", "functional", "claude-code", "experiences", passed, detail, ms)]
+
+
+def judge_messages(status: int, body: dict, raw: str = ""):
+    """(passed, detail) of one Anthropic Messages answer. A reasoning model can spend a small max_tokens on thinking, so the
+    content may hold a thinking block, or nothing visible with output tokens spent: the path answered, the row says so."""
+    if status != 200:
+        return False, f"status={status} {raw[:160]}"
+    blocks = [b for b in body.get("content") or [] if isinstance(b, dict)]
+    text = "".join(b.get("text", "") for b in blocks)
+    thinking = "".join(b.get("thinking", "") for b in blocks)
+    if text.strip():
+        return True, f"status=200 {len(text)} chars"
+    if thinking.strip():
+        return True, f"status=200 {len(thinking)} chars of thinking, no text yet (stop {body.get('stop_reason')})"
+    spent = (body.get("usage") or {}).get("output_tokens") or 0
+    if spent:
+        return True, f"status=200 no visible content but {spent} output tokens spent (stop {body.get('stop_reason')})"
+    return False, f"status=200 empty content and no output tokens: {raw[:120]}"
 
 
 def judge_burst(statuses, limit: int):

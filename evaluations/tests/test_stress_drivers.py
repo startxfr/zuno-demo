@@ -466,6 +466,19 @@ class NetworkDrivers(unittest.TestCase):
         self.assertTrue(rows[0].passed)
         self.assertIn("skipped", rows[0].detail)
 
+    def test_blender_is_also_skipped_on_a_403_of_the_entry(self):
+        with mock.patch.object(net, "device_access_token", return_value="t"):
+            rows = one("blender-3d", ctx_with(lambda r: httpx.Response(403, text="forbidden")))
+        self.assertTrue(rows[0].passed)
+        self.assertIn("status=403 skipped", rows[0].detail)
+
+    def test_the_messages_judge_accepts_thinking_and_spent_tokens_but_not_nothing(self):
+        j = net.judge_messages
+        self.assertTrue(j(200, {"content": [{"type": "thinking", "thinking": "hm"}], "stop_reason": "max_tokens"})[0])
+        self.assertTrue(j(200, {"content": [], "usage": {"output_tokens": 128}, "stop_reason": "max_tokens"})[0])
+        self.assertFalse(j(200, {"content": []})[0])
+        self.assertFalse(j(502, {}, "bad gateway")[0])
+
     def test_blender_fails_on_a_429(self):
         def handler(request):
             return httpx.Response(200, json={}) if request.url.path == "/v1/models" else httpx.Response(429, text="quota")
@@ -495,7 +508,7 @@ class NetworkDrivers(unittest.TestCase):
     def test_claude_code_fails_on_an_empty_answer(self):
         with mock.patch.object(net, "device_access_token", return_value="t"):
             rows = one("claude-code-sovereign", ctx_with(lambda r: httpx.Response(200, json={"content": []})))
-        self.assertFalse(rows[0].passed)
+        self.assertFalse(rows[0].passed)  # no text, no thinking and no output token spent
 
     def test_the_device_token_is_cached_per_persona_and_client(self):
         with mock.patch.dict(sys.modules, {"device_login": SimpleNamespace(device_token=mock.Mock(return_value={"access_token": "a"}))}) as _:
