@@ -196,6 +196,10 @@ agentGroups: []
 # class (its own budget) on any path, UnifAI chats included; no user can add
 # themselves to a group. Empty = no extra group.
 evalPersonasGroup: /zuno-evaluation
+# The eval personas Job's deadline. Was 600 s: with the stress twins and the WP-306 load pool (about 20 personas, each a
+# handful of kcadm calls of a few seconds) the Job ran out of time twice on 2026-11-19 (DeadlineExceeded 04:13Z and
+# 08:34Z) and left the pool partial (stress-load-08 missing).
+evalPersonasJobDeadlineSeconds: 1800
 # ADR-0624 clause 5 / WP-306: further top-level groups an evalPersonas entry may join through its own `extraGroups`
 # list, created by the Job when missing (same create-only rule as evalPersonasGroup). `/zuno-loadtest` is the group the
 # ai-gateway maps to the `loadtest` quota class (ai-gateway values quotaLoadtestGroup).
