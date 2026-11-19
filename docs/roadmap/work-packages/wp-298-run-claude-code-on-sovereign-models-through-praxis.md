@@ -1,6 +1,6 @@
 # WP-298: Run Claude Code on sovereign models through Praxis
 
-- **State:** Operator pending (2026-11-18): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant), and the workstation coding task of the acceptance passed live on 2026-11-18; left: step 4 (the `claude-code` experience-client declaration in an agents release)
+- **State:** Done (2026-11-19): the realm client and the entry are live (groups ocp-ai-dev, ocp-ai-ops and consultant), the workstation coding task of the acceptance passed live on 2026-11-18, and step 4 (the `claude-code` experience-client declaration) ships in every agents release since v1.1.0 (zuno-demo-agents PR #62, merged 2026-11-17)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-292](wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)
 - **Related:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
@@ -82,7 +82,7 @@ Repo work done; nothing is applied to the cluster.
   2. the praxis chart with its NetworkPolicy peer (WP-292);
   3. `praxisWorkstationEntry.enabled: true` with `keycloakAcmeWildcardTLS: true` and, preferably, `allowedGroups`
      in `gitops/apps/connectivity-link/application-d1.yaml`;
-  4. step 4 of this brief (the agents release).
+  4. step 4 of this brief (the agents release): done, see the note of 2026-11-19.
 
 ## 2026-11-18: the entry admits the AI operators and the consultants
 
@@ -180,3 +180,20 @@ tokens`.
   error. No SaaS host was called.
 - **Fixes this needed:** 8e209a9d (the translation inside the router steps, rolled on demo333), 2efc90e4,
   ae27952a and 54b545ee (client settings).
+
+## 2026-11-19: step 4 was already shipped; WP-298 is Done
+
+The `claude-code` experience-client declaration (`experience-clients/claude-code/client.okf.md` and `tasks/code.md`
+in zuno-demo-agents, task `code`, no tools, the SaaS roles forbidden) was merged by PR #62 on 2026-11-17 (05ef2aa).
+It is in every release since v1.1.0, and zuno-demo promoted v1.1.0, v1.1.1, v1.1.2 and v1.1.3. The v1.1.0 promotion
+generated its routing entry (`gitops/charts/ai-gateway/files/model-routing.generated.yaml`, `agent: claude-code`,
+`task: code`, local models only). The declaration only keeps the client on record: Claude Code calls Praxis only,
+never the ai-gateway or the mcp-gateway. Praxis's own refusal of SaaS models for this client is its
+`saas.deniedClients` value.
+
+Every acceptance item is met:
+- the device sign-in;
+- the coding task on `qwen3.6-27b-instruct` (2026-11-18);
+- no SaaS call in the Praxis log;
+- a token of another client refused (2026-11-17).
+
