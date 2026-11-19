@@ -125,3 +125,12 @@ Migration/evolution and Review evidence.
 - [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
 - [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md)
 - [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md)
+
+## Amended (2026-11-19): the tooling moved to zuno-demo-agents
+
+A dated note, not a rewrite. `platform/okf/generate_authorization_matrix.py`, `platform/okf/generate_deployment_snapshot.py` and
+`agents/*/deployment/` named in the status no longer exist in this repository: WP-165 (commit 0913a36ea, 2026-10-23) deleted the
+agents mirror and the OKF tooling after [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
+made `startxfr/zuno-demo-agents` the only source of agent definitions. `generate_authorization_matrix.py` lives on there as
+`platform/okf/generate_authorization_matrix.py`; no `generate_deployment_snapshot.py` was found in that repository on this date.
+The decision stands as history; read the agents repository for the code.

@@ -28,3 +28,10 @@ Acceptance criteria and Review evidence.
 - [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md)
 - [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)
 - [ADR-0107](0107-introduce-automated-model-quality-gates.md)
+
+## Amended (2026-11-19): the model NetworkPolicy file was split
+
+A dated note, not a rewrite. `gitops/charts/models/templates/networkpolicy.yaml` named in the status was deleted on 2026-08-25
+(commit f9ef85a0b, ADR-0521/WP-076 step 1, the migration of the primary chat model to `LLMInferenceService`). The chart now carries
+one NetworkPolicy template per model and path: `networkpolicy-qwen.yaml`, `networkpolicy-qwen35.yaml`, `networkpolicy-gptoss.yaml`,
+`networkpolicy-wesh.yaml`, `networkpolicy-embedding.yaml` and `networkpolicy-evalhub-clients.yaml`. The gate decision is unchanged.

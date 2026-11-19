@@ -109,3 +109,11 @@ Migration/evolution and Review evidence.
 - [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md)
 - [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md)
 - [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md)
+
+## Amended (2026-11-19): the contract tests moved to zuno-demo-agents
+
+A dated note, not a rewrite. `platform/okf/run_agent_contract_tests.py` named in the status was deleted from this repository by
+WP-165 (commit 0913a36ea, 2026-10-23), with the mirrored `agents/*/tests/`, after
+[ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md). The runner and the suites
+live in `startxfr/zuno-demo-agents` (`platform/okf/run_agent_contract_tests.py`, `agents/<name>/tests/`). The decision stands as
+history.
