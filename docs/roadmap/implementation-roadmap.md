@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 44 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-307, WP-313 |
+| v0.17 | 14 | 11 | 45 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-297, WP-298, WP-299, WP-300, WP-301, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1225,6 +1225,7 @@ Blender and world-model.
 | WP-303 | [wp-303](work-packages/wp-303-give-world-model-the-alternative-gateways.md) | 0619 | WP-292 | Not started | owner's go: world-model web roll |
 | WP-304 | [wp-304](work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md) | 0619 | WP-296, WP-297, WP-298 | Operator pending | the three pages exist; `claude-code-sovereign` rehearsed (5 min) with its GIF on 2026-11-19 (75b05ec9); left: `multi-gateway` and `agents-alt-gateway` not rehearsed, owner's go: one live play of each scenario |
 | WP-305 | [wp-305](work-packages/wp-305-build-the-stress-runner-core-and-profiles.md) | 0624 | none | Repo work in review | owner's go: the smoke run of WP-307 |
+| WP-306 | [wp-306](work-packages/wp-306-give-the-stress-runs-their-own-identity-and-budget.md) | 0624 | WP-305, WP-307 | Repo work in review | owner's go: a zuno-demo-agents release defining `loadtest`, the gateway image rolls, the stress subscriptions and the persona pool |
 | WP-307 | [wp-307](work-packages/wp-307-launch-the-stress-campaign-as-an-indexed-job.md) | 0624 | WP-305 | Repo work in review | owner's go: the smoke run through make and AAP; an aap-config roll |
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
 

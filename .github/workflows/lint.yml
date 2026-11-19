@@ -294,6 +294,8 @@ jobs:
           # WP-250: the caller context inside the call assertion, and generate_diagram's assertion.
           python3 tests/test_wp250_assertion_context.py
           python3 tests/test_wp250_diagram_assertion.py
+          # ADR-0624 (WP-306): the stress tag is a span attribute only (SDK on, exporter at a closed port).
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_traffic_tag.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -361,6 +363,9 @@ jobs:
           # WP-157: the default-off MaaS switches (429 pass-through, gateway
           # identity and its attested headers, per-class fail modes).
           python3 tests/test_wp157_maas_switches.py
+          # ADR-0624 (WP-306): a dedicated MaaS credential per quota class (no fallback to the shared one), the loadtest
+          # group, and the span-only zuno.traffic tag.
+          OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 python3 tests/test_wp306_stress_identity.py
           # WP-209 (ADR-0565 clause 5): effective = max(header, floor(agent, task)),
           # and the level of a header-less call (C1 shipped, C3 tested).
           python3 tests/test_wp209_classification_floor.py

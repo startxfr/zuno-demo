@@ -58,6 +58,9 @@
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
       # WP-184: empty outside a shared-quota proof.
       quotaStresstestGroup: "{{ zuno_ai_gateway_quota_stresstest_group | default('') }}"
+      # ADR-0624 clause 5 / WP-306: the group of the `loadtest` quota class (the stress-load-NN personas join
+      # /zuno-loadtest). Empty = off. Set it only once the quota policy of an admitted release defines the class.
+      quotaLoadtestGroup: "{{ zuno_ai_gateway_quota_loadtest_group | default('') }}"
       # ADR-0581 (WP-164 lot 2): mount the generated model-routing policy.
       modelRouting:
         generated: "{{ zuno_ai_gateway_model_routing_generated | default(false) | bool }}"
@@ -101,6 +104,10 @@
         circuitBreaker:
           enabled: "{{ zuno_ai_gateway_circuit_breaker | default(false) | bool }}"
       maasAdapter:
+        # ADR-0624 clause 5 / WP-306: the dedicated MaaS ServiceAccount of the stress quota classes. The same switch
+        # drives the models role (its subscriptions), so the two halves are on together or not at all.
+        classCredentials:
+          enabled: "{{ zuno_ai_gateway_stress_credentials | default(false) | bool }}"
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"
         quota429Passthrough:

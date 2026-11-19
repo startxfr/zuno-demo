@@ -882,6 +882,15 @@ def _default_quota_class(identity: CallerIdentity) -> str:
     eval-* and stress-* personas), provided the budgets define the class -
     an image older than the policy that adds it keeps them on `standard`
     rather than denying them as an unknown class."""
+    # WP-306 (ADR-0624 clause 5): a loadtest group (empty = off) puts its members under the `loadtest`
+    # class, the budget of the stress personas that carry real load. Checked first, and only when the
+    # budgets define the class, so an image older than the policy that adds it keeps them on the next rule.
+    loadtest_group = os.getenv("QUOTA_LOADTEST_GROUP", "").strip().lstrip("/")
+    if (
+        loadtest_group and loadtest_group in (identity.groups or [])
+        and "loadtest" in (getattr(quota.ledger, "_classes", None) or {})
+    ):
+        return "loadtest"
     # WP-184: a stresstest group (empty = off) puts its members under the tight
     # `stresstest` budget class, so the shared-quota proof needs no budget
     # change. Leaving the group ends it.
@@ -1732,7 +1741,7 @@ def _metered_upstream_headers(
 ) -> Dict[str, str]:
     headers = {"Content-Type": "application/json", "X-Zuno-Request-Id": request_id, **forwarded}
     if cfg.get("via_maas"):
-        headers["Authorization"] = f"Bearer {maas_adapter._maas_bearer_token(identity.token)}"
+        headers["Authorization"] = f"Bearer {maas_adapter._maas_bearer_token(identity.token, quota_class)}"
         if maas_adapter.gateway_identity_enabled():
             headers.update(maas_adapter.attested_headers(maas_adapter.MaasCallContext(
                 sub=identity.persona, groups=tuple(identity.groups or ()),

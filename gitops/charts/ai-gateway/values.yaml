@@ -145,6 +145,20 @@ maasAdapter:
   endpoint: https://maas-default-gateway-istio.openshift-ingress.svc
   secretName: llm-provider-maas
   apiKeyEnabled: false
+  # ADR-0624 clause 5 / WP-306: a dedicated MaaS credential per quota class, so stress traffic never spends the
+  # ai-gateway ServiceAccount's MaaS counter (1,000,000 tokens an hour per route, shared by every caller: the 2026-11-19
+  # stresstest drained it). When on, the chart renders a second ServiceAccount and its token Secret (a
+  # kubernetes.io/service-account-token Secret, filled in by the token controller: no secret material in git), mounts it
+  # at `mountPath` and sets MAAS_CLASS_TOKEN_PATHS so the gateway sends that token for the listed classes. A listed class
+  # whose token is unreadable fails the call: there is no fallback to the shared ServiceAccount. The models chart
+  # subscribes the ServiceAccount to each local model with its own limit (altGatewayPeers.stress). Off by default: the
+  # pod template is then unchanged and landing this rolls no pod.
+  classCredentials:
+    enabled: false
+    serviceAccount: ai-gateway-stress
+    secretName: ai-gateway-stress-token
+    mountPath: /var/run/secrets/maas-stress
+    classes: [loadtest, stresstest]
   # ADR-0201 (WP-27): distinct from `enabled` above - routing the LOCAL
   # model's own traffic through MaaS (enabled: true alone) never leaves
   # the cluster network; letting an EXTERNAL SaaS candidate (via_maas:
@@ -248,6 +262,12 @@ trustedPlatformClients: []
 # Set it only for a proof and clear it afterwards. The class is fail_mode closed:
 # it needs the local models, because it skips every SaaS candidate.
 quotaStresstestGroup: ""
+
+# ADR-0624 clause 5 / WP-306: Keycloak group whose members run under the `loadtest` quota class, the budget of the stress
+# personas that carry real load (stress-load-NN). Empty = off. Checked before quotaStresstestGroup. The class itself comes
+# with the quota policy (zuno-demo-agents policies/quotas/quota-policy.yaml); until a release defines it, the gateway
+# ignores the group and the members stay on the next rule.
+quotaLoadtestGroup: ""
 
 # ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
 # zuno_guardrails_* (the token's `azp`, the user experience the call came

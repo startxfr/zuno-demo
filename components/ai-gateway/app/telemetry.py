@@ -314,6 +314,25 @@ def set_caller_task(task: Optional[str]) -> None:
     _caller_task.set(task or "")
 
 
+# WP-306 (ADR-0624): stress traffic is tagged by the optional request header X-Zuno-Traffic and recorded on the SPANS
+# only (`zuno.traffic`), never as a metric label. Only the values below are kept: any other text is dropped, so a caller
+# cannot put arbitrary content on a span. Query it in Tempo with { span.zuno.traffic = "stresstest" }.
+_ALLOWED_TRAFFIC = frozenset({"stresstest"})
+_caller_traffic: ContextVar[str] = ContextVar("zuno_caller_traffic", default="")
+
+
+def traffic_label(value: Optional[str]) -> str:
+    """The allow-listed traffic tag of a header value, or "" (untagged)."""
+    cleaned = (value or "").strip().lower()
+    return cleaned if cleaned in _ALLOWED_TRAFFIC else ""
+
+
+def set_caller_traffic(value: Optional[str]) -> None:
+    """Remember this request's traffic tag for the spans. Set by adopt_incoming_trace_context, so one place covers every
+    endpoint and a request without the header resets it."""
+    _caller_traffic.set(traffic_label(value))
+
+
 def set_caller_client(azp: Optional[str]) -> None:
     """Remember this request's experience client for model_call_span and the
     guardrails counters. Called once per handler, after token validation."""
@@ -330,6 +349,7 @@ async def adopt_incoming_trace_context(request: Request) -> None:
     `traceparent` leaves the variable empty, which keeps the previous behaviour
     (each model call is its own trace root).
     """
+    set_caller_traffic(request.headers.get("x-zuno-traffic"))  # WP-306: the span-only stress tag
     carrier = {k: v for k, v in request.headers.items() if k.lower() in ("traceparent", "tracestate")}
     ctx = extract(carrier) if carrier else None
     if ctx is not None and trace.get_current_span(ctx).get_span_context().is_valid:
@@ -354,6 +374,9 @@ def guardrails_observe_span(
         span.set_attribute("zuno.agent", agent)
         span.set_attribute("zuno.backend", backend)
         span.set_attribute("zuno.guardrails_mode", mode)
+        traffic = _caller_traffic.get()
+        if traffic:
+            span.set_attribute("zuno.traffic", traffic)
         if project_id:
             span.set_attribute("zuno.project_id", project_id)
         try:
@@ -522,6 +545,9 @@ def model_call_span(
         task = _caller_task.get()
         if task:
             span.set_attribute("zuno.task", task)
+        traffic = _caller_traffic.get()
+        if traffic:
+            span.set_attribute("zuno.traffic", traffic)
         if model_kind:
             span.set_attribute("zuno.model_kind", model_kind)
         if project_id:

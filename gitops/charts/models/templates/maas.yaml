@@ -244,6 +244,18 @@ same limits and priority. The MaaSAuthPolicy below picks the user up from the su
 {{- end }}
 {{- end }}
 {{- end }}
+{{- /*
+ADR-0624 clause 5 / WP-306: the load tests have their own ServiceAccount and their own limit per model route, so a stress
+run cannot spend the ai-gateway's counter. One subscription per local model that the ai-gateway ServiceAccount is
+subscribed to, named `<model>-stress`. Off by default (altGatewayPeers.stress.enabled).
+*/}}
+{{- if and $.Values.altGatewayPeers.stress.enabled (ne (toString .modelRefKind) "ExternalModel") }}
+{{- range .subscriptions }}
+{{- if and .user (hasSuffix ":ai-gateway" .user) }}
+{{- $subs = append $subs (dict "name" (printf "%s-stress" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
 {{- $subs = list }}
 {{- range .subscriptions }}
