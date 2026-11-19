@@ -492,6 +492,10 @@ zuno_ai_gateway_quota_loadtest_group: zuno-loadtest
 zuno_stress_clients_enabled: true
 zuno_stress_reader_enabled: true
 zuno_stress_reader_monitoring_view: true
+# ADR-0624 / WP-311 (owner go 2026-11-19): the AAP installer credential may create and delete AdminNetworkPolicies, so the
+# aggressive profile's provider-cut runs through AAP too. A real grant: an ANP outranks every NetworkPolicy, and RBAC
+# cannot limit a create to one name.
+zuno_stress_chaos_rbac_enabled: true
 # WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
 # the per-agent guardrail modes generated from the agents release. Needs the
 # image built from b1facfc2 or later (ai-gateway-28).
