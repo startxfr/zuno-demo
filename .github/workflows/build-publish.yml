@@ -66,6 +66,7 @@ jobs:
   # components/mcp-servers, so this can't silently rot into a no-op.
   discover-mcp-servers:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     outputs:
       servers: ${{ steps.discover.outputs.servers }}
     steps:
@@ -79,6 +80,7 @@ jobs:
 
   build-publish-sign:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     permissions:
       contents: read
       # Keyless signing: the job's OIDC token is exchanged for a Fulcio certificate.
@@ -307,6 +309,7 @@ jobs:
     needs: discover-mcp-servers
     if: needs.discover-mcp-servers.outputs.servers != '[]'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     permissions:
       contents: read
       # Keyless signing: the job's OIDC token is exchanged for a Fulcio certificate.

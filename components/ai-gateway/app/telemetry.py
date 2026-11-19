@@ -27,7 +27,7 @@ import os
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterable, Iterator, List, Optional
+from typing import Dict, Iterable, Iterator, List, Optional
 
 from fastapi import Request
 from opentelemetry import context as otel_context

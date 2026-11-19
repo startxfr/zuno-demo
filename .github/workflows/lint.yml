@@ -16,6 +16,7 @@ permissions:
 jobs:
   policy-as-code:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -199,15 +200,10 @@ jobs:
 
   helm:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
-      - name: helm lint every chart
-        run: |
-          set -e
-          for chart in gitops/charts/*/; do
-            helm lint "$chart"
-          done
       - run: pip install pyyaml
       # Renders the keycloak chart (needs helm, installed above): realm
       # column limits, the client reconcile Job and the WP-169 eval
@@ -267,15 +263,33 @@ jobs:
           for chart in gitops/charts/*/; do if grep -q '^dependencies:' "$chart/Chart.yaml"; then helm dependency build "$chart"; fi; done
           python3 platform/gitops/check_app_projects.py --strict-dependencies
           python3 platform/gitops/tests/test_check_app_projects.py
+      # After the step above, which adds the dependency repositories and builds every chart's dependencies: linted before,
+      # the wrapper charts only warned "missing dependencies" and nothing of what they render was checked.
+      - name: helm lint every chart (dependencies built)
+        run: |
+          set -e
+          for chart in gitops/charts/*/; do
+            helm lint "$chart"
+          done
 
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
       - run: pip install pyyaml jinja2
+      # ruff.toml: the blocking rules find real defects only (syntax errors, undefined names, redefinitions); the wider set
+      # is informational, its debt is mostly deliberate style (see ruff.toml).
+      - name: ruff, defect rules (blocking)
+        run: pip install ruff==0.17.6 && ruff check .
+      - name: ruff, wider rule set (informational)
+        run: ruff check --select E4,E7,E9,F --statistics . || true
+      # shellcheck is on the runner image. Informational until the baseline is known: it was never run on these scripts.
+      - name: shellcheck (informational)
+        run: shellcheck --severity=warning $(git ls-files '*.sh') || true
       # ADR-0580/WP-165: agents and the corp policies are not in this
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
@@ -527,6 +541,7 @@ jobs:
     # rationale and the WP-10 brief's "Operator follow-up" for where the
     # real live verdict is exercised instead.
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -609,6 +624,7 @@ jobs:
 
   ansible:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # ADR-0603 M20 (WP-226): ansible pinned, collections from the pinned
@@ -621,6 +637,9 @@ jobs:
           for playbook in ansible/playbooks/*.yml; do
             ansible-playbook -i ansible/inventories/demo/hosts.yml "$playbook" --syntax-check
           done
+      # .ansible-lint (profile safety) and its baseline .ansible-lint-ignore: a NEW finding fails, the old debt does not.
+      - name: ansible-lint
+        run: pip install ansible-lint==26.6.0 && ansible-lint -q ansible/
       # ADR-0616 (WP-270): action -> demo_run.yml -> results -> page section, on the fixture demo, which needs no
       # cluster. The tests run with a temporary HOME and pass PYTHONUSERBASE on, so an Ansible installed in the user
       # site stays importable.
@@ -635,6 +654,7 @@ jobs:
   # lock nor a binding removed from under a released agent can merge.
   okf-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

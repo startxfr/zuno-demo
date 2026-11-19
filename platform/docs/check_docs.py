@@ -78,7 +78,7 @@ import subprocess
 import sys
 import urllib.parse
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List
 
 import yaml
 

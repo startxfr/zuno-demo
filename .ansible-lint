@@ -1,0 +1,19 @@
+# ansible-lint (26.x), best-practices audit lot 1. The default profile reported 3 732 findings, 3 100 of them style: this
+# repository writes task names as `role | lower-case action` on purpose (name[casing]) and keeps long Jinja lines
+# (yaml[line-length]). Those two are off. What stays on is what finds real mistakes (risky-shell-pipe, no-changed-when,
+# ignore-errors, risky-file-permissions, jinja and yaml syntax). The remaining debt is listed in .ansible-lint-ignore
+# (`ansible-lint --generate-ignore`): CI fails on a NEW finding and never on the old ones. Pay the debt down by deleting
+# lines from that file; never add a line to silence a new finding without saying why in the commit.
+profile: safety
+exclude_paths:
+  - .git/
+  - .github/
+  - .claude/
+  - gitops/
+  - docs/
+skip_list:
+  - name[casing]
+  - yaml[line-length]
+warn_list:
+  - var-naming[no-role-prefix]
+  - name[template]

@@ -1,5 +1,8 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
+# A recipe that fails must not leave a half-written target file behind. (SHELLFLAGS stay as they are: -o pipefail would change
+# the exit status of every recipe that pipes into head or grep.)
+.DELETE_ON_ERROR:
 
 ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml

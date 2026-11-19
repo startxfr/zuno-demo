@@ -37,6 +37,7 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       BASE: ${{ inputs.base || vars.OKF_PROMOTE_BASE || 'devel' }}
     steps:

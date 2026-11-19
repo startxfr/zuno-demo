@@ -1,5 +1,4 @@
 import re,json,glob,collections,os
-import os
 R=os.environ.get('REPO','.').rstrip('/')+'/docs/'
 adr={};band=None;retired=False
 for l in open(R+'adr/README.md'):

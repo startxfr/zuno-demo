@@ -209,7 +209,7 @@ def test_maas_adapter_never_widens_c3_local_only_eligibility() -> None:
     _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/v1")
 
     class _StubTable(RoutingTable):
-        def __init__(self) -> None:  # noqa: super not called - avoid file I/O
+        def __init__(self) -> None:  # super().__init__ is not called on purpose: avoid file I/O
             self._config = {
                 "providers": [
                     {"name": "local", "kind": "local", "eligible_for": ["C1", "C2", "C3"]},
