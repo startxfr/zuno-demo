@@ -1690,6 +1690,65 @@ def check_stress_table() -> List[Finding]:
     return stress_table_findings(readme.read_text(), demos, _registered_stress_driver_ids())
 
 
+# --- ADR Status lines against the tree: a path a live ADR cites must exist, or the ADR must say it moved ----------------------
+# A backticked repository path (a "/" and a file extension, no `<`, `*` or `{`) in the Status line of an ADR that is Implemented or
+# Accepted names a file the decision rests on. When the file is gone the ADR is wrong, and the fix is a dated "## Amended (...)"
+# note that names the path, not silence. Skipped by design: paths that cannot be checked from this tree.
+ADR_STATUS_LIVE = re.compile(r"^(Implemented|Accepted)\b")
+ADR_STATUS_PATH_RE = re.compile(r"`([^`\s]+)`")
+ADR_AMENDED_RE = re.compile(r"^## Amend(?:ed|ment) \(", re.M)
+# agents/ and policies/ live in zuno-demo-agents since the split; tests/ is relative to a component's own test directory;
+# evaluations/benchmarks/ holds generated artifacts of one run.
+ADR_PATH_SKIP_PREFIXES = ("agents/", "policies/", "tests/", "evaluations/benchmarks/")
+
+
+def adr_status_paths(status: str) -> List[str]:
+    """The checkable repository paths a Status line cites."""
+    out = []
+    for path in ADR_STATUS_PATH_RE.findall(status):
+        if "/" not in path or not re.search(r"\.[A-Za-z0-9]+$", path) or re.search(r"[<*{]", path):
+            continue
+        if path.startswith(ADR_PATH_SKIP_PREFIXES):
+            continue
+        out.append(path)
+    return out
+
+
+def _amended_text(body: str) -> str:
+    m = ADR_AMENDED_RE.search(body)
+    return body[m.start():] if m else ""
+
+
+def _named_in(path: str, text: str) -> bool:
+    """True when `text` names the path, its file name, or a directory of it (two segments or more, e.g. components/agent-runtime/)."""
+    parts = path.split("/")
+    candidates = [path, parts[-1]] + ["/".join(parts[:n]) + "/" for n in range(2, len(parts))]
+    return any(c in text for c in candidates)
+
+
+def adr_status_path_findings(adr: str, body: str, exists) -> List[Finding]:
+    """Findings for one ADR file's text: `adr` is its number ('0108'), `exists(path)` says whether a path is in the tree."""
+    m = re.search(r"^- \*\*Status:\*\*\s*(.+?)(?=\n- \*\*|\n\n|\Z)", body, re.S | re.M)
+    if not m:
+        return []
+    status = " ".join(m.group(1).split())
+    if not ADR_STATUS_LIVE.match(status):
+        return []
+    if "zuno-demo-agents" in status or re.search(r"\bmoved\b", status, re.I):
+        return []
+    amended = _amended_text(body)
+    return [Finding("adr-status-path", f"ADR-{adr} status cites {path}, which does not exist: add a dated 'Amended' note that names it "
+                                      f"and replace or drop the path (docs/adr/{adr}-*.md)")
+            for path in adr_status_paths(status) if not exists(path) and not _named_in(path, amended)]
+
+
+def check_adr_status_paths() -> List[Finding]:
+    out: List[Finding] = []
+    for adr in sorted((REPO_ROOT / "docs" / "adr").glob("[0-9][0-9][0-9][0-9]-*.md")):
+        out += adr_status_path_findings(adr.name[:4], adr.read_text(), lambda path: (REPO_ROOT / path).exists())
+    return out
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1711,6 +1770,7 @@ def main() -> int:
         + check_doc_links()
         + check_model_context_windows()
         + check_stress_table()
+        + check_adr_status_paths()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
@@ -1726,7 +1786,7 @@ def main() -> int:
           "model architectural roles against provider-routing.yaml/"
           "model-routing-policy.yaml, relative links and #anchors in every "
           "tracked markdown file, and model context windows against "
-          "gitops/charts/models/values.yaml, and the demo README's stress table against the demos and the stress drivers.")
+          "gitops/charts/models/values.yaml, the demo README's stress table against the demos and the stress drivers, and the paths cited by the Status line of every live ADR.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0
