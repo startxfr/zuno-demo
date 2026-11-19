@@ -310,3 +310,25 @@ budget.
   `iem_delegate_task<|channel|>commentary`, three times. A Harmony control token leaked into the name, so no tool
   matched and nothing was delegated. The same shape very likely explains session 38021eeb of 11-18. unifai-main fixed
   it in the fork (c3925ef1d, `restore_tool_names` cuts the name at the first `<|`), for the 0.1.73 canary.
+
+### 2026-11-19 evening: Tekos replay (owner's go)
+
+Tekos alone answered 8 turns on demo333, on v1.1.5 with ai-gateway-63, between 16:57 and 17:10 UTC. All 8 returned
+HTTP 200. The workstation evidence is in `~/.local/share/zuno/evidence/v115-tekos-replay-20261119T1657Z/`.
+
+| Question | Runs | Result |
+|---|---|---|
+| The query Arkos sent on 11-18, with no citation asked | 2 | Full answers, no source cited, no statement of what the passages leave unsupported. |
+| The query Arkos sent second on 11-18, asking for citations | 2 | Answers citing 1 or 2 pages (openshift-docs Gateway API, docs.redhat.com overview). Both treat Ingress as the Gateway API `HTTPRoute`, which is wrong. |
+| "What is the difference between a Route and an Ingress in OpenShift?" | 2 | Non-answers: "the documents describe Routes and Ingress separately but do not state the difference". |
+| Control, answered by the corpus: cluster-wide proxy | 1 | Full answer, no source cited. |
+| Control, outside the corpus: RHEL 12 GA date | 1 | Correct non-answer. |
+
+What this shows:
+- Tekos cites its sources only when the question asks for them.
+- The v1.1.5 rule on comparisons, which says to build the comparison from passages that each cover one side, did not
+  apply to the plain question.
+- When Tekos does cite, its comparison can rest on the wrong page.
+
+The session state that the UnifAI UI receives does not include the injected passages, so they are not in the
+evidence. zuno-demo-agents is preparing a stricter v1.1.6 for after the demo.
