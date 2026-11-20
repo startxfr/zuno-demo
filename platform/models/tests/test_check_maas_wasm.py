@@ -105,6 +105,15 @@ class InCluster(unittest.TestCase):
         self.assertEqual(result["failed_update_lines"], 3)
         self.assertNotIn("huge", json.dumps(result))
 
+    def test_an_optimistic_conflict_is_not_a_failed_update(self):
+        # Seen live 2026-11-20 15:06Z right after the tiers sync: the operator retried at once on the newest version.
+        conflict = ('{"level":"error","msg":"failed to update envoyfilter object","error":"Operation cannot be fulfilled on '
+                    'envoyfilters.networking.istio.io \\"kuadrant-maas-default-gateway\\": the object has been modified; please '
+                    'apply your changes to the latest version and try again"}\n')
+        result = self.collect(fake_api(*self.GOOD, {"op-1": conflict}))
+        self.assertEqual(result["failed_update_lines"], 0)
+        self.assertTrue(result["ok"])
+
     def test_the_default_container_annotation_wins(self):
         fetch = fake_api(*self.GOOD, {"op-1": ""}, containers=("a", "b"), annotations={"kubectl.kubernetes.io/default-container": "b"})
         self.collect(fetch)

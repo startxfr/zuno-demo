@@ -12,7 +12,8 @@ stale, and the limits added since are NOT USED: nothing is counted for them, sil
     conditions (regex limit\\.[A-Za-z0-9_]+__[0-9a-f]{8}) appears in the configuration of ANY of those EnvoyFilters, else NOT USED;
     a limit that names no key at all is NO-KEY (a warning, not a failure: nothing can be said about it);
   - the number of "failed to update envoyfilter object" lines in the last --log-window (default 30m) of the kuadrant operator log. ONLY the
-    count is printed: each such line carries the whole object.
+    count is printed: each such line carries the whole object. An optimistic-concurrency conflict ("the object has been
+    modified") is not counted: the operator retries it at once.
 
 Exit code 1 when a limit is NOT USED, an EnvoyFilter is above --max-bytes (default 1,400,000) or that count is above 0; 2 when `oc`
 cannot answer. It only runs `oc get` and `oc logs`; with --in-cluster it makes the same three reads
@@ -40,6 +41,7 @@ LIMITADOR = ("kuadrant-system", "limitador")
 OPERATOR = ("openshift-operators", "deploy/kuadrant-operator-controller-manager")
 DEFAULT_LOG_WINDOW = "30m"
 LOG_MARKER = "failed to update envoyfilter object"
+CONFLICT_MARKER = "the object has been modified"
 KEY_RE = re.compile(r"limit\.[A-Za-z0-9_]+__[0-9a-f]{8}")
 
 Runner = Callable[[List[str]], str]
@@ -169,8 +171,12 @@ def limit_rows(limitador: Dict[str, Any], configurations: List[str]) -> List[Dic
 
 
 def failed_updates(log_text: str) -> int:
-    """How many lines of the operator log say the EnvoyFilter update failed. The lines themselves are never kept."""
-    return sum(1 for line in log_text.splitlines() if LOG_MARKER in line)
+    """How many lines of the operator log say the EnvoyFilter update failed. The lines themselves are never kept.
+
+    An optimistic-concurrency conflict ("the object has been modified") is not counted: the operator retries on the
+    newest version at once, so it is the normal trace of two reconciles meeting (seen after every MaaS change), not an
+    object the API server refuses."""
+    return sum(1 for line in log_text.splitlines() if LOG_MARKER in line and CONFLICT_MARKER not in line)
 
 
 def object_size(obj: Dict[str, Any]) -> int:
