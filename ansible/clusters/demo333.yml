@@ -506,7 +506,7 @@ zuno_stress_chaos_rbac_enabled: true
 # 2.9 MB without the persona-group and /sales ones, because every route rule is emitted once per gateway listener).
 # Dropping those 8 subscriptions bought nothing and cut the direct MaaS access of agent_* and sales, so the owner had
 # them restored the same day (both true).
-# WP-314 (owner decision 2026-11-20, applied 2026-11-21): the fix is in the models chart, not here. The model routes have
+# WP-314 (owner decision 2026-11-20, applied 2026-11-20): the fix is in the models chart, not here. The model routes have
 # 3 matches instead of 15, Praxis shares the ai-gateway subscription, /sales is on gpt-oss-20b only and the generated
 # <model>-agents subscriptions are not rendered (chart values maas.agentSubscriptionTier.enabled false,
 # maas.salesSubscriptions.models). These two switches stay true: they still pass the generated groups and keep /sales.

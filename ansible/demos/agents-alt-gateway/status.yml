@@ -1,6 +1,6 @@
 ---
 # agents-alt-gateway status: the page's `### Status` reads: the Deployments named there and, where it names them, the Agents. Fast
-# reads only; no model call. The alternative gateway does not exist on the cluster yet, so this file reports it missing.
+# reads only; no model call. Praxis runs in zuno-ai-gateways since 2026-11-19; a missing Deployment is reported as missing.
 # Written by hand for WP-304 on the model of ansible/demos/kagent/status.yml.
 - name: "agents-alt-gateway status | the Deployments"
   ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
