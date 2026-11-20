@@ -1,0 +1,30 @@
+---
+# demo222: a documented SKELETON (legacy example). demo222 was retired on 2026-10-23; this inventory shows the shape
+# of a second cluster and is checked by CI (syntax-check, platform/gitops/tests/test_cluster_inventories.py). It is not
+# meant to be run: resolve_cluster_name.yml refuses it against any cluster whose apps domain is not apps.demo222.*.
+# How to create a demo<N> from it: ansible/inventories/demo222/README.md.
+#
+# This inventory's cluster. It must equal the directory name and the name the live apps domain gives. It selects
+# ansible/inventories/demo222/cluster.yml and confidential.yml. AAP never reads this file.
+zuno_cluster_name: demo222
+
+zuno_org: zuno
+zuno_orgId: zn
+
+zuno_env: demo
+zuno_envId: demo
+
+# ADR-0602 clause 3: demo | hardened (see ansible/inventories/demo333/group_vars/all/main.yml for the two schemes).
+zuno_security_profile: demo
+
+# ADR-0057: default report format for `make d3 test|stresstest`.
+day2_report_format: text
+
+# ADR-0603 M3 (WP-226): verify the certificates of the cluster's own Routes. false until this cluster's ACME
+# wildcard is issued (zuno_certmanager_acme_enabled): the router's self-signed default certificate is not trusted by
+# any control host. demo333 sets it to true.
+zuno_validate_route_certs: false
+
+# Global OLM approval switch (ADR-0607 clause 2), and the components that ignore it.
+zuno_operator_install_plan_approval: Automatic
+zuno_operator_install_plan_approval_exempt: [openshift-ai, openclaw, nfs-provisioner, unifai]

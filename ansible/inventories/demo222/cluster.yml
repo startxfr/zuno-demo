@@ -1,0 +1,31 @@
+---
+# demo222: SKELETON of a cluster's committed, NON-SECRET variables (legacy example; demo222 was retired on
+# 2026-10-23). Loaded by ansible/tasks/load_cluster_vars.yml from the cluster's short name - on a workstation and in
+# AAP, which reads this file from its project checkout (it never reads the inventory's group_vars). Loaded BEFORE
+# confidential.yml, which still overrides any value. Real secrets never belong here.
+#
+# Only the keys every cluster must define are set (platform/gitops/tests/test_cluster_inventories.py, REQUIRED): the
+# others keep the roles' defaults until a cluster sets them. ansible/inventories/demo333/cluster.yml is the complete
+# example of everything a cluster can set (OpenShift AI version pin, operator channels, UnifAI values, Praxis,
+# alternative gateways, stress switches...). Values below are placeholders following ADR-0546's per-cluster bucket
+# convention zuno-<cluster>-<purpose>; create the buckets before the installs that use them.
+
+# The branch every Argo CD Application of this cluster follows, and the AAP Project's branch. Read without a default
+# by ansible/tasks/apply_gitops_app.yml (through resolve_gitops_target_revision.yml) and the aap_config role.
+zuno_gitops_target_revision: main
+
+# The branch the in-cluster OpenShift builds check out (ansible/tasks/apply_openshift_build.yml); main if unset.
+zuno_build_git_ref: main
+
+# ADR-0546 / ADR-0547: the per-cluster S3 buckets. Unset, they fall to the noisy placeholder ZUNO_S3_BUCKET_NOT_SET
+# (models, mlflow, mlops) or fail the role's assert (registry_bucket, quay_registry, backups_bucket).
+zuno_models_s3_bucket: "zuno-demo-sources"
+zuno_models_s3_prefix: "models"
+zuno_mlflow_artifacts_s3_bucket: "zuno-demo222-mlops"
+zuno_mlflow_artifacts_s3_region: "eu-west-2"
+zuno_mlops_s3_bucket: "zuno-demo222-mlops"
+zuno_mlops_s3_region: "eu-west-2"
+zuno_quay_s3_bucket: "zuno-demo222-registry"
+zuno_quay_s3_region: "eu-west-2"
+zuno_backups_s3_bucket: "zuno-demo222-backups"
+zuno_backups_s3_region: "eu-west-2"

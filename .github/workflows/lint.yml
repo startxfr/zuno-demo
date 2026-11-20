@@ -475,6 +475,8 @@ jobs:
         run: python3 platform/gitops/tests/test_limitador_disk_chart.py
       - name: an Application's targetRevision is only written through apply_gitops_app.yml, which always finds it
         run: python3 platform/gitops/tests/test_gitops_target_revision_pin.py
+      - name: every ansible/inventories/<cluster>/ is complete (zuno_cluster_name, cluster.yml required keys, no secret)
+        run: python3 platform/gitops/tests/test_cluster_inventories.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

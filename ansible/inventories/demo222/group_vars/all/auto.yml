@@ -1,0 +1,20 @@
+---
+zuno_orgID: "{{ zuno_orgId | upper  }}"
+
+zuno_env: demo
+zuno_environment: "{{ zuno_env | default('dev') }}"
+zuno_envID: "{{ zuno_envId | default(zuno_environment) | upper }}"
+
+# Repo root, resolved relative to playbooks in ansible/playbooks/.
+zuno_repo_root: "{{ playbook_dir }}/../.."
+
+zuno_name: "{{ zuno_org }}-{{ zuno_env }}"
+zuno_id: "{{ zuno_orgId }}{{ zuno_envId }}"
+zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
+
+# The passwords - one variable per component - live in passwords.yml (ADR-0595,
+# with the ADR-0602 demo/hardened profiles). The tokens that used to be derived
+# here from the shared admin password (zuno_admin_vault_token,
+# zuno_admin_mcp_gateway_token) were removed by WP-223: the MCP Gateway token is
+# now random (vault role default, seed-only-if-missing), and the Vault token
+# alias had no consumer.

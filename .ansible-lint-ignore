@@ -1,5 +1,8 @@
 # This file contains ignores rule violations for ansible-lint
 ansible/inventories/demo333/cluster.yml yaml[indentation]
+ansible/inventories/demo222/group_vars/all/auto.yml jinja[spacing]
+ansible/inventories/demo222/group_vars/all/auto.yml var-naming[pattern]
+ansible/inventories/demo222/group_vars/all/main.yml var-naming[pattern]
 ansible/inventories/demo333/group_vars/all/auto.yml jinja[spacing]
 ansible/inventories/demo333/group_vars/all/auto.yml var-naming[pattern]
 ansible/inventories/demo333/group_vars/all/main.yml var-naming[pattern]
