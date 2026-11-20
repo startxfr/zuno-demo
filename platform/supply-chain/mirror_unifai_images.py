@@ -62,7 +62,7 @@ def pinned_references(cluster_file: pathlib.Path, unifai_values: pathlib.Path) -
 
 def resolve_tag(repository: str, tag: str) -> str:
     out = subprocess.run(["skopeo", "inspect", "--no-creds", "--format", "{{.Digest}}", f"docker://{repository}:{tag}"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, check=False)
     digest = out.stdout.strip()
     if out.returncode != 0 or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
         raise MirrorError(f"{repository}:{tag}: cannot resolve a digest ({out.stderr.strip()[:200] or 'no output'})")

@@ -144,7 +144,7 @@ def wait_done(client: Any, api: str, names: Iterable[str], timeout: float = 300,
 
 def _oc(*args: str) -> str:
     cmd = ["oc"] + (["--context", os.environ["OC_CONTEXT"]] if os.getenv("OC_CONTEXT") else []) + list(args)
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
     if out.returncode != 0 or not out.stdout.strip():
         raise LibraryError(f"`oc {args[0]} ...` failed (is `oc` logged in?)")
     return out.stdout.strip()

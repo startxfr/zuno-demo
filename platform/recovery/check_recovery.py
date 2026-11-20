@@ -42,7 +42,7 @@ Oc = Callable[[List[str]], Dict]
 
 
 def oc_json(args: List[str]) -> Dict:
-    out = subprocess.run(["oc", *args, "-o", "json"], capture_output=True, text=True)
+    out = subprocess.run(["oc", *args, "-o", "json"], capture_output=True, text=True, check=False)
     if out.returncode != 0:
         raise RuntimeError(f"oc {' '.join(args)}: {out.stderr.strip()[:200]}")
     return json.loads(out.stdout)

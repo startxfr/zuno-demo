@@ -361,7 +361,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
             logger.warning("stream ended: %s", type(exc).__name__)
             try:
                 await ws.send_text(json.dumps({"type": "state", "state": "FAILED", "message": "stream interrupted"}))
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - best effort: the socket is probably gone, which is why the stream ended
                 pass
         finally:
             session.streaming = False
@@ -371,7 +371,7 @@ def get_app(settings: Optional[Settings] = None, authenticator: Optional[Authent
                 session.state = "READY"
             try:
                 await ws.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - best effort: closing an already closed socket is harmless
                 pass
 
     async def relay(session: Session, ws: WebSocket, upstream) -> None:

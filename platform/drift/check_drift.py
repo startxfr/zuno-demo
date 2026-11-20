@@ -44,7 +44,7 @@ class Oc:
         self.base = ["oc"] + (["--context", context] if context else [])
 
     def json(self, *args: str) -> Dict:
-        out = subprocess.run(self.base + list(args) + ["-o", "json"], capture_output=True, text=True, timeout=180)
+        out = subprocess.run(self.base + list(args) + ["-o", "json"], capture_output=True, text=True, timeout=180, check=False)
         if out.returncode != 0:
             raise RuntimeError(f"oc {' '.join(args)}: {out.stderr.strip()[:200]}")
         return json.loads(out.stdout)
@@ -137,7 +137,7 @@ def leftover_canaries(namespaces: List[Dict], states: Dict[str, str]) -> List[st
 
 def on_origin(commit: str) -> bool:
     out = subprocess.run(["git", "-C", str(REPO), "branch", "-r", "--contains", commit],
-                         capture_output=True, text=True, timeout=60)
+                         capture_output=True, text=True, timeout=60, check=False)
     return out.returncode == 0 and any(line.strip().startswith("origin/") for line in out.stdout.splitlines())
 
 
@@ -168,7 +168,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     oc = Oc(args.oc_context)
     findings: Dict[str, List[str]] = {}
     try:
-        subprocess.run(["git", "-C", str(REPO), "fetch", "-q", "origin"], timeout=120, capture_output=True)
+        subprocess.run(["git", "-C", str(REPO), "fetch", "-q", "origin"], timeout=120, capture_output=True, check=False)
         findings["subscriptions"] = undeclared_subscriptions(
             oc.json("get", "subscriptions.operators.coreos.com", "-A")["items"], repo_text(), load_external())
         live_sc = {i["metadata"]["name"] for i in oc.json("get", "storageclass")["items"]}

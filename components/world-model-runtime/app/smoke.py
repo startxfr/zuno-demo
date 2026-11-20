@@ -30,7 +30,7 @@ def _nvidia_smi() -> str:
     try:
         return subprocess.run(
             ["nvidia-smi", "--query-gpu=name,driver_version,memory.total,encoder.stats.sessionCount",
-             "--format=csv,noheader"], capture_output=True, text=True, timeout=30).stdout.strip()
+             "--format=csv,noheader"], capture_output=True, text=True, timeout=30, check=False).stdout.strip()
     except Exception as exc:  # noqa: BLE001
         return f"unavailable: {exc}"
 

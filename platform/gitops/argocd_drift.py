@@ -69,7 +69,8 @@ def _oc(args: List[str]) -> Optional[str]:
     """Run an `oc` command, returning stdout or None if it failed at all."""
     try:
         done = subprocess.run(
-            ["oc", *args], capture_output=True, text=True, timeout=HTTP_TIMEOUT
+            ["oc", *args], capture_output=True, text=True, timeout=HTTP_TIMEOUT,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None

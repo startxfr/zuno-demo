@@ -145,6 +145,7 @@ def _run_probe(agent: str, persona: str, message: str) -> dict:
             capture_output=True,
             text=True,
             timeout=_PROBE_SUBPROCESS_TIMEOUT_SECONDS,
+            check=False,
         )
     except subprocess.TimeoutExpired as exc:
         return {"agent": agent, "persona": persona, "ok": False, "detail": f"probe subprocess exceeded {_PROBE_SUBPROCESS_TIMEOUT_SECONDS}s: stdout={exc.stdout!r} stderr={exc.stderr!r}"}

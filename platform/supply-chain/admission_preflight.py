@@ -42,7 +42,7 @@ class PreflightUnavailable(RuntimeError):
 
 def _run(args: List[str], stdin: Optional[str] = None) -> "subprocess.CompletedProcess[str]":
     try:
-        return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=120)
+        return subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=120, check=False)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         raise PreflightUnavailable(f"`{args[0]}` is not usable: {exc}") from exc
 

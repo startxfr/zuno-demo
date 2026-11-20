@@ -159,7 +159,7 @@ def clean_env(kubeconfig: str, variables: Dict[str, str], home: str) -> Dict[str
     if kubeconfig:
         env["KUBECONFIG"] = kubeconfig
     base = subprocess.run([sys.executable, "-c", "import site; print(site.getuserbase())"], stdout=subprocess.PIPE,
-                          universal_newlines=True).stdout.strip()
+                          universal_newlines=True, check=False).stdout.strip()
     if base:
         env["PYTHONUSERBASE"] = base    # computed with the real HOME: `make` rows need the user-site Ansible
     for name, value in variables.items():
@@ -418,7 +418,7 @@ def demo_steps(demo_id: str, root: pathlib.Path = ROOT) -> Tuple[List[Step], Dic
     variables = {str(k): str(v) for k, v in (manifest.get("env") or {}).items()}
     if any("cluster_base_domain" in v for v in variables.values()):
         domain = subprocess.run(["oc", "get", "ingresses.config.openshift.io", "cluster", "-o", "jsonpath={.spec.domain}"],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True).stdout.strip()
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True, check=False).stdout.strip()
         if not domain:
             raise NoDomain("the demo's variables use the cluster domain and `oc` gave none: is oc logged in?")
         variables = {k: re.sub(r"\{\{\s*cluster_base_domain\s*\}\}", domain, v) for k, v in variables.items()}
@@ -475,7 +475,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     out = pathlib.Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     kubeconfig = os.environ.get("KUBECONFIG") or os.path.expanduser("~/.kube/config")
-    whoami = subprocess.run(["oc", "whoami", "-t"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True)
+    whoami = subprocess.run(["oc", "whoami", "-t"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, universal_newlines=True, check=False)
     token = whoami.stdout.strip()
     if whoami.returncode != 0 or not token:
         print("oc is not logged in: the presenter's session is what the terminal runs with", file=sys.stderr)

@@ -88,7 +88,7 @@ def _helm_template(chart: str, set_values: Dict[str, str] | None = None) -> List
     cmd = ["helm", "template", "test", str(REPO_ROOT / "gitops" / "charts" / chart)]
     for key, value in (set_values or {}).items():
         cmd.extend(["--set", f"{key}={value}"])
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         # A chart whose Chart.yaml lists a dependency renders only after `helm dependency build`
         # (needs `helm repo add startx https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable`).

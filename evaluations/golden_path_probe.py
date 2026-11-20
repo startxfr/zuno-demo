@@ -91,7 +91,7 @@ def oc(*args: str, stdin: Optional[str] = None, timeout: float = 120) -> subproc
     cmd = ["oc"]
     if os.getenv("OC_CONTEXT"):
         cmd += ["--context", os.environ["OC_CONTEXT"]]
-    return subprocess.run(cmd + list(args), input=stdin, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(cmd + list(args), input=stdin, capture_output=True, text=True, timeout=timeout, check=False)
 
 
 def ai_gateway_logs(since: str, timeout: float = 120) -> subprocess.CompletedProcess:
@@ -264,7 +264,7 @@ def probe_delegation_approval(ctx: Context) -> Result:
 
     started = time.monotonic()
     proof = subprocess.run([sys.executable, str(HERE / "arkos" / "approval_proof.py"), "reject"],
-                           env=ctx.env(), capture_output=True, text=True, timeout=720)
+                           env=ctx.env(), capture_output=True, text=True, timeout=720, check=False)
     tail = " | ".join(l.strip() for l in (proof.stdout + proof.stderr).splitlines()[-3:] if l.strip())
     if proof.returncode != 0:
         return Result("delegation-approval", FAIL, f"approval_proof.py reject exit {proof.returncode}: {tail[:240]}")

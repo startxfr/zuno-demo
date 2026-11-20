@@ -160,7 +160,7 @@ NOT_LOCALLY_BUILDABLE: List[Tuple[str, str, str]] = []
 
 
 def _oc(args: List[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(["oc", *args], capture_output=True, text=True)
+    return subprocess.run(["oc", *args], capture_output=True, text=True, check=False)
 
 
 def _run_or_die(args: List[str]) -> str:

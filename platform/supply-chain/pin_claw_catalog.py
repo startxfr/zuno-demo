@@ -56,7 +56,7 @@ class PinError(ValueError):
 
 def resolve(repository: str, tag: str) -> str:
     out = subprocess.run(["skopeo", "inspect", "--no-creds", "--format", "{{.Digest}}", f"docker://{repository}:{tag}"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, check=False)
     digest = out.stdout.strip()
     if out.returncode != 0 or not DIGEST.match(digest):
         raise PinError(f"{repository}:{tag}: cannot resolve a digest ({out.stderr.strip()[:200] or 'no output'})")
@@ -64,7 +64,7 @@ def resolve(repository: str, tag: str) -> str:
 
 
 def list_tags(repository: str) -> List[str]:
-    out = subprocess.run(["skopeo", "list-tags", "--no-creds", f"docker://{repository}"], capture_output=True, text=True)
+    out = subprocess.run(["skopeo", "list-tags", "--no-creds", f"docker://{repository}"], capture_output=True, text=True, check=False)
     if out.returncode != 0:
         raise PinError(f"{repository}: cannot list tags ({out.stderr.strip()[:200]})")
     return json.loads(out.stdout)["Tags"]
@@ -81,7 +81,7 @@ def read_catalog_configs(reference: str) -> List[dict]:
     """The FBC documents under configs/ of an image, read from its layers as data."""
     with tempfile.TemporaryDirectory() as tmp:
         out = subprocess.run(["skopeo", "copy", "-q", "--src-no-creds", f"docker://{reference}", f"dir:{tmp}"],
-                             capture_output=True, text=True)
+                             capture_output=True, text=True, check=False)
         if out.returncode != 0:
             raise PinError(f"{reference}: cannot download ({out.stderr.strip()[:200]})")
         manifest = json.loads((pathlib.Path(tmp) / "manifest.json").read_text())

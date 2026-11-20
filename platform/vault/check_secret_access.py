@@ -156,6 +156,7 @@ def helm_template(chart_dir: pathlib.Path, release: str, namespace: str, values:
             ["helm", "template", release, str(dst), "-f", str(values_file), "--namespace", namespace],
             capture_output=True,
             text=True,
+            check=False,
         )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip().splitlines()[0] if proc.stderr.strip() else "helm template failed")

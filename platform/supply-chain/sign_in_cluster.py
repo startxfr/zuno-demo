@@ -197,6 +197,7 @@ def export_public_key(vault_addr: str, vault_token: str, key_name: str, output: 
         env=_cosign_env(vault_addr, vault_token),
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         raise SignerError(f"cosign public-key failed: {(result.stderr or result.stdout).strip()}")
@@ -259,6 +260,7 @@ def _cosign_initialize_tuf(tuf_url: str) -> None:
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
     if result.returncode != 0:
         raise SignerError(f"cosign initialize (TUF root, {tuf_url}) failed: {(result.stderr or result.stdout).strip()}")
@@ -301,6 +303,7 @@ def sign_image(
             capture_output=True,
             text=True,
             timeout=120,
+            check=False,
         )
     finally:
         shutil.rmtree(docker_config_dir, ignore_errors=True)
@@ -349,6 +352,7 @@ def verify_image(
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
     finally:
         shutil.rmtree(docker_config_dir, ignore_errors=True)
@@ -405,6 +409,7 @@ def sign_blob(vault_addr: str, vault_token: str, key_name: str, blob: pathlib.Pa
         env=_cosign_env(vault_addr, vault_token),
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         raise SignerError(f"cosign sign-blob failed: {(result.stderr or result.stdout).strip()}")
@@ -426,6 +431,7 @@ def verify_blob(public_key: pathlib.Path, blob: pathlib.Path, signature: pathlib
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         raise SignerError(f"cosign verify-blob failed: {(result.stderr or result.stdout).strip()}")

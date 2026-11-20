@@ -116,7 +116,7 @@ def write_lock(reference: str, release: str, path: pathlib.Path = LOCK_PATH) -> 
 # --- tools --------------------------------------------------------------------
 
 def run(args: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[pathlib.Path] = None) -> str:
-    result = subprocess.run(args, capture_output=True, text=True, env=env, cwd=cwd)
+    result = subprocess.run(args, capture_output=True, text=True, env=env, cwd=cwd, check=False)
     if result.returncode != 0:
         raise AdmissionError(f"{' '.join(args[:3])} ... failed: {(result.stderr or result.stdout).strip()[:800]}")
     return result.stdout
@@ -423,7 +423,7 @@ def manifest(reference: str) -> dict:
 
 def fetch_blob(repository: str, digest: str) -> bytes:
     result = subprocess.run([require("oras"), "blob", "fetch", *_oras_http(repository), f"{repository}@{digest}", "--output", "-"],
-                            capture_output=True)
+                            capture_output=True, check=False)
     if result.returncode != 0:
         raise AdmissionError(f"oras blob fetch {repository}@{digest}: {result.stderr.decode()[:400]}")
     return result.stdout

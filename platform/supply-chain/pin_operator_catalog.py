@@ -60,7 +60,7 @@ class PinError(ValueError):
 
 def resolve(repository: str, tag: str) -> str:
     out = subprocess.run(["skopeo", "inspect", "--no-creds", "--format", "{{.Digest}}", f"docker://{repository}:{tag}"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, check=False)
     digest = out.stdout.strip()
     if out.returncode != 0 or not DIGEST.match(digest):
         raise PinError(f"{repository}:{tag}: cannot resolve a digest ({out.stderr.strip()[:200] or 'no output'})")

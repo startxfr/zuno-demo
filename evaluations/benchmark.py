@@ -155,6 +155,7 @@ def read_lm_eval_results_from_cluster(job_name: str, namespace: str = "zuno-ai-r
     check = subprocess.run(
         ["oc", "get", "pvc", pvc_name, "-n", namespace, "-o", "name"],
         capture_output=True, text=True,
+        check=False,
     )
     if check.returncode != 0:
         raise BenchmarkError(
@@ -165,6 +166,7 @@ def read_lm_eval_results_from_cluster(job_name: str, namespace: str = "zuno-ai-r
     driver_pod_check = subprocess.run(
         ["oc", "get", "pod", job_name, "-n", namespace, "-o", "name"],
         capture_output=True, text=True,
+        check=False,
     )
     if driver_pod_check.returncode == 0:
         return _read_results_via_exec(job_name, namespace)
@@ -195,6 +197,7 @@ def _read_results_via_exec(job_name: str, namespace: str) -> Dict[str, Any]:
             "sh", "-c", _find_latest_results_file_cmd(_DRIVER_POD_OUTPUT_MOUNT),
         ],
         capture_output=True, text=True,
+        check=False,
     )
     if proc.returncode != 0:
         raise BenchmarkError(
@@ -236,10 +239,12 @@ def _read_results_from_output_pvc(job_name: str, pvc_name: str, namespace: str) 
     subprocess.run(
         ["oc", "delete", "pod", reader_pod, "-n", namespace, "--ignore-not-found", "--wait=true"],
         capture_output=True, text=True,
+        check=False,
     )
     try:
         apply_proc = subprocess.run(
             ["oc", "apply", "-f", "-"], input=json.dumps(manifest), capture_output=True, text=True,
+            check=False,
         )
         if apply_proc.returncode != 0:
             raise BenchmarkError(f"could not create results-reader pod {reader_pod!r}: {apply_proc.stderr.strip()}")
@@ -250,8 +255,9 @@ def _read_results_from_output_pvc(job_name: str, pvc_name: str, namespace: str) 
                 "--for=jsonpath={.status.phase}=Succeeded", "--timeout=120s",
             ],
             capture_output=True, text=True,
+            check=False,
         )
-        logs_proc = subprocess.run(["oc", "logs", reader_pod, "-n", namespace], capture_output=True, text=True)
+        logs_proc = subprocess.run(["oc", "logs", reader_pod, "-n", namespace], capture_output=True, text=True, check=False)
         if wait_proc.returncode != 0:
             raise BenchmarkError(
                 f"results-reader pod {reader_pod!r} did not reach Succeeded: {wait_proc.stderr.strip()} "
@@ -265,6 +271,7 @@ def _read_results_from_output_pvc(job_name: str, pvc_name: str, namespace: str) 
         subprocess.run(
             ["oc", "delete", "pod", reader_pod, "-n", namespace, "--ignore-not-found"],
             capture_output=True, text=True,
+            check=False,
         )
 
     if isinstance(raw, dict) and "results" in raw:

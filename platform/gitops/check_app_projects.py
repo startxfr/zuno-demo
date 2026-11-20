@@ -212,6 +212,7 @@ def helm_template_with_dependencies(chart_dir: pathlib.Path, release: str, names
         proc = subprocess.run(
             ["helm", "template", release, str(chart_dir), "-f", str(values_file), "--namespace", namespace],
             capture_output=True, text=True,
+            check=False,
         )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip().splitlines()[0] if proc.stderr.strip() else "helm template failed")

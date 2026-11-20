@@ -124,6 +124,7 @@ def _has_build_config(name: str) -> bool:
         capture_output=True,
         text=True,
         timeout=15,
+        check=False,
     )
     return result.returncode == 0
 
@@ -165,6 +166,7 @@ def _resolve_live_digest(image: str) -> str:
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
     )
     digest = result.stdout.strip()
     if result.returncode != 0 or not digest:
@@ -214,6 +216,7 @@ def _cosign_initialize_tuf(cosign_bin: str, tuf_url: str) -> Optional[str]:
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
     if result.returncode != 0:
         return f"cosign initialize (TUF root, {tuf_url}) failed: {(result.stderr or result.stdout).strip()}"
@@ -244,6 +247,7 @@ def _verify_one(cosign_bin: str, ref: "ImageRef", cert_identity: str, cert_oidc_
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
     except subprocess.TimeoutExpired:
         return f"cosign verify timed out for {image_at_digest}"

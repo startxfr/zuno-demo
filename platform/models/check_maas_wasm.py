@@ -53,7 +53,7 @@ class OcError(RuntimeError):
 
 def run_oc(args: List[str]) -> str:
     try:
-        proc = subprocess.run(["oc"] + args, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(["oc"] + args, capture_output=True, text=True, timeout=120, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise OcError(f"oc {args[0]}: {type(exc).__name__}") from exc
     if proc.returncode != 0:

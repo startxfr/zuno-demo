@@ -127,6 +127,7 @@ def run_acceptance_gate(agent: str) -> Dict[str, Any]:
         cwd=str(agent_dir),
         capture_output=True,
         text=True,
+        check=False,
     )
     stdout_lines = proc.stdout.strip().splitlines()
     last_line = stdout_lines[-1] if stdout_lines else ""

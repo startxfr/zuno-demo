@@ -77,7 +77,7 @@ def aggregate(runs: List[Dict], repeats: int) -> Dict:
 def _blender_results(blender_bin: str, addon: pathlib.Path, scripts: List[pathlib.Path], render_dir: str) -> Dict:
     cmd = [blender_bin, "--background", "--factory-startup", "--python", str(HERE / "test_in_blender.py"), "--",
            str(addon)] + (["--render-dir", render_dir] if render_dir else []) + [str(s) for s in scripts]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, check=False)
     results = {}
     for line in out.stdout.splitlines():
         if line.startswith("RESULT_JSON "):
