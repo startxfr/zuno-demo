@@ -778,6 +778,7 @@
           no_log: true
 
         - name: "step 7 | delete the legacy Secrets (root token + unseal key copies)"
+          no_log: true
           kubernetes.core.k8s:
             state: absent
             kind: Secret

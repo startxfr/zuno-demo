@@ -46,6 +46,7 @@
   register: _rhtas_config_cip_lookup
 
 - name: "rhtas_config | look up the zuno-signer-client-secret Secret"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

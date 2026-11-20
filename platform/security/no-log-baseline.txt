@@ -1,0 +1,1 @@
+# Tasks that read or write a Secret and must show their result: "path :: task name" (a reason above each line). Empty: every such task carries no_log.

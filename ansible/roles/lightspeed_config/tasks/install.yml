@@ -34,6 +34,7 @@
 # covers that; until it lands this check turns a confusing half-synced
 # Application into an actionable message.
 - name: "lightspeed-config | check the MCP service-identity Secret was seeded"
+  no_log: true
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"

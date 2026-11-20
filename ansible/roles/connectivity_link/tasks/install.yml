@@ -206,6 +206,7 @@
 # it as a genuine regression on the next `make day1 check
 # connectivity-link` run rather than failing install here.
 - name: "connectivity_link | wait for the Service-CA-generated authorino-server-cert Secret (WP-071)"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

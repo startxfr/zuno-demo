@@ -192,6 +192,7 @@
     # (ttl-reaped after an hour) so its pod log stays readable, a successful
     # one is removed right away.
     - name: "redis | delete the short-lived external-assert credentials Secret"
+      no_log: true
       kubernetes.core.k8s:
         state: absent
         api_version: v1

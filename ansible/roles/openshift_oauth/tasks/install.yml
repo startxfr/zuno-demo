@@ -93,6 +93,7 @@
     - (_openshift_oauth_keycloak_ingress.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | look up the Secret the Keycloak Ingress actually references"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
@@ -209,6 +210,7 @@
 # deleted this ConfigMap and left Proxy/cluster referencing it -
 # `oc get co network` Degraded=True from 2026-09-03T08:31:26Z.
 - name: "openshift_oauth | look up the Vault-issued Keycloak Secret that carries the private PKI root"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

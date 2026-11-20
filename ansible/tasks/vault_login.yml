@@ -45,6 +45,7 @@
 - name: "vault-login | exchange a one-shot ansible-seeder ServiceAccount token for a Vault token"
   block:
     - name: "vault-login | remove a token Secret left by an interrupted run"
+      no_log: true
       kubernetes.core.k8s:
         state: absent
         kind: Secret
@@ -53,6 +54,7 @@
         wait: true
 
     - name: "vault-login | request a ServiceAccount token for ansible-seeder"
+      no_log: true
       kubernetes.core.k8s:
         state: present
         definition:
@@ -94,6 +96,7 @@
       no_log: true
   always:
     - name: "vault-login | delete the ServiceAccount token Secret (invalidates the JWT)"
+      no_log: true
       kubernetes.core.k8s:
         state: absent
         kind: Secret

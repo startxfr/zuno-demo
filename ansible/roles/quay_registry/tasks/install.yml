@@ -61,6 +61,7 @@
     gitops_app_wait_retries: 60
 
 - name: "quay_registry | wait for the database user Secret that PGO generates"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

@@ -437,6 +437,7 @@
     (_mlops_oc_token.stdout | default('') | trim) != ''
   block:
     - name: "mlops | list pipelines on the DSPA API server"
+      no_log: true
       ansible.builtin.uri:
         url: "https://{{ _mlops_dspa_route.resources[0].spec.host }}/apis/v2beta1/pipelines"
         headers:

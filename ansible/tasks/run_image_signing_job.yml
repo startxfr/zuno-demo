@@ -50,6 +50,7 @@
 # signed OKF bundles and left with them in WP-165). Callers for whom signing IS the
 # point (day3_release.yml) keep the default false and still fail hard.
 - name: "image-signing | check the RHTAS signer client secret exists"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

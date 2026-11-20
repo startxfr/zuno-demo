@@ -128,6 +128,7 @@
 # (ttl-reaped after an hour) so its pod log names the database that
 # refused AUTH, a successful one is removed right away.
 - name: "mariadb | delete the short-lived external-assert credentials Secret"
+  no_log: true
   kubernetes.core.k8s:
     state: absent
     api_version: v1

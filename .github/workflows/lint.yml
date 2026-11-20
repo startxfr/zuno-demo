@@ -664,6 +664,10 @@ jobs:
       # .ansible-lint (profile safety) and its baseline .ansible-lint-ignore: a NEW finding fails, the old debt does not.
       - name: ansible-lint
         run: pip install ansible-lint==26.6.0 && ansible-lint -q ansible/
+      - name: no_log on every task that reads or writes a Secret
+        run: |
+          python3 platform/security/check_ansible_no_log.py
+          python3 platform/security/tests/test_check_ansible_no_log.py
       # ADR-0616 (WP-270): action -> demo_run.yml -> results -> page section, on the fixture demo, which needs no
       # cluster. The tests run with a temporary HOME and pass PYTHONUSERBASE on, so an Ansible installed in the user
       # site stays importable.

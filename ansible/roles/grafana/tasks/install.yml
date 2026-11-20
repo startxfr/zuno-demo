@@ -50,6 +50,7 @@
       }}
 
 - name: "grafana | wait for the Prometheus-reader ServiceAccount token to be minted"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret

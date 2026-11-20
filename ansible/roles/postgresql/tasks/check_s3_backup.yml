@@ -283,6 +283,7 @@
         wait: false
 
     - name: "postgresql | delete the throwaway S3-creds Secret (cleanup)"
+      no_log: true
       kubernetes.core.k8s:
         state: absent
         api_version: v1

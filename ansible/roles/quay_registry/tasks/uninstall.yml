@@ -18,6 +18,7 @@
   delay: 10
 
 - name: "quay_registry | delete the config bundle Secret"
+  no_log: true
   kubernetes.core.k8s:
     state: absent
     api_version: v1

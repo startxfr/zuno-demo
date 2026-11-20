@@ -51,6 +51,7 @@
 # chart over it would start an EMPTY raft Vault next to the old file data.
 # The playbook sets vault_migration_in_progress itself.
 - name: "vault | look for the pre-WP-223 bootstrap credentials Secret"
+  no_log: true
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-vault

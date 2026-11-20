@@ -65,6 +65,7 @@
     - _oai_maas_db_copy_fix | default(false) | bool
   block:
     - name: "openshift_ai | maas-db copy: delete the stale copy"
+      no_log: true
       kubernetes.core.k8s:
         api_version: v1
         kind: Secret

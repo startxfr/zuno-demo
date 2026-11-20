@@ -33,6 +33,7 @@
 # vault-bootstrap-credentials only exists on a Vault initialized before
 # WP-223 that was never migrated; deleting an absent Secret is a no-op.
 - name: "vault | delete the KMS credentials and any pre-WP-223 bootstrap Secret"
+  no_log: true
   kubernetes.core.k8s:
     state: absent
     kind: Secret

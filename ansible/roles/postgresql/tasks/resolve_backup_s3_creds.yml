@@ -72,6 +72,7 @@
     or zuno_postgresql_backup_s3_path is not defined
 
 - name: "postgresql | look up the zuno-postgresql-backup-s3 Secret for the in-cluster S3 fallback"
+  no_log: true
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
