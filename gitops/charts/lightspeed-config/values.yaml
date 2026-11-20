@@ -89,6 +89,16 @@ olsConfig:
   # cluster state, scoped by the querying user's own RBAC.
   introspectionEnabled: true
 
+  # 2026-11-20 (owner's decision pending): OLS 2.0's tool-result safety inspection (default on) asks the ACTIVE model for
+  # a json_schema decision on every tool result. gpt-oss-20b on vLLM 0.24.0+rhaiv.13 (reasoning parser openai_gptoss)
+  # returns content=null after its analysis in about half of those structured-output calls, measured live (10/10 calls
+  # per input size, 3-6 of 10 empty), so the 3 attempts often all fail and Lightspeed stops every tool answer with "the
+  # tool-result safety inspection could not be completed". Off until the model side is fixed (vLLM
+  # --structured-outputs-config enable_in_reasoning, to test after the 2026-11-24 demo). Remove this key to return to
+  # the operator default (on).
+  toolResultInspection:
+    enabled: false
+
   # ADR-0524 clause 4, third layer. `tool_annotations` is the CRD default;
   # named explicitly so a future edit is a visible decision rather than a
   # silent inherit. 'never' would remove the approval prompt entirely.

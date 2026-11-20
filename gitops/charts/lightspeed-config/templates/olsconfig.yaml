@@ -56,6 +56,11 @@ spec:
     byokRAGOnly: {{ .Values.olsConfig.byokRAGOnly }}
     # ADR-0524 clause 6: operator-managed openshift-mcp-server stays on.
     introspectionEnabled: {{ .Values.olsConfig.introspectionEnabled }}
+    {{- with .Values.olsConfig.toolResultInspection }}
+    guardrails:
+      toolResultInspection:
+        enabled: {{ .enabled }}
+    {{- end }}
     toolsApprovalConfig:
       approvalType: {{ .Values.olsConfig.toolsApproval.approvalType }}
       approvalTimeout: {{ .Values.olsConfig.toolsApproval.approvalTimeout }}
