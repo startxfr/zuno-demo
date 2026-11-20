@@ -1,11 +1,11 @@
-# WP-315: MaaS hardening: usage tiers, single-listener test, wasm-config alert, Limitador on Redis
+# WP-315: MaaS hardening: usage tiers, single-listener test, wasm-config alert, Limitador on disk
 
 - **State:** Not started (2026-11-20: owner-approved, applied in the evening of the same day, step by step, each with the owner's go and a notice to zuno-demo-cluster; the results are recorded below as they come)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)
 - **Related:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md), [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md)
 - **Target:** v0.17
-- **Estimated files touched:** ~12: `gitops/charts/models/` (templates and values), the MaaS gateway, a CronJob and a PrometheusRule, a Limitador Redis, `platform/models/check_maas_wasm.py`, this brief, and the scenario pages that quote the subscriptions
+- **Estimated files touched:** ~12: `gitops/charts/models/` (templates and values), the MaaS gateway, a CronJob and a PrometheusRule, a PersistentVolumeClaim for Limitador, `platform/models/check_maas_wasm.py`, this brief, and the scenario pages that quote the subscriptions
 
 ## Goal
 
@@ -42,9 +42,11 @@ is over the size gate or has a limit NOT USED (zuno-demo-coder). The runbook lin
 
 Result: pending.
 
-## 4. Limitador on a dedicated Redis (about 17:45 UTC)
+## 4. Limitador on disk (decision of 2026-11-20, about 14:50 UTC)
 
-A Redis in `kuadrant-system` dedicated to Limitador, so the counters survive a Limitador restart. The price is a dependency: a Redis outage fails part of the MaaS calls.
+Limitador keeps its counters on a PersistentVolumeClaim (1 Gi, the default `gp3-csi` class) through `spec.storage.disk` on the operator-owned `Limitador` resource, so the counters survive a Limitador restart.
+The owner replaced the first plan, a Redis dedicated to Limitador: the disk adds no component and no outage to handle. The price is one replica, as today.
+The chart only asserts `spec.storage.disk` (`Prune=false`, `Delete=false`); it is applied by `make d1 install argocd`, then `connectivity-link`, then `namespaces`. The file name of this brief keeps the first plan's word `redis` so that links stay valid.
 
 Result: pending.
 
