@@ -41,7 +41,7 @@
   delay: 15
 
 # ADR-0620 clause 4, owner's choice of 2026-11-17: the push credential is the zuno organisation's robot
-# (zuno+zuno_demo), kept in ansible/confidential.yml and written to Vault here, so the ExternalSecret of d1 finds it.
+# (zuno+zuno_demo), kept in ansible/inventories/<cluster>/confidential.yml and written to Vault here, so the ExternalSecret of d1 finds it.
 - name: "openshift_pipelines | load this cluster's confidential.yml if present"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
   vars:
@@ -75,7 +75,7 @@
 - name: "openshift_pipelines | say when the push robot is not configured"
   ansible.builtin.debug:
     msg: >-
-      zuno_quay_io_push_token is not set in ansible/confidential.yml: Vault zuno/quay-io/zuno-push is not written, the
+      zuno_quay_io_push_token is not set in ansible/inventories/<cluster>/confidential.yml: Vault zuno/quay-io/zuno-push is not written, the
       ExternalSecret quay-io-zuno-push stays in error and the d1 Application Degraded until it is (see
       ansible/confidential.example.yml), and `make d2 build praxis` cannot push.
   when: zuno_quay_io_push_token | default('xxxxxx') == 'xxxxxx'

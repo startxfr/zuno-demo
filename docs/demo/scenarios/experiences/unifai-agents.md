@@ -135,7 +135,7 @@ Run the 5-minute version, then:
 - **Team sessions are shared** with every member of the team, answers included. On the WP-208 screenshots, one
   `agent-tekos` session lists both ai-ops-01 and consultant-02 as participants.
 - **Personal starters exist for three personas only**: consultant-01, sale-01 and ai-ops-01
-  ([`ansible/clusters/demo333.yml`](../../../../ansible/clusters/demo333.yml), `personalStarters`). consultant-02 has none.
+  ([`ansible/inventories/demo333/cluster.yml`](../../../../ansible/inventories/demo333/cluster.yml), `personalStarters`). consultant-02 has none.
 - **"Configure & Generate" on a template was not checked in the browser.** The WP-198 live record leaves that check
   open. Do not generate a workflow on stage before you have rehearsed it.
 - **The starters and the team examples call the shared `zuno-gateway` LLM without a classification header.** Their turns
@@ -221,7 +221,7 @@ flowchart TB
 
 UnifAI's internals and the path of a Tekos turn. Drawn from `gitops/charts/unifai/` (`values.yaml`,
 `templates/unifaistack.yaml`, `templates/objects.yaml`, `templates/_helpers.tpl`), the UnifAI block of
-`ansible/clusters/demo333.yml`, `platform/okf/stack-config.generated.yaml`, and the live objects listed in the status
+`ansible/inventories/demo333/cluster.yml`, `platform/okf/stack-config.generated.yaml`, and the live objects listed in the status
 banner.
 
 ```mermaid

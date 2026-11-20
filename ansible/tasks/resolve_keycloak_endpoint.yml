@@ -5,13 +5,13 @@
 # facts instead of building `https://keycloak.<domain>` itself. Internal mode (the
 # default, `zuno_keycloak_mode` absent) reproduces exactly the strings the callers
 # used to write by hand, so including this file changes nothing there. External mode
-# (`zuno_keycloak_mode: external`, ansible/confidential.yml) resolves the same facts
+# (`zuno_keycloak_mode: external`, ansible/inventories/<cluster>/confidential.yml) resolves the same facts
 # from the `zuno_keycloak_external_*` payload.
 #
 # An include, not group_vars: the AAP Controller inventory has no group_vars
 # directory (see gitops/charts/aap-config/templates/ansibleinventory.yaml), so a
 # variable defined there would be undefined in every AAP-launched job. For the same
-# reason external mode needs ansible/confidential.yml, which AAP checkouts do not
+# reason external mode needs ansible/inventories/<cluster>/confidential.yml, which AAP checkouts do not
 # carry: run the keycloak-dependent roles locally while it is external.
 #
 # Needs: cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml).
@@ -41,7 +41,7 @@
 - name: "keycloak-endpoint | validate the external payload (fail fast, before any apply)"
   ansible.builtin.fail:
     msg: >-
-      zuno_keycloak_mode is 'external' but {{ _kc.name }} {{ _kc.why }} in ansible/confidential.yml
+      zuno_keycloak_mode is 'external' but {{ _kc.name }} {{ _kc.why }} in ansible/inventories/<cluster>/confidential.yml
       (ADR-0352 clause 2, see ansible/confidential.example.yml).
   when:
     - (zuno_keycloak_mode | default('internal')) == 'external'

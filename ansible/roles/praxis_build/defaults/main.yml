@@ -2,7 +2,7 @@
 # ADR-0620 (WP-291): Praxis AI built from source by the source-image-build Pipeline
 # (gitops/charts/openshift-pipelines) and pushed to quay.io/zuno/praxis-ai.
 # Switch the source per cluster with zuno_praxis_build_source (fork | upstream) in
-# ansible/clusters/<cluster>.yml, or once with -e zuno_praxis_build_source=upstream.
+# ansible/inventories/<cluster>/cluster.yml, or once with -e zuno_praxis_build_source=upstream.
 zuno_praxis_build_source: fork
 zuno_praxis_build_image_repository: quay.io/zuno/praxis-ai
 zuno_praxis_build_namespace: zuno-ai-build

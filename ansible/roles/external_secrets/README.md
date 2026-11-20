@@ -40,7 +40,7 @@ replaces the Application's Helm values wholesale rather than merging.
 
 ## External mode (ADR-0352, WP-216)
 
-`zuno_external_secrets_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that the External
+`zuno_external_secrets_mode: external` in `ansible/inventories/<cluster>/confidential.yml` (absent = `internal`) declares that the External
 Secrets Operator is installed and lifecycle-managed outside this installer. It is a Tier A-operator component: the
 mode key is the whole contract, there is no endpoint and no `_external_*` payload.
 

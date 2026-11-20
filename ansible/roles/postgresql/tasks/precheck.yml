@@ -112,7 +112,7 @@
       {% if not (_postgresql_backup_s3_enabled | default(false) | bool) -%}
       No S3 backup repo configured (repo2 absent) - repo1's local PVC is the
       only pgBackRest repository, and it disappears with the cluster. Fill in
-      the zuno_postgresql_backup_s3_* fields in ansible/confidential.yml.
+      the zuno_postgresql_backup_s3_* fields in ansible/inventories/<cluster>/confidential.yml.
       {%- elif not (_postgresql_s3_check_succeeded | default(false) | bool) -%}
       COULD NOT QUERY S3 repo2 at path
       {{ zuno_postgresql_backup_s3_path | default('<unresolved>', true) }} in

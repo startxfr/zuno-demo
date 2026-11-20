@@ -13,7 +13,7 @@ operator, then the generic `source-image-build` Pipeline in `zuno-ai-build`.
 The install waits for the operator's `TektonConfig/config` to be Ready before it applies d1,
 because the Pipeline kind and the catalog tasks only exist after that.
 
-The push robot comes from `ansible/confidential.yml` (`zuno_quay_io_push_username`, default
+The push robot comes from `ansible/inventories/<cluster>/confidential.yml` (`zuno_quay_io_push_username`, default
 `zuno+zuno_demo`, and `zuno_quay_io_push_token`). When the token is set, the install writes both
 to Vault `zuno/quay-io/zuno-push` before it applies d1.
 

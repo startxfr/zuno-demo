@@ -41,7 +41,7 @@ caveats on the operator's package/channel/catalog and its singleton
 
 ## External mode (ADR-0352, WP-217)
 
-`zuno_cert_manager_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that cert-manager is
+`zuno_cert_manager_mode: external` in `ansible/inventories/<cluster>/confidential.yml` (absent = `internal`) declares that cert-manager is
 installed and lifecycle-managed outside this installer. It is a Tier A-operator component: the mode key is the whole
 contract, there is no endpoint and no `_external_*` payload.
 

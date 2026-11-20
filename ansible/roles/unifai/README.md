@@ -11,7 +11,7 @@ Day 2 component (ADR-0561, ADR-0574, WP-151): the UnifAI agent and RAG platform.
   shared ai-gateway LLM, the mcp-gateway MCP provider, signed OKF bundles and
   RAG sources.
 
-Cluster-specific values come from `ansible/confidential.yml`
+Cluster-specific values come from `ansible/inventories/<cluster>/confidential.yml`
 (`zuno_unifai_values`, deep-merged over the role's defaults), e.g. pinned
 images, admin users, `okf.bundles`, `ragSources`, `stack.backup`.
 Every bundle is verified keyless (ADR-0578): the frozen Vault Transit

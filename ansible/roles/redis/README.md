@@ -48,7 +48,7 @@ on ordering.
 
 ## Internal or external mode (ADR-0352, WP-214)
 
-`zuno_redis_mode` in `ansible/confidential.yml` (absent = `internal`, the
+`zuno_redis_mode` in `ansible/inventories/<cluster>/confidential.yml` (absent = `internal`, the
 behaviour above, unchanged). `external` means a Redis this platform does not
 own; the payload is `zuno_redis_external_{host,port,password,ca_bundle}`
 (documented in `ansible/confidential.example.yml`).

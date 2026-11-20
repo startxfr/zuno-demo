@@ -101,7 +101,7 @@ no live measurement exists yet for AAP; trim `values.yaml`'s
 
 ## Red Hat subscription activation (`zuno_aap_enabled`)
 
-When `ansible/confidential.yml` sets `zuno_aap_enabled: true` (plus
+When `ansible/inventories/<cluster>/confidential.yml` sets `zuno_aap_enabled: true` (plus
 `zuno_aap_rhn_username`/`zuno_aap_rhn_password`, see
 `ansible/confidential.example.yml`), `tasks/install.yml` ends by
 attaching that Red Hat account's AAP entitlement to the freshly started

@@ -163,7 +163,7 @@ Run the 5-minute version, then:
   read by the `delegate_task` tool) bounds the delegations of one work item. Past the cap nothing is sent: the item is
   closed with the answers it already has (done), or failed when none arrived, and the model is told to answer. The
   answer to an approval request leaves through the A2A client, not through `delegate_task`, so it does not count. On
-  demo333 the variable is set to 2 for both multi-agent deployments (`stack.extraEnv` in `ansible/clusters/demo333.yml`),
+  demo333 the variable is set to 2 for both multi-agent deployments (`stack.extraEnv` in `ansible/inventories/demo333/cluster.yml`),
   so the third delegation of an item is refused. The per-session cap of 3 approval requests (UnifAI 0.1.62) was never
   reached live: Arkos stops after the first refusal. One delegation may relay at most 5 approvals before the remote
   task is cancelled. Source: [the fork](https://github.com/startxfr/UnifAI/blob/devel/multi-agent/lib/mas/elements/tools/builtin/delegation/delegate_task.py)
@@ -251,7 +251,7 @@ One approved delegation, from the question to the AAP job. Drawn from `component
 (token and entitlement at the door), `app/executor.py` (the turn, the write gate, the resume), `app/approvals.py`
 (the pending request, 300 s), `app/agent_chain.py` (`verify_chain`, the corp limits) and `app/clients.py` (downstream
 headers and the signed chain), `gitops/charts/a2a-gateway/values.yaml`, the Arkos `delegation` block of
-`ansible/clusters/demo333.yml`, `components/mcp-servers/aap/server.py` (`cluster_audit`, launch limit, job link) and
+`ansible/inventories/demo333/cluster.yml`, `components/mcp-servers/aap/server.py` (`cluster_audit`, launch limit, job link) and
 `evaluations/arkos/approval_proof.py` (the session API the UnifAI UI uses).
 
 ```mermaid

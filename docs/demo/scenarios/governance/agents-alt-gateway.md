@@ -210,7 +210,7 @@ flowchart TB
 
 The road of the two agents. Drawn from `gitops/charts/kagent/templates/alt-gateways.yaml` (the second model setting
 `zuno-model-praxis` and the Agent), the `altGateways` list of `gitops/charts/zuno-token-proxy`, `gitops/charts/praxis`
-and the alternative-gateway lists of `ansible/clusters/demo333.yml`. The page was not played: check the names against
+and the alternative-gateway lists of `ansible/inventories/demo333/cluster.yml`. The page was not played: check the names against
 the live objects.
 
 ```mermaid

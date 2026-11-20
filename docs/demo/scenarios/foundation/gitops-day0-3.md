@@ -88,7 +88,7 @@ Nothing to do. GitOps is part of the shared platform: the file only verifies it.
 Nothing is prepared by the file. What only a person does:
 
 - [ ] A terminal logged in with `oc` as **paas-ops-01**, at the root of the checkout that holds
-  `ansible/confidential.yml`, large font. If **paas-ops-01** has never signed in to the OpenShift console (on
+  `ansible/inventories/<cluster>/confidential.yml`, large font. If **paas-ops-01** has never signed in to the OpenShift console (on
   2026-11-13 its group `ocp-paas-ops` did not exist), sign in once in a browser first, then log the terminal in.
 - [ ] Keep the output of the morning's `make demo golden-path` run open (about 15 minutes; never run it while the
   audience watches), see [golden-path.md](../../golden-path.md).
@@ -155,7 +155,7 @@ Run the 5-minute version, then:
 - **No golden-path probe for this scenario.** The checks above are its proof. `make d0 check argocd` was green on
   2026-11-04 ([WP-195](../../../roadmap/work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md));
   the gate passed and the drift check was clean on 2026-11-07 (ADR-0607, ADR-0608). None was run for this page.
-- **An install without the branch variable leaves an Application on `main`.** The manifests say `main` and the role writes the cluster's branch only when `zuno_gitops_target_revision` is set. It happened on 2026-11-17 and 2026-11-19 (six Applications, from a worktree without the cluster's variables) and on 2026-11-20 through an AAP job (`connectivity-link`); all were set back the same day. Since 2026-11-20 the branch falls back to the cluster file `ansible/clusters/demo333.yml` when the variable is not passed (`ansible/tasks/resolve_gitops_target_revision.yml`), proven by an AAP job that left no Application on `main`.
+- **An install without the branch variable leaves an Application on `main`.** The manifests say `main` and the role writes the cluster's branch only when `zuno_gitops_target_revision` is set. It happened on 2026-11-17 and 2026-11-19 (six Applications, from a worktree without the cluster's variables) and on 2026-11-20 through an AAP job (`connectivity-link`); all were set back the same day. Since 2026-11-20 the branch falls back to the cluster file `ansible/inventories/demo333/cluster.yml` when the variable is not passed (`ansible/tasks/resolve_gitops_target_revision.yml`), proven by an AAP job that left no Application on `main`.
 - **A push to `devel` is a deployment on demo333.** The manifests say `main`; the roles write
   `zuno_gitops_target_revision` (`devel`). `main` carries the tags ([RELEASING.md](../../../../RELEASING.md)).
 - **The Applications are not synced from Git** (ADR-0311). `gitops/apps/*/application-*.yaml` is applied by the roles

@@ -21,7 +21,7 @@
       - lookup('vars', item, default='xxxxxx') != 'xxxxxx'
       - lookup('vars', item, default='') | length > 0
     fail_msg: >-
-      {{ item }} is unset in ansible/confidential.yml. Dify's files live in a dedicated S3 bucket
+      {{ item }} is unset in ansible/inventories/<cluster>/confidential.yml. Dify's files live in a dedicated S3 bucket
       (ADR-0599, decision 2026-11-04): set the four zuno_dify_s3_* values, run `make d0 install vault`
       to seed Vault zuno/dify/s3, then run this again.
     quiet: true

@@ -24,7 +24,7 @@ which Vault's PKI role would otherwise reject as out of domain.
 ## Identities and the root token (ADR-0602 clause 1 / WP-223)
 
 - **Unseal**: AWS KMS, from the four `zuno_vault_kms_*` values of
-  `ansible/confidential.yml` (the IAM credentials go to the `vault-aws-kms`
+  `ansible/inventories/<cluster>/confidential.yml` (the IAM credentials go to the `vault-aws-kms`
   Secret, the key ARN and region into the Application's values). The role
   stops if any is missing. A restart no longer needs a human.
 - **Initialization** (first run only): `vault operator init
@@ -58,7 +58,7 @@ technical token, the Quay registry credentials (stored for future
 cluster-side use - separate from the GitHub Actions
 `QUAY_USERNAME`/`QUAY_PASSWORD` CI secrets), the Atlassian Jira technical
 token (unused, reserved ahead of time), and the RAG corpus S3 bucket
-credentials. Those come from `ansible/confidential.yml` -
+credentials. Those come from `ansible/inventories/<cluster>/confidential.yml` -
 copied from the checked-in `ansible/confidential.example.yml` and filled
 in by an operator before the first `make d0 install vault`, gitignored so
 no secret is ever written to a Git-tracked file. `install.yml` re-reads it

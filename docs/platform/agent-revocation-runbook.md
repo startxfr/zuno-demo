@@ -24,7 +24,7 @@ of ADR-0584). Record the person who approves; that name goes in the `actor` fiel
 
 ## The path (once the operator release of WP-221 is pinned)
 
-1. **Write the entry.** In the cluster's file under `ansible/clusters/`, add to `zuno_unifai_values.agentRevocations`:
+1. **Write the entry.** In the cluster's `ansible/inventories/<cluster>/cluster.yml`, add to `zuno_unifai_values.agentRevocations`:
 
    ```yaml
    agentRevocations:

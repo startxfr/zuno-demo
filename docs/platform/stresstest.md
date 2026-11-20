@@ -81,7 +81,7 @@ wait.
 
 ## What the switches of the cluster do
 
-These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-11-19) and in the roles that read them.
+These are in `ansible/inventories/demo333/cluster.yml` (each is the owner's decision, 2026-11-19) and in the roles that read them.
 
 | Switch | Effect |
 |---|---|
@@ -90,7 +90,7 @@ These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-
 | `zuno_stress_clients_enabled: true` | The Dify and kagent token proxies admit the stress Job's pods, so the Job can replay those clients' path |
 | `zuno_stress_reader_enabled: true` | The Job runs as the ServiceAccount `zuno-stress-reader` (namespaces chart, `stressReader`): get-only on the objects the demos' state checks name, generated from the demos' own lists, no Secret, no write. Without it the Job runs as `acceptance-gate` and every state row fails with `status=403` and says what to enable |
 | `zuno_stress_reader_monitoring_view: true` | Adds the built-in `cluster-monitoring-view` to that ServiceAccount, for the `saturation` and `counters` samplers |
-| `chaosRbac.enabled` (chart `aap-config`, default off) | Gives the AAP execution identity the cluster role the disruptions need: delete one pod of the listed applications, create and delete an AdminNetworkPolicy. Needed to run `aggressive` with chaos through AAP; from `make`, your own login does it. The variable that sets it from `ansible/clusters/` was not found in the repository when this page was written |
+| `chaosRbac.enabled` (chart `aap-config`, default off) | Gives the AAP execution identity the cluster role the disruptions need: delete one pod of the listed applications, create and delete an AdminNetworkPolicy. Needed to run `aggressive` with chaos through AAP; from `make`, your own login does it. The variable that sets it from `ansible/inventories/<cluster>/cluster.yml` was not found in the repository when this page was written |
 
 ## Identities and budgets
 

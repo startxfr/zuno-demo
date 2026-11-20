@@ -10,7 +10,7 @@ the [ADRs](../adr/README.md); this directory says how to install, change and run
 | Page | What it covers |
 |---|---|
 | [prerequisites.md](prerequisites.md) | What must be true and decided before the first `make day0 install` on a new cluster. |
-| [installation.md](installation.md) | The installation workflow, starting from `ansible/confidential.yml`. |
+| [installation.md](installation.md) | The installation workflow, starting from `ansible/inventories/<cluster>/confidential.yml`. |
 | [configuration.md](configuration.md) | The component names each Makefile verb accepts, validated against the Makefile. |
 | [release-sequence.md](release-sequence.md) | The steps of a platform release on demo333, including an agents release. |
 

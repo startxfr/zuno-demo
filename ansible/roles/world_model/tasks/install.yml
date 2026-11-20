@@ -34,7 +34,7 @@
         msg: >-
           zuno_world_model_enabled is false: the world-model demo is not installed
           ({{ 'removed now' if (_world_model_app.resources | default([])) | length > 0 else 'it was not present' }}).
-          Set it to true in ansible/clusters/<cluster>.yml, then `make d0 install world-model-gpu` and
+          Set it to true in ansible/inventories/<cluster>/cluster.yml, then `make d0 install world-model-gpu` and
           `make d2 install world-model`, to run it.
 
 # ----------------------------------------------------------------- switch on

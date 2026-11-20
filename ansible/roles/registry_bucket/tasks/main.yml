@@ -5,7 +5,7 @@
 - name: "registry_bucket | require the bucket name"
   ansible.builtin.assert:
     that: zuno_quay_s3_bucket | length > 0
-    fail_msg: "Set zuno_quay_s3_bucket in ansible/clusters/<cluster>.yml (ADR-0547)."
+    fail_msg: "Set zuno_quay_s3_bucket in ansible/inventories/<cluster>/cluster.yml (ADR-0547)."
     quiet: true
 
 - name: "registry_bucket | read the current state (read-only)"

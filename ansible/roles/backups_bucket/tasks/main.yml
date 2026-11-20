@@ -5,7 +5,7 @@
 - name: "backups_bucket | require the bucket name"
   ansible.builtin.assert:
     that: zuno_backups_s3_bucket | length > 0
-    fail_msg: "Set zuno_backups_s3_bucket in ansible/clusters/<cluster>.yml (ADR-0547)."
+    fail_msg: "Set zuno_backups_s3_bucket in ansible/inventories/<cluster>/cluster.yml (ADR-0547)."
     quiet: true
 
 - name: "backups_bucket | read the current state (read-only)"
@@ -97,5 +97,5 @@
   ansible.builtin.debug:
     msg: >-
       Access key file: {{ backups_bucket_key_file }} (0600). It goes into the PostgreSQL backup S3 key fields of
-      ansible/confidential.yml and into Vault postgresql/backup-s3; it is never committed.
+      ansible/inventories/<cluster>/confidential.yml and into Vault postgresql/backup-s3; it is never committed.
   when: backups_bucket_apply | bool and _bb_keys | int == 0

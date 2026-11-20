@@ -22,7 +22,7 @@ does not downgrade: a bad release is undone by a restore or a forward fix, never
 
 | Operator | How it is pinned | The move |
 |---|---|---|
-| OpenShift AI | `startingCSV` + `installPlanApproval: Manual`; the role approves only the pinned InstallPlan | set `zuno_openshift_ai_version` in `ansible/clusters/<cluster>.yml`, then `make d1 install openshift-ai` |
+| OpenShift AI | `startingCSV` + `installPlanApproval: Manual`; the role approves only the pinned InstallPlan | set `zuno_openshift_ai_version` in `ansible/inventories/<cluster>/cluster.yml`, then `make d1 install openshift-ai` |
 | claw-operator | catalog digest + `startingCSV` + Manual | `platform/supply-chain/pin_claw_catalog.py`, then the openclaw role |
 | unifai-operator | catalog digest, Automatic approval (ADR-0574: the commit that moves the digest is the approval) | `pin_operator_catalog.py <catalog digest> --version X.Y.Z` and `pin_unifai_images.py vX.Y.Z --cluster <cluster>` (dry run first; the digests must match the release's), then `make d2 install unifai` |
 

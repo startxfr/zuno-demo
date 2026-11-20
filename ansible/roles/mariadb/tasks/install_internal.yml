@@ -57,7 +57,7 @@
 # the chart's externalsecret-backup-s3.yaml reads Vault zuno/mariadb/s3 -
 # so requiring their literals only makes sense where confidential.yml
 # can exist at all. New contract: the non-secret trio (bucket/endpoint/
-# region, now from ansible/clusters/<cluster>.yml) declares the intent;
+# region, now from ansible/inventories/<cluster>/cluster.yml) declares the intent;
 # the credential check still applies on a workstation (confidential.yml
 # present), and without confidential.yml the Vault seed is trusted - if
 # it is missing the ExternalSecret goes Degraded and the sync fails
@@ -82,7 +82,7 @@
   ansible.builtin.debug:
     msg: >-
       zuno_mariadb_backup_s3_* fields are not all set in
-      ansible/confidential.yml - the mariadb MariaDB will not get a
+      ansible/inventories/<cluster>/confidential.yml - the mariadb MariaDB will not get a
       PhysicalBackup schedule. Fill in all five of the bucket/endpoint/
       region/access_key_id/secret_access_key fields (all five are required
       together), then run `make d0 install vault` to seed zuno/mariadb/s3

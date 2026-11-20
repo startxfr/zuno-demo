@@ -73,7 +73,7 @@
         install: "{{ _unifai_install_operator | bool }}"
 
 # Backups to the cluster's backups bucket (ADR-0112, ADR-0546) reuse the S3
-# settings PostgreSQL already has in ansible/confidential.yml: same bucket and
+# settings PostgreSQL already has in ansible/inventories/<cluster>/confidential.yml: same bucket and
 # identity, under the unifai/<namespace> prefix. Off when they are not set.
 # No `endpoint` is passed (WP-224 rehearsal, 2026-11-08): with an explicit endpoint the aws cli uses
 # path-style requests to the regional apex host, whose rotating front IPs the EgressFirewall dnsName rule
@@ -128,7 +128,7 @@
 # ADR-0586 / WP-176: the five application images are verified before the stack is
 # applied; a failure stops the run with nothing applied (zuno_unifai_verify_images,
 # default true; a cluster that must switch it off says so, with its reason, in its
-# ansible/clusters/<cluster>.yml, where check_unifai_pins.py reports it).
+# ansible/inventories/<cluster>/cluster.yml, where check_unifai_pins.py reports it).
 - name: "unifai | verify the stack images"
   ansible.builtin.include_tasks: verify_images.yml
   vars:

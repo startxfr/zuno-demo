@@ -34,7 +34,7 @@
     - name: "praxis | say what the switch means"
       ansible.builtin.debug:
         msg: >-
-          zuno_praxis_enabled is false: Praxis is not installed. Set it to true in ansible/clusters/<cluster>.yml
+          zuno_praxis_enabled is false: Praxis is not installed. Set it to true in ansible/inventories/<cluster>/cluster.yml
           (with zuno_praxis_image_digest from `make d2 build praxis`), then `make d2 install models`,
           `make d1 install redis` and `make d2 install praxis`, to run it.
 
@@ -49,7 +49,7 @@
           - zuno_praxis_image_digest is match('^sha256:[0-9a-f]{64}$')
         fail_msg: >-
           zuno_praxis_image_digest is empty or not sha256:<64 hex>. Build the image first
-          (`make d2 build praxis`, WP-291), then write the digest it prints in ansible/clusters/<cluster>.yml.
+          (`make d2 build praxis`, WP-291), then write the digest it prints in ansible/inventories/<cluster>/cluster.yml.
 
     - name: "praxis | resolve the cluster base domain"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"

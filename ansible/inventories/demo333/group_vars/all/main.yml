@@ -26,8 +26,8 @@ zuno_envId: demo
 #              the value lives only in Vault; no md5 fallback is ever computed;
 #              Keycloak gets a password policy, a shorter idle session and TOTP
 #              for the console administrator. Personas keep one shared value.
-# Override per cluster in ansible/clusters/<cluster>.yml or in
-# ansible/confidential.yml. ansible/tasks/assert_security_profile.yml rejects
+# Override per cluster in ansible/inventories/<cluster>/cluster.yml or in
+# ansible/inventories/<cluster>/confidential.yml. ansible/tasks/assert_security_profile.yml rejects
 # any other value. Switching an already-seeded cluster changes no Vault path
 # (seed-only-if-missing, ADR-0345): hardened is meant for fresh installs.
 zuno_security_profile: demo
@@ -53,10 +53,13 @@ day2_report_format: text
 # `make d0 install aap-config` passed with it on, and every Route these tasks call (keycloak, aap, rh-ai,
 # ai-gateway, the mlops DSPA, the Tempo gateway, data-science-gateway, maas) verifies with the system trust store.
 # A cluster without the ACME wildcard sets it back to false in its own inventory.
-# It lives here, not in ansible/clusters/<cluster>.yml, because most of the
+# It lives here, not in ansible/inventories/<cluster>/cluster.yml, because most of the
 # roles concerned (aap, aap_config, kagent, dify, openclaw) do not load the
 # cluster file. Calls to in-cluster Services signed by the service CA keep
-# their own reason in place.
+# their own reason in place. AAP jobs never read this inventory, so they keep
+# the tasks' `default(false)`: certificate verification is a workstation-only
+# setting today (moving it to cluster.yml would need every role above to load
+# that file first).
 zuno_validate_route_certs: true
 
 # Global OLM approval switch (post-demo 2026-11-09, ADR-0607 clause 2 can make Manual the rule): the approval mode of

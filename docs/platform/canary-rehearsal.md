@@ -10,8 +10,8 @@ rollback, a window outside any freeze, and a golden-path run afterwards.
 ## Create and remove
 
 ```bash
-ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/canary_namespace.yml -e canary_wp=WP-211
-ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/canary_namespace.yml -e canary_wp=WP-211 -e canary_state=absent
+ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/canary_namespace.yml -e canary_wp=WP-211
+ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/canary_namespace.yml -e canary_wp=WP-211 -e canary_state=absent
 ```
 
 The namespace is `zuno-canary-<wp>`, with these labels: `zuno.io/canary=true`, `zuno.io/work-package=<WP>`, restricted

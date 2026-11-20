@@ -219,7 +219,7 @@ flowchart TB
 
 The two roads of one client, and what each one checks. Drawn from `gitops/charts/praxis` (the models, the `auto` alias,
 the JWT check), the `altGateways` lists of the client charts (`gitops/charts/open-webui`, `gitops/charts/kagent`,
-`gitops/charts/zuno-token-proxy`) and their values in `ansible/clusters/demo333.yml`. The page was not played: check
+`gitops/charts/zuno-token-proxy`) and their values in `ansible/inventories/demo333/cluster.yml`. The page was not played: check
 the names against the live objects.
 
 ```mermaid

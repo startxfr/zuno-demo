@@ -59,7 +59,7 @@
   ansible.builtin.debug:
     msg: >-
       The pgBackRest repo2 path could not be resolved - neither
-      zuno_postgresql_backup_s3_path in ansible/confidential.yml nor
+      zuno_postgresql_backup_s3_path in ansible/inventories/<cluster>/confidential.yml nor
       spec.backups.pgbackrest.global['repo2-path'] on the zuno-postgresql
       PostgresCluster provided one. The S3 cross-check is skipped
       ("couldn't tell" semantics) rather than run against a guessed prefix,
@@ -88,7 +88,7 @@
           propagationPolicy: Background
         wait: true
 
-    # A throwaway Secret built directly from ansible/confidential.yml, NOT
+    # A throwaway Secret built directly from ansible/inventories/<cluster>/confidential.yml, NOT
     # the ArgoCD/ExternalSecret-managed zuno-postgresql-backup-s3 - this
     # check must run *before* zuno-postgresql-d1 is (re)applied (that's the
     # whole point: it decides whether that apply carries the restore

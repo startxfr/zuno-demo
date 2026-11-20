@@ -180,6 +180,22 @@ missing is the statement that they are mandatory.
     of the criterion is carried by WP-130's gate on `make d0 install`, each
     probe proven able to fire (P6 driven live, the rest unit-tested).
 
+- **2026-11-20 — where per-cluster values live (per-cluster inventories).**
+  Each cluster has one directory, `ansible/inventories/<cluster>/`:
+  `group_vars/all/main.yml` (`zuno_cluster_name` and the workstation
+  settings), `cluster.yml` (the committed non-secret values, formerly
+  `ansible/clusters/<cluster>.yml`) and the gitignored, encrypted
+  `confidential.yml` (formerly `ansible/confidential.yml`, whose
+  `confidential.example.yml` stays the single template). `cluster.yml` and
+  `confidential.yml` are read by one loader each,
+  `ansible/tasks/load_cluster_vars.yml` and
+  `ansible/tasks/load_confidential_vars.yml`, in that order, so the
+  precedence is unchanged. AAP reads no inventory and finds `cluster.yml`
+  from the apps domain. `resolve_cluster_name.yml` refuses an inventory whose
+  `zuno_cluster_name` is not the live cluster. The old paths are read as a
+  deprecated fallback. `ansible/inventories/demo222/README.md` explains the
+  layout.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives,
 Consequences, Security/Operational considerations, Migration/evolution and
 Review evidence.

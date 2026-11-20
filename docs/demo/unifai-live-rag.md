@@ -107,7 +107,7 @@ the cluster ([freeze protocol](freeze-protocol.md)). Prepare it before the sessi
    a word that only the new version contains. `startxfr.atlassian.net` is a real company site: change a page you may
    change, and revert the edit after the session (the next scheduled sync picks the revert up). The personas have no
    Atlassian account.
-2. **Prepare the commit, without pushing it.** In `ansible/clusters/demo333.yml`, under
+2. **Prepare the commit, without pushing it.** In `ansible/inventories/demo333/cluster.yml`, under
    `zuno_unifai_values.ragSources`, set a new `resyncToken` on the source whose tree holds the page:
 
    ```yaml
@@ -270,7 +270,7 @@ flowchart TB
 The RAG inside the UnifAI stack: the upload path, the question path and the Confluence sync. Drawn from
 `gitops/charts/unifai/` (`values.yaml`, `templates/unifaistack.yaml`, `templates/objects.yaml`, and the
 `unifai.personalStarter` and `unifai.teamExamples` templates of `templates/_helpers.tpl`) and from the
-`zuno_unifai_values` block of `ansible/clusters/demo333.yml` (`ragSources`, `personalStarters`, `stack.images`).
+`zuno_unifai_values` block of `ansible/inventories/demo333/cluster.yml` (`ragSources`, `personalStarters`, `stack.images`).
 
 ```mermaid
 flowchart LR
@@ -301,7 +301,7 @@ flowchart LR
   RAGS -->|"hybrid search filtered by<br/>owner and token groups"| QD
   PWF & TWF -->|"passages and question, user token,<br/>shared LLM zuno-gateway, no classification header"| AIGW["ai-gateway<br/>zuno-ai-run"]
   KC["Keycloak realm zuno"] -.->|"groups claim"| RAGS
-  GIT["ansible/clusters/demo333.yml<br/>ragSources, resyncToken"] -.->|"make d2 install unifai,<br/>Argo CD zuno-unifai-d1"| SRC
+  GIT["ansible/inventories/demo333/cluster.yml<br/>ragSources, resyncToken"] -.->|"make d2 install unifai,<br/>Argo CD zuno-unifai-d1"| SRC
   OPR -->|"registers the source,<br/>queues a sync on a spec change"| RAGS
   SRC -.-> OPR
   CEL -->|"incremental sync, technical identity<br/>Vault confluence/technical"| CONF[("Confluence<br/>startxfr.atlassian.net")]

@@ -1,6 +1,6 @@
 ---
 # Installs Vault via GitOps, initializes it on first run, and configures it.
-# Operator-supplied secrets come from ansible/confidential.yml (gitignored).
+# Operator-supplied secrets come from ansible/inventories/<cluster>/confidential.yml (gitignored).
 #
 # ADR-0602 clause 1 / WP-223: Vault auto-unseals with AWS KMS, stores on
 # raft and serves TLS (gitops/charts/vault). Initialization produces
@@ -600,13 +600,13 @@
         default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 # These can't be self-generated - real external service credentials,
-# supplied via ansible/confidential.yml and re-applied idempotently.
+# supplied via ansible/inventories/<cluster>/confidential.yml and re-applied idempotently.
 
 # ADR-0211: least-privilege Route53 DNS-01 IAM access key for the ACME
 # ClusterIssuers (gitops/charts/cert-manager acme.*) - created out of
 # band by the operator (see ansible/confidential.example.yml's exact IAM
 # policy; never the AdministratorAccess research credentials).
-- name: "vault | seed the AWS Route53 DNS-01 access key from ansible/confidential.yml (ADR-0211)"
+- name: "vault | seed the AWS Route53 DNS-01 access key from this cluster's confidential.yml (ADR-0211)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/aws/route53-dns01 @PAYLOAD"
@@ -618,7 +618,7 @@
     and zuno_aws_route53_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-- name: "vault | seed the Google OAuth client from ansible/confidential.yml"
+- name: "vault | seed the Google OAuth client from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/google-oauth/client @PAYLOAD"
@@ -630,7 +630,7 @@
     and zuno_google_oauth_client_secret | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-- name: "vault | seed the SMTP technical credentials from ansible/confidential.yml"
+- name: "vault | seed the SMTP technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/smtp/technical @PAYLOAD"
@@ -650,7 +650,7 @@
 # Secret an ExternalSecret materializes from this path - the standard
 # ADR-0024 chain, replacing that role's original direct confidential.yml
 # read).
-- name: "vault | seed the AAP Red Hat account credentials from ansible/confidential.yml (ADR-0354)"
+- name: "vault | seed the AAP Red Hat account credentials from this cluster's confidential.yml (ADR-0354)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/aap/rhn @PAYLOAD"
@@ -664,7 +664,7 @@
 
 # url/email are required alongside token: Atlassian Cloud's REST API uses
 # email+API-token Basic Auth, not a bearer token alone.
-- name: "vault | seed the Confluence technical credentials from ansible/confidential.yml"
+- name: "vault | seed the Confluence technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/confluence/technical @PAYLOAD"
@@ -683,7 +683,7 @@
 # from ADR-0115's build-publish.yml CI consumer, which reads
 # QUAY_USERNAME/QUAY_PASSWORD as GitHub Actions repo secrets set directly in
 # GitHub, not from Vault/confidential.yml.
-- name: "vault | seed the Quay registry credentials from ansible/confidential.yml"
+- name: "vault | seed the Quay registry credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/quay/registry @PAYLOAD"
@@ -699,7 +699,7 @@
 # Confluence originally had. Same url/email/token/enabled shape as
 # confluence/technical above (Jira Cloud uses the same Atlassian
 # email+API-token Basic Auth scheme).
-- name: "vault | seed the Jira technical credentials from ansible/confidential.yml"
+- name: "vault | seed the Jira technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/jira/technical @PAYLOAD"
@@ -719,7 +719,7 @@
 # read/create/update), unlike Jira above. Single bearer access token
 # rather than email+token Basic Auth (Salesforce's own REST API
 # convention, ADR-0208 service-identity).
-- name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
+- name: "vault | seed the Salesforce technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/salesforce/technical @PAYLOAD"
@@ -738,7 +738,7 @@
 # this demo). Security considerations (ADR-0120): this token must NOT
 # carry the delete_repo scope - delete_repository refuses regardless, but
 # the credential itself should never be able to either.
-- name: "vault | seed the GitHub technical credentials from ansible/confidential.yml"
+- name: "vault | seed the GitHub technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/github/technical @PAYLOAD"
@@ -754,7 +754,7 @@
 # considerations (ADR-0120): this account must NOT hold the Owner role on
 # any reachable project - Developer/Maintainer is enough for read/write/
 # create/fork.
-- name: "vault | seed the GitLab technical credentials from ansible/confidential.yml"
+- name: "vault | seed the GitLab technical credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/gitlab/technical @PAYLOAD"
@@ -781,7 +781,7 @@
 # operator-supplied pattern as confluence/salesforce above. Skipped
 # while the placeholder remains, so maasAdapter.enabled stays effectively
 # inert (MAAS_GATEWAY_API_KEY unset) until this is seeded.
-- name: "vault | seed the MaaS gateway API key from ansible/confidential.yml"
+- name: "vault | seed the MaaS gateway API key from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/maas/gateway-api-key @PAYLOAD"
@@ -794,7 +794,7 @@
 # Only seeded when all five fields are real - no placeholder fallback,
 # since the ExternalSecret that reads it only renders under the same
 # condition (postgresql role's backups.s3.enabled).
-- name: "vault | seed the PostgreSQL backup S3 credentials from ansible/confidential.yml"
+- name: "vault | seed the PostgreSQL backup S3 credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/postgresql/backup-s3 @PAYLOAD"
@@ -817,7 +817,7 @@
 # (accessKeyId/secretAccessKey), matching
 # gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml's
 # remoteRef.property - unlike postgresql/backup-s3's snake_case above.
-- name: "vault | seed the MariaDB backup S3 credentials from ansible/confidential.yml"
+- name: "vault | seed the MariaDB backup S3 credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/mariadb/s3 @PAYLOAD"
@@ -834,7 +834,7 @@
 # its first consumer; bucket/region/endpoint are chart config, not secret).
 # Property names (accessKeyId/secretAccessKey), same camelCase convention as
 # mariadb/s3 above.
-- name: "vault | seed the RAG corpus S3 credentials from ansible/confidential.yml"
+- name: "vault | seed the RAG corpus S3 credentials from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/rag/s3 @PAYLOAD"
@@ -848,7 +848,7 @@
 
 # Dify's dedicated file storage bucket (ADR-0599, WP-204; user decision 2026-11-04).
 # Same four-field shape as aap/hub-s3 below; skipped while the placeholders are unset.
-- name: "vault | seed the Dify S3 config from ansible/confidential.yml"
+- name: "vault | seed the Dify S3 config from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/dify/s3 @PAYLOAD"
@@ -868,7 +868,7 @@
 # block). Unlike rag/s3 above, bucket/region are also seeded here (not
 # plain chart values) per explicit request - all 4 fields read together by
 # externalsecret-hub-s3.yaml.
-- name: "vault | seed the AAP Hub S3 config from ansible/confidential.yml"
+- name: "vault | seed the AAP Hub S3 config from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/aap/hub-s3 @PAYLOAD"
@@ -889,7 +889,7 @@
 # AAP Hub S3 task above - bucket/region seeded here too, not left as plain
 # chart values - read by
 # gitops/charts/openshift-ai/templates/externalsecret-traces-s3.yaml.
-- name: "vault | seed the RHOAI monitoring traces S3 config from ansible/confidential.yml"
+- name: "vault | seed the RHOAI monitoring traces S3 config from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   vars:
     vault_cli_args: "kv put zuno/rhoai/traces-s3 @PAYLOAD"
@@ -931,18 +931,18 @@
       zuno/google-oauth/client, zuno/smtp/technical, zuno/confluence/technical,
       zuno/quay/registry, zuno/jira/technical and/or zuno/salesforce/technical
       are still placeholders -
-      the corresponding value(s) in ansible/confidential.yml are still the
+      the corresponding value(s) in ansible/inventories/<cluster>/confidential.yml are still the
       "xxxxxx" sentinel from confidential.example.yml. Fill them in and
       re-run `make d0 install vault` (this role re-seeds from
       confidential.yml on every run, without overwriting anything already
       populated another way). ADR-0014's real Google OAuth delegation
       depends on the first one - everything else in this file is unattended.
 
-# LLM provider API keys, supplied via ansible/confidential.yml. Kept
+# LLM provider API keys, supplied via ansible/inventories/<cluster>/confidential.yml. Kept
 # separate from the block above because the placeholder key name differs:
 # externalsecret-{openai,gemini,anthropic,mistral}.yaml each resolve
 # `api_key`, so both real seed and placeholder must use that same key.
-- name: "vault | seed real LLM provider API keys from ansible/confidential.yml"
+- name: "vault | seed real LLM provider API keys from this cluster's confidential.yml"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_cli.yml"
   loop: "{{ _llm_provider_real_keys | dict2items }}"
   loop_control:
@@ -988,7 +988,7 @@
     msg: >-
       zuno/providers/{openai,gemini,anthropic,mistral,mistral-codestral,ovhcloud}
       are still placeholders - the corresponding zuno_llm_provider_<name>_api_key
-      value(s) in ansible/confidential.yml are still the "xxxxxx" sentinel
+      value(s) in ansible/inventories/<cluster>/confidential.yml are still the "xxxxxx" sentinel
       from confidential.example.yml. Fill them in and re-run
       `make d0 install vault` (this role re-seeds from confidential.yml on
       every run, without overwriting anything already populated another

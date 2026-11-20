@@ -21,7 +21,7 @@
 # Ansible must still render: a placeholder version would build the startingCSV
 # `rhods-operator.mycluster-version`, which OLM rejects. So the chart holds the
 # platform's chosen version and the variable is the per-cluster escape hatch.
-# ansible/clusters/<cluster>.yml first, so the committed per-cluster pin
+# ansible/inventories/<cluster>/cluster.yml first, so the committed per-cluster pin
 # applies everywhere (workstation and AAP), and confidential.yml, loaded after
 # it, can still override it locally. Without this, a pin committed there was
 # silently ignored (WP-195 step 3, demo333, 2026-11-04: the precheck still saw
@@ -57,7 +57,7 @@
       gitops/charts/openshift-ai/values.yaml's
       cluster-ods.operator.subscription.version is missing, or
       zuno_openshift_ai_version is set to an empty value in
-      ansible/confidential.yml. startingCSV is built from it
+      ansible/inventories/<cluster>/confidential.yml. startingCSV is built from it
       (rhods-operator.<version>), so an empty pin produces a Subscription OLM
       cannot resolve.
   when: (_openshift_ai_version | default('') | trim | length) == 0

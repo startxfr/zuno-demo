@@ -251,7 +251,7 @@ One pipeline run, from the trigger to a served adapter. Drawn from `gitops/chart
 `download_adapter.py`), `ansible/roles/mlops/tasks/run.yml`, `gitops/charts/mlflow/` (`values.yaml`,
 `templates/mlflow.yaml`, `templates/workspace-rbac.yaml`), `gitops/charts/kueue/` (`values.yaml`,
 `templates/queue-resources.yaml`), `gitops/charts/models/templates/llminferenceservice-qwen35.yaml` and
-`ansible/clusters/demo333.yml`, with the live objects listed under Page status.
+`ansible/inventories/demo333/cluster.yml`, with the live objects listed under Page status.
 
 ```mermaid
 flowchart LR

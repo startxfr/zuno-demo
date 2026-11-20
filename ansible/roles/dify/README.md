@@ -12,7 +12,7 @@ token proxy of ADR-0601).
 
 ## Before the first install
 
-1. `ansible/confidential.yml`: the four `zuno_dify_s3_*` values (bucket, region, access key, secret key) of the
+1. `ansible/inventories/<cluster>/confidential.yml`: the four `zuno_dify_s3_*` values (bucket, region, access key, secret key) of the
    dedicated bucket. `make d0 install vault` then seeds Vault `zuno/dify/s3`.
 2. The pushed repository carries the `dify` database (postgresql chart), the `dify` Keycloak client and the
    `zuno-dify` ingress allowance on `zuno-data`; the `postgresql`, `keycloak` and `namespaces` Applications must

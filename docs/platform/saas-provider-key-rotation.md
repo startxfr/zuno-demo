@@ -47,9 +47,9 @@ Each step that changes the cluster needs the owner's go. Never put the key on a 
 
 1. **Write the key (the owner).** `vault kv put zuno/providers/<provider> api_key=...`, typed by the owner so that it
    stays out of shell history and logs. These paths hold only `api_key`, so `put` replaces nothing else.
-   Alternative, reported by the cluster session on 2026-11-19: keep `ansible/confidential.yml` as the source. Get the
+   Alternative, reported by the cluster session on 2026-11-19: keep `ansible/inventories/<cluster>/confidential.yml` as the source. Get the
    new key from the provider console (for Mistral, `console.mistral.ai/api-keys`), set the matching variable with
-   `ansible-vault edit ansible/confidential.yml` (`zuno_llm_provider_<provider>_api_key`, for example
+   `ansible-vault edit ansible/inventories/<cluster>/confidential.yml` (`zuno_llm_provider_<provider>_api_key`, for example
    `zuno_llm_provider_mistral_codestral_api_key`), then run `make d0 install vault`, which writes the Vault path. The
    role re-seeds from that file on every run, so a key written only in Vault by hand can be put back to an older value
    by a later run: when you use `vault kv put`, update `confidential.yml` too.

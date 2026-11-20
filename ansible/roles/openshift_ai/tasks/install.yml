@@ -28,7 +28,7 @@
           subscription:
             # WP-132: the pin comes from resolve_version_pin.yml, so a cluster
             # whose catalog cannot serve the chart's version is recorded in
-            # ansible/confidential.yml instead of by editing the chart - which
+            # ansible/inventories/<cluster>/confidential.yml instead of by editing the chart - which
             # renders from git main with selfHeal, i.e. a live change everywhere.
             version: "{{ _openshift_ai_version }}"
             operator:
@@ -120,7 +120,7 @@
       resource: "InstallPlan/{{ _openshift_ai_installplan.resources[0].metadata.name }} (redhat-ods-operator)"
       state: "CSV drift: targets {{ _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames }}"
       cause: "The InstallPlan targets a different CSV than the pinned startingCSV {{ _openshift_ai_subscription.resources[0].spec.startingCSV }}"
-      solution: "Investigate and approve manually, then set zuno_openshift_ai_version in ansible/confidential.yml (or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv to change it for every cluster)"
+      solution: "Investigate and approve manually, then set zuno_openshift_ai_version in ansible/inventories/<cluster>/confidential.yml (or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv to change it for every cluster)"
       auto_fix: "manual only - reconcile refuses to approve drifted InstallPlans"
   when: _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames != [_openshift_ai_subscription.resources[0].spec.startingCSV]
 
@@ -164,7 +164,7 @@
           subscription:
             # WP-132: the pin comes from resolve_version_pin.yml, so a cluster
             # whose catalog cannot serve the chart's version is recorded in
-            # ansible/confidential.yml instead of by editing the chart - which
+            # ansible/inventories/<cluster>/confidential.yml instead of by editing the chart - which
             # renders from git main with selfHeal, i.e. a live change everywhere.
             version: "{{ _openshift_ai_version }}"
             operator:

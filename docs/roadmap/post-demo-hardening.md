@@ -94,7 +94,7 @@ Handed to zuno-main, which owns the agent chain (WP-247, WP-250). Each live step
   `--clear` the same evening, recorded as WP-249 row 4). Still open: a release that keeps its digests, the AAP
   execution environment digest, and `zuno-first-party-images` enforce extended to more namespaces (with WP-227).
 - `zuno_validate_route_certs`: **done 2026-11-11** (user's go). The three runs passed with it on, every Route these
-  tasks call verifies, and the default is `true` in `ansible/inventories/demo/group_vars/all/main.yml` (ADR-0603 M3).
+  tasks call verifies, and the default is `true` in `ansible/inventories/demo333/group_vars/all/main.yml` (ADR-0603 M3).
 - WP-227 (hardened profile) not started. It now carries the removal of ArgoCD's `cluster-admin` (user decision
   2026-11-11, ADR-0602 amendment).
 - The plain-HTTP startx chart repository: **done 2026-11-12**, fixed at its source.

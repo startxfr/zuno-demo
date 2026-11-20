@@ -11,4 +11,4 @@
   ansible.builtin.debug:
     msg: >-
       The world-model application is removed. The GPU node still bills: run `make d0 uninstall world-model-gpu`, then set
-      zuno_world_model_enabled to false in ansible/clusters/<cluster>.yml.
+      zuno_world_model_enabled to false in ansible/inventories/<cluster>/cluster.yml.

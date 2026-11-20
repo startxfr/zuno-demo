@@ -10,7 +10,7 @@ renders:
   role auto-generates at `zuno/keycloak/admin`; the shared demo-persona
   password, auto-generated at `zuno/keycloak/demo-personas`; and the
   Google OAuth client at `zuno/google-oauth/client` (seeded from
-  `ansible/confidential.yml` by `ansible/roles/vault/tasks/install.yml` -
+  `ansible/inventories/<cluster>/confidential.yml` by `ansible/roles/vault/tasks/install.yml` -
   falls back to an empty placeholder until that file's values are
   filled in);
 - the `KeycloakRealmImport` CR carrying the `zuno` realm (ADR-0349
@@ -321,7 +321,7 @@ cluster and adjust any of the above that turns out to be wrong.
 
 ## External mode (ADR-0352, WP-211)
 
-`zuno_keycloak_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that the Keycloak is not
+`zuno_keycloak_mode: external` in `ansible/inventories/<cluster>/confidential.yml` (absent = `internal`) declares that the Keycloak is not
 owned by this platform. Payload and meaning of each key: `ansible/confidential.example.yml`. Only the realm `zuno`
 is supported.
 

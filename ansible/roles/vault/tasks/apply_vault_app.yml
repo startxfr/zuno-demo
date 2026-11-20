@@ -11,11 +11,11 @@
 # No fallback and no "skip KMS" switch: awskms is the design (a Vault that
 # needs a human to unseal after every restart is the gap this closes), so a
 # missing value stops the run here, before anything is applied.
-- name: "vault | fail if the AWS KMS auto-unseal settings are missing from ansible/confidential.yml"
+- name: "vault | fail if the AWS KMS auto-unseal settings are missing from this cluster's confidential.yml"
   ansible.builtin.fail:
     msg: >-
       {{ _vault_kms_missing | join(', ') }} missing or still "xxxxxx" in
-      ansible/confidential.yml. Vault auto-unseals with AWS KMS (ADR-0602
+      ansible/inventories/<cluster>/confidential.yml. Vault auto-unseals with AWS KMS (ADR-0602
       clause 1): create the KMS key and the KMS-only IAM user described in
       docs/platform/vault-kms-raft-migration.md ("Prerequisites") and fill
       in the four zuno_vault_kms_* values (block "Vault auto-unseal" of

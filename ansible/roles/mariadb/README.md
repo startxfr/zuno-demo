@@ -22,7 +22,7 @@ namespace (already created by the `namespaces` role).
   only ever publishes `alpha`, so it always falls back), then applies
   `gitops/apps/mariadb/application-d0.yaml` with that selection injected
   via `gitops_app_extra_helm_values`. Once `-d0` is Synced+Healthy,
-  soft-reads `ansible/confidential.yml` for
+  soft-reads `ansible/inventories/<cluster>/confidential.yml` for
   `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}`
   (same optional shape as `ansible/roles/postgresql`'s S3 repo2) and
   applies `application-d1.yaml`, then waits for the `mariadb-operator`
@@ -86,7 +86,7 @@ repo.
   `status.tls.*` (`mariadb-0` as primary, an auto-generated
   CA/server/client cert chain) - not currently read by this role.
 - The `PhysicalBackup` CR's `spec.storage.s3` shape is unexercised
-  without real S3 credentials in `ansible/confidential.yml`.
+  without real S3 credentials in `ansible/inventories/<cluster>/confidential.yml`.
 
 ## Vault must be (re-)seeded before the first install
 
@@ -118,7 +118,7 @@ key into the operator's working tree left with the OKF Transit chain in
 WP-165): it deletes and
 recreates the `vault-configure` Job on every run (idempotent, but it
 re-runs the whole PKI/policy configuration), and hard-fails if
-`ansible/confidential.yml` is absent.
+`ansible/inventories/<cluster>/confidential.yml` is absent.
 
 Separately: if ArgoCD's automated sync already exhausted its retry
 budget (5 attempts), a plain `argocd.argoproj.io/refresh=hard`
@@ -138,7 +138,7 @@ it is in the Makefile's `DAY1_RUN_COMPONENTS`, not `DAY0_COMPONENTS`, so a
 
 `ansible/roles/vault/tasks/install.yml` seeds `zuno/mariadb/root`
 (auto-generated `password`, unless `zuno_admin_mariadb_root_password` is
-set) and, only once `ansible/confidential.yml` provides real values,
+set) and, only once `ansible/inventories/<cluster>/confidential.yml` provides real values,
 `zuno/mariadb/s3` (`accessKeyId`/`secretAccessKey` - note the camelCase
 property names, matching `gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml`'s
 `remoteRef.property`, unlike `postgresql`'s snake_case `access_key`/
@@ -147,7 +147,7 @@ Enterprise operator, `mariadb-operator`'s image is public.
 
 ## Internal or external mode (ADR-0352 / WP-143)
 
-`zuno_mariadb_mode` in `ansible/confidential.yml` selects who runs the
+`zuno_mariadb_mode` in `ansible/inventories/<cluster>/confidential.yml` selects who runs the
 MariaDB. `internal` (the default, key absent) is everything above,
 unchanged. `external` means a pre-existing MariaDB/MySQL endpoint is
 used: neither `zuno-mariadb` Application is applied, `install` instead

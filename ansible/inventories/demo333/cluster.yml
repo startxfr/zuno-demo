@@ -4,7 +4,7 @@
 # from the cluster short name resolve_cluster_name.yml derives.
 #
 # Why this file exists: since ADR-0354/WP-094 the day1/2/3 make verbs run
-# inside AAP from the Project's SCM checkout, where ansible/confidential.yml
+# inside AAP from the Project's SCM checkout, where ansible/inventories/<cluster>/confidential.yml
 # does not exist (gitignored). Every role that injected a confidential
 # per-cluster value into an Application's Helm values therefore fell back
 # to its ADR-0547 noisy placeholder under AAP (models' modelsS3.bucket
@@ -13,7 +13,7 @@
 # and prefixes are not secrets: committing them per cluster gives every
 # checkout - workstation and AAP - the same truth.
 #
-# Precedence: this file is loaded BEFORE ansible/confidential.yml, so a
+# Precedence: this file is loaded BEFORE ansible/inventories/<cluster>/confidential.yml, so a
 # value set in confidential.yml still overrides it locally. Real secrets
 # (access keys, passwords) NEVER belong here - they stay in
 # confidential.yml and reach the cluster through Vault seeding + ESO.

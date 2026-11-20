@@ -3,7 +3,7 @@
 # the Keycloak client (WP-179's four-place pattern); this role seeds only its own
 # openclaw/<persona> path, and only when it is missing.
 # ADR-0595: the Control UI password reads zuno_personas_openclaw_ui_password, which
-# inherits zuno_personas_mainpwd from ansible/confidential.yml. ADR-0602 / WP-223: in
+# inherits zuno_personas_mainpwd from ansible/inventories/<cluster>/confidential.yml. ADR-0602 / WP-223: in
 # the hardened profile that variable is undefined on purpose, so each persona's path
 # gets its own random password below (read it back from Vault openclaw/<persona>).
 - name: "openclaw | load the committed per-cluster variables"

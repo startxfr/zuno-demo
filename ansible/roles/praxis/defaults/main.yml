@@ -1,6 +1,6 @@
 ---
-# ADR-0619 (WP-292). The switch lives in ansible/clusters/<cluster>.yml (committed: AAP reads the SCM) and may be
-# overridden locally from ansible/confidential.yml. The models and redis roles read the same switch, to admit the
+# ADR-0619 (WP-292). The switch lives in ansible/inventories/<cluster>/cluster.yml (committed: AAP reads the SCM) and may be
+# overridden locally from ansible/inventories/<cluster>/confidential.yml. The models and redis roles read the same switch, to admit the
 # Praxis pod (altGatewayPeers.praxis in both charts).
 zuno_praxis_enabled: false
 
@@ -9,7 +9,7 @@ praxis_app_name: zuno-praxis-d1
 praxis_app_name_d0: zuno-praxis-d0
 
 # The image: quay.io/zuno/praxis-ai, by digest (ADR-0619 clause 7). `make d2 build praxis` (WP-291) prints it; write it
-# in ansible/clusters/<cluster>.yml. Empty: the install refuses, there is no image to run.
+# in ansible/inventories/<cluster>/cluster.yml. Empty: the install refuses, there is no image to run.
 zuno_praxis_image_digest: ""
 
 # Claude and Codestral, the only SaaS models (ADR-0619 clause 3). Off: the gateway serves the sovereign models only and

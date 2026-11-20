@@ -67,7 +67,7 @@ and SecretStores pick the new CA up on their own).
    }
    ```
    Create an access key (the secret is shown once).
-3. **`ansible/confidential.yml`**: fill in the block "Vault auto-unseal with
+3. **`ansible/inventories/<cluster>/confidential.yml`**: fill in the block "Vault auto-unseal with
    AWS KMS" (`zuno_vault_kms_key_id`, `zuno_vault_kms_region`,
    `zuno_vault_kms_access_key_id`, `zuno_vault_kms_secret_access_key`).
    `make d0 install vault` stops if one is missing. The IAM credentials go
@@ -97,7 +97,7 @@ certificate issuance and seeding wait.
 
 ```sh
 oc login ...   # cluster-admin
-ansible-playbook -i ansible/inventories/demo/hosts.yml \
+ansible-playbook -i ansible/inventories/demo333/hosts.yml \
   ansible/playbooks/vault_migrate_kms_raft.yml
 # optional: also rekey the recovery keys to 3 shares / threshold 2 (step 8)
 #   -e vault_migrate_rekey_recovery=true

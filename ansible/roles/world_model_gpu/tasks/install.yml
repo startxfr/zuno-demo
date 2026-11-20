@@ -63,7 +63,7 @@
         msg: >-
           zuno_world_model_enabled is false: no world-model GPU node
           ({{ 'removed now' if _world_model_gpu_app_present | bool else 'none was present' }}).
-          Set it to true in ansible/clusters/<cluster>.yml to provision one.
+          Set it to true in ansible/inventories/<cluster>/cluster.yml to provision one.
 
 # ----------------------------------------------------------------- switch on
 - name: "world-model-gpu | switch on: render and wait for the GPU node"
@@ -108,7 +108,7 @@
           Zones {{ _world_model_gpu_search_azs }} were requested for the world-model GPU node, but only
           {{ _world_model_gpu_entries | map(attribute='az') | list }} have an installer MachineSet to read the
           subnet from (discovered: {{ cluster_aws_identity.subnetByAz.keys() | list }}). Fix
-          zuno_world_model_gpu_azs in ansible/clusters/<cluster>.yml.
+          zuno_world_model_gpu_azs in ansible/inventories/<cluster>/cluster.yml.
       when: _world_model_gpu_search_azs | difference(_world_model_gpu_entries | map(attribute='az') | list) | length > 0
 
     - name: "world-model-gpu | build the values with this cluster's identity"

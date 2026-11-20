@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vault passphrase provider for ansible.cfg (vault_password_file). Prints the passphrase of the
-# ansible-vault encrypted ansible/confidential.yml, read from ~/.config/zuno/vault-pass (mode 0600,
+# ansible-vault encrypted ansible/inventories/<cluster>/confidential.yml, read from ~/.config/zuno/vault-pass (mode 0600,
 # outside the repository; override the path with ZUNO_VAULT_PASS_FILE).
 #
 # It never fails: ansible-playbook reads this at startup even when no vault file is involved, so a

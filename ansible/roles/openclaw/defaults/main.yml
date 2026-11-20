@@ -1,5 +1,5 @@
 ---
 # ADR-0619 clause 5 / WP-301: the alternative gateways OpenClaw may use, each {name, label, url, models}
 # (name = the route name, e.g. praxis; url = http://<name>.zuno-ai-gateways.svc:8080/v1). Set per cluster in
-# ansible/clusters/<cluster>.yml. Empty (the default): not added to the Application values, so they are the ones of before.
+# ansible/inventories/<cluster>/cluster.yml. Empty (the default): not added to the Application values, so they are the ones of before.
 zuno_openclaw_alt_gateways: []

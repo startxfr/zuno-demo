@@ -8,7 +8,7 @@
 # exists). WP-156 removed agent-runtime from this role's loops (and its
 # first-run OKF signing); ai-gateway stays.
 # The WP-157 ai-gateway switches are per-cluster knobs
-# (ansible/clusters/<cluster>.yml), so the cluster file is loaded first.
+# (ansible/inventories/<cluster>/cluster.yml), so the cluster file is loaded first.
 - name: "llm | load this cluster's non-secret variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
@@ -40,7 +40,7 @@
 
 # Inline values REPLACE the manifest's own (apply_gitops_app.yml), hence
 # clusterBaseDomain restated. The WP-157 switches default to the
-# chart's own false; a cluster turns one on in ansible/clusters/<cluster>.yml
+# chart's own false; a cluster turns one on in ansible/inventories/<cluster>/cluster.yml
 # only after its live verification (WP-157 brief, enable sequence).
 - name: "llm | apply the AI Inference Gateway GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -80,7 +80,7 @@
       # ADR-0565 clause 5 (WP-209): mount the generated classification floors;
       # the level of a header-less call stays C1 unless a cluster sets C3.
       # WP-225 lot C: verify the a2a-gateway's signed agent chain (public half of Vault a2a/agent-chain).
-      # Off unless a cluster sets both variables in ansible/clusters/<cluster>.yml.
+      # Off unless a cluster sets both variables in ansible/inventories/<cluster>/cluster.yml.
       agentChain:
         verify: "{{ zuno_ai_gateway_agent_chain_verify | default(false) | bool }}"
         publicKey: "{{ zuno_ai_gateway_agent_chain_public_key | default('') }}"

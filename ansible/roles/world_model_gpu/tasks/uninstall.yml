@@ -55,5 +55,5 @@
   ansible.builtin.debug:
     msg: >-
       No world-model GPU node remains. Set zuno_world_model_enabled to false in
-      ansible/clusters/<cluster>.yml, or the next `make d0 install world-model-gpu`
+      ansible/inventories/<cluster>/cluster.yml, or the next `make d0 install world-model-gpu`
       creates it again.

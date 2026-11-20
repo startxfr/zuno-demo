@@ -123,7 +123,7 @@ Run the 5-minute version, then:
 | Symptom | Fallback | Say |
 |---|---|---|
 | `oc get clusterimagepolicy` lists only `openshift` | Use the full name `clusterimagepolicies.policy.sigstore.dev`. | "OpenShift has its own resource with the same name." |
-| A policy shows `warn` | Show it as it is. The mode is one value in Git (`zuno_unifai_admission_mode` in `ansible/clusters/demo333.yml`, `policyOperand.clusterImagePolicy.mode` in the rhtas-config chart). | "Today it reports instead of refusing. The switch is one line, reviewed like code." |
+| A policy shows `warn` | Show it as it is. The mode is one value in Git (`zuno_unifai_admission_mode` in `ansible/inventories/demo333/cluster.yml`, `policyOperand.clusterImagePolicy.mode` in the rhtas-config chart). | "Today it reports instead of refusing. The switch is one line, reviewed like code." |
 | `zuno-unifai` or `unifai-operator` is missing from the opted-in list | The break-glass was used: it removes the label of a namespace ([operations.md](../../../platform/operations.md#a-legitimate-pod-is-refused-break-glass)). Do not relabel on stage. | "Someone used the emergency exit. Putting it back is the owner's call." |
 | An event says `admission webhook "policy.rhtas.com" denied the request` | Show the event. Follow the break-glass procedure after the session, with the owner's go. | "The cluster did its job. Now a human decides." |
 | `quay` is not `AVAILABLE`, or pods wait on images | Nodes fall back to `quay.io` for the mirrored images (`AllowContactingSource`); the gateways' agents release does not. Skip to the RHTAS and policy steps. | |
@@ -241,7 +241,7 @@ The three paths: signing what the cluster builds, verifying and mirroring the Un
 `values.yaml`, `ansible/tasks/run_image_signing_job.yml`, `ansible/tasks/verify_image_signatures.yml`,
 `ansible/roles/supply_chain/tasks/check.yml`, `platform/supply-chain/` (`tag_local_release.py`,
 `check_release_ledger.py`, `verify_unifai_images.py`, `mirror_unifai_images.py`, `admission_preflight.py`,
-`image-identities.yaml`), `gitops/charts/quay-registry/templates/`, `ansible/clusters/demo333.yml` and the live objects
+`image-identities.yaml`), `gitops/charts/quay-registry/templates/`, `ansible/inventories/demo333/cluster.yml` and the live objects
 listed under Page status.
 
 ```mermaid

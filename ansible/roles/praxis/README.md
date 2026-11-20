@@ -5,7 +5,7 @@ Praxis AI as an alternative AI gateway next to the Zuno ai-gateway
 [WP-292](../../../docs/roadmap/work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md)). Day 2,
 `make d2 install|check|uninstall praxis`.
 
-It follows one switch, `zuno_praxis_enabled` (default `false`, set in `ansible/clusters/<cluster>.yml`):
+It follows one switch, `zuno_praxis_enabled` (default `false`, set in `ansible/inventories/<cluster>/cluster.yml`):
 
 - **Off:** the Applications `zuno-praxis-d0` and `zuno-praxis-d1` are removed if they exist, and nothing else happens.
 - **On:** the role needs `zuno_praxis_image_digest` (the digest `make d2 build praxis` prints, WP-291), applies the

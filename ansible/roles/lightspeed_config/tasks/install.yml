@@ -49,7 +49,7 @@
       is not present in
       '{{ lightspeed_namespace | default('openshift-lightspeed') }}' yet. The
       ExternalSecret rendered below resolves it from Vault path
-      zuno/lightspeed/mcp-token - seed that path (ansible/confidential.yml +
+      zuno/lightspeed/mcp-token - seed that path (ansible/inventories/<cluster>/confidential.yml +
       `make d0 install vault`) or Lightspeed's MCP calls will 401 against
       mcp-gateway. The OLSConfig itself still reconciles; only the Zuno
       knowledge path is affected.

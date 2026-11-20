@@ -258,7 +258,7 @@
           zuno-aap has no real username/password - Vault zuno/aap/rhn is
           still the operator-supplied placeholder. Fill in
           zuno_aap_rhn_username/zuno_aap_rhn_password in
-          ansible/confidential.yml (a real access.redhat.com login, see
+          ansible/inventories/<cluster>/confidential.yml (a real access.redhat.com login, see
           ansible/confidential.example.yml), run `make d0 install vault`
           to seed it, then re-run this install - or set
           zuno_aap_enabled: false.

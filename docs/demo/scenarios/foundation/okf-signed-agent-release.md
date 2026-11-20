@@ -238,7 +238,7 @@ From a release tag in the agents repository to a verified release in a pod. Draw
 [`.github/workflows/publish.yml`](https://github.com/startxfr/zuno-demo-agents/blob/main/.github/workflows/publish.yml),
 and in this repository from `.github/workflows/okf-promote.yml`, `platform/supply-chain/admit_okf_bundle.py` (`verify`,
 `extract`, `mirror`, `prune`, `admit`), `platform/okf/sigstore/identity.yaml`, the `admit` verb of the `Makefile`,
-`gitops/charts/mcp-gateway/templates/deployment.yaml` (init container `okf-fetch`), `ansible/clusters/demo333.yml`
+`gitops/charts/mcp-gateway/templates/deployment.yaml` (init container `okf-fetch`), `ansible/inventories/demo333/cluster.yml`
 (`zuno_okf_registry_mirror`), [the revocation runbook](../../../platform/agent-revocation-runbook.md), and the live
 `UnifaiAgentBundle` objects of `zuno-unifai`.
 

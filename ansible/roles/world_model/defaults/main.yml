@@ -1,6 +1,6 @@
 ---
-# ADR-0604 (WP-235). The switch lives in ansible/clusters/<cluster>.yml (committed: AAP reads the SCM) and may be
-# overridden locally from ansible/confidential.yml.
+# ADR-0604 (WP-235). The switch lives in ansible/inventories/<cluster>/cluster.yml (committed: AAP reads the SCM) and may be
+# overridden locally from ansible/inventories/<cluster>/confidential.yml.
 zuno_world_model_enabled: false
 
 world_model_namespace: zuno-world-model
@@ -21,5 +21,5 @@ world_model_wait_delay: 15
 
 # ADR-0619 clause 5 / WP-303: the alternative gateways the world-model prompt enhancement may use, each {name, label, url, models}
 # (name = the route name, e.g. praxis; url = http://<name>.zuno-ai-gateways.svc:8080/v1). Set per cluster in
-# ansible/clusters/<cluster>.yml. Empty (the default): not added to the Application values, so they are the ones of before.
+# ansible/inventories/<cluster>/cluster.yml. Empty (the default): not added to the Application values, so they are the ones of before.
 zuno_world_model_alt_gateways: []

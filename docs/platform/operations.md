@@ -51,7 +51,7 @@ A line in the webhook log names the namespace, the pod and the image. In `warn` 
 
 ### Warn or enforce
 
-The mode is a cluster variable: `zuno_unifai_admission_mode` (default `warn`) in `ansible/clusters/<cluster>.yml`, applied by
+The mode is a cluster variable: `zuno_unifai_admission_mode` (default `warn`) in `ansible/inventories/<cluster>/cluster.yml`, applied by
 `make d1 install rhtas-config`. `zuno_unifai_admission_enabled: false` removes the policy and the labels. Only the UnifAI policy changes mode:
 the first-party policy `zuno-first-party-images` stays in `warn`. A new cluster gets the policy in `warn`.
 
@@ -111,7 +111,7 @@ a registry setting, so zuno-demo pins by **digest** taken from the `release.json
 
 Operator and application images move in two separate steps, always in this order, each with the user's go and with the owner of any running measurement (stresstest, ranking set) agreeing that no UnifAI pod may restart.
 
-1. **Operator.** The release owner publishes the operator, bundle and catalog digests once its CI and canary are green. From a detached worktree on `origin/devel` with `ansible/confidential.yml` copied in: `python3 platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z --dry-run` (signatures with the release identity, then the internal Quay, WP-282, then the admission preflight; the dry run of a release not yet copied lists the three digests to copy), the same without `--dry-run` and with `--mirror-to <registry>/zuno` (push robot's `DOCKER_CONFIG`; the user's go for the copy), commit and push only that commit, then `make d2 install unifai` and `make d2 check unifai`. Only the operator controller restarts. Rolled so far on demo333: 0.1.42 to 0.1.45 and 0.1.47 (0.1.46 was never released).
+1. **Operator.** The release owner publishes the operator, bundle and catalog digests once its CI and canary are green. From a detached worktree on `origin/devel` with `ansible/inventories/<cluster>/confidential.yml` copied in: `python3 platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z --dry-run` (signatures with the release identity, then the internal Quay, WP-282, then the admission preflight; the dry run of a release not yet copied lists the three digests to copy), the same without `--dry-run` and with `--mirror-to <registry>/zuno` (push robot's `DOCKER_CONFIG`; the user's go for the copy), commit and push only that commit, then `make d2 install unifai` and `make d2 check unifai`. Only the operator controller restarts. Rolled so far on demo333: 0.1.42 to 0.1.45 and 0.1.47 (0.1.46 was never released).
 2. **Application images, one roll.** `python3 platform/supply-chain/pin_unifai_images.py devel-<sha> --accept-dev --dry-run`, then the real pin, then a single `make d2 install unifai`: this restarts the UnifAI pods, so batch every stack change (chart values, CR fields) into the same roll. Settings that a release adds but a measurement owner switches on one by one (ranking `spec.rag.search`, `spec.rag.reranker`, `resyncToken`) stay unset in that roll.
 3. **Check.** `make d2 check unifai`, the webhook log (`policy-controller-operator`) for refusals, and the release owner's read-only proofs (digests, environment of the pods).
    **Catalog tags (found 2026-10-31).** A catalog digest that carries only the moving tag `latest` is garbage-collected by quay, signature tags included, as soon as `latest` moves to the next release: the CatalogSource pod can then no longer be rescheduled, a rollback is impossible and `make d2 check unifai` fails on the signature of the pinned catalog. Since the fork's fix (devel 8d492f981) each release also pushes `unifai-operator-catalog:v<VERSION>`, which keeps its digest. A catalog released before that fix (0.1.48) needs the tag `v<VERSION>` pushed on its digest by someone with quay write rights before the next release; until then bump to the newest catalog quickly after a release.
@@ -129,8 +129,8 @@ report. The gate costs about 80 s per run. For a rehearsal on a cluster whose Da
 
 ## Security profiles: demo and hardened (ADR-0602, WP-223)
 
-`zuno_security_profile` (in `ansible/inventories/demo/group_vars/all/main.yml`, overridable in `ansible/clusters/<cluster>.yml`
-or `ansible/confidential.yml`) picks one of two credential schemes. `ansible/tasks/assert_security_profile.yml` rejects any
+`zuno_security_profile` (in `ansible/inventories/demo333/group_vars/all/main.yml`, overridable in `ansible/inventories/<cluster>/cluster.yml`
+or `ansible/inventories/<cluster>/confidential.yml`) picks one of two credential schemes. `ansible/tasks/assert_security_profile.yml` rejects any
 other value. demo333 runs `demo`.
 
 | | `demo` (default) | `hardened` |
@@ -143,7 +143,7 @@ other value. demo333 runs `demo`.
 | MCP Gateway workload token | random (both profiles since WP-223; no longer `token-<admin password>`) | random |
 | Keycloak `zuno` realm | brute-force detection (30 failures, 60 s steps, 15 min ceiling, never permanent) | the same, plus `passwordPolicy` `length(12) and digits(1) and notUsername`, a 1 h idle session (10 h maximum unchanged), and TOTP enrolment for the master console administrator `zuno-admin` |
 
-A per-component variable set explicitly in `ansible/confidential.yml` still wins in `hardened` (a deliberate choice, never a
+A per-component variable set explicitly in `ansible/inventories/<cluster>/confidential.yml` still wins in `hardened` (a deliberate choice, never a
 derivation). In `hardened`, read an admin password from Vault, never from the inventory:
 `vault kv get -field=password zuno/keycloak/console` (Keycloak console, user `zuno-admin`), `zuno/aap/admin` (AAP), `zuno/dify/admin`,
 `zuno/openclaw/<persona>` (field `ui_password`), `zuno/<path>` for a database (the keys of `_vault_generated_secrets` in
@@ -173,7 +173,7 @@ Before the window:
 
 For each role:
 
-1. Set the new value in `ansible/confidential.yml` (the per-component variable, or the shared `zuno_admin_mainpwd`).
+1. Set the new value in `ansible/inventories/<cluster>/confidential.yml` (the per-component variable, or the shared `zuno_admin_mainpwd`).
 2. Patch the `password` of the Vault path and keep its `username`: `vault kv patch -method=rw zuno/<path> password=-`, with the
    value on stdin and never on a command line (ADR-0603 M9; `ansible/tasks/vault_cli.yml` does the same from a playbook). The
    paths are the keys of `_vault_generated_secrets` in `ansible/roles/vault/tasks/install.yml`. Log in as `ansible-seeder`
@@ -294,7 +294,7 @@ the `zuno-postgresql-repo-host-0` pod: the `archive` lines of repo1 and repo2 mu
 demo333 on 2026-11-13, when repo2 (`zuno-demo222-backups/postgresql`) carried 13 histories (`18-13`).
 
 Durable fix, applied on demo333 on 2026-11-14: move repo2 to a fresh path, so its stanza starts at the same id as repo1.
-1. Set `zuno_postgresql_backup_s3_path` in `ansible/confidential.yml` (`ansible-vault edit`; it overrides the operand) and
+1. Set `zuno_postgresql_backup_s3_path` in `ansible/inventories/<cluster>/confidential.yml` (`ansible-vault edit`; it overrides the operand) and
    run `make d0 install postgresql` (the restore gate only fires when the PostgresCluster does not exist).
 2. PGO does not create the stanza on the new path (its `repoOptionsHash` ignores `repo2-path`), so archive-push fails
    until `pgbackrest --stanza=db stanza-create` (no `--repo`; repo1 is only re-validated) runs in the leader's `database`
@@ -306,7 +306,7 @@ Durable fix, applied on demo333 on 2026-11-14: move repo2 to a fresh path, so it
 
 Moving repo2 to another bucket follows the same steps, with three differences seen when demo333 moved from
 `zuno-demo222-backups` (eu-west-2) to `zuno-demo333-backups/postgresql` (eu-central-1) later on 2026-11-14:
-- The bucket, endpoint, region, path and key change together in `ansible/confidential.yml`, and the key goes into Vault
+- The bucket, endpoint, region, path and key change together in `ansible/inventories/<cluster>/confidential.yml`, and the key goes into Vault
   `postgresql/backup-s3` (the vault role's seed task; the ExternalSecrets pick it up with a `force-sync` annotation).
   From that moment until PGO switches, archive-push fails (2 min that day), so run `make d0 install postgresql` at once.
 - A bucket change does alter PGO's `repoOptionsHash`, so PGO runs stanza-create by itself (unlike a path-only change).

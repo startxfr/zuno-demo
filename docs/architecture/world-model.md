@@ -34,7 +34,7 @@ flowchart TB
 
 | Piece | Where | Lifetime |
 |---|---|---|
-| GPU node (one RTX PRO 6000 Blackwell on a `g7e` instance, no MIG; MachineSets for `g7e.4xlarge`, `g7e.2xlarge` and `g7e.8xlarge` in zones a and b are searched together because capacity comes and goes, and only the zone that gets a node is kept) | `gitops/apps/machines-world-model`, role `world_model_gpu` | only while `zuno_world_model_enabled` is true (`false` in the committed `ansible/clusters/demo333.yml`) |
+| GPU node (one RTX PRO 6000 Blackwell on a `g7e` instance, no MIG; MachineSets for `g7e.4xlarge`, `g7e.2xlarge` and `g7e.8xlarge` in zones a and b are searched together because capacity comes and goes, and only the zone that gets a node is kept) | `gitops/apps/machines-world-model`, role `world_model_gpu` | only while `zuno_world_model_enabled` is true (`false` in the committed `ansible/inventories/demo333/cluster.yml`) |
 | Runtime, web tier, front door | `gitops/charts/world-model`, role `world_model` | same switch |
 | Namespace, GPU quota, SecretStore | `gitops/charts/namespaces`, `gitops/charts/external-secrets` | always (empty while off) |
 | Keycloak client `world-model` and its group | realm import, created live by the role | always |
@@ -43,7 +43,7 @@ flowchart TB
 
 ## Rules worth knowing
 
-- **One switch** (`zuno_world_model_enabled`, in `ansible/clusters/<cluster>.yml`) drives both the node (Day 0, run locally: the
+- **One switch** (`zuno_world_model_enabled`, in `ansible/inventories/<cluster>/cluster.yml`) drives both the node (Day 0, run locally: the
   AAP credential has no Machine API rights) and the application (Day 2). Install converges to it; off removes what is left.
 - **One world per GPU.** The lease is taken before the slow image generation; a second visitor is told busy. A tab left open
   frees the GPU after 60 seconds, a quiet session after 3 minutes, any session after 30. The Sign out button frees the GPU first, then ends the Keycloak session.

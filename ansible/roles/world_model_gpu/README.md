@@ -17,8 +17,8 @@ g7e.4xlarge comes and goes per zone (no capacity in a and b for hours on 2026-11
 InvalidConfiguration). Searching both zones at once is the fast way to get the node; when one zone has it, scale the other to 0
 (`oc scale machineset zuno-gpu-world-model-<z> -n openshift-machine-api --replicas=0`).
 
-The switch lives in `ansible/clusters/<cluster>.yml` (committed: AAP reads the SCM checkout) and can be overridden
-locally from `ansible/confidential.yml`. `zuno_world_model_gpu_az` (cluster file; demo333 sets `b`, because g7e.4xlarge had no
+The switch lives in `ansible/inventories/<cluster>/cluster.yml` (committed: AAP reads the SCM checkout) and can be overridden
+locally from `ansible/inventories/<cluster>/confidential.yml`. `zuno_world_model_gpu_az` (cluster file; demo333 sets `b`, because g7e.4xlarge had no
 capacity in eu-central-1a on 2026-11-07) moves the node to another zone letter that offers g7e. It is a variable of its own
 because `zuno_machines_az_override` is one map that a workstation's `confidential.yml` replaces whole: an entry added to the
 cluster file would not apply there. The map's entry for this MachineSet still works and the dedicated variable wins over it.

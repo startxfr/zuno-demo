@@ -1,5 +1,5 @@
 ---
-# ADR-0352 / WP-211: `zuno_keycloak_mode: external` (ansible/confidential.yml) means the Keycloak is not ours: the
+# ADR-0352 / WP-211: `zuno_keycloak_mode: external` (ansible/inventories/<cluster>/confidential.yml) means the Keycloak is not ours: the
 # RHBK operator (-d0) and the built-in instance are not deployed, install_external.yml asserts the endpoint instead,
 # and the -d1 Application only carries the consumer side (client-secret ExternalSecrets, the client ConfigMap and the
 # reconcile Job that creates the realm content in the external Keycloak). Absent means internal, exactly as before.
@@ -162,7 +162,7 @@
     msg: >-
       The realm's "google" identity provider will only complete login flows
       once zuno/google-oauth/client has real values - normally seeded from
-      ansible/confidential.yml (zuno_google_oauth_client_id/_secret) by
+      ansible/inventories/<cluster>/confidential.yml (zuno_google_oauth_client_id/_secret) by
       ansible/roles/vault/tasks/install.yml. If confidential.yml still has
       the "xxxxxx" placeholder for those fields, fill it in and re-run
       `make d0 install vault`, or populate it directly with

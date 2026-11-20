@@ -4,7 +4,7 @@
 # collection, both uploaded to the cluster's backups bucket under
 # unifai/zuno-unifai/. The CronJobs are created by unifai-operator from
 # UnifaiStack.spec.backup, which the unifai role fills from the PostgreSQL S3
-# settings of ansible/confidential.yml (install.yml).
+# settings of ansible/inventories/<cluster>/confidential.yml (install.yml).
 #
 # Like the PostgreSQL role, this is an explicit action: it fails loudly when a
 # job does not complete instead of reporting an old scheduled backup as the
@@ -21,7 +21,7 @@
   ansible.builtin.fail:
     msg: >-
       zuno-unifai/unifai has no spec.backup. Set the zuno_postgresql_backup_s3_*
-      values in ansible/confidential.yml (or zuno_unifai_values.stack.backup)
+      values in ansible/inventories/<cluster>/confidential.yml (or zuno_unifai_values.stack.backup)
       and run 'make d2 install unifai' first.
   when: >-
     (_unifai_backup_stack.resources | default([]) | length == 0)

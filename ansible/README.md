@@ -62,16 +62,30 @@ No secret is ever written to a Git-tracked file. Anything a role needs at
 run time comes from Vault via the `community.hashi_vault` lookup plugin;
 anything a workload needs comes from an `ExternalSecret`.
 
+**One inventory per cluster.** Each demo cluster has its own directory under `ansible/inventories/`:
+`demo333/` (the live cluster) and `demo222/` (a documented skeleton; its `README.md` explains the layout and how
+to create a `demo<N>`). A cluster directory holds `hosts.yml`, `group_vars/all/` (`main.yml` carries
+`zuno_cluster_name`, the workstation settings), `cluster.yml` (the committed, non-secret per-cluster values,
+loaded by `ansible/tasks/load_cluster_vars.yml`) and `confidential.yml` (the gitignored secrets, loaded by
+`ansible/tasks/load_confidential_vars.yml` after `cluster.yml`, so it wins). `make` selects the cluster with
+`CLUSTER=<name>` (default `demo333`; `ZUNO_CLUSTER` works too), and `ansible-playbook` with
+`-i ansible/inventories/<name>/hosts.yml` (always the `hosts.yml` file, never the directory: `cluster.yml` and
+`confidential.yml` are not inventory sources). `ansible/tasks/resolve_cluster_name.yml` refuses to run when the
+inventory's `zuno_cluster_name` is not the cluster the current `oc login` points at. AAP reads no repository
+inventory: its jobs find `cluster.yml` from the cluster name the apps domain gives. The deprecated
+`ansible/clusters/<cluster>.yml` and `ansible/confidential.yml` are still read, with a deprecation message, when
+the per-cluster file is missing.
+
 Before the first `make day0|d0 install` (specifically before installing
-`vault`), copy `ansible/confidential.example.yml` to `ansible/confidential.yml`
+`vault`), copy `ansible/confidential.example.yml` to `ansible/inventories/<cluster>/confidential.yml`
 and fill in what this cluster needs - `ansible/confidential.example.yml` is the
 authority, 20 blocks with per-variable prose, most of them optional, and
 fields left as `xxxxxx` treated as not configured - the `vault` role fails fast if this file is
 missing, and reads it on every run to (re-)seed Vault, so it can be deleted
-again afterwards unless Vault needs to be reinstalled. `ansible/confidential.yml`
+again afterwards unless Vault needs to be reinstalled. `ansible/inventories/<cluster>/confidential.yml`
 is gitignored; never commit it.
 
-**Encrypting it (ADR-0603 M22).** The file, and any `ansible/confidential-*.back` copy, can be kept
+**Encrypting it (ADR-0603 M22).** The file, and any `ansible/inventories/<cluster>/confidential-*.back` copy, can be kept
 `ansible-vault` encrypted so a leak of the working tree or of a backup exposes nothing. `ansible.cfg` points
 `vault_password_file` at `ansible/vault-pass.sh`, which prints the first line of `~/.config/zuno/vault-pass`
 (override with `ZUNO_VAULT_PASS_FILE`), so no `make` target ever prompts. The script never fails when that file
@@ -81,8 +95,8 @@ decrypt error. One-time setup, typed by hand so nothing lands in a log:
 ```bash
 umask 077; mkdir -p ~/.config/zuno
 read -rs -p 'passphrase: ' p; printf '%s\n' "$p" > ~/.config/zuno/vault-pass; unset p   # keep a copy in your password manager
-ansible-vault encrypt ansible/confidential.yml ansible/confidential-*.back
-ansible-vault edit ansible/confidential.yml     # edit later; ansible-vault view to read
+ansible-vault encrypt ansible/inventories/<cluster>/confidential.yml ansible/inventories/<cluster>/confidential-*.back
+ansible-vault edit ansible/inventories/<cluster>/confidential.yml     # edit later; ansible-vault view to read
 ```
 
 The passphrase file sits on the same disk as the secrets: this protects against leaks through git, backups and

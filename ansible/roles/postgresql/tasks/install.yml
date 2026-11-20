@@ -140,7 +140,7 @@
   ansible.builtin.debug:
     msg: >-
       zuno_postgresql_backup_s3_* fields are not all set in
-      ansible/confidential.yml - the zuno-postgresql PostgresCluster will
+      ansible/inventories/<cluster>/confidential.yml - the zuno-postgresql PostgresCluster will
       only get the local PVC backup repo (repo1). Fill in the bucket/
       endpoint/region/access_key/secret_key fields and re-run
       `make d0 install postgresql` to add the off-cluster S3 repo (repo2).

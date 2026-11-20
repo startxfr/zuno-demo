@@ -18,7 +18,7 @@
   ansible.builtin.fail:
     msg: >-
       zuno_mariadb_mode is 'external' but {{ item.name }} is missing or
-      still the 'xxxxxx' sentinel in ansible/confidential.yml. External
+      still the 'xxxxxx' sentinel in ansible/inventories/<cluster>/confidential.yml. External
       mode requires the endpoint and both per-database credential
       pairs (ADR-0352 clause 2) - see ansible/confidential.example.yml.
   when: (item.value | default('xxxxxx')) in ['xxxxxx', '']

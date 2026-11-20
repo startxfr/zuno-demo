@@ -34,9 +34,9 @@ An existing OpenShift 4.22 AWS IPI cluster, cluster-admin access, and:
   cert-manager renders — the check reports it.
 - GPU nodes for the served models, if any model is to run locally.
 
-## 2. `ansible/confidential.yml`
+## 2. `ansible/inventories/<cluster>/confidential.yml`
 
-Copy `ansible/confidential.example.yml` to `ansible/confidential.yml` and fill
+Copy `ansible/confidential.example.yml` to `ansible/inventories/<cluster>/confidential.yml` and fill
 in what this cluster needs. **That example file is the authority** — it carries
 20 blocks with per-variable prose, most of them optional, and fields left as
 `xxxxxx` are treated as not configured. The `vault` role fails fast without the

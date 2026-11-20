@@ -5,7 +5,7 @@
 # Read-only (platform/drift/check_drift.py, needs `oc` logged in on the machine that runs it).
 #
 # Report-only until the first clean run on a cluster: set zuno_drift_strict: true in
-# ansible/clusters/<cluster>.yml once it is clean, and any finding then fails this check.
+# ansible/inventories/<cluster>/cluster.yml once it is clean, and any finding then fails this check.
 - name: "drift | look for oc and a git checkout (an AAP execution environment has neither)"
   ansible.builtin.shell: "command -v oc >/dev/null && git -C {{ zuno_repo_root | quote }} rev-parse --git-dir >/dev/null"
   register: _drift_tools

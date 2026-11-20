@@ -11,7 +11,7 @@ Zuno Demo is an internal MVP demonstrating a reusable agentic AI platform on Red
 ## MVP target
 
 - Red Hat OpenShift Container Platform 4.22 on AWS, installed with IPI.
-- Red Hat OpenShift AI 3.5 (`rhods-operator.3.5.0` GA, `stable-3.5` channel) as the platform default. demo333 runs the 3.6.0-ea.2 early access on `beta` on purpose (WP-195 step 6, pinned in `ansible/clusters/demo333.yml`).
+- Red Hat OpenShift AI 3.5 (`rhods-operator.3.5.0` GA, `stable-3.5` channel) as the platform default. demo333 runs the 3.6.0-ea.2 early access on `beta` on purpose (WP-195 step 6, pinned in `ansible/inventories/demo333/cluster.yml`).
 - GPU inference on NVIDIA RTX PRO 6000 Blackwell 96 GB nodes (`g7e.4xlarge`) partitioned by MIG, next to infra and general node pools ([ADR-0614](docs/adr/0614-split-the-cluster-into-infra-general-worker-and-gpu-node-pools.md), [physical architecture](docs/architecture/physical-architecture.md)).
 - About 50 named users, 10 expected concurrent users, and 5 concurrent active conversations as the initial sizing reference.
 - First-token objective below 6 seconds for interactive chat paths.
@@ -52,7 +52,7 @@ in the [ADR index](docs/adr/README.md).
 ## Operator workflow
 
 Three manual inputs, and no secret is ever committed (ADR-0024): the
-OpenShift API endpoint and a cluster-admin token; `ansible/confidential.yml`,
+OpenShift API endpoint and a cluster-admin token; `ansible/inventories/<cluster>/confidential.yml`,
 copied from the gitignored example and holding this environment's credentials
 and per-cluster configuration; and, on a cluster whose catalog has moved past
 the pinned build, a deliberate OpenShift AI version choice. Everything else is

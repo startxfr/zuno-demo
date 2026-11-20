@@ -94,7 +94,7 @@
 # Route53 region and its own contact mailbox. None of it is secret (a public
 # hosted zone and its ID are published DNS facts; only the IAM key, in Vault
 # at aws/route53-dns01, is), but all of it is operator configuration, so it
-# is declared in ansible/confidential.yml alongside the S3 endpoints.
+# is declared in ansible/inventories/<cluster>/confidential.yml alongside the S3 endpoints.
 #
 # Defaults come from the chart file itself rather than being restated here:
 # one source of truth, and this apply stays byte-identical on demo222 until
@@ -216,7 +216,7 @@
       apiServerNamedCert={{ _cert_manager_acme_identity['consumers']['apiServerNamedCert'] }}.
       Applying that would prune the ClusterIssuers, the Certificates and the
       IngressController/APIServer patches this cluster is serving TLS from.
-      Almost certainly ansible/confidential.yml on this machine is missing
+      Almost certainly ansible/inventories/<cluster>/confidential.yml on this machine is missing
       zuno_certmanager_acme_enabled / _issuer / _router_default_cert /
       _api_server_named_cert - set them to the live values above. If you really
       are rolling the ACME track back, set

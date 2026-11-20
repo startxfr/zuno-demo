@@ -15,7 +15,7 @@
     that:
       - zuno_quay_s3_bucket | length > 0
     fail_msg: >-
-      Set zuno_quay_s3_bucket in ansible/clusters/<cluster>.yml and create the bucket first:
+      Set zuno_quay_s3_bucket in ansible/inventories/<cluster>/cluster.yml and create the bucket first:
       ansible-playbook ansible/playbooks/registry_bucket.yml -e registry_bucket_apply=true (key file {{ zuno_quay_s3_key_file }}).
     quiet: true
 

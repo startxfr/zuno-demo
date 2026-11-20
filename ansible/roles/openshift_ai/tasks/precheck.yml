@@ -406,7 +406,7 @@
       resource: "PackageManifest/rhods-operator channel {{ _oai_pinned_channel }} (openshift-marketplace)"
       state: "catalog publishes {{ _oai_catalog_csv }}, chart pins {{ _oai_pinned_csv }}"
       cause: "WP-118 B9 - the pinned startingCSV is not what this cluster's catalog serves on that channel. install.yml will refuse to approve the resulting InstallPlan rather than silently install a different build. Expected on a cluster provisioned later than the pin (ADR-0517's demo333 case), and NOT a defect: the refusal is what keeps the platform reproducible."
-      solution: "Decide the version deliberately, then set zuno_openshift_ai_version to '{{ _oai_catalog_csv | regex_replace('^rhods-operator\\.', '') }}' in ansible/confidential.yml before running the install - per-cluster, no chart edit and no live change to other clusters. Change gitops/charts/openshift-ai/values.yaml's subscription.version only to move the whole fleet. Pinning to an older CSV than the channel head is also valid."
+      solution: "Decide the version deliberately, then set zuno_openshift_ai_version to '{{ _oai_catalog_csv | regex_replace('^rhods-operator\\.', '') }}' in ansible/inventories/<cluster>/confidential.yml before running the install - per-cluster, no chart edit and no live change to other clusters. Change gitops/charts/openshift-ai/values.yaml's subscription.version only to move the whole fleet. Pinning to an older CSV than the channel head is also valid."
       auto_fix: "manual only - choosing a platform version is a decision, not a reconcile"
   when:
     - _oai_catalog_csv | length > 0

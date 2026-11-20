@@ -61,7 +61,7 @@ What the platform entry is made of (all delivered by commits and Argo CD, nothin
 |---|---|---|
 | Public Keycloak client `blender`, device authorization grant only, maas-gateway-audience mapper (audience zuno-admin-api) | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
 | `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
-| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for `zuno-agent-gateway` | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
+| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for `zuno-agent-gateway` | `ansible/inventories/<cluster>/cluster.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d2 install llm` |
 | Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group ocp-ai-dev), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, turned on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
 | Experience client `blender`, task `bpy`, `models.preferred: [reasoning, default]` (`gpt-oss-20b` first), no tools, C3 | [`experience-clients/blender/`](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/client.okf.md) in zuno-demo-agents | the agents release and its promotion |
 
@@ -314,7 +314,7 @@ The add-on, the workstation entry and the decision that keeps the call local. Dr
 `evaluations/blender/zuno_3d_generator.py`, `gitops/charts/connectivity-link/templates/workstation-entry.yaml` with the
 values of `gitops/charts/connectivity-link/values.yaml` and `gitops/apps/connectivity-link/application-d1.yaml`, the
 client `blender` in `gitops/charts/keycloak/files/realm-zuno.json`, `gitops/charts/ai-gateway/values.yaml`, the floor
-`zuno_ai_gateway_classification_client_floors` in `ansible/clusters/demo333.yml`, and
+`zuno_ai_gateway_classification_client_floors` in `ansible/inventories/demo333/cluster.yml`, and
 [experience-clients/blender/](https://github.com/startxfr/zuno-demo-agents/blob/main/experience-clients/blender/client.okf.md)
 in the agents release.
 

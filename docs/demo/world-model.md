@@ -43,7 +43,7 @@ earlier and prepare the recording. Credentials are named by their Vault path, ne
 ### Status
 
 Nothing to do when it reports the demo is off: that is its normal state today. The file reads, without changing
-anything: the flag `zuno_world_model_enabled` in `ansible/clusters/demo333.yml` (as committed in this checkout, not read from the
+anything: the flag `zuno_world_model_enabled` in `ansible/inventories/demo333/cluster.yml` (as committed in this checkout, not read from the
 cluster), the namespace `zuno-world-model`, the
 node labelled `zuno.io/gpu-workload=world-model`, and the world-model Application. While the flag is false there is no
 node and no Application, and the page is not show-ready. When the flag is true and a piece is missing, run Install.
@@ -67,13 +67,13 @@ other egress, Route up. It must be green.
 ### Install
 
 The file never creates the GPU node. While `zuno_world_model_enabled` is not `true` on `origin/devel`
-(`ansible/clusters/demo333.yml`, as of the last `git fetch`), it fails with `REFUSED` and nothing is installed: use the
+(`ansible/inventories/demo333/cluster.yml`, as of the last `git fetch`), it fails with `REFUSED` and nothing is installed: use the
 recording. When the flag is true, it only reads what exists (the node, the Application, the pods) and prints the owner's
 actions below. A GPU node is cluster infrastructure: it needs the platform owner's **double approval**, given
 before anything runs, and the owner does the following by hand, never the step. `make demo rehearse` does not run
 Install either: it refuses while the demo is off.
 
-1. Set `zuno_world_model_enabled: true` in `ansible/clusters/demo333.yml`, commit and push. The Day-2 install runs
+1. Set `zuno_world_model_enabled: true` in `ansible/inventories/demo333/cluster.yml`, commit and push. The Day-2 install runs
    through AAP, which reads the repository, not your workstation.
 2. `make d0 install world-model-gpu`, run locally (the AAP credential has no Machine API rights). It scales each
    world-model GPU MachineSet named in `zuno_world_model_gpu_sets` to one Machine and waits until one node is Ready
@@ -129,7 +129,7 @@ The file removes nothing: it shows what is still there (the node and the pods) a
 owner does them by hand after the session, never the step. The rehearsal covers Uninstall as that no-op:
 
 1. `make d2 uninstall world-model` removes the application.
-2. Set `zuno_world_model_enabled: false` in `ansible/clusters/demo333.yml`, commit and push. Otherwise the next
+2. Set `zuno_world_model_enabled: false` in `ansible/inventories/demo333/cluster.yml`, commit and push. Otherwise the next
    `make d0 install` creates the node again.
 3. `make d0 uninstall world-model-gpu` terminates the GPU node and removes the world-model MachineSets. It refuses
    while the application exists, and it never touches `zuno-gpu-a`.

@@ -1,7 +1,7 @@
 ---
 # ADR-0352 (WP-216): resolve zuno_external_secrets_mode for install, precheck
 # and uninstall alike (symmetric gating, clause 4). The key lives in
-# ansible/confidential.yml; absent means internal. Tier A-operator components
+# ansible/inventories/<cluster>/confidential.yml; absent means internal. Tier A-operator components
 # carry only the mode key (clause 2): no endpoint, no _external_* payload.
 - name: "external_secrets | load this cluster's confidential.yml if present"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"

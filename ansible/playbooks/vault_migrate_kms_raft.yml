@@ -8,7 +8,7 @@
 # Runbook (prerequisites, IAM policy, what each step proves, rollback):
 # docs/platform/vault-kms-raft-migration.md. Run from the repository root,
 # logged in with `oc login` as cluster-admin, with the four zuno_vault_kms_*
-# values filled in ansible/confidential.yml:
+# values filled in ansible/inventories/<cluster>/confidential.yml:
 #
 #   ansible-playbook -i ansible/inventories/demo333/hosts.yml \
 #     ansible/playbooks/vault_migrate_kms_raft.yml
@@ -91,7 +91,7 @@
       ansible.builtin.fail:
         msg: >-
           {{ _vm_kms_missing | join(', ') }} missing or "xxxxxx" in
-          ansible/confidential.yml - create the KMS key and IAM user first
+          ansible/inventories/<cluster>/confidential.yml - create the KMS key and IAM user first
           (docs/platform/vault-kms-raft-migration.md, Prerequisites).
       vars:
         _vm_kms_values:

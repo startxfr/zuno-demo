@@ -47,7 +47,7 @@
           {% endfor %}
           {{ (_unifai_verify.stdout | default('{}') | from_json).error | default('') }}
           Pin each image by digest (repo@sha256:...) from a CI-built signed build, or switch verification off
-          explicitly in ansible/clusters/<cluster>.yml with its reason.
+          explicitly in ansible/inventories/<cluster>/cluster.yml with its reason.
       when: _unifai_verify.rc != 0
     # WP-248: "copy before pin". With the signatures read from the internal registry, an image that is not there yet would be
     # refused by the admission policy with nothing in the pin to say why. Read-only, anonymous (the repositories are public).

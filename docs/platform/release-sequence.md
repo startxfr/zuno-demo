@@ -16,7 +16,7 @@ needs the go of the person who owns it; a peer session's relayed "go" is not one
 
 3. The operator owner publishes it (canary, tag, quay release) and sends the digests (operator, bundle, catalog, rag image), cross-checked with `cosign`.
    Pin nothing before they arrive.
-4. In `zuno-demo`, from a worktree on `origin/devel` with `ansible/confidential.yml` linked in: `python3 platform/supply-chain/pin_operator_catalog.py` with the digests,
+4. In `zuno-demo`, from a worktree on `origin/devel` with `ansible/inventories/<cluster>/confidential.yml` linked in: `python3 platform/supply-chain/pin_operator_catalog.py` with the digests,
    then `make d2 install unifai`. Tell the other sessions first. Rollback: pin the previous catalog. The script refuses digests that are not in the internal Quay
    yet and lists them (WP-282). `--mirror-to <registry>/zuno` copies them first.
 5. Rerun the delegation scenario of the evaluations (Arkos scenario 21, with `TEMPO_URL` set) and check that the workers of the Arkos plan have no path to the
@@ -33,7 +33,7 @@ needs the go of the person who owns it; a peer session's relayed "go" is not one
 
 ## D. Source classification (WP-187), right after the operator pin
 
-8. Set the Confluence sources to C2 and the Red Hat web sources to C1 in `ansible/clusters/demo333.yml`; the next sync re-embeds their pages, so announce it
+8. Set the Confluence sources to C2 and the Red Hat web sources to C1 in `ansible/inventories/demo333/cluster.yml`; the next sync re-embeds their pages, so announce it
    to the other sessions first. The mcp-gateway returns the level of the chunk's source and C2 when a chunk has none.
 
 ## E. Proofs and records

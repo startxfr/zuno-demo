@@ -3,7 +3,7 @@
 Last reviewed: 2026-11-19
 
 Before the first `make day0|d0 install`, copy `ansible/confidential.example.yml`
-to `ansible/confidential.yml` and fill in what this cluster needs - `ansible/confidential.example.yml` is the
+to `ansible/inventories/<cluster>/confidential.yml` and fill in what this cluster needs - `ansible/confidential.example.yml` is the
 authority, 20 blocks with per-variable prose, most of them optional, and
 fields left as `xxxxxx` treated as not configured. The `vault` role
 (the first Day 0 component that needs them) fails fast if this file is

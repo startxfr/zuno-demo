@@ -35,7 +35,7 @@
   ansible.builtin.fail:
     msg: >-
       zuno_redis_mode is 'external' but zuno_redis_external_host is missing or still the 'xxxxxx' sentinel in
-      ansible/confidential.yml, so the {{ gitops_component_name }} Application cannot be pointed at it. Fill in the
+      ansible/inventories/<cluster>/confidential.yml, so the {{ gitops_component_name }} Application cannot be pointed at it. Fill in the
       zuno_redis_external_* keys (see ansible/confidential.example.yml), run `make d1 install redis`, then this
       component again.
   when:

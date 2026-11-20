@@ -2,7 +2,7 @@
 # Shared by install.yml, restore.yml and check_s3_backup.yml - extracted
 # from install.yml so all three read the exact same S3 credentials/enabled
 # determination instead of three copies drifting apart. Soft-read of
-# ansible/confidential.yml (not a hard fail like vault's): S3 backup is
+# ansible/inventories/<cluster>/confidential.yml (not a hard fail like vault's): S3 backup is
 # opt-in, a cluster with no S3 creds configured simply has no repo2.
 - name: "postgresql | load this cluster's confidential.yml if present"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
@@ -191,7 +191,7 @@
   ansible.builtin.debug:
     msg: >-
       {% if (zuno_postgresql_backup_s3_path | default('')) | length == 0 -%}
-      pgBackRest repo2 path UNRESOLVED - neither ansible/confidential.yml nor
+      pgBackRest repo2 path UNRESOLVED - neither ansible/inventories/<cluster>/confidential.yml nor
       the zuno-postgresql PostgresCluster provided one. Anything that reads the
       repo will report "couldn't tell" rather than guess a prefix.
       {%- elif (_postgresql_backup_s3_fallback_path | default('')) == zuno_postgresql_backup_s3_path -%}

@@ -1,6 +1,6 @@
 ---
 # ADR-0612/WP-248 step 3: the S3 bucket that holds the internal Quay's blobs.
-# Per-cluster values live in ansible/clusters/<cluster>.yml (ADR-0547).
+# Per-cluster values live in ansible/inventories/<cluster>/cluster.yml (ADR-0547).
 zuno_quay_s3_bucket: ""            # e.g. zuno-demo333-registry (WP-131 convention)
 zuno_quay_s3_region: eu-central-1  # passed explicitly: the AWS profile's declared region is wrong
 zuno_quay_s3_iam_user: "{{ zuno_quay_s3_bucket }}"

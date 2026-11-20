@@ -1,7 +1,7 @@
 ---
 # There is no SMTP server to install, only the technical mail identity's
 # credential to expose via ExternalSecret, seeded at zuno/smtp/technical
-# by the vault role from ansible/confidential.yml.
+# by the vault role from ansible/inventories/<cluster>/confidential.yml.
 #
 # zuno_smtp_enabled (soft-read below, no fail if the file is missing) gates
 # both Applications: defaults to true, but confidential.example.yml sets it
@@ -30,7 +30,7 @@
 - name: "smtp | note that smtp is disabled"
   ansible.builtin.debug:
     msg: >-
-      zuno_smtp_enabled is false in ansible/confidential.yml - skipping
+      zuno_smtp_enabled is false in ansible/inventories/<cluster>/confidential.yml - skipping
       both smtp GitOps Applications. Set it to true (or remove it) and
       re-run `make d1 install smtp` to enable the technical mail identity.
   when: not (zuno_smtp_enabled | default(true) | bool)

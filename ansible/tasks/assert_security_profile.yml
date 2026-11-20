@@ -1,6 +1,6 @@
 ---
 # ADR-0602 clause 3 / WP-223: validate zuno_security_profile (main.yml,
-# overridable in ansible/clusters/<cluster>.yml or ansible/confidential.yml).
+# overridable in ansible/inventories/<cluster>/cluster.yml or ansible/inventories/<cluster>/confidential.yml).
 #
 # Why an assert: passwords.yml and the keycloak chart both branch on the exact
 # string. A typo ("hardend") would silently fall into the demo branch of
@@ -20,7 +20,7 @@
       zuno_security_profile is '{{ zuno_security_profile | default('demo') }}'; expected 'demo' or
       'hardened' (ADR-0602 clause 3). Fix it in
       ansible/inventories/<cluster>/group_vars/all/main.yml,
-      ansible/clusters/<cluster>.yml or ansible/confidential.yml.
+      ansible/inventories/<cluster>/cluster.yml or ansible/inventories/<cluster>/confidential.yml.
     quiet: true
 
 # The hardened realm policy (gitops/charts/keycloak: "length(12) and digits(1)
@@ -39,7 +39,7 @@
     fail_msg: >-
       ADR-0602 hardened profile: the shared persona password
       (zuno_personas_mainpwd, or zuno_personas_humans_password when set) must
-      be set in ansible/confidential.yml, be at least 12 characters long and
+      be set in ansible/inventories/<cluster>/confidential.yml, be at least 12 characters long and
       contain a digit - the zuno realm's hardened passwordPolicy refuses
       anything else.
     quiet: true

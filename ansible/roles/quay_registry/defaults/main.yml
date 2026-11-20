@@ -1,6 +1,6 @@
 ---
 zuno_quay_namespace: zuno-registry
-# Per-cluster (ansible/clusters/<cluster>.yml, ADR-0547): zuno_quay_s3_bucket, zuno_quay_s3_region.
+# Per-cluster (ansible/inventories/<cluster>/cluster.yml, ADR-0547): zuno_quay_s3_bucket, zuno_quay_s3_region.
 zuno_quay_s3_bucket: ""
 zuno_quay_s3_region: eu-central-1
 # The one-time key file written by roles/registry_bucket.
@@ -16,5 +16,5 @@ zuno_quay_organization_email: registry@zuno.invalid  # must differ from the admi
 zuno_quay_validate_certs: true
 # WP-261 family (e): put the zuno+pull robot for the registry route host in the global pull secret
 # (tasks/node_pull_secret.yml), so the nodes can read the PRIVATE Red Hat mirror repositories. Per-cluster switch, set in
-# ansible/clusters/<cluster>.yml with the owner's go; flip it before gitops redhatRedirects.enabled.
+# ansible/inventories/<cluster>/cluster.yml with the owner's go; flip it before gitops redhatRedirects.enabled.
 zuno_quay_node_pull_secret: false
