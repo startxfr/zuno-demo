@@ -50,8 +50,7 @@ Result: pending.
 
 ## Related work
 
-The image-proof guard (a ValidatingAdmissionPolicy and a deny-all NetworkPolicy) belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). The aggressive chaos run of the evening
-gets its evidence file under `docs/roadmap/evidence/`.
+The image-proof guard (a ValidatingAdmissionPolicy and a deny-all NetworkPolicy) belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). The aggressive chaos run, first planned for the evening of 2026-11-20, is moved to after the demonstration (owner's decision of the same day); it is not part of this work package, and its evidence file will go under `docs/roadmap/evidence/` when it runs.
 
 ## Acceptance
 
