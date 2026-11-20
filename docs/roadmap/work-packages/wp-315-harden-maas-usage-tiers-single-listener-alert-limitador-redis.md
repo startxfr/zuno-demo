@@ -23,10 +23,10 @@ The owner's principles: usage profiles, not per-user subscriptions; one window; 
 | `gpt-oss-20b-builders` | the groups `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops` | 5,000,000 tokens an hour | 20 | gpt-oss-20b |
 | `gpt-oss-20b-business` | the group `/sales` | 5,000 tokens an hour | 1 | gpt-oss-20b |
 
-They replace `<model>-ai-gateway`, `<model>-lightspeed` and `<model>-load`, the three `ocp-*` subscriptions and `<model>-sales`. Estimate: about 0.55 MB, 12 subscription limits plus the default deny.
+They replace `<model>-ai-gateway`, `<model>-lightspeed` and `<model>-load`, the three `ocp-*` subscriptions and `<model>-sales`. Estimate from the rendered chart: 550,448 bytes, 12 subscription limits plus the default deny.
 The tier is the unit of delegation; this amends [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) (dated note).
 
-Result: pending.
+Result: the chart is on `devel` since 2026-11-20 15:01 UTC (7b289ce5); it goes live when the `zuno-models-d1` auto-sync is restored after the KServe window (about 15:12 UTC). The names, `owner.users`, limit count and bytes measured on the cluster are recorded here after that; until then the figures above are estimates, not measurements.
 
 ## 2. Single-listener test (about 16:30 UTC)
 
