@@ -333,3 +333,17 @@ operandNamespace: kuadrant-system
 dayCheck:
   serviceAccount: aap-day0-check
   namespace: zuno-aap
+
+# WP-314: a CronJob that runs platform/models/check_maas_wasm.py (read-only: oc get / oc logs) in operandNamespace, and the
+# PrometheusRule ZunoMaasWasmConfigNotApplied that fires when it fails (templates/maas-wasm-check.yaml). The script is a copy in
+# files/check_maas_wasm.py, kept equal by platform/gitops/tests/test_maas_wasm_check_chart.py. Off by default.
+maasWasmCheck:
+  enabled: false
+  # ose-tools-rhel9 (oc and python3), the digest the rhtas_config role already pins.
+  image: registry.redhat.io/openshift4/ose-tools-rhel9@sha256:a3bdc6574db914ec8c4385b6ff8b2c315930f8de9a27a3a9e0204163c85cd6be
+  schedule: "*/15 * * * *"
+  logWindow: 20m          # a little more than the schedule, so a failure is seen by at least one run
+  maxBytes: 1400000
+  envoyfilterNamespace: openshift-ingress
+  operatorNamespace: openshift-operators
+  operatorDeployment: kuadrant-operator-controller-manager

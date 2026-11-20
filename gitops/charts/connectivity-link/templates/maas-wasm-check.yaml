@@ -1,0 +1,254 @@
+{{- /*
+WP-314: a periodic, read-only run of platform/models/check_maas_wasm.py in the cluster, and an alert when it fails.
+
+When the Kuadrant wasm EnvoyFilter of a gateway grows too big the API server refuses its update, the object stays stale
+and the token limits added since are NOT USED, silently. The script says so (exit 1: a limit not used, an EnvoyFilter
+above maxBytes, or "failed to update envoyfilter object" in the operator log); the CronJob turns that exit code into a
+failed Job, and the PrometheusRule ZunoMaasWasmConfigNotApplied into an alert.
+
+The script is shipped as a ConfigMap from files/check_maas_wasm.py, a copy of platform/models/check_maas_wasm.py (a chart
+cannot read outside its directory); platform/gitops/tests/test_maas_wasm_check_chart.py fails when the two differ.
+Off by default: maasWasmCheck.enabled. Only `oc get` and `oc logs` run, with the RBAC below (least privilege).
+*/ -}}
+{{- if .Values.maasWasmCheck.enabled }}
+{{- $c := .Values.maasWasmCheck }}
+{{- $ns := .Values.operandNamespace }}
+{{- $name := "maas-wasm-check" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-script
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+data:
+  check_maas_wasm.py: |
+{{ .Files.Get "files/check_maas_wasm.py" | indent 4 }}
+---
+# The EnvoyFilters of every gateway: oc get envoyfilter -n openshift-ingress
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-envoyfilters
+  namespace: {{ $c.envoyfilterNamespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+rules:
+  - apiGroups: ["networking.istio.io"]
+    resources: ["envoyfilters"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-envoyfilters
+  namespace: {{ $c.envoyfilterNamespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-envoyfilters
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $ns }}
+---
+# The Limitador CR: oc get limitador limitador -n kuadrant-system
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-limitador
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+rules:
+  - apiGroups: ["limitador.kuadrant.io"]
+    resources: ["limitadors"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-limitador
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-limitador
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $ns }}
+---
+# `oc logs deploy/<operator>` resolves the Deployment, lists its pods through the selector, then reads their logs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-operator-logs
+  namespace: {{ $c.operatorNamespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: [{{ $c.operatorDeployment | quote }}]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-operator-logs
+  namespace: {{ $c.operatorNamespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-operator-logs
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $ns }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "45"
+spec:
+  schedule: {{ $c.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ $name }}
+        spec:
+          serviceAccountName: {{ $name }}
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: check
+              image: {{ $c.image | quote }}
+              command: ["python3", "/scripts/check_maas_wasm.py", "--max-bytes", {{ $c.maxBytes | int | quote }}, "--log-window", {{ $c.logWindow | quote }}]
+              env:
+                - name: HOME
+                  value: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 256Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: script
+              configMap:
+                name: {{ $name }}-script
+            - name: tmp
+              emptyDir: {}
+---
+# kube_job_* and kube_cronjob_* come from kube-state-metrics; zuno namespaces carry openshift.io/cluster-monitoring=true
+# (see servicemonitor-limitador.yaml), so the platform Prometheus evaluates this rule.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "45"
+spec:
+  groups:
+    - name: zuno-maas-wasm
+      rules:
+        - alert: ZunoMaasWasmConfigNotApplied
+          # (a) the newest failed Job is newer than the last successful run, or (b) no success for 45 minutes, or
+          # (c) the CronJob has never succeeded.
+          expr: >-
+            (
+              max(
+                kube_job_created{namespace="{{ $ns }}", job_name=~"{{ $name }}-.*"}
+                * on (namespace, job_name) clamp_max(kube_job_status_failed{namespace="{{ $ns }}", job_name=~"{{ $name }}-.*"}, 1)
+              )
+              > max(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ $name }}"})
+            )
+            or (time() - max(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ $name }}"}) > 2700)
+            or absent(kube_cronjob_status_last_successful_time{namespace="{{ $ns }}", cronjob="{{ $name }}"})
+          for: 20m
+          labels:
+            severity: warning
+            wp: WP-314
+          annotations:
+            summary: "The Kuadrant wasm configuration of a MaaS gateway is not fully applied"
+            description: >-
+              The last run of the {{ $ns }}/{{ $name }} CronJob failed or none succeeded for 45 minutes: a token limit is
+              NOT USED (the EnvoyFilter is stale or too big), or the Kuadrant operator reports "failed to update envoyfilter
+              object". See `oc logs -n {{ $ns }} job/<latest {{ $name }} job>` and platform/models/check_maas_wasm.py.
+{{- end }}

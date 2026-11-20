@@ -464,6 +464,8 @@ jobs:
           python3 platform/gitops/tests/test_check_workload_hygiene.py
       - name: the GPU MachineSets of demo333 render as the golden file (owner's rule, never touch the GPU nodes)
         run: python3 platform/gitops/tests/test_machines_gpu_golden.py
+      - name: the in-cluster MaaS wasm check renders (switch, script copy, RBAC, alert)
+        run: python3 platform/gitops/tests/test_maas_wasm_check_chart.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

@@ -68,7 +68,7 @@ class Collect(unittest.TestCase):
         self.assertEqual([(o["name"], o["generation"], o["action_sets"]) for o in result["envoyfilters"]],
                          [("kuadrant-maas-default-gateway", 7, 2)])
         self.assertEqual([r["status"] for r in result["limits"]], ["COUNTED", "COUNTED"])
-        self.assertEqual(result["failed_update_lines_last_30m"], 0)
+        self.assertEqual(result["failed_update_lines"], 0)
 
     def test_a_limit_whose_key_is_missing_from_the_configuration_is_not_used(self):
         result = c.collect(fake_oc(envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A]), limit("ns/c", [KEY_C]))))
@@ -82,14 +82,30 @@ class Collect(unittest.TestCase):
     def test_failed_updates_are_counted_and_the_lines_never_kept(self):
         log = ("ok\n" + 'ERROR failed to update envoyfilter object {"huge": "object"}\n' * 3 + "ok\n")
         result = c.collect(fake_oc(envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A])), log))
-        self.assertEqual(result["failed_update_lines_last_30m"], 3)
+        self.assertEqual(result["failed_update_lines"], 3)
         self.assertFalse(result["ok"])
         self.assertNotIn("huge", json.dumps(result))
         self.assertNotIn("huge", c.render(result))
 
+    def test_the_log_window_is_passed_to_oc_logs_and_shown(self):
+        seen = []
+        inner = fake_oc(envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A])))
+
+        def run(args):
+            seen.append(args)
+            return inner(args)
+        default = c.collect(run)
+        self.assertIn("--since=30m", [a for args in seen for a in args])
+        self.assertIn("last 30m of the kuadrant operator log", c.render(default))
+        seen.clear()
+        result = c.collect(run, log_window="20m")
+        self.assertIn("--since=20m", [a for args in seen for a in args])
+        self.assertEqual(result["log_window"], "20m")
+        self.assertIn("last 20m of the kuadrant operator log", c.render(result))
+
     def test_an_unreadable_log_is_said_so_and_is_not_ok(self):
         result = c.collect(fake_oc(envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A])), log_error=True))
-        self.assertIsNone(result["failed_update_lines_last_30m"])
+        self.assertIsNone(result["failed_update_lines"])
         self.assertFalse(result["ok"])
         self.assertIn("could not be read", c.render(result))
 
