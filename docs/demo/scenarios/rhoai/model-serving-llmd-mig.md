@@ -268,8 +268,8 @@ flowchart LR
   S3[("S3 zuno-demo-sources<br/>models/served-name/, eu-west-2<br/>credential from Vault rag/s3")] --> POD & EMB
   HWP["HardwareProfiles mig-1g-24gb, mig-2g-48gb<br/>redhat-ods-applications"] -. nodeSelector .-> POD
   subgraph GPU["MachineSet zuno-gpu-a: 2 x g7e.4xlarge, RTX PRO 6000 96 GB, MIG all-balanced"]
-    NA["ip-10-18-18-19<br/>1g.24gb: qwen35-9b, embeddings<br/>2g.48gb: qwen36-27b-instruct"]
-    NB["ip-10-18-31-154<br/>1g.24gb: gpt-oss-20b, one free<br/>2g.48gb: qwen35-9b-wesh"]
+    NA["GPU node A<br/>1g.24gb: qwen35-9b, embeddings<br/>2g.48gb: qwen36-27b-instruct"]
+    NB["GPU node B<br/>1g.24gb: gpt-oss-20b, one free<br/>2g.48gb: qwen35-9b-wesh"]
   end
   POD --> NA & NB
   EMB --> NA

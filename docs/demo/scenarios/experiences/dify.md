@@ -296,7 +296,7 @@ The decisions this page rests on:
 > `zuno-dify-knowledge` 1/1 (Dify 1.17.0 pinned by digest) and `dify-redis-master` 1/1; route
 > `dify.apps.demo333.startx.fr`; five ExternalSecrets synced; EgressFirewall applied; the token proxy runs as Keycloak
 > client `dify` with `X-Zuno-Agent: dify` and task `chat`; `dify` is in the ai-gateway's experience and persona-claim
-> clients. Around 22:00Z master ip-10-18-36-37 was cordoned, Grafana was down and the local models were restarting. At
+> clients. Around 22:00Z master `ip-<address>` was cordoned, Grafana was down and the local models were restarting. At
 > 22:51Z the master was schedulable again, Grafana was 1/1, the four local models were Ready, and the Dify pods had been
 > recreated about 80 minutes earlier (`dify-api` with 3 restarts, `dify-web` with 1). The three applications were not
 > checked: that needs a sign-in.

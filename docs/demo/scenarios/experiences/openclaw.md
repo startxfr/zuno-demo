@@ -297,7 +297,7 @@ The decisions this page rests on:
 > Deployments `assistant`, `assistant-proxy` and `front-door` 1/1, Route `front-door` admitted and the operator's Route
 > `HostAlreadyClaimed`, EgressFirewall rules applied, ExternalSecrets `openclaw-client` and `openclaw-ui` synced. The
 > ai-gateway lists `openclaw-*` in its experience, persona-claim and fail-closed clients. The four local models were
-> Ready, Grafana 1/1 and master ip-10-18-36-37 schedulable again. One thing was not healthy: both claw-operator managers
+> Ready, Grafana 1/1 and master `ip-<address>` schedulable again. One thing was not healthy: both claw-operator managers
 > were restarting (13 restarts in 80 minutes in `zuno-claw-consultant-02`, 3 in 13 minutes in `zuno-claw-sale-01`, exit
 > code 1), while the assistants kept running. Run the probe before any session.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**

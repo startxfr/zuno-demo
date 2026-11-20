@@ -297,7 +297,7 @@ Evidence:
 > `unifai-operator.v0.1.69` Succeeded), the 14 stack pods Running, the 11 UnifaiTeams Ready (`agent-tekos` included),
 > UnifaiAgentBundle `tekos` Ready and verified (4 tasks, 17 objects), the 45 UnifaiWorkflows Ready (`tekos` and the
 > personal starters included), the four local models Ready, `ai-gateway` and `mcp-gateway` 1/1. An earlier check, at
-> about 22:00 UTC, found the master `ip-10-18-36-37` cordoned, Grafana down and the local models restarting. At
+> about 22:00 UTC, found the master `ip-<address>` cordoned, Grafana down and the local models restarting. At
 > 22:50 UTC the master was schedulable again and Grafana was 1/1. The UnifAI multiagent, worker and UI pods had
 > restarted at 22:47 UTC on the same image digests. The last recorded `unifai-tekos` pass was at 17:07 UTC that day
 > ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).

@@ -292,7 +292,7 @@ Evidence:
 > RemoteMCPServer `zuno-mcp-gateway` Accepted, with five discovered tools (`k8s.resource.read`, `k8s.resource.list`,
 > `k8s.events.read`, `k8s.logs.read`, `metrics.query`); Deployment `k8s-mcp` 1/1 in `zuno-ai-run`, its configuration
 > `read_only = true` with Secret and ConfigMap denied; route `kagent.apps.demo333.startx.fr`; the token proxy runs as
-> Keycloak client `kagent` with `X-Zuno-Agent: kagent` and task `diagnose`. Around 22:00Z master ip-10-18-36-37 was
+> Keycloak client `kagent` with `X-Zuno-Agent: kagent` and task `diagnose`. Around 22:00Z master `ip-<address>` was
 > cordoned, Grafana was down and the local models were restarting. At 22:51Z the master was schedulable again, Grafana
 > was 1/1, the four local models were Ready, and the kagent pods had been recreated about 80 minutes earlier with no
 > restart.
