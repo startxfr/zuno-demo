@@ -11,11 +11,21 @@
 # the name anyone types, and a bucket named after it would change if the
 # cluster were ever reinstalled under the same DNS. The apps domain is the
 # stable human-facing identity, and every consumer of this fact is human-facing.
+#
+# Per-cluster inventories: on a workstation zuno_cluster_name comes from the
+# inventory's group_vars (ansible/inventories/<cluster>/group_vars/all/main.yml)
+# and selects that cluster's cluster.yml and confidential.yml. The apps domain
+# is still read then, to refuse an inventory that names another cluster than
+# the one `oc` points at (the guard at the end of this file). AAP has no
+# inventory value: the name comes from the domain alone, so the guard is inert.
+# zuno_cluster_name_guard: false skips the domain read and the guard - only for
+# a cluster whose apps domain does not carry its short name (custom
+# appsDomain, readiness probe P3).
 - name: "cluster-name | resolve the apps domain first"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
   when:
     - cluster_name is not defined
-    - zuno_cluster_name is not defined
+    - zuno_cluster_name is not defined or (zuno_cluster_name_guard | default(true) | bool)
 
 # Strip a leading "apps." and keep the first label: apps.demo222.startx.fr ->
 # demo222. The prefix is stripped conditionally, NOT with an unguarded
@@ -50,11 +60,39 @@
     msg: >-
       Could not derive a cluster name from the apps domain
       '{{ cluster_base_domain | default('<unset>') }}'. Set zuno_cluster_name
-      explicitly in the inventory or ansible/confidential.yml. This value keys
+      explicitly in the inventory (zuno_cluster_name in
+      ansible/inventories/<cluster>/group_vars/all/main.yml). This value keys
       ADR-0546's per-cluster S3 bucket names and their Vault paths, so it must
       not be guessed.
   when:
     - cluster_name is not defined or (cluster_name | trim | length) == 0
+
+# The safety guard: `make CLUSTER=demo222 ...` while `oc` is logged in to
+# demo333 would otherwise load demo222's cluster.yml and confidential.yml and
+# apply them to demo333 (bucket names, Vault seeds, the Applications' branch).
+# Same label logic as the set_fact above.
+- name: "cluster-name | refuse an inventory that names another cluster than the live one"
+  ansible.builtin.fail:
+    msg: >-
+      This inventory is for '{{ zuno_cluster_name }}' (zuno_cluster_name, from
+      ansible/inventories/{{ zuno_cluster_name }}/group_vars/all/main.yml or -e),
+      but the cluster the current kubeconfig points at is '{{ _live_name }}'
+      (apps domain '{{ cluster_base_domain }}'). Refusing to apply one cluster's
+      values to another. Log in to the right cluster (`oc login`), or select its
+      inventory: make CLUSTER={{ _live_name }} ... (ansible-playbook -i
+      ansible/inventories/{{ _live_name }}/hosts.yml). For a cluster whose apps
+      domain does not carry its short name, set zuno_cluster_name_guard: false in
+      its group_vars.
+  vars:
+    _live_labels: "{{ (cluster_base_domain | default('')).split('.') }}"
+    _live_name: >-
+      {{ _live_labels[1] if (_live_labels | length) > 1 and _live_labels[0] == 'apps'
+         else _live_labels[0] }}
+  when:
+    - zuno_cluster_name is defined
+    - zuno_cluster_name_guard | default(true) | bool
+    - cluster_base_domain is defined
+    - _live_name | trim != zuno_cluster_name | trim
 
 - name: "cluster-name | report the resolved cluster name"
   ansible.builtin.debug:
