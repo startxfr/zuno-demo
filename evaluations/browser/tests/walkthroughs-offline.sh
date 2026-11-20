@@ -904,7 +904,7 @@ assert list(steps) == ["enter", "owned", "sign-in", "playground", "playground-sh
 assert steps["playground"]["url"] == "/maas-consumer-portal/gen-ai-studio/playground/zuno-playground" and steps["playground"]["create_button"] is False, steps["playground"]
 assert steps["mcp"]["row"]["listed"] is True and steps["mcp"]["row"]["connected"] is False and steps["mcp"]["row"]["tools"] == "0 active", steps["mcp"]
 assert "GET /gen-ai/api/v1/conversations" in steps["storage"]["store_like_requests"] and isinstance(steps["storage"]["keys"]["local"], list), steps["storage"]
-assert steps["model"]["chosen"] == [] and steps["model"]["before"] == {"model": True, "subscription": "gpt-oss-20b-agents"} and steps["model"]["subscription_shown"] == "gpt-oss-20b-agents", steps["model"]
+assert steps["model"]["chosen"] == [] and steps["model"]["before"] == {"model": True, "subscription": "gpt-oss-20b-builders"} and steps["model"]["subscription_shown"] == "gpt-oss-20b-builders", steps["model"]
 '
 out="$(genai g-saved RECORD_SCOUT=1 FAKE_MCP_SAVED=1)"; rc=$?
 echo "$out" | sed 's/^/    /'

@@ -146,6 +146,10 @@ altGatewayPeers:
       - limit: 200000
         window: 1h
     priority: 50
+    # WP-315 (2026-11-20, owner decision): the stress ServiceAccount is a user of the `<model>-service` tier (with
+    # Lightspeed, same 200,000/h and priority 50, its own counter) instead of a `<model>-load` subscription.
+    # true restores `<model>-load`.
+    ownSubscription: false
 
 # WP-115 (2026-11-07): the RHOAI Evaluations page (EvalHub, gitops/charts/trustyai-config)
 # runs its benchmark Jobs in this namespace; their pods call the model's workload Service on
@@ -1182,7 +1186,7 @@ maas:
         # /sales business-role tier, a materially lower limit than the
         # generated gpt-oss-20b-agents subscription, so the two-tier access
         # difference of ADR-0201/WP-27 stays demonstrable.
-        - name: gpt-oss-20b-sales
+        - name: gpt-oss-20b-business
           group: /sales
           tokenRateLimits:
             - limit: 5000
@@ -1202,20 +1206,14 @@ maas:
         # the gateway wasm object of this model's 15 route matches and each further
         # entry only a predicate clause; check the EnvoyFilter size (1.5 MiB etcd
         # limit) after it is applied.
-        - name: gpt-oss-20b-ocp-ai-dev
-          group: /ocp-ai-dev
-          tokenRateLimits:
-            - limit: 5000000
-              window: 1h
-          priority: 20
-        - name: gpt-oss-20b-ocp-ai-ops
-          group: /ocp-ai-ops
-          tokenRateLimits:
-            - limit: 5000000
-              window: 1h
-          priority: 20
-        - name: gpt-oss-20b-ocp-paas-ops
-          group: /ocp-paas-ops
+        # WP-315 (2026-11-20, owner decision): the three groups share ONE usage
+        # tier, `builders`, instead of one subscription per group. The budget is
+        # still per person (every maas-trlp-* limit counts by auth.identity.userid).
+        - name: gpt-oss-20b-builders
+          groups:
+            - /ocp-ai-dev
+            - /ocp-ai-ops
+            - /ocp-paas-ops
           tokenRateLimits:
             - limit: 5000000
               window: 1h
@@ -1237,7 +1235,7 @@ maas:
         # platform-level circuit breaker, not the mechanism doing real
         # quota enforcement. Priority 100 (above every persona tier) since
         # it represents infrastructure, not a contended end-user share.
-        - name: gpt-oss-20b-ai-gateway
+        - name: gpt-oss-20b-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1249,7 +1247,7 @@ maas:
         # qwen36-27b-instruct-lightspeed below - without this entry MaaS
         # 403s with "no matching subscription found for user" for this
         # model+identity pair specifically, independent of the qwen grant.
-        - name: gpt-oss-20b-lightspeed
+        - name: gpt-oss-20b-service
           user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
           tokenRateLimits:
             - limit: 200000
@@ -1275,7 +1273,7 @@ maas:
         # /sales business-role tier, a materially lower limit than the
         # generated qwen36-27b-instruct-agents subscription, so the two-tier access
         # difference of ADR-0201/WP-27 stays demonstrable.
-        - name: qwen36-27b-instruct-sales
+        - name: qwen36-27b-instruct-business
           group: /sales
           tokenRateLimits:
             - limit: 5000
@@ -1284,7 +1282,7 @@ maas:
         # ADR-0521 (WP-076) step 3: same ai-gateway-own-identity entry as
         # gptOssModel's own - see that one's comment for the full
         # user-vs-group scoping/rate-limit rationale.
-        - name: qwen36-27b-instruct-ai-gateway
+        - name: qwen36-27b-instruct-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1308,7 +1306,7 @@ maas:
         # infrastructure tier: Lightspeed serves interactive console questions
         # for many users, but it is one assistant, not the platform's whole
         # aggregate model traffic. Priority 50 for the same reason.
-        - name: qwen36-27b-instruct-lightspeed
+        - name: qwen36-27b-instruct-service
           user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
           tokenRateLimits:
             - limit: 200000
@@ -1334,7 +1332,7 @@ maas:
         # /sales business-role tier, a materially lower limit than the
         # generated qwen35-9b-wesh-agents subscription, so the two-tier access
         # difference of ADR-0201/WP-27 stays demonstrable.
-        - name: qwen35-9b-wesh-sales
+        - name: qwen35-9b-wesh-business
           group: /sales
           tokenRateLimits:
             - limit: 5000
@@ -1346,7 +1344,7 @@ maas:
         # depends on - without it the -maas sibling 403s and every turn
         # silently falls through to the direct twin. See gpt-oss-20b's own
         # entry for the full user-vs-group scoping rationale.
-        - name: qwen35-9b-wesh-ai-gateway
+        - name: qwen35-9b-wesh-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1372,7 +1370,7 @@ maas:
         # /sales business-role tier, a materially lower limit than the
         # generated qwen35-9b-agents subscription, so the two-tier access
         # difference of ADR-0201/WP-27 stays demonstrable.
-        - name: qwen35-9b-sales
+        - name: qwen35-9b-business
           group: /sales
           tokenRateLimits:
             - limit: 5000
@@ -1384,7 +1382,7 @@ maas:
         # depends on - without it the -maas sibling 403s and every turn
         # silently falls through to the direct twin. See gpt-oss-20b's own
         # entry for the full user-vs-group scoping rationale.
-        - name: qwen35-9b-ai-gateway
+        - name: qwen35-9b-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1393,7 +1391,7 @@ maas:
         # Lightspeed fallback (ADR-0524, 2026-10-25): same dedicated
         # ServiceAccount, tier and rationale as gpt-oss-20b-lightspeed, for
         # when Lightspeed's provider is switched to this model.
-        - name: qwen35-9b-lightspeed
+        - name: qwen35-9b-service
           user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
           tokenRateLimits:
             - limit: 200000
@@ -1414,7 +1412,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: mistral-large
       subscriptions:
-        - name: mistral-large-ai-gateway
+        - name: mistral-large-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1434,7 +1432,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: gpt-oss-120b-ovhcloud
       subscriptions:
-        - name: gpt-oss-120b-ovhcloud-ai-gateway
+        - name: gpt-oss-120b-ovhcloud-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1456,7 +1454,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: mistral-codestral
       subscriptions:
-        - name: mistral-codestral-ai-gateway
+        - name: mistral-codestral-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1468,7 +1466,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: openai-gpt-4o-mini
       subscriptions:
-        - name: openai-gpt-4o-mini-ai-gateway
+        - name: openai-gpt-4o-mini-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1480,7 +1478,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: anthropic-claude
       subscriptions:
-        - name: anthropic-claude-ai-gateway
+        - name: anthropic-claude-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000
@@ -1492,7 +1490,7 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: gemini-pro
       subscriptions:
-        - name: gemini-pro-ai-gateway
+        - name: gemini-pro-platform
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
             - limit: 1000000

@@ -12,7 +12,7 @@
       - {"api_version": "ols.openshift.io/v1alpha1", "kind": "OLSConfig", "name": "cluster", "condition": "RHOKPReady"}
       - {"api_version": "operators.coreos.com/v1alpha1", "kind": "ClusterServiceVersion", "name_prefix": "lightspeed-operator.v", "namespace": "openshift-lightspeed", "phase": "Succeeded"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "gpt-oss-20b", "namespace": "zuno-ai-run", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-lightspeed", "namespace": "models-as-a-service", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-service", "namespace": "models-as-a-service", "condition": "Ready"}
 - name: "lightspeed check | queue the golden-path probes"
   ansible.builtin.include_tasks: "{{ demo_lib }}/queue_probes.yml"
   vars:

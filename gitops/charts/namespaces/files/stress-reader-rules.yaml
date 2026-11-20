@@ -475,13 +475,11 @@ rules:
   resources:
   - maassubscriptions
   resourceNames:
-  - gpt-oss-120b-ovhcloud-ai-gateway
-  - gpt-oss-20b-ai-gateway
-  - gpt-oss-20b-lightspeed
-  - gpt-oss-20b-ocp-ai-dev
-  - gpt-oss-20b-ocp-ai-ops
-  - gpt-oss-20b-ocp-paas-ops
-  - mistral-large-ai-gateway
+  - gpt-oss-120b-ovhcloud-platform
+  - gpt-oss-20b-builders
+  - gpt-oss-20b-platform
+  - gpt-oss-20b-service
+  - mistral-large-platform
   verbs:
   - get
 - apiGroups:

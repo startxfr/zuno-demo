@@ -37,8 +37,8 @@ const PLAYGROUND = `<div>Project <button id="project">Zuno Playground</button></
 <div id="panel" hidden><div role="tablist">${["Model", "Prompt", "Knowledge", "MCP"].map((t) => `<button role="tab" aria-selected="false" data-tab="${t}">${t}</button>`).join("")}</div>
 <section data-for="Model" hidden><p>Model <button id="model" class="pf-v6-c-menu-toggle">${knob("FAKE_OTHER_MODEL") ? OTHER : MODEL}</button></p>
 <ul role="listbox" id="models" hidden><li role="option">${MODEL}</li><li role="option">${OTHER}</li></ul>
-<p>Subscription <button class="pf-v6-c-menu-toggle">gpt-oss-20b-agents</button></p>
-<ul role="listbox" hidden><li role="option">gpt-oss-20b-ocp-ai-ops</li><li role="option">gpt-oss-20b-agents</li></ul></section>
+<p>Subscription <button class="pf-v6-c-menu-toggle">gpt-oss-20b-builders</button></p>
+<ul role="listbox" hidden><li role="option">gpt-oss-20b-builders</li></ul></section>
 <section data-for="Prompt" hidden><textarea aria-label="System prompt">You are a helpful assistant.</textarea></section>
 <section data-for="MCP" hidden><table><tr><th>Name</th><th>Tools</th><th>Auth</th></tr>
 <tr><td>zuno-mcp-gateway</td><td>${knob("FAKE_MCP_SAVED") ? "9 active" : "0 active"}</td><td><button aria-label="${knob("FAKE_MCP_SAVED") ? "Authorized" : "Authorize"}" onclick="fetch('/fake/lock')">lock</button></td></tr></table></section></div>

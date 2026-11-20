@@ -23,9 +23,9 @@ const PORTAL = page("Red Hat AI portal", `<nav><a href="#endpoints">AI asset end
 <main><div id="keys" hidden><h1>API keys</h1><button id="create">Create API key</button><ul id="list"></ul></div>
 <div role="dialog" id="dialog" hidden style="border:1px solid #888;padding:16px"><h2>Create API key</h2><label>Name <input type="text" id="name"></label>
 <label>Description <textarea id="desc"></textarea></label>
-<div>Subscription <span hidden>gpt-oss-20b-ocp-ai-dev</span><select id="sub-select" ${PRESELECTED ? "" : "hidden"}><option>gpt-oss-20b-ocp-ai-dev</option></select>
+<div>Subscription <span hidden>gpt-oss-20b-builders</span><select id="sub-select" ${PRESELECTED ? "" : "hidden"}><option>gpt-oss-20b-builders</option></select>
 <button type="button" id="sub-toggle" aria-expanded="false" ${PRESELECTED ? "hidden" : ""}>Select a subscription</button>
-<ul role="menu" id="sub-menu" hidden><li role="menuitem" data-v="gpt-oss-20b-ocp-ai-dev">gpt-oss-20b-ocp-ai-dev 5,000,000 tokens per hour</li></ul></div>
+<ul role="menu" id="sub-menu" hidden><li role="menuitem" data-v="gpt-oss-20b-builders">gpt-oss-20b-builders 5,000,000 tokens per hour</li></ul></div>
 <div>Expiration <button type="button">30 days</button></div>
 <button type="submit" id="submit" disabled>Create API key</button><button type="button" id="cancel">Cancel</button></div>
 <div id="once" hidden><h2>Copy your key now, it is shown once</h2><p id="value" style="font-size:28px"></p></div></main>
@@ -41,7 +41,7 @@ $("nav-keys").onclick = (e) => { e.preventDefault(); $("keys").hidden = false; l
 $("create").onclick = () => { $("dialog").hidden = false; };
 // As the portal's dialog on 2026-11-16: the subscription is chosen in a menu, and the button is disabled until then.
 // FAKE_PRESELECTED=1: as the take of 2026-11-17 met it, the only subscription is already chosen when the dialog opens.
-let sub = ${PRESELECTED ? '"gpt-oss-20b-ocp-ai-dev"' : '""'};
+let sub = ${PRESELECTED ? '"gpt-oss-20b-builders"' : '""'};
 $("sub-toggle").onclick = () => { $("sub-menu").hidden = false; };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sub-menu").hidden) { $("sub-menu").hidden = true; e.stopPropagation(); } });
 $("sub-menu").firstElementChild.onclick = (e) => { sub = e.currentTarget.dataset.v; $("sub-toggle").textContent = sub; $("sub-menu").hidden = true; $("submit").disabled = !$("name").value; };
@@ -79,7 +79,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys/search" && req.method === "POST") {
     if (req.headers["x-portal"] !== "1") return json(400, { error: "the portal's own header is missing" });
     // As the portal on 2026-11-16: the list is not `data` itself but inside it.
-    return json(200, { data: { object: "list", data: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-ocp-ai-dev" })), has_more: false, subscriptionDetails: null } });
+    return json(200, { data: { object: "list", data: [...keys].map(([id, k]) => ({ id, name: k.name, status: k.status, subscription: "gpt-oss-20b-builders" })), has_more: false, subscriptionDetails: null } });
   }
   if (u.pathname === "/maas-consumer-portal/maas/api/v1/api-keys" && req.method === "POST") {
     return body((raw) => {

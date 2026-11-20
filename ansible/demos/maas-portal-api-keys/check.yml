@@ -11,9 +11,7 @@
       - {"api_version": "datasciencecluster.opendatahub.io/v2", "kind": "DataScienceCluster", "name": "zuno-dsc", "condition": "ModelsAsAServiceReady"}
       - {"api_version": "datasciencecluster.opendatahub.io/v2", "kind": "DataScienceCluster", "name": "zuno-dsc", "condition": "MaaSConsumerPortalAvailable"}
       - {"api_version": "gateway.networking.k8s.io/v1", "kind": "Gateway", "name": "maas-default-gateway", "namespace": "openshift-ingress", "condition": "Programmed"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-ai-dev", "namespace": "models-as-a-service", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-ai-ops", "namespace": "models-as-a-service", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-paas-ops", "namespace": "models-as-a-service", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-builders", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "kuadrant.io/v1", "kind": "AuthPolicy", "name": "maas-gateway-auth", "namespace": "openshift-ingress", "condition": "Enforced"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "gpt-oss-20b", "namespace": "zuno-ai-run", "condition": "Ready"}
 - name: "maas-portal-api-keys check | report"

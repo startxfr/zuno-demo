@@ -18,9 +18,7 @@
       - {"api_version": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "name": "zuno-portal-genai", "namespace": "redhat-ods-applications", "parents": "Accepted"}
       - {"api_version": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "name": "zuno-portal-dashboard", "namespace": "redhat-ods-applications", "parents": "Accepted"}
       - {"api_version": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "name": "zuno-portal-oauth-callback", "namespace": "openshift-ingress", "parents": "Accepted"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-ai-dev", "namespace": "models-as-a-service", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-ai-ops", "namespace": "models-as-a-service", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-ocp-paas-ops", "namespace": "models-as-a-service", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-20b-builders", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "gpt-oss-20b", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "qwen35-9b", "namespace": "zuno-ai-run", "condition": "Ready"}
       - {"api_version": "serving.kserve.io/v1alpha2", "kind": "LLMInferenceService", "name": "qwen35-9b-wesh", "namespace": "zuno-ai-run", "condition": "Ready"}

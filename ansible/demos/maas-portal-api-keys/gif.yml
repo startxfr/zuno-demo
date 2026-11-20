@@ -12,7 +12,7 @@
 # `created`. The revoke is in the take's log only, in no frame: the last caption is the page's close, row 4:15.
 record_notice: >-
   a recorded browser session as ai-dev-01 on the Red Hat AI portal: it creates ONE API key on the subscription
-  gpt-oss-20b-ocp-ai-dev and revokes it by its id at the end, pass or fail, then proves the revoke (the gateway must
+  gpt-oss-20b-builders and revokes it by its id at the end, pass or fail, then proves the revoke (the gateway must
   refuse the key; the take fails and names the key otherwise); the portal's shown-once dialog displays a masked
   value because the recorder replaced the key before the page received it: the key is in no picture, file or log;
   the calls of rows 2:15 and 3:00 are made by the recorder with that key (two reads and one chat completion on

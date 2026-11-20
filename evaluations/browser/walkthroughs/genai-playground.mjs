@@ -26,7 +26,7 @@
 // The first scout (2026-11-16 16:11, demo333, at a6f7635b): the sign-in lands on /maas-consumer-portal/gen-ai-studio/assets;
 // the menu link `nav a:text-is('Playground')` opens the playground of zuno-playground ("New chat", "Compare chat", no
 // chat history list); Settings > Model shows the model gpt-oss-20b and the subscription gpt-oss-20b-agents (not the
-// page's gpt-oss-20b-ocp-ai-ops) in PatternFly menu toggles; Settings > MCP lists zuno-mcp-gateway with "0 active" and a
+// page's gpt-oss-20b-builders) in PatternFly menu toggles; Settings > MCP lists zuno-mcp-gateway with "0 active" and a
 // lock: no saved connection in a fresh browser, the token is kept in the browser. zuno-demo-reorg's decision:
 // TOOLS_ROW stays off, no token is given to the recorder, and the subscription shown is filmed as it is, never chosen.
 // localStorage holds one key (mod-arch.namespace.lastUsed), sessionStorage none; the page reads its models, MCP

@@ -13,7 +13,7 @@
 // `$MAAS_API_KEY` unexpanded, each followed by what the gateway really answered. It is not a terminal and does not
 // look like one.
 //
-// What it costs and leaves: ONE key created on the subscription gpt-oss-20b-ocp-ai-dev and revoked by its id in
+// What it costs and leaves: ONE key created on the subscription gpt-oss-20b-builders and revoked by its id in
 // cleanup(), pass or fail; the revoke is then PROVED (the same call with the key must be refused) and the take fails,
 // naming the key's id and name, if it is not. One chat completion on ai-dev-01's subscription. A revoked key may stay
 // listed as revoked: owned() counts the keys that are not.
@@ -47,7 +47,7 @@ export const allows = [
   { method: "POST", path: /api-?keys\/search\/?$/i, what: "the key list (a read)" },
   { method: "POST", path: /api-?keys\/?$/i, what: "create the take's key" },
 ];
-const SUBSCRIPTION = "gpt-oss-20b-ocp-ai-dev";   // the page's row 1:00
+const SUBSCRIPTION = "gpt-oss-20b-builders";   // the page's row 1:00
 const KEY = /sk-oai-[A-Za-z0-9_-]{8,}/;          // the page: a key starting with sk-oai-
 const MASK = "sk-oai-••••••••••••••••••••••••";
 const KEYS_API = /api-?keys/i;                   // seen live: /maas-consumer-portal/maas/api/v1/api-keys/search (the list, a POST)

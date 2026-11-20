@@ -270,7 +270,7 @@ same limits and priority. The MaaSAuthPolicy below picks the user up from the su
 {{- if (dig "ownSubscription" true $.Values.altGatewayPeers.praxis) }}
 {{- range .subscriptions }}
 {{- if and .user (hasSuffix ":ai-gateway" .user) }}
-{{- $subs = append $subs (merge (dict "name" (printf "%s-praxis" (trimSuffix "-ai-gateway" .name)) "user" $praxisUser) (omit . "name" "user")) }}
+{{- $subs = append $subs (merge (dict "name" (printf "%s-praxis" (trimSuffix "-platform" (trimSuffix "-ai-gateway" .name))) "user" $praxisUser) (omit . "name" "user")) }}
 {{- end }}
 {{- end }}
 {{- else }}
@@ -297,9 +297,33 @@ counter for the stress ServiceAccount, so its budget was not enforced). `load` s
 Off by default (altGatewayPeers.stress.enabled).
 */}}
 {{- if and $.Values.altGatewayPeers.stress.enabled (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $stressUser := printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount }}
+{{- $base := "" }}
 {{- range .subscriptions }}
 {{- if and .user (hasSuffix ":ai-gateway" .user) }}
-{{- $subs = append $subs (dict "name" (printf "%s-load" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.stress.namespace $.Values.altGatewayPeers.stress.serviceAccount) "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- $base = trimSuffix "-platform" (trimSuffix "-ai-gateway" .name) }}
+{{- end }}
+{{- end }}
+{{- if $base }}
+{{- if (dig "ownSubscription" true $.Values.altGatewayPeers.stress) }}
+{{- $subs = append $subs (dict "name" (printf "%s-load" $base) "user" $stressUser "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- else }}
+{{- /* WP-315: the `service` tier. The stress ServiceAccount is a second user of `<model>-service` (Lightspeed's), or the
+     only user of a `<model>-service` on a model Lightspeed does not use. Same budget per identity, its own counter. */}}
+{{- $merged := list }}
+{{- $found := false }}
+{{- range $subs }}
+{{- if eq .name (printf "%s-service" $base) }}
+{{- $merged = append $merged (merge (dict "extraUsers" (concat (.extraUsers | default (list)) (list $stressUser))) (omit . "extraUsers")) }}
+{{- $found = true }}
+{{- else }}
+{{- $merged = append $merged . }}
+{{- end }}
+{{- end }}
+{{- if not $found }}
+{{- $merged = append $merged (dict "name" (printf "%s-service" $base) "user" $stressUser "tokenRateLimits" $.Values.altGatewayPeers.stress.tokenRateLimits "priority" $.Values.altGatewayPeers.stress.priority) }}
+{{- end }}
+{{- $subs = $merged }}
 {{- end }}
 {{- end }}
 {{- end }}

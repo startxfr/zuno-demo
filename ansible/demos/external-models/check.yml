@@ -10,12 +10,12 @@
     cr_ready:
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "ExternalModel", "name": "mistral-large", "namespace": "zuno-ai-run", "phase": "Migrated"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "mistral-large", "namespace": "zuno-ai-run", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "mistral-large-ai-gateway", "namespace": "models-as-a-service", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "mistral-large-platform", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSAuthPolicy", "name": "mistral-large-entitlement", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "kuadrant.io/v1alpha1", "kind": "TokenRateLimitPolicy", "name": "maas-trlp-mistral-large", "namespace": "zuno-ai-run", "condition": "Enforced"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "ExternalModel", "name": "gpt-oss-120b-ovhcloud", "namespace": "zuno-ai-run", "phase": "Migrated"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "gpt-oss-120b-ovhcloud", "namespace": "zuno-ai-run", "condition": "Ready"}
-      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-120b-ovhcloud-ai-gateway", "namespace": "models-as-a-service", "condition": "Ready"}
+      - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSSubscription", "name": "gpt-oss-120b-ovhcloud-platform", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSAuthPolicy", "name": "gpt-oss-120b-ovhcloud-entitlement", "namespace": "models-as-a-service", "condition": "Ready"}
       - {"api_version": "kuadrant.io/v1alpha1", "kind": "TokenRateLimitPolicy", "name": "maas-trlp-gpt-oss-120b-ovhcloud", "namespace": "zuno-ai-run", "condition": "Enforced"}
       - {"api_version": "maas.opendatahub.io/v1alpha1", "kind": "MaaSModelRef", "name": "gpt-oss-20b", "namespace": "zuno-ai-run", "condition": "Ready"}

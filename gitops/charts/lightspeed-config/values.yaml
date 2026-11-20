@@ -44,7 +44,7 @@ olsConfig:
     # MaaS AuthPolicy matching the request path against a model identity that no
     # caller could present; since the MaaSModelRefs carry the plain served-model
     # names, the path identity (zuno-ai-run/gpt-oss-20b) matches the subscription
-    # `gpt-oss-20b-lightspeed` (gitops/charts/models/values.yaml) and the entitlement
+    # `gpt-oss-20b-service` (gitops/charts/models/values.yaml) and the entitlement
     # of the ServiceAccount `lightspeed-maas-client`. The body `model` must be the
     # served name (maasModelRef above): the llm-d router answers 404 to any other
     # value. Roll back with `endpointMode: direct`; nothing else needs to change.
