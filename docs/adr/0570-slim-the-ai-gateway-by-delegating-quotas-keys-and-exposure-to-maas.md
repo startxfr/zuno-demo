@@ -351,3 +351,12 @@ local `<model>-ai-gateway` subscription (`altGatewayPeers.praxis.ownSubscription
 gpt-oss-20b only (`maas.salesSubscriptions.models`), and the generated `<model>-agents` subscriptions are not rendered (ADR-0581 note of the same date).
 The subscriptions of a local model go from 28 to 17 across the cluster. Since the filter was rewritten on 2026-11-20 every per-subscription budget is counted (20 limits, V1 of the WP); until
 then 11 of the 29 limits were not.
+
+## Amended (2026-11-20, owner decision): the tier is the unit of delegation
+
+A dated note, not a rewrite, applied by [WP-315](../roadmap/work-packages/wp-315-harden-maas-usage-tiers-single-listener-alert-limitador-redis.md). The MaaS subscriptions stop being named after single identities and become usage
+tiers, per the owner's principles: usage profiles and not per-user subscriptions, one window, exclusive predicates, MaaSAuthPolicy subjects derived from the subscriptions, the default deny kept.
+Per model: `<model>-platform` (the ai-gateway and Praxis ServiceAccounts, 1,000,000 tokens an hour, priority 100), `<model>-service` (the Lightspeed and `ai-gateway-stress` ServiceAccounts, 200,000, priority 50),
+and on gpt-oss-20b `gpt-oss-20b-builders` (the groups `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops`, 5,000,000, priority 20) and `gpt-oss-20b-business` (`/sales`, 5,000, priority 1). They replace `<model>-ai-gateway`,
+`<model>-lightspeed`, `<model>-load`, the three `ocp-*` subscriptions and `<model>-sales`. Clause 2 (MaaS subscription limits are per model) stands; what changes is who a subscription belongs to.
+
