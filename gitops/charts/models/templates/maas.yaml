@@ -243,8 +243,19 @@ the render is then the one of before.
 {{- end }}
 {{- $subs = $kept }}
 {{- end }}
+{{- /* WP-314: /sales only on the published models listed in maas.salesSubscriptions.models (empty = every model). */}}
+{{- $salesModels := dig "salesSubscriptions" "models" (list) $.Values.maas }}
+{{- if and $salesModels (not (has .publishedName $salesModels)) }}
+{{- $kept := list }}
+{{- range $subs }}
+{{- if ne (toString .group) "/sales" }}
+{{- $kept = append $kept . }}
+{{- end }}
+{{- end }}
+{{- $subs = $kept }}
+{{- end }}
 {{- $generated := index $.Values.maas.agentSubscriptions .publishedName }}
-{{- if and $generated (ne (toString .modelRefKind) "ExternalModel") }}
+{{- if and $generated (ne (toString .modelRefKind) "ExternalModel") (dig "agentSubscriptionTier" "enabled" true $.Values.maas) }}
 {{- $tier := $.Values.maas.agentSubscriptionTier }}
 {{- $subs = append $subs (dict "name" (printf "%s-agents" .publishedName) "groups" $generated.groups "tokenRateLimits" $tier.tokenRateLimits "priority" $tier.priority) }}
 {{- end }}
@@ -255,10 +266,24 @@ same limits and priority. The MaaSAuthPolicy below picks the user up from the su
 (altGatewayPeers.praxis.enabled): the render is then the one of before.
 */}}
 {{- if and $.Values.altGatewayPeers.praxis.enabled (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $praxisUser := printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.praxis.namespace $.Values.altGatewayPeers.praxis.serviceAccount }}
+{{- if (dig "ownSubscription" true $.Values.altGatewayPeers.praxis) }}
 {{- range .subscriptions }}
 {{- if and .user (hasSuffix ":ai-gateway" .user) }}
-{{- $subs = append $subs (merge (dict "name" (printf "%s-praxis" (trimSuffix "-ai-gateway" .name)) "user" (printf "system:serviceaccount:%s:%s" $.Values.altGatewayPeers.praxis.namespace $.Values.altGatewayPeers.praxis.serviceAccount)) (omit . "name" "user")) }}
+{{- $subs = append $subs (merge (dict "name" (printf "%s-praxis" (trimSuffix "-ai-gateway" .name)) "user" $praxisUser) (omit . "name" "user")) }}
 {{- end }}
+{{- end }}
+{{- else }}
+{{- /* WP-314: Praxis's ServiceAccount becomes a second user of the ai-gateway subscription (copies, values untouched). */}}
+{{- $merged := list }}
+{{- range $subs }}
+{{- if and .user (hasSuffix ":ai-gateway" .user) }}
+{{- $merged = append $merged (merge (dict "extraUsers" (list $praxisUser)) (omit . "extraUsers")) }}
+{{- else }}
+{{- $merged = append $merged . }}
+{{- end }}
+{{- end }}
+{{- $subs = $merged }}
 {{- end }}
 {{- end }}
 {{- /*
@@ -372,6 +397,9 @@ spec:
     # maassubscription.spec.owner --recursive`).
     users:
       - {{ .user | quote }}
+      {{- range .extraUsers }}
+      - {{ . | quote }}
+      {{- end }}
     {{- else }}
     # Each group in both spellings: Keycloak tokens carry the full path
     # ("/agent_tekos", the groups mapper's full.path), while MaaS API keys carry
@@ -420,11 +448,14 @@ spec:
     {{- $authUsers := list }}
     {{- range $subs }}
     {{- if .user }}
-    {{- $authUsers = append $authUsers .user }}
+    {{- $authUsers = concat $authUsers (list .user) (.extraUsers | default (list)) }}
     {{- else }}
     {{- $authGroups = concat $authGroups (include "models.maasGroupSpellings" (.groups | default (list .group)) | fromJsonArray) }}
     {{- end }}
     {{- end }}
+    {{- /* WP-314: one subject per identity, whatever the number of subscriptions naming it. */}}
+    {{- $authGroups = uniq $authGroups }}
+    {{- $authUsers = uniq $authUsers }}
     {{- if $authGroups }}
     groups:
       {{- range $authGroups }}

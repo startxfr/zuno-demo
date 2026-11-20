@@ -81,55 +81,18 @@ parentRefs:
     name: {{ .gatewayName }}
     namespace: {{ .gatewayNamespace }}
 rules:
-{{- $root := . }}
-{{- range $ep := list "completions" "chat/completions" "responses" "messages" }}
-{{- $slug := $ep | replace "/" "-" }}
-  - name: {{ $root.name }}-v1-{{ $slug }}-path
-    matches:
-      - path:
-          type: PathPrefix
-          value: /{{ $root.namespace }}/{{ $root.name }}/v1/{{ $ep }}
-    filters:
-      - type: URLRewrite
-        urlRewrite:
-          path:
-            type: ReplacePrefixMatch
-            replacePrefixMatch: /v1/{{ $ep }}
-    backendRefs:
-      - group: ""
-        kind: Service
-        name: {{ $root.name }}-kserve-workload-svc
-        port: 8000
-        weight: 1
-    timeouts:
-      backendRequest: 0s
-      request: 0s
-  - name: {{ $root.name }}-v1-{{ $slug }}-model-routing
-    matches:
-      - headers:
-          - name: X-Gateway-Model-Name
-            type: Exact
-            value: publishers/{{ $root.namespace }}/models/{{ $root.publishedModel }}
-        path:
-          type: Exact
-          value: /v1/{{ $ep }}
-      - headers:
-          - name: X-Gateway-Model-Name
-            type: Exact
-            value: publishers/{{ $root.namespace }}/models/{{ $root.publishedModel }}
-        path:
-          type: Exact
-          value: /v1/{{ $ep }}/
-    backendRefs:
-      - group: ""
-        kind: Service
-        name: {{ $root.name }}-kserve-workload-svc
-        port: 8000
-        weight: 1
-    timeouts:
-      backendRequest: 0s
-      request: 0s
-{{- end }}
+  # 2026-11-20 (owner decision, WP-314): only the two catch-all rules and the
+  # pool anchor remain. The four per-endpoint rule pairs the controller
+  # generates (v1/completions, chat/completions, responses, messages: a
+  # PathPrefix rule rewriting to /v1/<ep> and an X-Gateway-Model-Name rule
+  # with two Exact matches) are dropped: every backend above is the same
+  # workload Service, so the catch-alls route and rewrite those paths to the
+  # same result. They cost the gateway's wasm config one action set per match
+  # and per listener (15 matches instead of 3), which pushed EnvoyFilter
+  # kuadrant-maas-default-gateway to 3.9 MB, above the 1.5 MiB etcd limit:
+  # the operator could not write it after 2026-11-05 and the subscriptions
+  # created since were never counted. platform/models/maas_wasm_size.py keeps
+  # the estimate under 1.4 MB in CI.
   - name: {{ .name }}-v1-catch-all-path
     matches:
       - path:

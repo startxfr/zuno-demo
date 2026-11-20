@@ -125,6 +125,11 @@ altGatewayPeers:
     namespace: zuno-ai-gateways
     podName: praxis
     serviceAccount: praxis
+    # WP-314 (2026-11-20, owner decision): Praxis's ServiceAccount is a second user of each local `<model>-ai-gateway`
+    # subscription instead of a `<model>-praxis` copy. Same limit and priority; the counters stay separate, because every
+    # maas-trlp-* limit counts by auth.identity.userid. One limit fewer per local route in the gateway's wasm config.
+    # true restores the separate `<model>-praxis` subscriptions.
+    ownSubscription: false
   # ADR-0624 clause 5 / WP-306: the load tests spend their OWN MaaS budget, never the ai-gateway ServiceAccount's
   # (1,000,000 tokens an hour per route, shared by every caller of the gateway: the 2026-11-19 stresstest drained it and
   # Open WebUI, Dify, kagent and OpenClaw got 429). With this on, every local model gets a MaaSSubscription for the
@@ -1109,10 +1114,22 @@ maas:
   # subscription gets (the former /agent_tekos tier). The /sales business-
   # role subscriptions stay hand-written on each local model (WP-164).
   agentSubscriptionTier:
+    # WP-314 (2026-11-20, owner decision): the generated `<model>-agents` subscriptions are not rendered. No agent calls
+    # MaaS with an agent_* identity (the ai-gateway always sends its own ServiceAccount, MAAS_GATEWAY_IDENTITY); they only
+    # gave humans of the agent_* groups direct access, and they outranked /sales (priority 10 against 1), so sale-01
+    # landed on them and the two-tier contrast of ADR-0201 did not hold. agentSubscriptions stays generated (ADR-0581
+    # clause 3) and validated; true renders the subscriptions again.
+    enabled: false
     tokenRateLimits:
       - limit: 100000
         window: 1h
     priority: 10
+  # 2026-11-19 / WP-314: enabled false drops every hand-written /sales subscription. `models` keeps them on these published
+  # models only (WP-314, 2026-11-20 owner decision: gpt-oss-20b, the model of the API keys scenario); empty = every model.
+  salesSubscriptions:
+    enabled: true
+    models:
+      - gpt-oss-20b
 
   models:
     # The proven WP-27 reference: gpt-oss-20b, live-verified end-to-end
