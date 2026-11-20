@@ -339,8 +339,9 @@ dayCheck:
 # files/check_maas_wasm.py, kept equal by platform/gitops/tests/test_maas_wasm_check_chart.py. Off by default.
 maasWasmCheck:
   enabled: false
-  # ose-tools-rhel9 (oc and python3), the digest the rhtas_config role already pins.
-  image: registry.redhat.io/openshift4/ose-tools-rhel9@sha256:a3bdc6574db914ec8c4385b6ff8b2c315930f8de9a27a3a9e0204163c85cd6be
+  # The mirrored python image (the base of the ai-gateway): the script runs with --in-cluster, stdlib only, no `oc`.
+  image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
+  imageNamespace: zuno-ai-build   # where the image lives: gets a system:image-puller RoleBinding for the check's ServiceAccount
   schedule: "*/15 * * * *"
   logWindow: 20m          # a little more than the schedule, so a failure is seen by at least one run
   maxBytes: 1400000

@@ -15,18 +15,23 @@ stale, and the limits added since are NOT USED: nothing is counted for them, sil
     count is printed: each such line carries the whole object.
 
 Exit code 1 when a limit is NOT USED, an EnvoyFilter is above --max-bytes (default 1,400,000) or that count is above 0; 2 when `oc`
-cannot answer. It only runs `oc get` and `oc logs`.
+cannot answer. It only runs `oc get` and `oc logs`; with --in-cluster it makes the same three reads
+through the API server with the pod's ServiceAccount (urllib, no `oc`).
 
-    python3 platform/models/check_maas_wasm.py [--max-bytes N] [--log-window 20m] [--json]
+    python3 platform/models/check_maas_wasm.py [--max-bytes N] [--log-window 20m] [--in-cluster] [--json]
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
+import ssl
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 ENVOYFILTER_NAMESPACE = "openshift-ingress"
 ENVOYFILTER_PREFIX = "kuadrant-"
@@ -52,6 +57,77 @@ def run_oc(args: List[str]) -> str:
     if proc.returncode != 0:
         raise OcError(f"oc {' '.join(args[:3])} ... failed: {proc.stderr.strip()[:200]}")
     return proc.stdout
+
+
+SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
+API_SERVER = "https://kubernetes.default.svc"
+ENVOYFILTER_API = "/apis/networking.istio.io/v1alpha3"
+LIMITADOR_API = "/apis/limitador.kuadrant.io/v1alpha1"
+Fetch = Callable[[str], str]  # an API path (with its query) -> the response body
+
+
+def api_fetch(path: str) -> str:
+    """GET one API path with the pod's ServiceAccount token and CA (stdlib only)."""
+    try:
+        with open(f"{SA_DIR}/token") as handle:
+            token = handle.read().strip()
+        context = ssl.create_default_context(cafile=f"{SA_DIR}/ca.crt")
+        request = urllib.request.Request(API_SERVER + path, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+        with urllib.request.urlopen(request, context=context, timeout=60) as response:  # noqa: S310 - fixed https URL
+            return response.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        raise OcError(f"api GET {path.split('?')[0]}: HTTP {exc.code}") from exc
+    except (OSError, ValueError) as exc:
+        raise OcError(f"api GET {path.split('?')[0]}: {type(exc).__name__}") from exc
+
+
+def duration_seconds(value: str) -> int:
+    """'20m', '1h30m', '90s' or a bare number of seconds, as `oc logs --since` takes them."""
+    text = value.strip()
+    if text.isdigit():
+        return int(text)
+    parts = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?", text)
+    if not text or not parts:
+        raise ValueError(f"not a duration: {value!r}")
+    hours, minutes, seconds = (int(g or 0) for g in parts.groups())
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def in_cluster_runner(fetch: Fetch = api_fetch) -> Runner:
+    """A Runner that answers the three `oc` calls of collect() from the API server (the same reads, no `oc`)."""
+    def logs(namespace: str, target: str, since: str) -> str:
+        kind, name = target.split("/", 1)
+        if kind not in ("deploy", "deployment"):
+            raise OcError(f"api logs: unsupported target {target}")
+        deployment = json.loads(fetch(f"/apis/apps/v1/namespaces/{namespace}/deployments/{name}"))
+        labels = ((deployment.get("spec") or {}).get("selector") or {}).get("matchLabels") or {}
+        if not labels:
+            raise OcError(f"api logs: deployment {name} has no matchLabels selector")
+        selector = urllib.parse.quote(",".join(f"{k}={v}" for k, v in sorted(labels.items())))
+        pods = json.loads(fetch(f"/api/v1/namespaces/{namespace}/pods?labelSelector={selector}")).get("items") or []
+        if not pods:
+            raise OcError(f"api logs: no pod for deployment {name}")
+        seconds = duration_seconds(since.split("=", 1)[1])
+        text = []
+        for pod in pods:
+            pod_name = pod["metadata"]["name"]
+            containers = (pod.get("spec") or {}).get("containers") or []
+            default = (pod["metadata"].get("annotations") or {}).get("kubectl.kubernetes.io/default-container")
+            container = default or (containers[0]["name"] if containers else "")
+            query = f"sinceSeconds={seconds}" + (f"&container={urllib.parse.quote(container)}" if container else "")
+            text.append(fetch(f"/api/v1/namespaces/{namespace}/pods/{pod_name}/log?{query}"))
+        return "\n".join(text)
+
+    def run(args: List[str]) -> str:
+        if args[:2] == ["get", "envoyfilter"] and "-n" in args:
+            return fetch(f"{ENVOYFILTER_API}/namespaces/{args[args.index('-n') + 1]}/envoyfilters")
+        if args[:2] == ["get", "limitador"] and "-n" in args:
+            return fetch(f"{LIMITADOR_API}/namespaces/{args[args.index('-n') + 1]}/limitadors/{args[2]}")
+        if "logs" in args and "-n" in args:
+            i = args.index("logs")
+            return logs(args[args.index("-n") + 1], args[i + 1], next(a for a in args if a.startswith("--since=")))
+        raise OcError(f"in-cluster: unsupported call {args}")
+    return run
 
 
 def wasm_configuration(envoyfilter: Dict[str, Any]) -> str:
@@ -152,13 +228,17 @@ def render(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Optional[List[str]] = None, run: Runner = run_oc) -> int:
+def main(argv: Optional[List[str]] = None, run: Optional[Runner] = None, fetch: Fetch = api_fetch) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES, help="an EnvoyFilter above this many bytes is a problem")
     ap.add_argument("--log-window", default=DEFAULT_LOG_WINDOW, metavar="DURATION",
                     help="how far back the operator log is read, an `oc logs --since` value such as 20m (default: %(default)s)")
+    ap.add_argument("--in-cluster", action="store_true",
+                    help="read through the pod's ServiceAccount and the API server (stdlib only, no `oc`), for the CronJob")
     ap.add_argument("--json", action="store_true", help="machine output")
     args = ap.parse_args(argv)
+    if run is None:
+        run = in_cluster_runner(fetch) if args.in_cluster else run_oc
     try:
         result = collect(run, args.max_bytes, args.log_window)
     except (OcError, ValueError) as exc:

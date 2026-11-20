@@ -61,6 +61,82 @@ def fake_oc(envoy, lim: dict, log: str = "", log_error: bool = False):
 CONFIG = json.dumps({"actionSets": [{"name": "a", "keys": [KEY_A]}, {"name": "b", "keys": [KEY_B]}]})
 
 
+def fake_api(envoy, lim: dict, logs: dict, containers=("manager",), annotations=None):
+    """A `fetch(path)` answering the API paths of the in-cluster mode; `logs` maps pod name -> log text. Records the paths."""
+    filters = envoy if isinstance(envoy, list) else [envoy]
+    seen = []
+
+    def fetch(path):
+        seen.append(path)
+        if path == "/apis/networking.istio.io/v1alpha3/namespaces/openshift-ingress/envoyfilters":
+            return json.dumps({"items": filters})
+        if path == "/apis/limitador.kuadrant.io/v1alpha1/namespaces/kuadrant-system/limitadors/limitador":
+            return json.dumps(lim)
+        if path == "/apis/apps/v1/namespaces/openshift-operators/deployments/kuadrant-operator-controller-manager":
+            return json.dumps({"spec": {"selector": {"matchLabels": {"control-plane": "controller-manager", "app": "kuadrant"}}}})
+        if path.startswith("/api/v1/namespaces/openshift-operators/pods?labelSelector="):
+            assert path.endswith("app%3Dkuadrant%2Ccontrol-plane%3Dcontroller-manager"), path
+            return json.dumps({"items": [{"metadata": {"name": n, "annotations": annotations or {}}, "spec": {"containers": [{"name": c} for c in containers]}}
+                                         for n in logs]})
+        for name, text in logs.items():
+            if path.startswith(f"/api/v1/namespaces/openshift-operators/pods/{name}/log?"):
+                return text
+        raise AssertionError(f"unexpected API path {path}")
+    fetch.seen = seen
+    return fetch
+
+
+class InCluster(unittest.TestCase):
+    GOOD = (envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A])))
+
+    def collect(self, fetch, window="20m"):
+        return c.collect(c.in_cluster_runner(fetch), log_window=window)
+
+    def test_same_result_as_oc_and_the_log_window_becomes_since_seconds(self):
+        fetch = fake_api(*self.GOOD, {"op-1": "ok\n"})
+        result = self.collect(fetch)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result, c.collect(fake_oc(*self.GOOD), log_window="20m"))
+        self.assertIn("/api/v1/namespaces/openshift-operators/pods/op-1/log?sinceSeconds=1200&container=manager", fetch.seen)
+
+    def test_failed_updates_are_counted_over_every_pod_and_never_kept(self):
+        bad = 'ERROR failed to update envoyfilter object {"huge": 1}\n'
+        result = self.collect(fake_api(*self.GOOD, {"op-1": bad * 2, "op-2": bad}))
+        self.assertEqual(result["failed_update_lines"], 3)
+        self.assertNotIn("huge", json.dumps(result))
+
+    def test_the_default_container_annotation_wins(self):
+        fetch = fake_api(*self.GOOD, {"op-1": ""}, containers=("a", "b"), annotations={"kubectl.kubernetes.io/default-container": "b"})
+        self.collect(fetch)
+        self.assertTrue(any(p.endswith("&container=b") for p in fetch.seen))
+
+    def test_an_api_error_is_an_oc_error_and_main_exits_2(self):
+        def broken(path):
+            raise c.OcError("api GET ...: HTTP 403")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(c.main(["--in-cluster"], fetch=broken), 2)
+        self.assertIn("HTTP 403", err.getvalue())
+
+    def test_main_in_cluster_reads_through_fetch_and_exits_0(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = c.main(["--in-cluster", "--log-window", "20m"], fetch=fake_api(*self.GOOD, {"op-1": ""}))
+        self.assertEqual(code, 0)
+        self.assertIn("last 20m of the kuadrant operator log", out.getvalue())
+
+    def test_durations(self):
+        self.assertEqual([c.duration_seconds(v) for v in ("20m", "1h30m", "90s", "45", "1h")], [1200, 5400, 90, 45, 3600])
+        for bad in ("", "abc", "5x"):
+            with self.assertRaises(ValueError):
+                c.duration_seconds(bad)
+
+    def test_the_default_mode_is_still_oc(self):
+        seen = []
+        c.main([], run=lambda a: seen.append(a) or fake_oc(*self.GOOD)(a))
+        self.assertTrue(seen and seen[0][:2] == ["get", "envoyfilter"])
+
+
 class Collect(unittest.TestCase):
     def test_every_limit_counted_and_no_failed_update_is_ok(self):
         result = c.collect(fake_oc(envoyfilter(CONFIG), limitador(limit("ns/a", [KEY_A]), limit("ns/b", [KEY_B]))))

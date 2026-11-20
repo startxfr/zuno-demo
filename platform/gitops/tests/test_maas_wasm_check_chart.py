@@ -47,7 +47,7 @@ class MaasWasmCheckChart(unittest.TestCase):
     def test_the_objects_rendered_when_on(self):
         kinds = sorted(d["kind"] for d in self.on)
         self.assertEqual(kinds, ["ConfigMap", "CronJob", "PrometheusRule", "Role", "Role", "Role", "RoleBinding", "RoleBinding",
-                                 "RoleBinding", "ServiceAccount"])
+                                 "RoleBinding", "RoleBinding", "ServiceAccount"])
 
     def test_the_shipped_script_is_the_repository_script(self):
         shipped = (CHART / "files" / "check_maas_wasm.py").read_text()
@@ -70,6 +70,11 @@ class MaasWasmCheckChart(unittest.TestCase):
         for binding in self.of("RoleBinding"):
             self.assertEqual(binding["subjects"], [{"kind": "ServiceAccount", "name": NAME, "namespace": "kuadrant-system"}])
 
+    def test_only_the_check_may_pull_from_the_image_namespace(self):
+        (puller,) = [b for b in self.of("RoleBinding") if b["roleRef"]["name"] == "system:image-puller"]
+        self.assertEqual(puller["metadata"]["namespace"], "zuno-ai-build")
+        self.assertEqual(puller["roleRef"]["kind"], "ClusterRole")
+
     def test_the_cronjob(self):
         cron = self.of("CronJob")[0]
         self.assertEqual(cron["spec"]["schedule"], "*/15 * * * *")
@@ -80,8 +85,8 @@ class MaasWasmCheckChart(unittest.TestCase):
         self.assertEqual(pod["serviceAccountName"], NAME)
         self.assertEqual(pod["restartPolicy"], "Never")
         container = pod["containers"][0]
-        self.assertIn("@sha256:", container["image"])
-        self.assertEqual(container["command"][:2], ["python3", "/scripts/check_maas_wasm.py"])
+        self.assertEqual(container["image"], "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim")
+        self.assertEqual(container["command"][:3], ["python3", "/scripts/check_maas_wasm.py", "--in-cluster"])
         self.assertEqual(container["command"][container["command"].index("--log-window") + 1], "20m")
         self.assertEqual(container["securityContext"]["capabilities"], {"drop": ["ALL"]})
         self.assertTrue(pod["securityContext"]["runAsNonRoot"])
