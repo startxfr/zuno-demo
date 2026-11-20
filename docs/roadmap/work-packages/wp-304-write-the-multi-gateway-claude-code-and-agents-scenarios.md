@@ -61,3 +61,16 @@ steps, which a rehearsal does not run, were played through the clients' own APIs
   and the 3:15 question on `auto` is answered in 23 s by qwen3.6 (Praxis `maas` step, 200). Dify's own model list was not
   opened: it needs Dify's administrator sign-in, which the agent sessions are not allowed to use. Check it at the
   rehearsal.
+
+### 15-minute steps checked on 2026-11-20 (23:10 UTC, read-only)
+
+- **Traces (multi-gateway 5:00 and 6:30, agents-alt-gateway 7:30 and 9:00):**
+  - The ai-gateway trace of the Open WebUI question carries the `zuno.*` tags (persona, groups, classification,
+    model).
+  - Praxis traces run under the service `praxis`, with the spans `routing.select`, `token_rate_limit` and `llm_request`,
+    and `selected.provider` naming the local model. There is no `provider.route` span, so the pages are corrected.
+  - No subject is recorded on the Praxis side, only the sidecar address and the client's user agent (`OpenAI/Go` for
+    kagent, aiohttp for Open WebUI).
+- **Ledger (multi-gateway 8:00, agents-alt-gateway 10:15):** `zuno_model_calls_total` counts the Zuno questions
+  (open-webui and kagent) and none of the Praxis ones.
+  - A client's first call after its series appears does not show in an `increase()` panel; the raw counter shows it.
