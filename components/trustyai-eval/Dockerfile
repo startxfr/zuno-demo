@@ -23,4 +23,5 @@ COPY components/trustyai-eval/ragas_eval.py .
 
 # Writable HOME for library caches under OpenShift's random UID.
 ENV HOME=/tmp
+# No USER on purpose: OpenShift (restricted-v2 SCC) starts this image under an arbitrary non-root UID in group 0.
 CMD ["python3", "ragas_eval.py"]

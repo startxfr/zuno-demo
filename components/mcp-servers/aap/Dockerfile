@@ -18,4 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server.py .
 
 EXPOSE 8000
+# No USER on purpose: OpenShift (restricted-v2 SCC) starts this image under an arbitrary non-root UID in group 0.
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

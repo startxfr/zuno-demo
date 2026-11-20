@@ -668,6 +668,11 @@ jobs:
         run: |
           python3 platform/security/check_ansible_no_log.py
           python3 platform/security/tests/test_check_ansible_no_log.py
+      - name: every test file is run by a workflow, and the components without tests still build
+        run: |
+          python3 platform/testing/check_tests_wired.py
+          python3 platform/testing/tests/test_check_tests_wired.py
+          python3 platform/testing/tests/test_components_smoke.py
       # ADR-0616 (WP-270): action -> demo_run.yml -> results -> page section, on the fixture demo, which needs no
       # cluster. The tests run with a temporary HOME and pass PYTHONUSERBASE on, so an Ansible installed in the user
       # site stays importable.

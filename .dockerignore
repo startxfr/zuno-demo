@@ -1,0 +1,12 @@
+# Build context hygiene for the images built from the repository root (the COPY sources are all under components/, platform/ and
+# policies/; platform/testing/tests/test_components_smoke.py checks that each one exists). Nothing below is copied by any Dockerfile.
+.git
+.github
+.claude
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/node_modules
+docs
+ansible
+gitops

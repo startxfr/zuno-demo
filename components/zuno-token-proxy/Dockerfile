@@ -22,4 +22,5 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
 
+# No USER on purpose: OpenShift (restricted-v2 SCC) starts this image under an arbitrary non-root UID in group 0.
 CMD ["uvicorn", "app.main:get_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]

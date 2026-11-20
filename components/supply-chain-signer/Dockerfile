@@ -63,4 +63,5 @@ RUN chmod -R a+rX /app/platform
 COPY platform/supply-chain/sign_in_cluster.py ./sign_in_cluster.py
 
 ENTRYPOINT ["python3", "/app/sign_in_cluster.py"]
+# No USER on purpose: OpenShift (restricted-v2 SCC) starts this image under an arbitrary non-root UID in group 0.
 CMD ["dry-run"]

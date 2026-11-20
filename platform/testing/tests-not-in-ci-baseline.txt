@@ -1,0 +1,8 @@
+# Test files no CI workflow runs yet (platform/testing/check_tests_wired.py). The baseline only shrinks.
+# components/mlops: these import boto3 and psycopg at module load (the torch/transformers stack is lazy and never needed); a CI step
+# needs `pip install -c platform/python/constraints.txt boto3 "psycopg[binary]" requests PyYAML httpx pytest` and a first CI run to
+# confirm it is enough. Two of the four (test_mlflow_tracking, test_trainjob) already pass on a bare Python.
+components/mlops/tests/test_download_adapter.py
+components/mlops/tests/test_mlflow_tracking.py
+components/mlops/tests/test_mlops.py
+components/mlops/tests/test_trainjob.py
