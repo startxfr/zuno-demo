@@ -19,7 +19,7 @@ revoked at any time. The gateway, the Kuadrant policies and the custom resources
 **The message:** "A developer gets a governed model key in one minute, without a ticket. The platform still decides
 which models, how many tokens per hour, and can revoke it."
 
-![The 5-minute version of the API keys demo, recorded live as ai-dev-01 on the Red Hat AI portal: an empty API keys page, a key created on a subscription from one form, and the dialog that shows it once. The recorder kept the real key out of the page, so the field shows a masked value. The two last screens are a plain page of calls made by the recorder with that key: refused without it, answered with it, then one chat completion. The key was revoked at the end of the take.](../../../assets/img/demo/maas-portal-api-keys.gif)
+![The 5-minute version of the API keys demo, recorded live as ai-dev-01 on the Red Hat AI portal: an empty API keys page, a key created on a subscription from one form, and the dialog that shows it once. The recorder kept the real key out of the page, so the field shows a masked value. The two last screens are a plain page of calls made by the recorder with that key: refused without it, answered with it, then one chat completion. The key was revoked at the end of the take. Recorded again on 2026-11-20, after the WP-315 usage tiers: the key sits on the `gpt-oss-20b-builders` subscription.](../../../assets/img/demo/maas-portal-api-keys.gif)
 
 ## Personas
 
