@@ -201,7 +201,7 @@ DEMO_VERBS := list use status check install start stop uninstall step freeze reh
 # dict rather than a string needing `from_json`.
 define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
-  local mode="auto" conf=""; \
+  local mode="auto" conf="" f; \
   for f in ansible/inventories/$(CLUSTER)/confidential.yml ansible/confidential.yml; do \
     if [[ -f "$$f" ]]; then conf="$$f"; break; fi; \
   done; \
