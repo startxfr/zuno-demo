@@ -1,6 +1,6 @@
 # WP-314: Fit the MaaS gateway wasm config under 1.4 MB
 
-- **State:** Operator pending (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; left: the live sale-01 refusal on the qwen models (V4, the full check of 2026-11-22) and `make d2 check agents` on agents v1.1.7 (V6), by zuno-demo-cluster)
+- **State:** Operator pending (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; `make d2 check agents` on agents v1.1.7 passes after the change; left: the live sale-01 refusal on the qwen models (V4, the full check of 2026-11-22))
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** none
 - **Related:** [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md), [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md), [WP-306](wp-306-give-the-stress-runs-their-own-identity-and-budget.md), [WP-313](wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md)
@@ -59,7 +59,7 @@ now with 3 rules and 3 matches. It rebuilds the same 3-match routes, not the 15-
 | V3 | Limitador counters of each local route | Two counters under `<model>-ai-gateway` (the ai-gateway and Praxis identities), one under `<model>-load`, and the last limit by name counted | On each local route: 3 counters, two under `<model>-ai-gateway` with separate budgets and one under `<model>-load`; `-load`, the last limit by name on the qwen routes, is counted, so the Kuadrant shim defect does not touch the subscription limits |
 | V4 | The ADR-0201 contrast, live | sale-01 gets 200 on gpt-oss-20b with a counter under `gpt-oss-20b-sales` and 403 on qwen36-27b-instruct | **Not run live** (it needs sale-01's credentials). Verified on the configuration only: `gpt-oss-20b-sales` exists (5,000 tokens an hour) and the qwen MaaSAuthPolicies have no group subject. The live test is in the full check of 2026-11-22 |
 | V5 | Clients: the golden-path probes, `make demo status` of the affected scenarios | Probes pass; statuses clean | 14 of 14 golden-path probes PASS; `make demo status` PASS for maas-portal-api-keys, genai-playground, quotas, external-models and multi-gateway. Praxis had no client traffic during the checks; its ServiceAccount got 200 directly |
-| V6 | `make d2 check agents` on agents v1.1.7, run by zuno-demo-cluster | The acceptance gate passes | Pending |
+| V6 | `make d2 check agents` on agents v1.1.7, run by zuno-demo-cluster after the change | The acceptance gate passes | OVERALL PASS, failed 0: quality 18/19, security 14/14, gate checks 5/5. The one failure, #11 (RAG citation), was already there on agents v1.1.6 before this change. A real Praxis client call (OpenClaw, consultant-02) also returned 200, with `step="maas" status=200` in the Praxis log |
 
 ## Rollback
 
