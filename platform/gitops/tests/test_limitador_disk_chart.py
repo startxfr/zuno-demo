@@ -40,7 +40,8 @@ class LimitadorDiskChart(unittest.TestCase):
         # spec.limits belongs to the Kuadrant operator: the chart must never declare it.
         self.assertEqual(list(cr["spec"]), ["storage"])
         disk = cr["spec"]["storage"]["disk"]
-        self.assertEqual(disk["persistentVolumeClaim"]["resources"]["requests"]["storage"], "1Gi")
+        # One quantity, not a map: the CRD types requests as int-or-string (refused live 2026-11-20 16:25Z).
+        self.assertEqual(disk["persistentVolumeClaim"]["resources"]["requests"], "1Gi")
         self.assertNotIn("storageClassName", disk["persistentVolumeClaim"])
 
     def test_argo_never_deletes_the_operator_owned_cr(self):

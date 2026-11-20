@@ -26,7 +26,8 @@ spec:
         {{- with .Values.kuadrant.limitadorDisk.storageClassName }}
         storageClassName: {{ . }}
         {{- end }}
+        # The limitador-operator CRD types requests as ONE quantity (int-or-string), not a ResourceList map: a
+        # `storage:` key here is refused by the API server (the first sync of 2026-11-20 16:25Z).
         resources:
-          requests:
-            storage: {{ .Values.kuadrant.limitadorDisk.size }}
+          requests: {{ .Values.kuadrant.limitadorDisk.size }}
 {{- end }}
