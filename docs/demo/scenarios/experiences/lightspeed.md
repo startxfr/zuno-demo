@@ -14,7 +14,7 @@ subscription. Its company tools come from the mcp-gateway, called with the conso
 **The message:** "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what
 the person asking may see."
 
-![The 5-minute version of the OpenShift Lightspeed demo, recorded live as consultant-02: the assistant panel in the OpenShift console, a one-sentence answer from the local model, the names of the pods of a Zuno namespace read with the persona's own rights, and the refusal for a namespace the persona may not read.](../../../assets/img/demo/lightspeed.gif)
+![The 5-minute version of the OpenShift Lightspeed demo, recorded live as consultant-02: the assistant panel in the OpenShift console, a one-sentence answer from the local model, the names of the pods of a Zuno namespace read with the persona's own rights, and the refusal for a namespace the persona may not read. Recorded again on 2026-11-20.](../../../assets/img/demo/lightspeed.gif)
 
 ## Personas
 
