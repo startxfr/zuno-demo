@@ -168,11 +168,10 @@ fails and says so, it never guesses another one.
 
 ## Known limits
 
-- **Limitador does not count the `-load` limits yet** (reported by the cluster session on 2026-11-19; not yet written
-  in the repository's evidence): the Kuadrant EnvoyFilter of the `maas-default-gateway` has been stale since
-  2026-11-05, so the MaaS side of the isolation proof reads "no counter" for the stress ServiceAccount. The fix is
-  pending the owner's go. The `<model>-load` subscriptions were renamed from `<model>-stress` because the wasm shim
-  never creates a counter for the last token-limit action of a route, ordered by limit name.
+- **The `-load` limits were not counted from 2026-11-05 until the MaaS gateway's wasm config was fitted** ([WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md), the
+  2026-11-21 window): the Kuadrant EnvoyFilter of the `maas-default-gateway` could not be written (3.92 MB desired, over the 3 MiB API request limit), so the MaaS side of the isolation proof read
+  "no counter" for the stress ServiceAccount. After that change the `-load` limits are counted and the isolation row shows it. The `<model>-load` subscriptions were renamed from `<model>-stress`
+  because the wasm shim never creates a counter for the last token-limit action of a route, ordered by limit name.
 - `multi-gateway` is replayed in part (one question through the ai-gateway and through Praxis); `agents-alt-gateway` has
   only its state check. Their state checks now judge the kagent agent `zuno-diagnose-praxis` for real: it was read live on
   demo333 as Accepted and Ready on 2026-11-19, so the skip list `NOT_YET` of `driver_state.py` is empty and a missing agent

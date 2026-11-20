@@ -28,7 +28,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **ai-dev-01** | AI developer, back office. Group `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`. | Subscription `gpt-oss-20b-ocp-ai-dev`: 5,000,000 tokens per hour on gpt-oss-20b. Creates and revokes its own keys in the portal. | The developer of the 5-minute version: signs in to the portal, creates a key, calls the model from a terminal. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Subscription `gpt-oss-20b-ocp-ai-ops`, same budget. Opens Grafana. | Shows the **Mesh & gateway** dashboard in the 15-minute version. Can replace **ai-dev-01** as the key creator. |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the MaaS objects outside the AI namespaces (`models-as-a-service`, `openshift-ingress`). | The presenter's `oc` terminal for the subscription and policy steps of the 15-minute version. |
-| **sale-01** | Salesperson, front office. Group `sales`. | Subscription `*-sales`: 5,000 tokens per hour. | Named only, as the contrast of budgets by group. Not signed in during this scenario. |
+| **sale-01** | Salesperson, front office. Group `sales`. | Subscription `gpt-oss-20b-sales`: 5,000 tokens per hour, on gpt-oss-20b only; no subscription on the other models, so a call there is refused with 403. | Named only, as the contrast of budgets by group. Not signed in during this scenario. |
 
 Other identities: the ai-gateway's service account holds its own subscription (1,000,000 tokens per hour, and the only
 one on the SaaS models). It carries the traffic of every chat experience.
@@ -103,7 +103,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | `oc get maassubscriptions -n models-as-a-service` | "Budgets are subscriptions bound to groups. Developers and operators get 5 million tokens an hour on gpt-oss-20b; agents 100,000; sales 5,000." | `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops` (priority 20), `-agents` (10), `-sales` (1), `-ai-gateway` (100), `-lightspeed` (50). |
+| 5:00 | `oc get maassubscriptions -n models-as-a-service` | "Budgets are subscriptions bound to groups. Developers and operators get 5 million tokens an hour on gpt-oss-20b; the ai-gateway 1 million; sales 5,000." | `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops` (priority 20), `-sales` (1), `-ai-gateway` (100), `-lightspeed` (50) and `-load` (50, the stress identity). There is no `-agents` subscription since WP-314. |
 | 7:00 | `oc get tokenratelimitpolicy -n zuno-ai-run` and `oc get authpolicy maas-gateway-auth -n openshift-ingress -o yaml` | "Kuadrant enforces it on the gateway. Two identities are accepted: a MaaS key, or an OpenShift token. The token limit is counted per user and per subscription." | One `maas-trlp-<model>` per model. The AuthPolicy has two identity sources, `api-keys` (`Bearer sk-oai-`) and `kubernetesTokenReview`. |
 | 9:00 | `oc get externalmodels,maasmodelrefs -n zuno-ai-run` | "MaaS also publishes SaaS models, Mistral and gpt-oss-120b on OVHcloud. Only the ai-gateway is subscribed to them, so nobody can skip the classification rules by calling a SaaS model directly." | ExternalModels `mistral-large` and `gpt-oss-120b-ovhcloud`; six MaaSModelRefs. |
 | 10:30 | Grafana **Mesh & gateway**: **Authorino: auth decisions** and **Limitador: authorized vs limited calls** | "Every call is authenticated and counted at the gateway, including the 401 we just caused." | Allowed and denied auth decisions; authorized calls. |
@@ -136,8 +136,9 @@ Run the 5-minute version, then:
 - **SaaS traffic does not go through MaaS yet.** The ai-gateway still calls Mistral, Codestral and OVHcloud directly
   (`MAAS_EXTERNAL_EGRESS_ENABLED=false`, checked 2026-11-13). The ExternalModels are published for a later cutover (WP-219).
   See [external models](external-models.md).
-- **Each new rate adds to a Kuadrant EnvoyFilter** close to the etcd object size limit (about 1.34 MB of 1.5 MiB).
-  Adding subscriptions on stage is not part of this scenario.
+- **Each new limit adds to the gateway's Kuadrant EnvoyFilter**, which must stay under the API request limit of 3 MiB (1.5 MiB in etcd). It could not be written between 2026-11-05 and the
+  2026-11-21 window, so 11 of the 29 limits were never counted; since [WP-314](../../../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) (3 route matches per model, 17 subscriptions) it is estimated at about 0.68 MB, with a CI gate at 1.4 MB.
+  Adding subscriptions on stage is not part of this scenario. The steps and subscription list of this page follow that change and have not been rehearsed since.
 
 ## Appendix A - HLD
 
@@ -249,6 +250,7 @@ flowchart LR
 
 The decisions this page rests on:
 
+- [WP-314](../../../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md): the gateway's wasm config fit; 17 subscriptions, `/sales` on gpt-oss-20b only, no `-agents`.
 - [ADR-0201](../../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md): MaaS is the model
   access and consumption plane; Zuno's business policy router sits in front of it.
 - [ADR-0521](../../../adr/0521-route-local-model-traffic-through-maas.md): all local-model traffic of the ai-gateway

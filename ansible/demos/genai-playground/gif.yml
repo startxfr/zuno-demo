@@ -9,7 +9,7 @@
 # kept on the server: the walkthrough's TOOLS_ROW then adds q2-sent and q2-done, and this list gains their moments.
 # The scout of 2026-11-16 found the gateway listed with "0 active" in a fresh browser (the token is kept in the
 # browser): TOOLS_ROW stays off (zuno-demo-reorg) and the 1:45 caption says the gateway is listed and not connected.
-# The 0:00 still shows the subscription the portal shows (gpt-oss-20b-agents in the scout), never chosen: no caption
+# The 0:00 still shows the subscription the portal shows (gpt-oss-20b-agents in the scout of 2026-11-16, before WP-314 stopped rendering it), never chosen: no caption
 # names a subscription. Row 4:15 is words.
 record_notice: >-
   a recorded browser session as ai-ops-01 in the MaaS consumer portal's playground, project Zuno Playground:

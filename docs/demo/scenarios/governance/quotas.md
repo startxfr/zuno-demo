@@ -193,7 +193,7 @@ Run the 5-minute version, then:
   by group; one person's calls are on the trace (`zuno.persona`) and in the ledger.
 - **MaaS does not count per person.** Through the gateway, every persona draws on the gateway's subscription
   (1,000,000 tokens per hour on gpt-oss-20b). Direct MaaS keys from the portal use group subscriptions instead, for
-  example `gpt-oss-20b-sales` at 5,000 tokens per hour, and never touch the ledger: see the
+  example `gpt-oss-20b-sales` at 5,000 tokens per hour (the sales subscription exists on gpt-oss-20b only, and there is no `-agents` subscription since 2026-11-20), and never touch the ledger: see the
   [MaaS portal scenario](../rhoai/maas-portal-api-keys.md). SaaS providers are called directly, so only the ledger
   counts them.
 - **The request-rate limits of the policy are not enforced** for the in-cluster experiences. The only live
