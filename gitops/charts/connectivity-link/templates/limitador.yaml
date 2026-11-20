@@ -1,0 +1,32 @@
+{{- if and .Values.kuadrant.enabled .Values.kuadrant.limitadorDisk.enabled }}
+# WP-315 (owner's decision 2026-11-20): Limitador keeps its counters on a disk (a PVC) instead of in memory, so a restart
+# of its pod no longer resets every MaaS subscription and quota budget. The owner chose the disk over a dedicated Redis:
+# no new component and no Redis outage to handle, at the cost of a single Limitador replica (the same count as before).
+# Same shape as templates/authorino.yaml: the Kuadrant operator creates this CR and writes its spec.limits from the
+# policies; the Kuadrant CRD has no field for the operand's storage, so only spec.storage is asserted here and every
+# operator-written field is left alone. The limitador-operator rolls a disk-backed Limitador with Recreate (the volume is
+# ReadWriteOnce): Limitador is away for the restart and the volume attach.
+# Prune=false and Delete=false: switching this off, or removing the template, must never make Argo CD delete the
+# operator-owned CR (the DataScienceCluster prune of 2026-11-19). The storage stays on the disk until changed by hand.
+apiVersion: limitador.kuadrant.io/v1alpha1
+kind: Limitador
+metadata:
+  name: limitador
+  namespace: {{ .Values.operandNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  storage:
+    disk:
+      optimize: {{ .Values.kuadrant.limitadorDisk.optimize }}
+      persistentVolumeClaim:
+        {{- with .Values.kuadrant.limitadorDisk.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.kuadrant.limitadorDisk.size }}
+{{- end }}

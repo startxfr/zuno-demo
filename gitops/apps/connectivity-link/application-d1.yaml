@@ -26,6 +26,13 @@ spec:
           enabled: true
           authorinoTls:
             enabled: true
+          # WP-315 (owner's decision 2026-11-20): Limitador's counters on a PVC (templates/limitador.yaml).
+          limitadorDisk:
+            enabled: true
+        # WP-314/WP-315 (owner's go 2026-11-20): check_maas_wasm every 15 minutes and the alert
+        # ZunoMaasWasmConfigNotApplied (templates/maas-wasm-check.yaml).
+        maasWasmCheck:
+          enabled: true
         # ADR-0517 B4 (WP-118 step 1) / ADR-0555 B (WP-142): tokens,
         # substituted by ansible/tasks/apply_gitops_app.yml.
         # quotaEnforcement.gateway.enabled defaults to true in the chart's

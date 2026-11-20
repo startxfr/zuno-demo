@@ -289,6 +289,14 @@ kuadrant:
   # ADR-0614 (WP-260 P3): Authorino pods (templates/authorino.yaml).
   authorinoReplicas: 2
   enabled: false
+  # WP-315 (owner's decision 2026-11-20): Limitador's counters on a PVC instead of in memory (templates/limitador.yaml).
+  # Off by default, same convention; set true in gitops/apps/connectivity-link/application-d1.yaml. An empty
+  # storageClassName uses the cluster's default class. `optimize: throughput` keeps hot counters cached in memory.
+  limitadorDisk:
+    enabled: false
+    size: 1Gi
+    storageClassName: ""
+    optimize: throughput
   # Enables the spec.listener.tls override in templates/authorino.yaml so
   # Authorino's own listener is TLS-enabled - required for
   # DataScienceCluster's MaaSPrerequisitesAvailable condition (this
