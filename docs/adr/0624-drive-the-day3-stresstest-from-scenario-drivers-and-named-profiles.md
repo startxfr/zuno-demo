@@ -105,3 +105,9 @@ A dated note, not a rewrite. As implemented by WP-305 to WP-313: the profiles ar
 (clause 3 says `evaluations/stress/profiles/`) and the drivers are `evaluations/stress/driver_*.py` (clause 1 says
 `evaluations/stress/drivers/`). A fifth profile, `mutating`, runs the three state-changing drivers as `stress-mutate-01`. The
 runbook is [docs/platform/stresstest.md](../platform/stresstest.md).
+
+## Amended (2026-11-20): the `-load` limits are counted once the wasm config fits
+
+A dated note, not a rewrite. The finding that Limitador did not count the `<model>-load` limits (clause 5 and the live finding above) had one cause: the
+Kuadrant EnvoyFilter of the `maas-default-gateway` could not be written after 2026-11-05. [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) brings it back under the limit, so the `-load` limits are
+counted after that change; the isolation row of the stress report is how to see it.

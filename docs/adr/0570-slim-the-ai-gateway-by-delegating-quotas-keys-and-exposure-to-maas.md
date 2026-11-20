@@ -342,3 +342,12 @@ amends the decision to accept the ai-gateway quota ledger as the permanent desig
   here means the decision is built as amended, not that those five checks have passed.
 - **Re-opening:** if `zuno-token-quota` is turned back on (the `model-based-routing-only` levers of MaaS 3.6 are untested here), the ledger
   and the gateway policy would both count the same budgets, and the double count has to be resolved first.
+
+## Amended (2026-11-20, owner decision): Praxis shares the ai-gateway subscription, `/sales` only on gpt-oss-20b
+
+A dated note, not a rewrite. To keep the gateway's wasm config under the API request limit ([WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)): Praxis's ServiceAccount becomes a second user of each
+local `<model>-ai-gateway` subscription (`altGatewayPeers.praxis.ownSubscription: false`) instead of a `<model>-praxis` copy; the limits count by
+`auth.identity.userid`, so the two identities keep separate counters of the same size. The hand-written `/sales` subscriptions are rendered on
+gpt-oss-20b only (`maas.salesSubscriptions.models`), and the generated `<model>-agents` subscriptions are not rendered (ADR-0581 note of the same date).
+The subscriptions of a local model go from 28 to 17 across the cluster. Once the filter is rewritten, every per-subscription budget is counted; until
+then 11 of the 29 limits were not.

@@ -151,3 +151,11 @@ Checked against the repository and demo333 while closing WP-164. The decision st
 - **Clause 3.** `lint.yml` runs `generate_stack_config.py --check`; the promotion workflow regenerates the files, so the promotion PR carries them and is checked by that job.
 - **Clause 4, the groups in the realm import.** `gitops/charts/keycloak/files/realm-zuno.json` still lists the eight `agent_*` groups. They stay on purpose: 26 of the 32 users of the import are members of one of them, so a realm imported on a new cluster needs the groups to exist. The import copy is the bootstrap; the reconcile Job creates any group the release adds, and never deletes one.
 - **Not hand-written but kept:** the quota-demo hostnames in `gitops/charts/connectivity-link/values.yaml` are a demo fixture, not an agent-derived value.
+
+## Amended (2026-11-20, owner decision): `<model>-agents` is not rendered on demo333
+
+A dated note, not a rewrite. Clause 2 still generates `gitops/charts/models/values.agents.generated.yaml` and the chart still validates it
+(clause 3 is unchanged), but `maas.agentSubscriptionTier.enabled` is `false` on demo333, so no `<model>-agents` MaaSSubscription is rendered.
+No agent calls MaaS with an `agent_*` identity: the ai-gateway always sends its own ServiceAccount (`MAAS_GATEWAY_IDENTITY`), so these
+subscriptions only gave humans of the `agent_*` groups direct access. They also outranked `/sales` (priority 10 against 1), so sale-01 landed on
+them and the two-tier contrast of ADR-0201 did not hold. Setting the value to `true` renders them again. See [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).
