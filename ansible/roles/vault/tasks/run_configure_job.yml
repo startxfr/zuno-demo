@@ -206,7 +206,7 @@
               - name: script
                 configMap:
                   name: vault-configure-script
-                  defaultMode: 0755
+                  defaultMode: 0755  # noqa: yaml[octal-values] - a Kubernetes API integer: PyYAML (Ansible) reads 0755 as octal 493, which is what the API wants
               - name: secret-access
                 configMap:
                   name: vault-configure-secret-access

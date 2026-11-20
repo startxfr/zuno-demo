@@ -280,7 +280,7 @@
       `oc get certificate -A` shows {{ item.item.name }} Ready, then set it.
   loop: "{{ _cert_manager_consumer_cert_check.results | default([]) }}"
   when: >-
-    (item.skipped | default(false)) | bool == false and
+    not ((item.skipped | default(false)) | bool) and
     ((item.resources | default([]) | length) == 0 or
      not (item.resources[0].status.conditions
           | default([]) | selectattr('type', 'equalto', 'Ready')

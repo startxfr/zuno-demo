@@ -108,6 +108,7 @@
       ansible.builtin.copy:
         dest: "{{ _release_digests_file.path }}"
         content: "{{ _release_digests_raw.stdout }}"
+        mode: "0600"  # what the tempfile above already has
 
     # Independent verification pass - proves each signature is actually
     # retrievable/valid, not just that `cosign sign` exited 0. Same Job

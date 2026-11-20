@@ -23,4 +23,3 @@
       altGatewayPeers:
         praxis:
           enabled: "{{ zuno_praxis_enabled | default(false) | bool }}"
-

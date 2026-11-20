@@ -19,3 +19,4 @@
     path: "{{ state_report_file }}"
     line: "{{ ansible_role_name | replace('_', '-') }} is {{ '' if _state_is_installed else 'NOT ' }}installed"
     create: true
+    mode: "0644"

@@ -142,7 +142,7 @@
     # it was stopped. Prove the two operations the awskms seal needs.
     - name: "step 0 | prove the KMS key can encrypt and decrypt with the IAM credentials"
       ansible.builtin.shell: |
-        set -e
+        set -eo pipefail
         d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
         printf probe > "$d/p"
         aws kms encrypt --key-id "$ZUNO_KMS_KEY" --plaintext "fileb://$d/p" --query CiphertextBlob --output text | base64 -d > "$d/c"

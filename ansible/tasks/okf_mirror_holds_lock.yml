@@ -55,7 +55,9 @@
         mode: "0600"
       no_log: true
 
-- name: "okf mirror | verify that the internal registry holds the locked release (ADR-0611, ADR-0612)"
+- name: "okf mirror | verify that the internal registry holds the locked release (ADR-0611, ADR-0612)"  # noqa: risky-shell-pipe
+  # noqa above: `grep -v ... | grep .` is the lock's "non-comment, non-empty lines"; an empty lock makes the last grep exit 1 on purpose
+  # and the script reports it itself, so `pipefail` would only change which message is printed.
   ansible.builtin.shell: |
     set -u
     export DOCKER_CONFIG="{{ _okf_mirror_tmp.path | default(lookup('ansible.builtin.env', 'HOME') ~ '/.config/zuno/quay-pull') }}"
