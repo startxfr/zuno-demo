@@ -1,5 +1,7 @@
 # Scenario: GitOps and Day 0-3 - the install and operations contract
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Zuno is installed and operated through one entry point: `make`, then a day, a verb and a component. Ansible runs the
@@ -112,7 +114,7 @@ Terminal **paas-ops-01**, at the repository root.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | `make help` | "One entry point for the whole platform: make, a day, a verb, a component. Day 0 is the cluster's foundation, Day 1 the platform operators, Day 2 the AI services and their content, Day 3 the operations on a running platform." | The usage lines (`make day0\|d0 check [component]` ...), then the component lists of each day at the bottom. |
-| 1:00 | `oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.spec.source.targetRevision}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}' \| sort \| uniq -c` | "Each component is two Argo CD Applications: its operator, then its service. All of them follow one Git branch. Argo CD keeps the cluster equal to that branch and undoes any change made by hand." | Almost all lines are `devel Synced Healthy`, with a few exceptions. On 2026-11-16: `112 devel Synced Healthy` and `2 devel OutOfSync Healthy`; on 2026-11-13: 111, 2 and `1 devel Synced Progressing`. The counts change every day: read them before the session. On 2026-11-20 six `zuno-*` Applications (kagent, OpenClaw, Open WebUI) followed `main` and five `startx-cluster-*` followed a chart tag: such lines may appear. |
+| 1:00 | `oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.spec.source.targetRevision}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}' \| sort \| uniq -c` | "Each component is two Argo CD Applications: its operator, then its service. All the Zuno ones follow one Git branch; the few cluster-base ones follow a chart version. Argo CD keeps the cluster equal to that branch and undoes any change made by hand." | Almost all lines are `devel Synced Healthy`, with a few exceptions. On 2026-11-16: `112 devel Synced Healthy` and `2 devel OutOfSync Healthy`; on 2026-11-13: 111, 2 and `1 devel Synced Progressing`. The counts change every day: read them before the session. On 2026-11-20 at 17:05 UTC: 113 Applications on `devel`, all Synced and Healthy, and 5 `startx-cluster-*` on the chart tag `21.3.377` (3 Synced, 2 OutOfSync, all Healthy). Earlier that day six `zuno-*` Applications (kagent, OpenClaw, Open WebUI) followed `main`, because they had been installed without the cluster's branch variable; they were set back to `devel`. If a `main` line appears, say so and name the component: it was installed without the variable. |
 | 2:00 | `oc get applications.argoproj.io -n openshift-gitops \| awk 'NR==1 \|\| $2!="Synced" \|\| $3!="Healthy"'` | "Each exception has a name. Two come from the cluster's provisioning, outside this repository, without self-heal: they differ on the OAuth and monitoring settings our roles change. If there is a third, name it: a component that is catching up or being changed." | `startx-cluster-auth` and `startx-cluster-infra-config` OutOfSync Healthy. On 2026-11-16 nothing else; on 2026-11-13 `zuno-postgresql-d1` was also listed, Synced Progressing (a database replica catching up). Your list may differ: read it before the session. |
 | 3:00 | `make d0 check argocd` | "And every component has a read-only check. This one asks: is Argo CD installed, are its projects in place, is its operator healthy." | The Ansible run, then a state report with `argocd is installed` and no `is not healthy` message. Duration not measured. |
 | 4:15 | Close | "The platform is the repository. One command installs or checks any piece of it, Argo CD keeps the cluster equal to Git, and before any live session we prove each moment with a real answer." | |
@@ -153,6 +155,7 @@ Run the 5-minute version, then:
 - **No golden-path probe for this scenario.** The checks above are its proof. `make d0 check argocd` was green on
   2026-11-04 ([WP-195](../../../roadmap/work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md));
   the gate passed and the drift check was clean on 2026-11-07 (ADR-0607, ADR-0608). None was run for this page.
+- **An install without the branch variable leaves an Application on `main`.** The manifests say `main` and the role writes the cluster's branch only when `zuno_gitops_target_revision` is set. It happened on 2026-11-17 and 2026-11-19 (six Applications, from a worktree without the cluster's variables) and on 2026-11-20 through an AAP job (`connectivity-link`); all were set back the same day. A lasting fix is planned after the demonstration.
 - **A push to `devel` is a deployment on demo333.** The manifests say `main`; the roles write
   `zuno_gitops_target_revision` (`devel`). `main` carries the tags ([RELEASING.md](../../../../RELEASING.md)).
 - **The Applications are not synced from Git** (ADR-0311). `gitops/apps/*/application-*.yaml` is applied by the roles
@@ -278,7 +281,7 @@ flowchart LR
   AAPJ --> ROLE
   ROLE -->|"Application name-d0, then name-d1<br/>targetRevision: zuno_gitops_target_revision, devel"| APPS
   subgraph GO["openshift-gitops, OpenShift GitOps 1.22.3"]
-    APPS["114 Applications<br/>106 zuno-*, 8 startx-cluster-*"]
+    APPS["118 Applications on 2026-11-20<br/>113 on the cluster branch, 5 on a chart tag"]
     PROJ["AppProjects zuno-platform, zuno-apps,<br/>zuno-bootstrap, cluster-admin"]
     REPO["repo-server"]
     CTRL["application-controller<br/>automated sync, prune, self-heal<br/>ClusterRole cluster-admin"]
