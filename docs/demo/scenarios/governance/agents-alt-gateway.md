@@ -268,4 +268,5 @@ Evidence: the work packages of the two clients:
 > **Status:** Rehearsed on 2026-11-20, 5-minute version: `make demo rehearse` passes, and the chat steps were played
 > through the clients' own APIs with the page's personas (see
 > [WP-304](../../../roadmap/work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md)).
-> The Dify steps (2:30, 3:15) were not replayed; they rest on WP-300's live proof of 2026-11-19.
+> For the Dify steps (2:30, 3:15), the road behind `praxis-auto` was replayed from Dify's token proxy; Dify's own model
+> list was not opened (it needs Dify's administrator sign-in): check it at the rehearsal.

@@ -56,5 +56,8 @@ steps, which a rehearsal does not run, were played through the clients' own APIs
   question first, or say that the local model thinks before it answers.
 - **multi-gateway and agents-alt-gateway, kagent:** the 2:15 / 1:30 question to `zuno-sre` is answered in 1.5 s on the
   default road; to `zuno-diagnose-praxis` in 11 s through Praxis (`maas` step, 200). No tool call on either.
-- **agents-alt-gateway, Dify (2:30, 3:15):** not replayed tonight; the `praxis-auto` model rests on WP-300's live proof
-  of 2026-11-19.
+- **agents-alt-gateway, Dify (2:30, 3:15):** the road behind Dify's `praxis-auto` model was replayed at 23:05 UTC from
+  inside Dify's token proxy, as the golden-path probe does: `/alt/praxis/v1/models` lists `auto` and the local models,
+  and the 3:15 question on `auto` is answered in 23 s by qwen3.6 (Praxis `maas` step, 200). Dify's own model list was not
+  opened: it needs Dify's administrator sign-in, which the agent sessions are not allowed to use. Check it at the
+  rehearsal.
