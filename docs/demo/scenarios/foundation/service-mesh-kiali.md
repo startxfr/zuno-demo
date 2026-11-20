@@ -80,8 +80,8 @@ It is read-only and allowed during a freeze, so it is not a changing unit and ne
 - [ ] Browser profile **ai-ops-01**: Kiali `https://kiali-zuno-mesh.apps.demo333.startx.fr`, **Log In With
   OpenShift**, then the identity provider `openshift` (Keycloak), not `startx-htpasswd_auth`. The Kiali sign-in as
   ai-ops-01 was not tried on 2026-11-13: do it the day before.
-- [ ] Browser profile **paas-ops-01**: the same Kiali sign-in, for the 5:00 graph. On 2026-11-20 paas-ops-01 had never
-  signed in to OpenShift on this cluster: sign in once the day before, so that its user and its group exist.
+- [ ] Browser profile **paas-ops-01**: the same Kiali sign-in, for the 5:00 graph. paas-ops-01 must have signed in to
+  OpenShift once, so that its user and its group `ocp-paas-ops` exist (done on demo333 on 2026-11-20).
 - [ ] Same profile: Grafana `https://grafana-route-zuno-monitoring.apps.demo333.startx.fr`, dashboard **Zuno Platform /
   Mesh & gateway**, last 1 hour, row **Mesh traffic & control plane** open.
 - Known, not a failure: every sidecar logs a repeating SDS error about a missing `service-ca.crt`. It is benign
