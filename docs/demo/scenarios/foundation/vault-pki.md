@@ -80,7 +80,7 @@ Nothing is prepared by the file. What only a person does:
   never signed in to the OpenShift console (on 2026-11-13 it had no OpenShift user), sign in once in a browser first,
   then log the terminal in.
 - [ ] Open the "What changed" table of the [migration runbook](../../../platform/vault-kms-raft-migration.md#what-changed).
-- [ ] There is no Vault URL to open: the UI Route is off by design.
+- [ ] Vault has one Route, `vault` in `zuno-vault` (passthrough). The page does not open it: every step is in the terminal.
 - [ ] This page shows no `vault` command. Never run one that reads a value in front of an audience.
 - Known on screen, not a failure:
   - the SecretStores show `CAPABILITIES ReadWrite`: that is the operator's view of the provider. The Vault policy
@@ -112,7 +112,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | `oc get cm zuno-vault-config -n zuno-vault -o jsonpath='{.data.extraconfig-from-values\.hcl}' \| grep -E '^(storage\|seal\|listener)'`, then `oc get route -n zuno-vault` | "Three lines carry the design: Raft storage, the AWS KMS seal, a TLS listener. The KMS key is used by an IAM user that may only encrypt and decrypt with that one key. The web UI is off: every client is inside the cluster." | `listener "tcp" {`, `storage "raft" {`, `seal "awskms" {`. Then `No resources found in zuno-vault namespace.` On 2026-11-20 the command listed a Route `vault` (passthrough, created on 2026-11-17, not rendered by the chart): tell the platform owner before the session. Do not print the whole ConfigMap: it shows the KMS key identifier. |
+| 5:00 | `oc get cm zuno-vault-config -n zuno-vault -o jsonpath='{.data.extraconfig-from-values\.hcl}' \| grep -E '^(storage\|seal\|listener)'`, then `oc get route -n zuno-vault` | "Three lines carry the design: Raft storage, the AWS KMS seal, a TLS listener. The KMS key is used by an IAM user that may only encrypt and decrypt with that one key. The web UI is on and reachable through one Route, created by hand on 17 November and kept on purpose. TLS goes through to Vault untouched, and Vault still requires a token for everything." | `listener "tcp" {`, `storage "raft" {`, `seal "awskms" {`. Then one Route: `vault`, service `zuno-vault`, port `https`, termination `passthrough`, insecure policy `None` (read on 2026-11-20). Do not print the whole ConfigMap: it shows the KMS key identifier. |
 | 6:00 | `oc get cm vault-configure-secret-access -n zuno-vault -o jsonpath='{.data.ns-zuno-ai-run\.hcl}' \| grep '^path'` | "This is the Vault policy of the `zuno-ai-run` store: 18 paths, read only. It is generated from one table in Git, and a check fails the build if an ExternalSecret asks for a key the table does not list. ai-ops-01 and ai-dev-01 may create ExternalSecrets here, so this list is all they could ever pull." | 18 lines, from `path "zuno/data/aap/mcp-token" {` to `path "zuno/data/smtp/technical" {`. Paths only, no values. |
 | 7:15 | `oc get externalsecret llm-provider-mistral -n zuno-ai-run -o jsonpath='{.spec.secretStoreRef.kind}/{.spec.secretStoreRef.name}{"  "}{.spec.data[*].remoteRef.key}{"  "}{.status.refreshTime}{"\n"}'` | "One example: the ai-gateway's Mistral key. The manifest in Git names a path. The value is fetched by the operator and refreshed every hour." | `SecretStore/vault  providers/mistral  <a time within the last hour>`. |
 | 8:15 | `oc get deploy a2a-gateway mcp-gateway -n zuno-ai-run -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .spec.template.spec.containers[0].env[*]}{"  "}{.name}={.value}{"\n"}{end}{end}' \| grep -E 'gateway$\|SIGNER\|VAULT_(AUTH_ROLE\|TRANSIT_KEY\|ADDR)'` | "Two private keys used to sit in Secrets: one signs the agent chain of a delegation, one signs every tool call. Now Vault Transit signs. The gateway sends the bytes, Vault returns a signature, and the key never leaves Vault. If Vault does not answer, nothing is signed another way: the tool call is refused, the delegation goes without a chain." | `a2a-gateway`: `AGENT_CHAIN_SIGNER=transit`, `VAULT_ADDR=https://zuno-vault.zuno-vault.svc:8200`, `VAULT_AUTH_ROLE=a2a-gateway`, `VAULT_TRANSIT_KEY=agent-chain`. `mcp-gateway`: `MCP_CALL_ASSERTION_SIGNER=transit`, role `mcp-gateway`, key `mcp-call-assertion`. |
@@ -136,6 +136,7 @@ Run the 5-minute version, then:
 
 ## Limits
 
+- **The Vault Route is not in Git.** The chart keeps its Route off (the design of ADR-0602, clause 1). The Route `vault` was created by hand in the console on 2026-11-17 and the owner keeps it for now (decision of 2026-11-20). Argo CD does not track it. Whether the chart should own it is decided after the demonstration.
 - **No `vault` command is shown.** The seal state comes from the labels Vault writes on its own pod. `vault status`
   runs only inside `make d0 check vault`, before the session.
 - **One Vault replica.** Raft runs with one node; the configuration is ready for three (`retry_join`), and no
@@ -257,7 +258,7 @@ flowchart LR
     LE["Let's Encrypt<br/>production and staging"]
   end
   subgraph VNS["zuno-vault: not meshed, ingress from cert-manager,<br/>zuno-ai-run, zuno-auth, zuno-data, zuno-ai-build"]
-    VAULT["StatefulSet zuno-vault, 1 replica, OnDelete<br/>Vault 1.17.2, raft at /vault/data/raft<br/>TLS :8200, service-CA cert vault-tls<br/>Service zuno-vault, no Route"]
+    VAULT["StatefulSet zuno-vault, 1 replica, OnDelete<br/>Vault 1.17.2, raft at /vault/data/raft<br/>TLS :8200, service-CA cert vault-tls<br/>Service zuno-vault, Route vault (passthrough)"]
     ENG["KV v2 zuno/<br/>PKI pki/, root zuno-demo.internal<br/>Transit transit/: agent-chain,<br/>mcp-call-assertion, zuno-platform-signer<br/>auth kubernetes"]
     CFG["Job vault-configure, role vault-configurator<br/>policies ns-namespace from secret-access.yaml<br/>Transit keys and roles, create-if-missing"]
     BAK["CronJobs vault-backup 04:00, CSI snapshot<br/>vault-raft-snapshot 04:30, role raft-snapshot"]
