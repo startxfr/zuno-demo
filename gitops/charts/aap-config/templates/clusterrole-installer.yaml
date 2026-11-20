@@ -334,4 +334,34 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch", "patch"]
+  # Amendment (2026-11-20, owner's go, WP-315): the Day-1 vital gate (ADR-0352 clause 10,
+  # ansible/tasks/check_day1_vital_gate.yml) runs the precheck of the 8 vital Day-0 components inside every
+  # `make d1 install` Job Template, and 8 of their reads were refused to this credential: job 1479
+  # (zuno-day1-install connectivity-link) failed with 403 on the first one. Each grant below is READ-ONLY and, where the
+  # precheck names its object, limited to that name: nothing here can change RBAC, ArgoCD, Keycloak or AAP, so the two
+  # exclusions of the header (cluster-scoped RBAC objects; the aap/tower APIs) still hold for every mutating verb.
+  # Measured with `oc auth can-i --as=system:serviceaccount:zuno-aap:aap-installer` on every k8s_info of the 8 prechecks.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get"]
+    resourceNames: ["zuno-argocd-application-controller-admin"]   # argocd precheck
+  - apiGroups: ["argoproj.io"]
+    resources: ["argocds"]
+    verbs: ["get"]
+    resourceNames: ["openshift-gitops"]   # argocd precheck
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list"]   # vault precheck (the newest Raft snapshot)
+  - apiGroups: ["k8s.keycloak.org"]
+    resources: ["keycloaks", "keycloakrealmimports"]
+    verbs: ["get"]
+    resourceNames: ["zuno", "zuno-realm"]   # keycloak precheck
+  - apiGroups: ["aap.ansible.com"]
+    resources: ["ansibleautomationplatforms"]
+    verbs: ["get"]
+    resourceNames: ["aap"]   # aap precheck
+  - apiGroups: ["tower.ansible.com"]
+    resources: ["ansibleprojects", "jobtemplates"]
+    verbs: ["get"]
+    resourceNames: ["zuno-demo", "zuno-day0-check"]   # aap_config precheck
 {{- end }}
