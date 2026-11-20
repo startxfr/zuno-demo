@@ -265,15 +265,7 @@ Evidence: the work packages of the two clients:
 
 ## Page status
 
-> **Status:** Not rehearsed. As of 2026-11-19 the work packages this page was written against (the alternative gateway,
-> the kagent routes, the Dify model) are Done in the [tracker](../../../roadmap/implementation-roadmap.md), but nobody
-> has played the page since: its steps and checkpoints were written before they landed, so check them against the live
-> objects (the token proxy's alternate routes, the second model setting, the Dify model) before showing it. The page
-> depends on
-> [WP-292](../../../roadmap/work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md),
-> [WP-297](../../../roadmap/work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) and
-> [WP-300](../../../roadmap/work-packages/wp-300-give-dify-the-alternative-gateways.md).
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> No golden-path probe: rehearse before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** none.
+> **Status:** Rehearsed on 2026-11-20, 5-minute version: `make demo rehearse` passes, and the chat steps were played
+> through the clients' own APIs with the page's personas (see
+> [WP-304](../../../roadmap/work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md)).
+> The Dify steps (2:30, 3:15) were not replayed; they rest on WP-300's live proof of 2026-11-19.

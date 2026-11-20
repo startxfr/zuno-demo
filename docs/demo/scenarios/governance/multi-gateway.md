@@ -85,7 +85,7 @@ Profile **ai-ops-01**, signed in to Open WebUI.
 |---|---|---|---|
 | 0:00 | Open the model picker of a new chat | "This is the chat everyone knows. It has two connections: Zuno, our governed gateway, and Praxis, an alternative one we added next to it." | "Zuno", "Zuno Code" and "Zuno wesh" from the default gateway, then the models of the alternative one, prefixed `praxis.` and tagged "Praxis": `praxis.auto`, the four local models, `praxis.claude` and `praxis.codestral-latest` (the list is the one read from Open WebUI's API on 2026-11-17; how the picker displays it is to confirm at the first rehearsal). |
 | 0:45 | Pick **Zuno** and ask: `In two sentences, what does a Kubernetes liveness probe do?` | "A public question, on purpose. Only public content goes down the alternative road." | A short answer. |
-| 1:30 | Pick **praxis.auto** and ask the same question | "Same sign-in, same screen, same question. The model name `auto` is mapped to a local model by the alternative gateway." | A short answer of the same kind. The wording differs. |
+| 1:30 | Pick **praxis.auto** and ask the same question | "Same sign-in, same screen, same question. The model name `auto` is mapped to a local model by the alternative gateway." | A short answer of the same kind. The wording differs. It can take close to a minute: the local model reasons first (50 s on 2026-11-20). |
 | 2:15 | Open kagent, agent **zuno-sre**. Ask: `What does it mean when a pod is in CrashLoopBackOff? Answer in two sentences and call no tool.` | "kagent is the second client. This agent uses the default road, through the token proxy." | A short answer, no tool call. |
 | 3:00 | Open the agent **zuno-diagnose-praxis** and ask the same question | "Same agent, same instructions. Its model setting points to the alternative gateway." | A short answer, no tool call. |
 | 3:45 | Say what the alternative road does not do | "On that road, my token budget is not counted, nothing raises the data class, and no per-agent policy applies. That is why we send public questions only." | |
@@ -284,16 +284,7 @@ first five are Done, Blender is not started and the world model waits for its li
 
 ## Page status
 
-> **Status:** Not rehearsed. As of 2026-11-19 the work packages this page was written against are Done in the
-> [tracker](../../../roadmap/implementation-roadmap.md) (the alternative gateway, and the Open WebUI and kagent
-> wiring), but nobody has played the page since: its steps and checkpoints were written before they landed, so check
-> them against the live objects before showing it. The 15-minute version also needs the Blender add-on (WP-302, not
-> started) and the world model (WP-303, live proof pending). The page depends on
-> [WP-292](../../../roadmap/work-packages/wp-292-deploy-praxis-ai-in-the-alternative-gateways-namespace.md),
-> [WP-296](../../../roadmap/work-packages/wp-296-give-open-webui-the-alternative-gateways.md) and
-> [WP-297](../../../roadmap/work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) for
-> the 5-minute version, and on the other client work packages for the 15-minute version.
-> **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> No golden-path probe: rehearse before showing it to an audience.
-> **Personas:** see [Personas](#personas).
-> **Used in workshops:** none.
+> **Status:** Rehearsed on 2026-11-20, 5-minute version: `make demo rehearse` passes, and the chat steps were played
+> through the clients' own APIs with the page's personas (see
+> [WP-304](../../../roadmap/work-packages/wp-304-write-the-multi-gateway-claude-code-and-agents-scenarios.md)).
+> The 15-minute version also needs the Blender add-on (WP-302, not started) and the world model (WP-303, live proof pending).

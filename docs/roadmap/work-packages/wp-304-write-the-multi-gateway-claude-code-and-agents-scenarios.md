@@ -1,6 +1,6 @@
 # WP-304: Write the multi-gateway, Claude Code and agents scenarios
 
-- **State:** Operator pending (2026-11-19): the three pages exist; `claude-code-sovereign` was rehearsed (5-minute version, 2026-11-18) and carries its GIF; left: `multi-gateway` and `agents-alt-gateway` are not rehearsed, and each scenario still needs one live play with the owner's go
+- **State:** Done (2026-11-20): the three pages exist and each scenario was played live once with the owner's go (`claude-code-sovereign` on 2026-11-18, `multi-gateway` and `agents-alt-gateway` on 2026-11-20)
 - **ADRs:** [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
 - **Depends on:** [WP-296](wp-296-give-open-webui-the-alternative-gateways.md), [WP-297](wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md), [WP-298](wp-298-run-claude-code-on-sovereign-models-through-praxis.md)
 - **Related:** [ADR-0616](../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)
@@ -43,3 +43,18 @@ Three catalogue scenarios:
   Praxis deployment that landed under WP-292 and WP-298.
 - State moved from Not started to Operator pending: the repository work of the step list is done, what remains needs
   the owner's go and live plays. "In progress" is not a state of the tracker.
+
+## 2026-11-20: multi-gateway and agents-alt-gateway played live
+
+Owner's go of 2026-11-20 (evening). `make demo rehearse <id> 15` passes for both pages (their status and read steps). The chat
+steps, which a rehearsal does not run, were played through the clients' own APIs with the pages' personas (22:18-22:25 UTC):
+
+- **multi-gateway, Open WebUI as ai-ops-01:** the model list shows `Zuno`, `Zuno Code`, `Zuno wesh`, then the
+  `praxis.`-prefixed models (`praxis.auto`, the four local models, `praxis.claude`, `praxis.codestral-latest`). The 0:45
+  question on `Zuno` is answered in 1 s; the same question on `praxis.auto` is answered in 50 s. The Praxis log shows the
+  `maas` step at 200. The time is qwen3.6's reasoning before it answers (WP-301 note): on stage, ask the Praxis
+  question first, or say that the local model thinks before it answers.
+- **multi-gateway and agents-alt-gateway, kagent:** the 2:15 / 1:30 question to `zuno-sre` is answered in 1.5 s on the
+  default road; to `zuno-diagnose-praxis` in 11 s through Praxis (`maas` step, 200). No tool call on either.
+- **agents-alt-gateway, Dify (2:30, 3:15):** not replayed tonight; the `praxis-auto` model rests on WP-300's live proof
+  of 2026-11-19.
