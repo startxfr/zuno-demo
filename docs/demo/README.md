@@ -235,4 +235,5 @@ Other identities, never signed in on stage:
 - [Freeze protocol](freeze-protocol.md): what stops changing before a demonstration day.
 - [Rollback](rollback.md): how to roll back an experience or a gateway.
 - [Stresstest](../platform/stresstest.md): the profile-driven campaign that replays the scenarios (the table above says which driver replays which).
+- [Demo day 2026-11-24](demo-day-2026-11-24.md): the runbook of the next demonstration day, with the schedule of the days before it and the known issues to say on stage.
 - [Demo day 2026-11-09](demo-day-2026-11-09.md): the runbook of that day, kept as a record and as an example.

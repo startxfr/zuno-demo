@@ -1,6 +1,6 @@
 # WP-314: Fit the MaaS gateway wasm config under 1.4 MB
 
-- **State:** Done (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; V4 and V6 passed; the re-check of V1 to V3 and of the regenerated routes after the KServe window of the same day is to be recorded below)
+- **State:** Done (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; V4 and V6 passed; the re-check after the KServe window of the same day passed at 15:33 UTC, see below)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** none
 - **Related:** [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md), [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md), [WP-306](wp-306-give-the-stress-runs-their-own-identity-and-budget.md), [WP-313](wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md)
@@ -61,7 +61,7 @@ now with 3 rules and 3 matches. It rebuilds the same 3-match routes, not the 15-
 | V5 | Clients: the golden-path probes, `make demo status` of the affected scenarios | Probes pass; statuses clean | 14 of 14 golden-path probes PASS; `make demo status` PASS for maas-portal-api-keys, genai-playground, quotas, external-models and multi-gateway. Praxis had no client traffic during the checks; its ServiceAccount got 200 directly |
 | V6 | `make d2 check agents` on agents v1.1.7, run by zuno-demo-cluster after the change | The acceptance gate passes | OVERALL PASS, failed 0: quality 18/19, security 14/14, gate checks 5/5. The one failure, #11 (RAG citation), was already there on agents v1.1.6 before this change. A real Praxis client call (OpenClaw, consultant-02) also returned 200, with `step="maas" status=200` in the Praxis log |
 
-**To record after the KServe window of 2026-11-20** (it moved to the day of the change, after V4): a re-check of V1 to V3 and that KServe regenerated the 3-rule routes from the LLMInferenceService spec, by zuno-demo-assist.
+**Re-check after the KServe window of 2026-11-20 (15:33 UTC, zuno-demo-assist): passed.** KServe regenerated the 4 model routes from the LLMInferenceService spec with 3 rules each (`catch-all-path`, `catch-all-model-routing`, `inference-pool-anchor`). By then the usage tiers of [WP-315](wp-315-harden-maas-usage-tiers-single-listener-alert-limitador-redis.md) were live, so V1 to V3 were measured on them: generation 14, 549,033 bytes, 15 limits COUNTED, 0 NOT USED; 401 without a token and 200 for the platform identities on the 4 models; one counter per tier and per identity.
 
 ## Rollback
 

@@ -1234,7 +1234,7 @@ Blender and world-model.
 | WP-312 | [wp-312](work-packages/wp-312-report-the-campaigns-and-read-the-limitador-counters.md) | 0624 | WP-307, WP-309 | Repo work in review | owner's go: a first standard run and its report |
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
 | WP-314 | [wp-314](work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) | 0624 | none | Done (2026-11-20) | applied 12:27 UTC (generation 4, 674,956 bytes, 20 limits counted); V4 (sale-01 live) and V6 (`make d2 check agents`, v1.1.7) passed; the re-check after the KServe window of the same day is to be recorded |
-| WP-315 | [wp-315](work-packages/wp-315-harden-maas-usage-tiers-single-listener-alert-limitador-redis.md) | 0624 | WP-314 | Not started | owner's go per step on 2026-11-20 evening: tiers (about 15:45Z), single-listener test (about 16:30Z), wasm-config alert, Limitador on disk (decision of 14:50Z, replaces the Redis plan) |
+| WP-315 | [wp-315](work-packages/wp-315-harden-maas-usage-tiers-single-listener-alert-limitador-redis.md) | 0624 | WP-314 | Operator pending | 2026-11-20: tiers live and measured at 15:33Z (generation 14, 549,033 bytes, 15 limits counted, 12 subscriptions); single-listener test done, the change deferred after the demo; alert, Limitador on disk and guard on `devel`, being applied |
 
 ### OKF stream phases
 

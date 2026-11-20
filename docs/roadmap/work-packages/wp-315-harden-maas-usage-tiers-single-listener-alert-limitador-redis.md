@@ -1,6 +1,6 @@
 # WP-315: MaaS hardening: usage tiers, single-listener test, wasm-config alert, Limitador on disk
 
-- **State:** Not started (2026-11-20: owner-approved, applied in the evening of the same day, step by step, each with the owner's go and a notice to zuno-demo-cluster; the results are recorded below as they come)
+- **State:** Operator pending (2026-11-20: the usage tiers are live and measured since 15:33 UTC; the single-listener test is done; the alert, the Limitador disk and the guard are on `devel` and being applied by the roles; the results are recorded below as they come)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)
 - **Related:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md), [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md)
@@ -26,14 +26,33 @@ The owner's principles: usage profiles, not per-user subscriptions; one window; 
 They replace `<model>-ai-gateway`, `<model>-lightspeed` and `<model>-load`, the three `ocp-*` subscriptions and `<model>-sales`. Estimate from the rendered chart: 550,448 bytes, 12 subscription limits plus the default deny.
 The tier is the unit of delegation; this amends [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) (dated note).
 
-Result: the chart is on `devel` since 2026-11-20 15:01 UTC (7b289ce5); it goes live when the `zuno-models-d1` auto-sync is restored after the KServe window (about 15:12 UTC). The names, `owner.users`, limit count and bytes measured on the cluster are recorded here after that; until then the figures above are estimates, not measurements.
+Result: **live and measured on 2026-11-20 at 15:33 UTC** (chart on `devel` since 15:01 UTC, 7b289ce5; the four local models were Ready again after the KServe window).
 
-## 2. Single-listener test (about 16:30 UTC)
+- **Size and limits:** the EnvoyFilter `kuadrant-maas-default-gateway` is at generation 14, 549,033 bytes (the estimate was 0.3 % above), 50 action sets. `python3 platform/models/check_maas_wasm.py`: 15 limits COUNTED (the 12 subscription limits, the default deny and the 2 workstation limits), 0 NOT USED, no failed update in 30 minutes.
+- **The 12 subscriptions, all Active:**
+
+  | Subscription | Owners | Priority | Tokens an hour |
+  |---|---|---|---|
+  | `<model>-platform` for gpt-oss-20b, qwen35-9b, qwen35-9b-wesh and qwen36-27b-instruct | `ai-gateway`, `praxis` | 100 | 1,000,000 |
+  | `mistral-large-platform`, `gpt-oss-120b-ovhcloud-platform` | `ai-gateway` | 100 | 1,000,000 |
+  | `<model>-service` for gpt-oss-20b, qwen35-9b and qwen36-27b-instruct | `lightspeed-maas-client`, `ai-gateway-stress` | 50 | 200,000 |
+  | `qwen35-9b-wesh-service` | `ai-gateway-stress` | 50 | 200,000 |
+  | `gpt-oss-20b-builders` | the groups `/ocp-ai-dev`, `/ocp-ai-ops`, `/ocp-paas-ops` | 20 | 5,000,000 |
+  | `gpt-oss-20b-business` | the group `/sales` | 1 | 5,000 |
+
+- **Access:** without a token, 401 on the 4 local models. `ai-gateway`, `praxis` and `ai-gateway-stress`: 200 on the 4. `lightspeed-maas-client`: 200 on gpt-oss-20b, qwen35-9b and qwen36-27b-instruct, 403 on qwen35-9b-wesh, as designed.
+- **Counters:** one counter per tier and per identity. Each local route has 2 platform counters (ai-gateway, Praxis) and 2 service counters (stress, Lightspeed); the wesh route has 2 platform counters and 1 service counter.
+- **Not measured live:** the builders and business tiers are checked by configuration only, because no stress twin is in the `ocp-*` groups. The business behaviour is the one measured in [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) with `stress-sale-01` (200 on gpt-oss-20b, 403 on qwen36-27b-instruct).
+- **Scenario checks** (`make demo status`): maas-portal-api-keys 8 PASS, genai-playground 14, quotas 12, external-models 7, lightspeed 7; 0 FAIL.
+
+## 2. Single-listener test (done 2026-11-20, 15:35 to 15:36 UTC)
 
 A throwaway route attached to the `https` listener only, called through the maas Route, to learn whether the model routes can stay on one listener (`sectionName`), which would halve the wasm config again.
 The second listener `https-external` stays for now: `maas-api` takes the external URL from it and the portal's API keys page needs it.
 
-Result to record: applied, or deferred with the reason.
+Result: **the test is done; the change itself is deferred until after the demonstration** (recommendation of zuno-demo-assist, the owner's confirmation is awaited).
+A call on the external host to a route attached to the `https` listener only reached the backend, so one listener is enough for routing. The change is not applied for two reasons: at 549 KB there is no size need,
+and the way the gateway's default authentication policy reaches a new route has to be examined first (the model routes do answer 401 without a token). The throwaway route was deleted at 15:36 UTC.
 
 ## 3. Alert on the wasm config
 
