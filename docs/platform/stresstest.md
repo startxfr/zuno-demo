@@ -85,7 +85,7 @@ These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-
 
 | Switch | Effect |
 |---|---|
-| `zuno_ai_gateway_stress_credentials: true` | The ai-gateway chooses its MaaS credential by quota class. The classes `stresstest` and `loadtest` reach MaaS with the ServiceAccount `zuno-ai-run/ai-gateway-stress` and its own `<model>-load` MaaSSubscriptions (models chart, `altGatewayPeers.stress`), never with the ai-gateway's own ServiceAccount, whose budget Open WebUI, Dify, kagent, OpenClaw and the acceptance gate share. Needs the ai-gateway image built from 01079893 or later |
+| `zuno_ai_gateway_stress_credentials: true` | The ai-gateway chooses its MaaS credential by quota class. The classes `stresstest` and `loadtest` reach MaaS with the ServiceAccount `zuno-ai-run/ai-gateway-stress` and the `<model>-service` tier of the MaaS subscriptions (200,000 tokens an hour, shared with Lightspeed; models chart), formerly `<model>-load`, never with the ai-gateway's own ServiceAccount, whose budget Open WebUI, Dify, kagent, OpenClaw and the acceptance gate share. Needs the ai-gateway image built from 01079893 or later |
 | `zuno_ai_gateway_quota_loadtest_group: zuno-loadtest` | Members of the Keycloak group `/zuno-loadtest` run in the quota class `loadtest`. Inert until an admitted agents release defines the class in `policies/quotas/quota-policy.yaml` |
 | `zuno_stress_clients_enabled: true` | The Dify and kagent token proxies admit the stress Job's pods, so the Job can replay those clients' path |
 | `zuno_stress_reader_enabled: true` | The Job runs as the ServiceAccount `zuno-stress-reader` (namespaces chart, `stressReader`): get-only on the objects the demos' state checks name, generated from the demos' own lists, no Secret, no write. Without it the Job runs as `acceptance-gate` and every state row fails with `status=403` and says what to enable |
@@ -101,7 +101,7 @@ These are in `ansible/clusters/demo333.yml` (each is the owner's decision, 2026-
 - **`stress-load-01` to `stress-load-08`**: the load pool, in `/zuno-evaluation` and in `/zuno-loadtest`. A budget is
   keyed by persona (WP-190), so a concurrency of N wants N personas. They exist after the Keycloak personas Job has
   run; without it each worker fails to sign in. Quota class `loadtest`.
-- **`ai-gateway-stress`** and the `<model>-load` subscriptions: the MaaS side of both classes, with its own limit
+- **`ai-gateway-stress`** and the `<model>-service` subscriptions (named `<model>-load` until 2026-11-20, WP-315): the MaaS side of both classes, with its own limit
   (200,000 tokens an hour per model in the work package's proposal; the numbers are the owner's decision). The traffic
   carries `X-Zuno-Traffic: stresstest`, recorded as the span attribute `zuno.traffic` on `model_call`, `guardrails_observe`
   and `tool_invoke` (search `{ span.zuno.traffic = "stresstest" }` in Tempo). It is never a metric label or an authorization
@@ -170,8 +170,8 @@ fails and says so, it never guesses another one.
 
 - **The `-load` limits were not counted from 2026-11-05 until the MaaS gateway's wasm config was fitted** ([WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md),
   applied on 2026-11-20 at 12:27 UTC): the Kuadrant EnvoyFilter of the `maas-default-gateway` could not be written (3.92 MB desired, over the 3 MiB API and 2 MiB gRPC request limits), so the MaaS side of the
-  isolation proof read "no counter" for the stress ServiceAccount. Since that change the `-load` limits are counted (a counter under `<model>-load` was seen on each local route) and the isolation
-  row shows it. The `<model>-load` subscriptions were renamed from `<model>-stress` because the wasm shim never creates a counter for the last token-limit action of a route, ordered by limit name.
+  isolation proof read "no counter" for the stress ServiceAccount. Since that change the `-load` limits are counted (a counter under `<model>-load`, now `<model>-service`, was seen on each local route) and the isolation
+  row shows it. The `<model>-load` subscriptions (now the `<model>-service` tier) were renamed from `<model>-stress` because the wasm shim never creates a counter for the last token-limit action of a route, ordered by limit name.
 - `multi-gateway` is replayed in part (one question through the ai-gateway and through Praxis); `agents-alt-gateway` has
   only its state check. Their state checks now judge the kagent agent `zuno-diagnose-praxis` for real: it was read live on
   demo333 as Accepted and Ready on 2026-11-19, so the skip list `NOT_YET` of `driver_state.py` is empty and a missing agent

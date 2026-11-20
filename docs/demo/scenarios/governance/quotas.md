@@ -43,7 +43,7 @@ Other identities:
   spend sale-01's budget. In the same way `service-account-dify` and `service-account-openclaw-consultant-02` spend
   consultant-02's budget, and `service-account-kagent` spends ai-ops-01's.
 - The ai-gateway's own ServiceAccount owns the MaaS subscriptions it calls through (for example
-  `gpt-oss-20b-ai-gateway`).
+  `gpt-oss-20b-platform`).
 - The Keycloak client `zuno-stresstest` is the only trusted platform client on demo333: only it may pick a class with
   the `X-Zuno-Quota-Class` header.
 
@@ -61,7 +61,7 @@ Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1` and `z
 `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `PERSONA_CLAIM_CLIENTS`, and no
 `QUOTA_STRESSTEST_GROUP`), the StatefulSet `zuno-redis-master` with its volume
 (the PersistentVolumeClaim `redis-data-zuno-redis-master-0`, `Bound`), the MaaS subscription
-`gpt-oss-20b-ai-gateway`, the Deployment `grafana-deployment`, the pod `tempo-tempo-0` and the `LLMInferenceService`
+`gpt-oss-20b-platform`, the Deployment `grafana-deployment`, the pod `tempo-tempo-0` and the `LLMInferenceService`
 local models in `zuno-ai-run` (and how many are Ready). If one is missing or not Healthy, stop and tell the
 platform owner: this demo installs nothing. If `QUOTA_STRESSTEST_GROUP` is set, an old replay was not reverted: tell
 the platform owner before the session.
@@ -138,7 +138,7 @@ Run the 5-minute version, then:
 | 5:00 | Open `policies/quotas/quota-policy.yaml` in the agents release | "The budgets are declared in the signed agents release, beside the tool policy. The gateway reads a slice generated from it and never defines an amount itself." | Four classes. `standard` and `evaluation` with `fail_mode: open`, `intensive` and `stresstest` with `fail_mode: closed`. |
 | 6:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' \| grep -E '^(QUOTA\|PERSONA\|MAAS_QUOTA)'` | "The ledger writes to Redis, so a restart does not give anyone a fresh budget. Fail modes are enforced. The tight test class is off." | `MAAS_QUOTA_429_PASSTHROUGH=true`, `QUOTA_FAIL_MODES_ENFORCED=true`, `PERSONA_CLAIM_CLIENTS=openclaw-*,dify,kagent`, `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `QUOTA_LEDGER_STORE=redis`. No `QUOTA_STRESSTEST_GROUP`. |
 | 8:00 | Explain the persona key with [Appendix B](#appendix-b---lld) | "Open WebUI and UnifAI call with my own token. OpenClaw, Dify and kagent call as service accounts, whose tokens carry a signed `persona` claim. The ledger keys my budget on that persona, so the three paths meet on one counter." | The Redis key in Appendix B: `zuno:quota:<class>:user:<persona>:<bucket>`. |
-| 9:00 | `oc get maassubscriptions.maas.opendatahub.io gpt-oss-20b-ai-gateway -n models-as-a-service -o jsonpath='{.spec}'` | "MaaS counts too, but per subscription and per model. Everything the gateway sends draws on the gateway's own subscription. Per-person budgets exist only in the ledger: that is the 2026-11-05 decision." | `tokenRateLimits` of 1,000,000 tokens per `1h`, owner `system:serviceaccount:zuno-ai-run:ai-gateway`. |
+| 9:00 | `oc get maassubscriptions.maas.opendatahub.io gpt-oss-20b-platform -n models-as-a-service -o jsonpath='{.spec}'` | "MaaS counts too, but per subscription and per model. Everything the gateway sends draws on the platform tier subscription. Per-person budgets exist only in the ledger: that is the 2026-11-05 decision." | `tokenRateLimits` of 1,000,000 tokens per `1h`, owner users `system:serviceaccount:zuno-ai-run:ai-gateway` and the Praxis ServiceAccount. |
 | 10:00 | Say what each refusal means | "A 429 that names `dimension: user` or `group` comes from the ledger. One that names `dimension: maas` comes from a MaaS subscription limit." | |
 | 10:45 | Explain `fail_mode: closed` | "`stresstest` is fail closed. If its budget file cannot be read, it refuses. It is served only through MaaS, where tokens are counted, so it never falls back to a SaaS model that would escape the count. With the GPU models down, its calls end in an error before any token is counted." | On 2026-11-02, with the GPU nodes down, three Open WebUI chats under `stresstest` returned 502 ([WP-184](../../../roadmap/work-packages/wp-184-three-experiences-demonstration.md)). |
 | 11:45 | The per-turn ceiling (R-543), from the [v0.14.5 addendum](../../../roadmap/release-notes/v0.14.5-addendum.md) | "A daily budget does not stop one runaway answer. An agent's signed sheet may also set `max_tokens_per_turn`. UnifAI checks it before each model call and ends the turn cleanly." | On 2026-11-11 a test bundle with a ceiling of 300, played as ai-ops-01, ended a turn that used a tool on "Token ceiling reached for this turn (1893/300 tokens)". A turn with a single model call is never cut. |
@@ -193,7 +193,7 @@ Run the 5-minute version, then:
   by group; one person's calls are on the trace (`zuno.persona`) and in the ledger.
 - **MaaS does not count per person.** Through the gateway, every persona draws on the gateway's subscription
   (1,000,000 tokens per hour on gpt-oss-20b). Direct MaaS keys from the portal use group subscriptions instead, for
-  example `gpt-oss-20b-sales` at 5,000 tokens per hour (the sales subscription exists on gpt-oss-20b only, and there is no `-agents` subscription since 2026-11-20), and never touch the ledger: see the
+  example `gpt-oss-20b-business` at 5,000 tokens per hour (the business tier, the group `/sales`, exists on gpt-oss-20b only, and there is no `-agents` subscription since 2026-11-20), and never touch the ledger: see the
   [MaaS portal scenario](../rhoai/maas-portal-api-keys.md). SaaS providers are called directly, so only the ledger
   counts them.
 - **The request-rate limits of the policy are not enforced** for the in-cluster experiences. The only live

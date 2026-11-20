@@ -115,7 +115,7 @@ flowchart LR
   AIGW["ai-gateway<br/>classification floor per client,<br/>routing, guardrails, per-persona quota"]
   MCPGW["mcp-gateway<br/>tools by group,<br/>read-only k8s tools for ocp-ai-ops"]
   LSP["OpenShift Lightspeed<br/>console plugin"]
-  MAAS["MaaS gateway<br/>subscription gpt-oss-20b-lightspeed"]
+  MAAS["MaaS gateway<br/>subscription gpt-oss-20b-service"]
   MODELS["Local models through MaaS,<br/>Codestral and other SaaS models by routing"]
   TOOLS["MCP servers<br/>Confluence, Drive, Git, AAP, k8s"]
   OW --> AIGW

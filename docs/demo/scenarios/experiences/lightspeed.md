@@ -26,8 +26,8 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the `OLSConfig`, the MaaS subscription and the bindings. Its token runs the probe. | The presenter's `oc` terminal in the 15-minute version. On 2026-11-12 it had never signed in to OpenShift on demo333 either; `kube:admin` with a token works too. |
 
 Other identities:
-- The ServiceAccount `lightspeed-maas-client` (`openshift-lightspeed`) makes every Lightspeed model call. It is the
-  only subject of the subscription `gpt-oss-20b-lightspeed`. The console user's identity never reaches MaaS.
+- The ServiceAccount `lightspeed-maas-client` (`openshift-lightspeed`) makes every Lightspeed model call. It shares
+  the service tier `gpt-oss-20b-service` with the stress identity `ai-gateway-stress`, and it is the only subject that calls through this page. The console user's identity never reaches MaaS.
 - Named only: **ai-ops-01**, **ai-dev-01** and **paas-dev-01** have no cluster-level binding to the query role, so
   the chat should answer "Not authorized" for them (read from the RBAC, not tested).
 
@@ -48,7 +48,7 @@ required one is missing, stop and tell the platform owner: this demo installs no
 
 Nothing to do when it passes. It reads that the `OLSConfig` conditions `MCPServerReady` and `RHOKPReady` are `True`, that the `lightspeed-operator`
 ClusterServiceVersion has succeeded, that `gpt-oss-20b` is `Ready` and that the MaaSSubscription
-`gpt-oss-20b-lightspeed` is `Ready`. It runs the golden-path probe `lightspeed` (see [golden-path.md](../../golden-path.md)).
+`gpt-oss-20b-service` is `Ready`. It runs the golden-path probe `lightspeed` (see [golden-path.md](../../golden-path.md)).
 The probe needs an `oc` session with a token (`oc whoami -t`); with a certificate login it prints `MANUAL`. There is no
 automated question in the console: ask it by hand, within the budget below. If it fails, see
 [If something goes wrong](#if-something-goes-wrong).
@@ -101,7 +101,7 @@ Run the 5-minute version, then:
 | 5:00 | Ask: `Search Confluence for our onboarding pages.` *(untested prompt)* | "Company knowledge comes through the same mcp-gateway as in every other experience. Lightspeed passes my OpenShift token; the gateway checks it with the Kubernetes API and applies my groups." | A call to `confluence.page.search`, then onboarding pages of the space SXSI. |
 | 6:30 | Profile 2, **sale-01**, same question *(untested prompt)* | "Same console, same assistant, another person. A salesperson has no Confluence tool, so the assistant cannot reach Confluence for them." | No Confluence call. An answer saying it cannot search Confluence. |
 | 8:00 | Terminal: `oc get olsconfig cluster -o jsonpath='{.spec.llm.providers[0].type} {.spec.llm.providers[0].url}{"\n"}{.spec.mcpServers[0].url}{"\n"}'` | "One provider, of type `rhoai_vllm`, pointed at the MaaS gateway, not at the ai-gateway. One extra MCP server: Zuno's mcp-gateway." | `rhoai_vllm https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1`, then `http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp`. |
-| 9:15 | `oc get maassubscription gpt-oss-20b-lightspeed -n models-as-a-service -o yaml` | "Lightspeed is a MaaS tenant like a developer: one service account, one model, 200,000 tokens an hour for all console users. Each call also carries about 15,000 tokens of tool definitions, so that is a handful of questions an hour." | `owner.users`: `system:serviceaccount:openshift-lightspeed:lightspeed-maas-client`; `limit: 200000`, `window: 1h`; phase `Active`. |
+| 9:15 | `oc get maassubscription gpt-oss-20b-service -n models-as-a-service -o yaml` | "Lightspeed is a MaaS tenant of the service tier: one service account (shared with the stress identity), one model, 200,000 tokens an hour for all console users. Each call also carries about 15,000 tokens of tool definitions, so that is a handful of questions an hour." | `owner.users`: `system:serviceaccount:openshift-lightspeed:lightspeed-maas-client` and `system:serviceaccount:zuno-ai-run:ai-gateway-stress`; `limit: 200000`, `window: 1h`; phase `Active`. |
 | 10:45 | `oc get clusterrolebinding zuno-lightspeed-query-access -o wide`, then `oc get rolebinding zuno-personas-view -n zuno-ai-run -o wide` | "Two bindings decide who may ask and what the cluster reads can see. The chat is open to consultants and sales, and they may view the Zuno namespaces only." | Role `lightspeed-operator-query-access` for groups `consultant` and `sales`; role `view` for the same groups. |
 | 12:00 | Open [`gitops/charts/mcp-gateway/values.yaml`](../../../../gitops/charts/mcp-gateway/values.yaml), block `lightspeed.frontdoorCapabilities` | "The mcp-gateway's front door has a read-only ceiling, whoever calls. The groups then filter it: a consultant gets five tools, a salesperson none." | Nine capabilities: Confluence search and read, technical-docs search, two AAP audits, four `k8s.*` reads. |
 | 13:15 | Explain the split with the ai-gateway | "Lightspeed does not go through the ai-gateway, by decision: it is a Red Hat product on a Red Hat model gateway. So it has no data classification, no Zuno guardrails and no per-person budget. Its only model is local, so nothing leaves the cluster. It is also why it is not on the Five experiences dashboard." | |
@@ -215,7 +215,7 @@ flowchart TB
 
 Lightspeed's operand and the three paths it calls. Drawn from `gitops/charts/lightspeed-config/` (`values.yaml`,
 `templates/olsconfig.yaml`, `clusterrolebinding-query-access.yaml`, `credentials-maas.yaml`, `configmap-maas-ca.yaml`),
-`gitops/charts/models/values.yaml` (subscription `gpt-oss-20b-lightspeed`), `gitops/charts/mcp-gateway/values.yaml`
+`gitops/charts/models/values.yaml` (subscription `gpt-oss-20b-service`), `gitops/charts/mcp-gateway/values.yaml`
 (`lightspeed.frontdoorCapabilities`), `gitops/charts/openshift-rbac-groups/` (`personaView`), and the live objects
 listed under Page status.
 
@@ -237,7 +237,7 @@ flowchart LR
   CRED & CA -.-> API
   API --> RHOKP & OMCP & PGS
   OMCP -->|"user's RBAC: view on the Zuno<br/>namespaces, zuno-personas-view"| K8S["Kubernetes API"]
-  API -->|"rhoai_vllm, Bearer SA token<br/>/zuno-ai-run/gpt-oss-20b/v1"| MAASGW["MaaS gateway<br/>maas-default-gateway, openshift-ingress<br/>subscription gpt-oss-20b-lightspeed<br/>200,000 tokens per hour"]
+  API -->|"rhoai_vllm, Bearer SA token<br/>/zuno-ai-run/gpt-oss-20b/v1"| MAASGW["MaaS gateway<br/>maas-default-gateway, openshift-ingress<br/>subscription gpt-oss-20b-service<br/>200,000 tokens per hour"]
   MAASGW --> MODEL["gpt-oss-20b<br/>LLMInferenceService, zuno-ai-run<br/>131,072-token window"]
   API -->|"/mcp, Authorization: the user's<br/>OpenShift token (valueFrom kubernetes)"| MCPGW["mcp-gateway, zuno-ai-run<br/>TokenReview, read-only ceiling<br/>of nine capabilities"]
   MCPGW -->|"tools allowed for<br/>the user's groups"| TOOLS["Confluence, technical docs,<br/>AAP audit, k8s reads"]

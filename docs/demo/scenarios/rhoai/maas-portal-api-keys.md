@@ -25,10 +25,10 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **ai-dev-01** | AI developer, back office. Group `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`. | Subscription `gpt-oss-20b-ocp-ai-dev`: 5,000,000 tokens per hour on gpt-oss-20b. Creates and revokes its own keys in the portal. | The developer of the 5-minute version: signs in to the portal, creates a key, calls the model from a terminal. |
-| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Subscription `gpt-oss-20b-ocp-ai-ops`, same budget. Opens Grafana. | Shows the **Mesh & gateway** dashboard in the 15-minute version. Can replace **ai-dev-01** as the key creator. |
+| **ai-dev-01** | AI developer, back office. Group `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`. | Subscription `gpt-oss-20b-builders` (shared with the other operator groups): 5,000,000 tokens per hour on gpt-oss-20b. Creates and revokes its own keys in the portal. | The developer of the 5-minute version: signs in to the portal, creates a key, calls the model from a terminal. |
+| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Subscription `gpt-oss-20b-builders`, same budget. Opens Grafana. | Shows the **Mesh & gateway** dashboard in the 15-minute version. Can replace **ai-dev-01** as the key creator. |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the MaaS objects outside the AI namespaces (`models-as-a-service`, `openshift-ingress`). | The presenter's `oc` terminal for the subscription and policy steps of the 15-minute version. |
-| **sale-01** | Salesperson, front office. Group `sales`. | Subscription `gpt-oss-20b-sales`: 5,000 tokens per hour, on gpt-oss-20b only; no subscription on the other models, so a call there is refused with 403 (tested live on 2026-11-20 with the twin `stress-sale-01`: 200 and counted on gpt-oss-20b, 403 on qwen36-27b-instruct). | Named only, as the contrast of budgets by group. Not signed in during this scenario. |
+| **sale-01** | Salesperson, front office. Group `sales`. | Subscription `gpt-oss-20b-business`: 5,000 tokens per hour, on gpt-oss-20b only; no subscription on the other models, so a call there is refused with 403 (tested live on 2026-11-20 with the twin `stress-sale-01`: 200 and counted on gpt-oss-20b, 403 on qwen36-27b-instruct). | Named only, as the contrast of budgets by group. Not signed in during this scenario. |
 
 Other identities: the ai-gateway's service account holds its own subscription (1,000,000 tokens per hour, and the only
 one on the SaaS models). It carries the traffic of every chat experience.
@@ -51,7 +51,7 @@ workloads `maas-api`, `maas-ui`, `maas-consumer-portal` and `kube-auth-proxy`, a
 
 There is no golden-path probe for this scenario: rehearse it the same day. The file runs reads only: the MaaS
 conditions of the DSC `zuno-dsc` (`ModelsAsAServiceReady`, `MaaSConsumerPortalAvailable`), the Gateway
-`maas-default-gateway` (`Programmed`), the MaaSSubscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops`
+`maas-default-gateway` (`Programmed`), the MaaSSubscription `gpt-oss-20b-builders`
 (`Ready`), the AuthPolicy `maas-gateway-auth` (`Enforced`), and the `LLMInferenceService` `gpt-oss-20b` `Ready`
 (`oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`). The three human subscriptions cover this model only: when
 it is not Ready, a key has nothing to call (on 2026-11-12 it was not Ready). See
@@ -92,7 +92,7 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Open the portal and sign in as **ai-dev-01** | "This is the Red Hat AI portal. I sign in with my company account, through OpenShift." | The portal shell with **AI asset endpoints**, **API keys** and **Playground**. |
-| 1:00 | **API keys**: create a key on the subscription `gpt-oss-20b-ocp-ai-dev` | "My group gives me 5 million tokens an hour on a model that runs on our own GPUs. I pick the subscription and get a key: no ticket, no wait." | A key starting with `sk-oai-`, shown **once**. Copy it into `MAAS_API_KEY`; do not leave it on screen. |
+| 1:00 | **API keys**: create a key on the subscription `gpt-oss-20b-builders` | "My group gives me 5 million tokens an hour on a model that runs on our own GPUs. I pick the subscription and get a key: no ticket, no wait." | A key starting with `sk-oai-`, shown **once**. Copy it into `MAAS_API_KEY`; do not leave it on screen. |
 | 2:15 | `curl -s -o /dev/null -w '%{http_code}\n' $MAAS/v1/models`, then the same with `-H "Authorization: Bearer $MAAS_API_KEY"` | "Without a key the gateway refuses. With my key it answers." | `401`, then `200`. |
 | 3:00 | `curl -s $MAAS/v1/chat/completions -H "Authorization: Bearer $MAAS_API_KEY" -H 'Content-Type: application/json' -d '{"model":"gpt-oss-20b","messages":[{"role":"user","content":"In one short sentence, say what you can help me with."}],"max_tokens":64}'` | "Any OpenAI-compatible tool works the same way: a notebook, a script, an IDE plug-in." | A JSON answer with `choices[0].message.content` and a `usage` block. |
 | 4:15 | Close | "One minute to a governed key. The platform keeps the model list, the budget and the right to revoke it." | |
@@ -103,7 +103,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | `oc get maassubscriptions -n models-as-a-service` | "Budgets are subscriptions bound to groups. Developers and operators get 5 million tokens an hour on gpt-oss-20b; the ai-gateway 1 million; sales 5,000." | `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops` (priority 20), `-sales` (1), `-ai-gateway` (100), `-lightspeed` (50) and `-load` (50, the stress identity). There is no `-agents` subscription since WP-314. |
+| 5:00 | `oc get maassubscriptions -n models-as-a-service` | "Budgets are subscriptions bound to groups. Builders (developers and operators) get 5 million tokens an hour on gpt-oss-20b; the platform tier (the ai-gateway and Praxis) 1 million; the service tier 200,000; the business tier (sales) 5,000." | `gpt-oss-20b-builders` (priority 20, the three operator groups), `gpt-oss-20b-business` (1, `/sales`), `gpt-oss-20b-platform` (100, the ai-gateway and Praxis) and `gpt-oss-20b-service` (50, Lightspeed and the stress identity). There is no `-agents` subscription since WP-314, and the tiers replaced the per-identity names on 2026-11-20 (WP-315). |
 | 7:00 | `oc get tokenratelimitpolicy -n zuno-ai-run` and `oc get authpolicy maas-gateway-auth -n openshift-ingress -o yaml` | "Kuadrant enforces it on the gateway. Two identities are accepted: a MaaS key, or an OpenShift token. The token limit is counted per user and per subscription." | One `maas-trlp-<model>` per model. The AuthPolicy has two identity sources, `api-keys` (`Bearer sk-oai-`) and `kubernetesTokenReview`. |
 | 9:00 | `oc get externalmodels,maasmodelrefs -n zuno-ai-run` | "MaaS also publishes SaaS models, Mistral and gpt-oss-120b on OVHcloud. Only the ai-gateway is subscribed to them, so nobody can skip the classification rules by calling a SaaS model directly." | ExternalModels `mistral-large` and `gpt-oss-120b-ovhcloud`; six MaaSModelRefs. |
 | 10:30 | Grafana **Mesh & gateway**: **Authorino: auth decisions** and **Limitador: authorized vs limited calls** | "Every call is authenticated and counted at the gateway, including the 401 we just caused." | Allowed and denied auth decisions; authorized calls. |
