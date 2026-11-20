@@ -118,6 +118,9 @@
     name: default-ingress-cert
     namespace: openshift-config-managed
   register: _openshift_oauth_router_ca_check
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _openshift_oauth_router_ca_check is read below with a default or its failed flag, so the precheck reports it
+  #   instead of stopping here
   ignore_errors: true
 
 - name: "openshift_oauth | look up the Keycloak Ingress to find its live TLS secret name"
@@ -127,6 +130,9 @@
     name: "{{ zuno_keycloak_cr_name | default('zuno') }}"
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ingress_check
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _openshift_oauth_keycloak_ingress_check is read below with a default or its failed flag, so the precheck reports
+  #   it instead of stopping here
   ignore_errors: true
   when: not (zuno_keycloak_external_mode | bool)
 
@@ -137,6 +143,9 @@
     name: "{{ _openshift_oauth_keycloak_ingress_check.resources[0].spec.tls[0].secretName }}"
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ca_check
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _openshift_oauth_keycloak_ca_check is read below with a default or its failed flag, so the precheck reports it
+  #   instead of stopping here
   ignore_errors: true
   when:
     - not (zuno_keycloak_external_mode | bool)

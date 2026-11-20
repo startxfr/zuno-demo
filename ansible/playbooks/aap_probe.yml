@@ -25,6 +25,9 @@
         namespace: zuno-aap
         name: aap
       register: _aap_probe_route
+      # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may
+      #   answer an error; _aap_probe_route is read below with a default or its failed flag, so the precheck reports it instead
+      #   of stopping here
       ignore_errors: true
 
     - name: Fail if the Gateway Route doesn't exist (AAP not installed)

@@ -85,6 +85,9 @@
       - "app.kubernetes.io/name=vault"
       - "app.kubernetes.io/component=backup"
   register: _vault_snapshots_lookup
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _vault_snapshots_lookup is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true  # CRD may not exist on a cluster with no CSI snapshot support
 
 - name: "vault | find the most recent ready VolumeSnapshot"

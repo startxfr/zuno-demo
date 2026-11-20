@@ -71,6 +71,8 @@
       until: (_chaos_gone.resources | default([]) | length) == 0
       retries: "{{ (_chaos.recover_within | int) // 5 }}"
       delay: 5
+      # ignore_errors: the wait is bounded by `retries`; when it runs out the row of this disruption is written from `.failed`
+      #   below, which says what did not recover, instead of aborting the whole campaign
       ignore_errors: true
 
     - name: "chaos {{ _chaos.id }} | the workload is whole again"
@@ -86,6 +88,8 @@
         ((_chaos_back.resources[0].status.updatedReplicas | default(0)) >= (_chaos_desired | int))
       retries: "{{ (_chaos.recover_within | int) // 5 }}"
       delay: 5
+      # ignore_errors: the wait is bounded by `retries`; when it runs out the row of this disruption is written from `.failed`
+      #   below, which says what did not recover, instead of aborting the whole campaign
       ignore_errors: true
 
     - name: "chaos {{ _chaos.id }} | what happened"
@@ -142,6 +146,8 @@
       until: (_chaos_anp_left.resources | default([]) | length) == 0
       retries: "{{ (_chaos.recover_within | int) // 5 }}"
       delay: 5
+      # ignore_errors: the wait is bounded by `retries`; when it runs out the row of this disruption is written from `.failed`
+      #   below, which says what did not recover, instead of aborting the whole campaign
       ignore_errors: true
 
     - name: "chaos {{ _chaos.id }} | what happened"

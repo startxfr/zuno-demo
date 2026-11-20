@@ -115,6 +115,9 @@
       - "gateway.networking.k8s.io/gateway-name=maas-default-gateway"
   register: _wp071_maas_gw_pod
   when: (_wp071_cert_secret.resources | default([]) | length) > 0
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _wp071_maas_gw_pod is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "connectivity_link | WP-071: verify TLS trust and ext_authz transport through maas-default-gateway"
@@ -132,6 +135,9 @@
       - "gateway.networking.k8s.io/gateway-name=zuno-agent-gateway"
   register: _wp071_zuno_gw_pod
   when: (_wp071_cert_secret.resources | default([]) | length) > 0
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _wp071_zuno_gw_pod is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "connectivity_link | WP-071: verify TLS trust and ext_authz transport through zuno-agent-gateway"

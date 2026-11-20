@@ -49,6 +49,9 @@
     kind: ClusterTriggerAuthentication
     name: "{{ cma_trigger_auth_name | default('ai-inference-keda-thanos') }}"
   register: _cma_trigger_auth
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _cma_trigger_auth is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "custom_metrics_autoscaler | look up the ScaledObjects KServe derives from spec.scaling (WP-121)"
@@ -57,6 +60,9 @@
     kind: ScaledObject
     namespace: "{{ cma_consumer_namespace | default('zuno-ai-run') }}"
   register: _cma_scaledobjects
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _cma_scaledobjects is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "custom_metrics_autoscaler | report the trigger auth"

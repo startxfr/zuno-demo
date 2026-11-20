@@ -63,6 +63,8 @@
     namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
     name: garak-smoke
   register: _tac_garak
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _tac_garak is read below with a default or its failed flag, so the precheck reports it instead of stopping here
   ignore_errors: true
 
 - name: "trustyai-config | report Garak smoke-test state"
@@ -80,6 +82,9 @@
     namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
     name: zuno-guardrails-smoke
   register: _tac_guardrails
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _tac_guardrails is read below with a default or its failed flag, so the precheck reports it instead of stopping
+  #   here
   ignore_errors: true
 
 - name: "trustyai-config | report guardrails smoke state"
@@ -102,6 +107,8 @@
     namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
     name: "{{ trustyai_config_nemo_name | default('zuno-guardrails') }}"
   register: _tac_nemo
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _tac_nemo is read below with a default or its failed flag, so the precheck reports it instead of stopping here
   ignore_errors: true
 
 # status.ca carries three independent CA-discovery booleans and
@@ -130,6 +137,9 @@
     namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
     name: "{{ trustyai_config_nemo_configmap | default('zuno-nemo-rails-observe') }}"
   register: _tac_nemo_cm
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _tac_nemo_cm is read below with a default or its failed flag, so the precheck reports it instead of stopping
+  #   here
   ignore_errors: true
 
 # A NemoGuardrails whose ConfigMap is missing mounts an empty /app/config

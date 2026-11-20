@@ -21,6 +21,9 @@
     label_selectors:
       - app.kubernetes.io/part-of=mlops
   register: _mlops_uninstall_trainjobs
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _mlops_uninstall_trainjobs is read below with a default or its failed flag, so the precheck reports it instead
+  #   of stopping here
   ignore_errors: true
 
 - name: "mlops | remove them"
@@ -33,4 +36,6 @@
   loop: >-
     {{ _mlops_uninstall_trainjobs.resources | default([])
        | map(attribute='metadata.name') | list }}
+  # ignore_errors: uninstall is best effort: a TrainJob that cannot be deleted (CRD gone, already deleted, API blip) must not
+  #   stop the removal of the rest of the component
   ignore_errors: true

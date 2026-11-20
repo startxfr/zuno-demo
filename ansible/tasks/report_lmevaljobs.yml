@@ -24,6 +24,8 @@
     kind: LMEvalJob
     namespace: "{{ lmeval_namespace }}"
   register: _lmevaljobs
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _lmevaljobs is read below with a default or its failed flag, so the precheck reports it instead of stopping here
   ignore_errors: true
 
 - name: "lmevaljobs | report LMEvalJob results"

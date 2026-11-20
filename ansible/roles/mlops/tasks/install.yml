@@ -411,6 +411,8 @@
   environment: "{{ k8s_auth_environment | default({}) }}"
   register: _mlops_oc_token
   changed_when: false
+  # ignore_errors: best effort, as the section comment above says: a missing login only skips the pipeline-upload confirmation,
+  #   never `make d2 install mlops`
   ignore_errors: true
 
 - name: "mlops | look up the mlops-dspa API server Route"
@@ -424,6 +426,9 @@
     # the retired rag_ingestion role documents).
     name: "ds-pipeline-mlops-dspa"
   register: _mlops_dspa_route
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _mlops_dspa_route is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "mlops | confirm the mlops pipeline is registered on the DSPA API"

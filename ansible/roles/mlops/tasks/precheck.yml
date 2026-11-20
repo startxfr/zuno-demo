@@ -48,6 +48,9 @@
     namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
     name: "{{ mlops_trainjob_runtime | default('mlops-lora') }}"
   register: _mlops_runtime
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _mlops_runtime is read below with a default or its failed flag, so the precheck reports it instead of stopping
+  #   here
   ignore_errors: true
 
 - name: "mlops | look up recent TrainJobs"
@@ -58,6 +61,9 @@
     label_selectors:
       - app.kubernetes.io/part-of=mlops
   register: _mlops_trainjobs
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _mlops_trainjobs is read below with a default or its failed flag, so the precheck reports it instead of stopping
+  #   here
   ignore_errors: true
 
 # A TrainingRuntime that is absent while trainJob is ENABLED is the

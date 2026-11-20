@@ -25,6 +25,9 @@
     namespace: zuno-aap
     name: zuno-demo
   register: _aap_config_project_cr
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _aap_config_project_cr is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "aap-config | look up the JobTemplate CR"
@@ -34,6 +37,9 @@
     namespace: zuno-aap
     name: zuno-day0-check
   register: _aap_config_jt_cr
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _aap_config_jt_cr is read below with a default or its failed flag, so the precheck reports it instead of
+  #   stopping here
   ignore_errors: true
 
 - name: "aap-config | compute install state"

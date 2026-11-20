@@ -63,6 +63,9 @@
     namespace: redhat-ods-applications
     name: rhods-dashboard
   register: _mlops_run_dashboard_route
+  # ignore_errors: a diagnostic lookup: the object or its CRD may be absent (component not installed yet) or the API may answer
+  #   an error; _mlops_run_dashboard_route is read below with a default or its failed flag, so the precheck reports it instead
+  #   of stopping here
   ignore_errors: true
 
 - name: "mlops | report the triggered run"
