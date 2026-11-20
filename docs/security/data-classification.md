@@ -1,5 +1,7 @@
 # Data Classification
 
+Last reviewed: 2026-11-20
+
 | Class | External SaaS models | Default handling |
 |---|---|---|
 | C1 | Allowed | Standard routing policy |

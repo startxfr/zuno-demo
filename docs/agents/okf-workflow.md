@@ -1,5 +1,7 @@
 # OKF Workflow
 
+Last reviewed: 2026-11-20
+
 This page described the OKF lifecycle while agent definitions still lived in this repository. They moved to
 [startxfr/zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents) on 2026-10-22 (ADR-0576), and the format is
 now the Zuno OKF profile 1.0

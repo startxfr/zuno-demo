@@ -1,5 +1,7 @@
 # Workshop: Trusted platform and operations
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 An AI platform is only as trustworthy as the platform under it. This workshop shows the foundations that the other

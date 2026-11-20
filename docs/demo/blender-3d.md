@@ -1,5 +1,7 @@
 # Scenario: Blender add-on - a sentence becomes editable 3D objects on a local model
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 The Blender add-on is the first experience client that runs on a **workstation**: a desktop application with no

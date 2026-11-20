@@ -1,5 +1,7 @@
 # Workshop: One backend, three experiences
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Three experiences that look nothing alike: an agent platform, a general-purpose chat and a personal assistant. The

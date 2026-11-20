@@ -1,5 +1,7 @@
 # Workshop: Agentic AI
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Agents are useful only if they can act. On Zuno they act inside the same rules as everyone else. The workshop

@@ -311,7 +311,7 @@ The decisions this page rests on:
   dashboards merged into **Mesh & gateway**.
 - [ADR-0349](../../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md): Restructure demo personas, ocp-* cluster-access groups and two new agents.
 - [ADR-0616](../../../adr/0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md): Prepare and play every catalogue demo through one make demo lifecycle.
-- [ADR-0411](../../../adr/0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md): trust the Vault PKI root for the Tekos frontend OIDC client (the SDS error follow-ups).
+- [ADR-0411](../../../adr/0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md): trust the Vault PKI root for the Tekos frontend OIDC client (the SDS error follow-ups; superseded by [ADR-0561](../../../adr/0561-adopt-unifai-as-the-agent-platform.md), the Tekos frontend is retired).
 
 Evidence:
 

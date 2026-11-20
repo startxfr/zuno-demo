@@ -1,5 +1,7 @@
 # Rolling back an experience or a gateway
 
+Last reviewed: 2026-11-20
+
 [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) clause 1 asks every
 experience for a written rollback. On demo333 the live Applications track `devel` with automated sync, so a revert
 pushed to `devel` is a rollback, and a rollback is a cluster change. Outside a freeze it needs the owner's go; inside a

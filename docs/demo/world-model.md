@@ -1,5 +1,7 @@
 # Scenario: World model - walk into a generated world on an on-demand GPU
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 A world model does not draw a scene from a 3D model. It invents the next frame from the last ones, the visitor's key

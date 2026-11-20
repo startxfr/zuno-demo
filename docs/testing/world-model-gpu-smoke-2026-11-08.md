@@ -1,5 +1,7 @@
 # World-model GPU smoke test, 2026-11-08 (WP-232)
 
+Last reviewed: 2026-11-20
+
 Measured on the on-demand GPU node of ADR-0604, by `platform/world-model/tests/gpu-smoke-job.yaml` running
 `python -m app.smoke` from the runtime image. Every figure below comes from this GPU; none is a vendor figure.
 
@@ -10,7 +12,7 @@ splice in about 2 seconds or less) are met with a wide margin on the default pre
 
 | Item | Value |
 |---|---|
-| Node | `ip-10-18-34-245` (`zuno-gpu-world-model-a`, `g7e.4xlarge`, eu-central-1b), no MIG |
+| Node | the `zuno-gpu-world-model-a` pool (`g7e.4xlarge`, eu-central-1b), no MIG |
 | GPU | NVIDIA RTX PRO 6000 Blackwell Server Edition, 97 887 MiB, compute capability 12.0 (sm_120) |
 | Driver, CUDA, torch | 595.91.07, CUDA 13.0, torch 2.11.0+cu130 |
 | Runtime image | `world-model-runtime` build 4, digest `sha256:4bd49654…53df4` (signed, keyless) |

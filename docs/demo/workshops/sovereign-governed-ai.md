@@ -1,5 +1,7 @@
 # Workshop: Sovereign and governed AI
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Before they adopt AI, organisations ask the same questions:

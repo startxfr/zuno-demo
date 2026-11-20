@@ -1,5 +1,7 @@
 # Scenario: UnifAI - live RAG on your own documents
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 UnifAI's RAG answers questions from documents and cites them. In Zuno it runs inside the UnifAI stack (see

@@ -1,5 +1,7 @@
 # Freeze protocol for a live demonstration
 
+Last reviewed: 2026-11-20
+
 [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) clause 3. A freeze protects
 a live demonstration from the people and sessions who would otherwise keep improving the platform under it. It opens
 with the golden-path baseline run and closes when the demonstration ends.
@@ -26,7 +28,7 @@ with the golden-path baseline run and closes when the demonstration ends.
 
 - **Do not push** to `devel` or `main`. On demo333 the Applications track `devel` with automated sync, so a push is a
   deployment.
-- **Do not run any frozen command.** That includes running one "just to check". While the freeze marker is set, `make demo install`, `uninstall` and `rehearse` refuse.
+- **Do not run any frozen command.** That includes running one "just to check". While the freeze marker is set, `make demo install`, `uninstall`, `rehearse`, `scout` and `record` refuse.
 - **Read-only work is allowed:** `make demo check` (the check of the demo chosen with `make demo use <id> 5|15`), `make demo golden-path`, `make demo browser`, `make demo status`, `oc get`, logs, dashboards, Tempo searches.
 - **Break glass only with the owner's go.** Name the one change, make it, then run the full golden path. Write the change
   and its result in the runbook.

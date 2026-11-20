@@ -1,5 +1,7 @@
 # Golden path: the check before a live demonstration
 
+Last reviewed: 2026-11-20
+
 [ADR-0605](../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md). A moment is proved by a
 real answer, never by a green status. The check has two parts: the automated probes, then the screens a person looks
 at. Run both at every golden-path run (the dry run, the freeze baseline, the two morning runs) and write the result in
@@ -21,6 +23,7 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 | `delegation-approval` | Arkos delegates to Tekos, the approval request appears and is rejected (nothing runs); the gateway logs show the delegated call |
 | `open-webui` | One answer from the Zuno model through Open WebUI's API, signed in through Keycloak |
 | `zuno-code` | One answer from the `zuno-code` model through Open WebUI (Codestral first) |
+| `zuno-wesh` | The same, with the declared model `zuno-wesh` (the wesh fine-tune, through the ai-gateway) |
 | `dify`, `kagent` | One answer through the experience's own token proxy, from inside its pod |
 | `openclaw` | Every persona assistant answers from inside its pod through the operator's egress proxy (the `openclaw-<persona>` token is injected there) |
 | `lightspeed` | The OLSConfig API and console plugin are Ready, and Lightspeed answers one question (temporary port-forward, your OpenShift token; with a certificate login it falls back to `manual`) |

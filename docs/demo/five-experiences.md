@@ -1,5 +1,7 @@
 # Workshop: One governed backend, many experiences
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Seven very different experiences sit on one platform:

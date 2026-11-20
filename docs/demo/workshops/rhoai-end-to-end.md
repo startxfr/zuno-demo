@@ -1,5 +1,7 @@
 # Workshop: RHOAI end to end
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Red Hat OpenShift AI is the model layer under everything else in Zuno. The workshop follows a model through its life
