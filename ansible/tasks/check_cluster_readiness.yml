@@ -302,11 +302,41 @@
        + (['api-server-tls'] if _readiness_acme['api'] | bool else []))
       | reject('in', _readiness_ready_certs | default([])) | list | length > 0
 
-# --- P5: ansible/confidential.yml ------------------------------------------
-- name: "readiness | P5: is ansible/confidential.yml present"
+# --- P5: this cluster's confidential.yml ------------------------------------
+# ansible/inventories/<cluster>/confidential.yml, or the deprecated
+# ansible/confidential.yml (the paths load_confidential_vars.yml reads). The
+# cluster's name is computed here WITHOUT resolve_cluster_name.yml, which fails
+# hard: a readiness probe records findings, it does not stop (same reason P6
+# guards its include). zuno_cluster_name (the inventory) first, else the apps
+# domain P3 read, labelled the way resolve_cluster_name.yml does it.
+- name: "readiness | P5: this cluster's short name, without failing"
+  ansible.builtin.set_fact:
+    _readiness_cluster: >-
+      {{ cluster_name | default(zuno_cluster_name | default(
+           _labels[1] if (_labels | length) > 1 and _labels[0] == 'apps' else _labels[0])) }}
+  vars:
+    _labels: >-
+      {{ ((_readiness_ingress.resources | default([]) | first | default({}))
+          .get('spec', {}).get('domain', '')).split('.') }}
+
+- name: "readiness | P5: is the per-cluster confidential.yml present: ansible/inventories/{{ _readiness_cluster }}"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/inventories/{{ _readiness_cluster }}/confidential.yml"
+  register: _readiness_conf_inventory
+  when: _readiness_cluster | length > 0
+
+- name: "readiness | P5: is the deprecated ansible/confidential.yml present"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _readiness_conf
+  register: _readiness_conf_legacy
+  when: not (_readiness_conf_inventory.stat.exists | default(false))
+
+- name: "readiness | P5: the confidential.yml this cluster would load"
+  ansible.builtin.set_fact:
+    _readiness_conf_path: >-
+      {{ _readiness_conf_inventory.stat.path if (_readiness_conf_inventory.stat.exists | default(false))
+         else (_readiness_conf_legacy.stat.path
+               if (_readiness_conf_legacy.stat.exists | default(false)) else '') }}
 
 - name: "readiness | P5: record a finding when confidential.yml is missing"
   ansible.builtin.set_fact:
@@ -314,13 +344,13 @@
   vars:
     _finding:
       component: vault
-      resource: "ansible/confidential.yml"
+      resource: "ansible/inventories/{{ _readiness_cluster }}/confidential.yml"
       state: "absent"
       cause: "The vault role fails fast without it, and it is the only pre-seeding ADR-0517's decision clause 2 permits. ansible/confidential.example.yml is the authority on what it carries - 20 blocks, most of them optional."
-      solution: "Copy ansible/confidential.example.yml to ansible/confidential.yml and fill in the values this cluster needs. Fields left as xxxxxx are treated as not configured."
+      solution: "Copy ansible/confidential.example.yml to ansible/inventories/{{ _readiness_cluster }}/confidential.yml and fill in the values this cluster needs. Fields left as xxxxxx are treated as not configured."
       auto_fix: "manual only - the file holds operator credentials"
       blocking: true
-  when: not _readiness_conf.stat.exists
+  when: _readiness_conf_path | length == 0
 
 # Names and set/unset booleans only. Computed inside this task's own `vars:` so
 # no secret value ever becomes a fact, and deliberately NOT via include_vars,
@@ -347,13 +377,13 @@
       - zuno_aws_route53_access_key_id
       - zuno_aws_route53_secret_access_key
     _set: >-
-      {{ (lookup('ansible.builtin.file', zuno_repo_root + '/ansible/confidential.yml')
+      {{ (lookup('ansible.builtin.file', _readiness_conf_path)
           | from_yaml | default({}, true))
          | dict2items
          | rejectattr('value', 'equalto', 'xxxxxx')
          | rejectattr('value', 'equalto', None)
          | map(attribute='key') | list }}
-  when: _readiness_conf.stat.exists
+  when: _readiness_conf_path | length > 0
 
 - name: "readiness | P5: record the MariaDB backup gap (ADR-0517 B8)"
   ansible.builtin.set_fact:
@@ -368,7 +398,7 @@
       auto_fix: "manual only - fill in the five keys, then re-run the vault and mariadb installs"
       blocking: false
   when:
-    - _readiness_conf.stat.exists
+    - _readiness_conf_path | length > 0
     - (_readiness_unset_mariadb | default([]) | length) > 0
 
 - name: "readiness | P5: record the Route53 credential gap when ACME is enabled"
@@ -384,7 +414,7 @@
       auto_fix: "manual only - these are operator credentials"
       blocking: true
   when:
-    - _readiness_conf.stat.exists
+    - _readiness_conf_path | length > 0
     - _readiness_acme['enabled'] | bool
     - (_readiness_unset_route53 | default([]) | length) > 0
 

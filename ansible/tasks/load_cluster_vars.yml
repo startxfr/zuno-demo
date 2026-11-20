@@ -1,27 +1,51 @@
 ---
 # ADR-0517 live finding (demo333, 2026-09-07): loads the committed
-# per-cluster NON-SECRET variable file ansible/clusters/<cluster_name>.yml
-# (see demo333.yml's header for the full rationale - AAP SCM checkouts
-# have no ansible/confidential.yml, so per-cluster Application values fell
-# back to ADR-0547 placeholders there).
+# per-cluster NON-SECRET variable file
+# ansible/inventories/<cluster_name>/cluster.yml (see demo333's header for the
+# full rationale - AAP SCM checkouts have no confidential.yml, so per-cluster
+# Application values fell back to ADR-0547 placeholders there). AAP does not
+# read the repo inventories: it finds this file by the cluster name derived
+# from the apps domain, in the project checkout.
+#
+# Transition (per-cluster inventories, lot B): a checkout that still carries
+# the old ansible/clusters/<cluster_name>.yml is read from there, with a
+# deprecation message.
 #
 # Contract for callers (mirrors the confidential.yml soft-read pattern):
-# include this BEFORE the role's own confidential.yml load, so that
+# include this BEFORE the role's own load_confidential_vars.yml, so that
 # confidential.yml - when present, i.e. on a workstation - still overrides
 # every value (later include_vars wins). A missing file is fine: an
 # unlisted cluster simply keeps the roles' noisy defaults.
 - name: "cluster-vars | resolve this cluster's short name"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
 
-- name: "cluster-vars | check for ansible/clusters/{{ cluster_name }}.yml"
+- name: "cluster-vars | check for ansible/inventories/{{ cluster_name }}/cluster.yml"
   ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
+    path: "{{ zuno_repo_root }}/ansible/inventories/{{ cluster_name }}/cluster.yml"
   register: _cluster_vars_file
 
-- name: "cluster-vars | load ansible/clusters/{{ cluster_name }}.yml if present"
+- name: "cluster-vars | check for the deprecated ansible/clusters/{{ cluster_name }}.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
+  register: _cluster_vars_legacy_file
+  when: not _cluster_vars_file.stat.exists
+
+- name: "cluster-vars | deprecation: ansible/clusters/{{ cluster_name }}.yml"
+  ansible.builtin.debug:
+    msg: >-
+      DEPRECATED: loading ansible/clusters/{{ cluster_name }}.yml. Per-cluster
+      values now live in ansible/inventories/{{ cluster_name }}/cluster.yml
+      (see ansible/inventories/demo222/README.md); move the file there.
+  when:
+    - not _cluster_vars_file.stat.exists
+    - _cluster_vars_legacy_file.stat.exists | default(false)
+
+- name: "cluster-vars | load this cluster's cluster.yml if present"
   ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
-  when: _cluster_vars_file.stat.exists
+    file: >-
+      {{ _cluster_vars_file.stat.path if _cluster_vars_file.stat.exists
+         else _cluster_vars_legacy_file.stat.path }}
+  when: _cluster_vars_file.stat.exists or (_cluster_vars_legacy_file.stat.exists | default(false))
 
 # ADR-0602 / WP-223: a per-cluster file may set zuno_security_profile; check
 # the effective value right after loading it.

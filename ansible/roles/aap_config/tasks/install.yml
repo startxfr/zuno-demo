@@ -18,15 +18,10 @@
 # tracking a work branch must point the AAP Project at that SAME branch,
 # or every AAP-launched day1/2/3 playbook runs main's code without the
 # branch's fixes). check_confidential_var_loaders enforces the pair.
-- name: "aap-config | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _aap_config_confidential_file
-
-- name: "aap-config | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _aap_config_confidential_file.stat.exists
+- name: "aap-config | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: aap-config
 
 - name: "aap-config | apply the aap-config GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

@@ -86,7 +86,7 @@ class TargetRevisionPin(unittest.TestCase):
             self.assertTrue(found, f"no task named like {fragment!r} in apply_gitops_app.yml")
             return found[0]
 
-        confidential = index("load ansible/confidential.yml")
+        confidential = index("load this cluster's confidential.yml")
         pin = index("load ansible/branch-pin.yml")
         fallback = index("the cluster's committed target revision")
         render = index("render the Application manifest")

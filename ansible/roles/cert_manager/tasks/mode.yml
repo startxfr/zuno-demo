@@ -3,15 +3,10 @@
 # uninstall alike (symmetric gating, clause 4). The key lives in
 # ansible/confidential.yml; absent means internal. Tier A-operator components
 # carry only the mode key (clause 2): no endpoint, no _external_* payload.
-- name: "cert_manager | check for ansible/confidential.yml (mode key)"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _cert_manager_mode_confidential_file
-
-- name: "cert_manager | load ansible/confidential.yml if present (mode key)"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _cert_manager_mode_confidential_file.stat.exists
+- name: "cert_manager | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: cert_manager
 
 - name: "cert_manager | resolve the mode and what an unmanaged operator must provide"
   ansible.builtin.set_fact:

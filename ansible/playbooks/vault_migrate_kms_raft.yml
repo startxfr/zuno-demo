@@ -75,19 +75,11 @@
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
 
     # ------------------------------------------------------------------ 0
-    - name: "step 0 | check for ansible/confidential.yml"
-      ansible.builtin.stat:
-        path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-      register: _vm_confidential
-
-    - name: "step 0 | fail if ansible/confidential.yml is missing"
-      ansible.builtin.fail:
-        msg: "ansible/confidential.yml is missing - it must carry the four zuno_vault_kms_* values."
-      when: not _vm_confidential.stat.exists
-
-    - name: "step 0 | load ansible/confidential.yml"
-      ansible.builtin.include_vars:
-        file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+    - name: "step 0 | load this cluster's confidential.yml (required: the four zuno_vault_kms_* values)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+      vars:
+        load_confidential_caller: vault_migrate_kms_raft
+        load_confidential_required: true
 
     - name: "step 0 | resolve the cluster domain and name"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"

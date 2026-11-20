@@ -28,15 +28,10 @@
 #   zuno_keycloak_admin_realm    realm the admin credential signs in to (master | the external one)
 #   zuno_keycloak_admin_token_url  password-grant token endpoint of that realm
 #   zuno_keycloak_ca_pem         external CA bundle, "" = system trust (always "" in internal mode)
-- name: "keycloak-endpoint | check for ansible/confidential.yml (the mode and the external payload)"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _keycloak_endpoint_confidential
-
-- name: "keycloak-endpoint | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _keycloak_endpoint_confidential.stat.exists
+- name: "keycloak-endpoint | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: keycloak-endpoint
 
 - name: "keycloak-endpoint | fail on an unknown mode value (ADR-0352 clause 1; absent means internal)"
   ansible.builtin.fail:

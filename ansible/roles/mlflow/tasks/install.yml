@@ -28,15 +28,10 @@
 - name: "mlflow | load the committed per-cluster variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
-- name: "mlflow | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _mlflow_confidential_file
-
-- name: "mlflow | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _mlflow_confidential_file.stat.exists
+- name: "mlflow | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: mlflow
 
 - name: "mlflow | apply the mlflow GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

@@ -1,0 +1,73 @@
+---
+# The ONE loader of this cluster's operator secrets (per-cluster inventories,
+# lot B). Every role and shared task that reads a confidential.yml variable
+# includes this file instead of its own stat + include_vars pair
+# (check_docs.py's check_confidential_var_loaders enforces it).
+#
+#   ansible/inventories/<cluster_name>/confidential.yml   (gitignored, vault-encrypted)
+#   ansible/confidential.yml                               (deprecated fallback, with a warning)
+#
+# Parameters:
+#   load_confidential_required: true  -> fail when neither file exists (the
+#       vault role and vault_migrate_kms_raft.yml); default false, a missing
+#       file is fine (AAP project checkouts never have one).
+#   load_confidential_caller: a label for the messages (the role's name).
+#
+# Precedence is unchanged from the per-site pairs it replaces: include_vars
+# (host-scoped, above group_vars and role vars), loaded AFTER
+# load_cluster_vars.yml wherever both are used, so confidential.yml wins.
+# Nothing here prints a value of the file.
+#
+# cluster_name: resolved by resolve_cluster_name.yml when the caller has not
+# resolved it yet - zuno_cluster_name from the inventory's group_vars on a
+# workstation (checked against the live apps domain), the apps domain in AAP
+# (which has no file to load anyway).
+- name: "confidential | resolve this cluster's short name"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
+  when: cluster_name is not defined
+
+- name: "confidential | check for the per-cluster confidential.yml of {{ cluster_name }}"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/inventories/{{ cluster_name }}/confidential.yml"
+  register: _confidential_inventory_file
+
+- name: "confidential | check for the deprecated ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _confidential_legacy_file
+  when: not _confidential_inventory_file.stat.exists
+
+- name: "confidential | choose the file to load"
+  ansible.builtin.set_fact:
+    _confidential_vars_path: >-
+      {{ _confidential_inventory_file.stat.path if _confidential_inventory_file.stat.exists
+         else (_confidential_legacy_file.stat.path
+               if (_confidential_legacy_file.stat.exists | default(false)) else '') }}
+
+- name: "confidential | deprecation: ansible/confidential.yml"
+  ansible.builtin.debug:
+    msg: >-
+      DEPRECATED ({{ load_confidential_caller | default('confidential') }}): loading
+      ansible/confidential.yml. Move it to ansible/inventories/{{ cluster_name }}/confidential.yml
+      (mv ansible/confidential.yml ansible/inventories/{{ cluster_name }}/confidential.yml;
+      it stays encrypted and gitignored).
+  when:
+    - not _confidential_inventory_file.stat.exists
+    - _confidential_vars_path | length > 0
+
+- name: "confidential | fail if this cluster's confidential.yml is missing"
+  ansible.builtin.fail:
+    msg: >-
+      {{ load_confidential_caller | default('confidential') }}:
+      ansible/inventories/{{ cluster_name }}/confidential.yml is missing. Copy
+      ansible/confidential.example.yml to
+      ansible/inventories/{{ cluster_name }}/confidential.yml, fill in the
+      values this cluster needs and encrypt it (see ansible/README.md).
+  when:
+    - load_confidential_required | default(false) | bool
+    - _confidential_vars_path | length == 0
+
+- name: "confidential | load this cluster's confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ _confidential_vars_path }}"
+  when: _confidential_vars_path | length > 0

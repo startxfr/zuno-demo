@@ -219,15 +219,10 @@
 # Same optional-read pattern as ansible/roles/keycloak/tasks/install.yml:
 # the role stays runnable without confidential.yml - a missing file just
 # leaves zuno_aap_enabled undefined, defaulting to false below.
-- name: "aap | check for ansible/confidential.yml (optional, only for the Red Hat subscription step)"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _aap_confidential_file
-
-- name: "aap | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _aap_confidential_file.stat.exists
+- name: "aap | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: aap
 
 - name: "aap | activate the Red Hat subscription"
   when: zuno_aap_enabled | default(false) | bool

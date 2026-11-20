@@ -288,6 +288,8 @@ def check_auto_fix_commands() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
     for path in sorted((REPO_ROOT / "ansible").rglob("*.yml")):
+        if path.name.startswith("confidential") and "example" not in path.name:
+            continue
         rel = path.relative_to(REPO_ROOT)
         for value in AUTO_FIX_RE.findall(path.read_text(encoding="utf-8")):
             # An unquoted-capture artefact leaves a stray quote behind for
@@ -376,7 +378,7 @@ def check_debug_make_commands() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
     for path in sorted((REPO_ROOT / "ansible").rglob("*.yml")):
-        if path.name == "confidential.yml":
+        if path.name.startswith("confidential") and "example" not in path.name:
             continue
         try:
             document = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -1510,13 +1512,20 @@ def check_version_consistency(profile: dict) -> List[Finding]:
 
 
 def check_confidential_var_loaders() -> List[Finding]:
-    """Catch roles that read an ansible/confidential.yml variable without loading it.
+    """Catch roles that read a confidential.yml variable without loading it.
 
     This repo has no vars_files and no global include_vars: every role that reads
-    an operator-supplied variable loads ansible/confidential.yml itself (stat,
-    then include_vars when present). A role that reads one of those variables and
-    skips the loader does not error - the variable is simply undefined, so the
-    role's `| default(<chart value>)` fallback wins silently.
+    an operator-supplied variable loads this cluster's confidential.yml itself,
+    through the one shared loader ansible/tasks/load_confidential_vars.yml
+    (ansible/inventories/<cluster>/confidential.yml, the deprecated
+    ansible/confidential.yml as a fallback). A role that reads one of those
+    variables and skips the loader does not error - the variable is simply
+    undefined, so the role's `| default(<chart value>)` fallback wins silently.
+
+    Per-cluster inventories (lot B): a task that still reads
+    ansible/confidential.yml by its own include_vars or stat bypasses the
+    per-cluster path, so that is a finding too (only the loader and the
+    readiness probe name the file).
 
     That is exactly how cert_manager broke. WP-118 B6 moved the ACME DNS-01
     identity out of gitops/charts/cert-manager/values.yaml into
@@ -1550,7 +1559,7 @@ def check_confidential_var_loaders() -> List[Finding]:
         if not tasks_dir.is_dir():
             continue
         text = "".join(f.read_text() for f in sorted(tasks_dir.rglob("*.yml")))
-        loads = "confidential.yml" in text and "include_vars" in text
+        loads = "load_confidential_vars.yml" in text
         if loads:
             continue
         used = sorted(
@@ -1563,8 +1572,23 @@ def check_confidential_var_loaders() -> List[Finding]:
                 f"ansible/roles/{role_dir.name} reads {', '.join(used)} from "
                 "ansible/confidential.yml but never loads the file - the "
                 "variable stays undefined and any `| default(...)` fallback "
-                "wins silently. Add the stat + include_vars pair the other "
-                "roles use (see ansible/roles/mariadb/tasks/install.yml).",
+                "wins silently. Include ansible/tasks/load_confidential_vars.yml "
+                "after load_cluster_vars.yml (see ansible/roles/mariadb/tasks/install.yml).",
+            ))
+
+    allowed = {"ansible/tasks/load_confidential_vars.yml", "ansible/tasks/check_cluster_readiness.yml"}
+    direct = re.compile(r"^\s*(?:path|file):\s*[\"']?\{\{\s*zuno_repo_root\s*\}\}/ansible/(?:inventories/[^/]+/)?confidential\.yml",
+                        re.M)
+    for path in sorted((REPO_ROOT / "ansible").rglob("*.yml")):
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if path.name.startswith("confidential") or rel in allowed:
+            continue
+        if direct.search(path.read_text(encoding="utf-8")):
+            findings.append(Finding(
+                "confidential_loader",
+                f"{rel} reads confidential.yml by its own stat/include_vars - "
+                "include ansible/tasks/load_confidential_vars.yml instead, the one "
+                "place that knows the per-cluster path (ansible/inventories/<cluster>/).",
             ))
     return findings
 

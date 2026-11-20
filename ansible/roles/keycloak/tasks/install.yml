@@ -46,21 +46,16 @@
 # Optional read (unlike vault's hard fail on a missing confidential.yml):
 # this role stays runnable without it - a missing file just leaves
 # zuno_keycloak_google_oauth_enabled undefined, defaulting to true below.
-- name: "keycloak | check for ansible/confidential.yml (optional, only for the googleOAuth.enabled flag)"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _keycloak_confidential_file
-
 # ADR-0602 / WP-223: zuno_security_profile may be set per cluster; load that
 # file BEFORE confidential.yml so a local confidential.yml still wins (same
 # contract as every other load_cluster_vars.yml caller).
 - name: "keycloak | load the committed per-cluster variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
-- name: "keycloak | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _keycloak_confidential_file.stat.exists
+- name: "keycloak | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: keycloak
 
 # ADR-0602 / WP-223: profile value, and in hardened the shared persona password
 # against the realm's hardened passwordPolicy (the eval-personas Job sets it in

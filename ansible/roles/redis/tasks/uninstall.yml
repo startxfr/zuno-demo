@@ -7,15 +7,10 @@
 # external mode is removed: a redis-external-assert Job (and Secret) left by a
 # failed or interrupted assertion. The Vault seed stays (the consumer's
 # ExternalSecret keeps reading it until the mode is flipped back).
-- name: "redis | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _redis_confidential_file
-
-- name: "redis | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _redis_confidential_file.stat.exists
+- name: "redis | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: redis
 
 - name: "redis | external mode: leave the external Redis untouched (ADR-0352 clause 4)"
   when: (zuno_redis_mode | default('internal')) == 'external'

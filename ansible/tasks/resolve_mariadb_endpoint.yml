@@ -12,18 +12,11 @@
 # pattern apply_gitops_app.yml uses), so a caller that never loads it
 # (rhtas) still resolves correctly and
 # check_confidential_var_loaders() stays satisfied.
-- name: "mariadb-endpoint | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _mariadb_endpoint_confidential_file
+- name: "mariadb-endpoint | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: mariadb-endpoint
   when: mariadb_endpoint_host is not defined
-
-- name: "mariadb-endpoint | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when:
-    - mariadb_endpoint_host is not defined
-    - _mariadb_endpoint_confidential_file.stat.exists
 
 - name: "mariadb-endpoint | resolve the MariaDB endpoint facts"
   ansible.builtin.set_fact:

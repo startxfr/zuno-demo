@@ -5,7 +5,12 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  # The first file that exists: this cluster's inventory cluster.yml, else the
+  # deprecated ansible/clusters/<cluster>.yml. The cluster is -e zuno_cluster,
+  # else the inventory's zuno_cluster_name, else demo333. vars_files (not
+  # include_vars) as before, so the precedence of these values is unchanged.
   vars_files:
-    - "{{ playbook_dir }}/../clusters/{{ zuno_cluster | default('demo333') }}.yml"
+    - - "{{ playbook_dir }}/../inventories/{{ zuno_cluster | default(zuno_cluster_name | default('demo333')) }}/cluster.yml"
+      - "{{ playbook_dir }}/../clusters/{{ zuno_cluster | default(zuno_cluster_name | default('demo333')) }}.yml"
   roles:
     - backups_bucket

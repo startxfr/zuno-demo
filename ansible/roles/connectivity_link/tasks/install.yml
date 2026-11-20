@@ -75,15 +75,10 @@
 # Loaded like every other role's, so zuno_gitops_target_revision applies
 # here too (this role never read it, which is why its d1 Application stayed
 # on main on demo333 while the rest followed devel).
-- name: "connectivity_link | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _connectivity_link_confidential_file
-
-- name: "connectivity_link | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _connectivity_link_confidential_file.stat.exists
+- name: "connectivity_link | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: connectivity_link
 
 - name: "connectivity_link | apply the connectivity-link GitOps Application (d1: Kuadrant instance)"
   when: not (zuno_connectivity_link_token_rate_limits.enabled | default(false) | bool)

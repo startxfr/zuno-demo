@@ -5,15 +5,10 @@
 - name: "world-model | load the committed per-cluster variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
-- name: "world-model | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _world_model_confidential_file
-
-- name: "world-model | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _world_model_confidential_file.stat.exists
+- name: "world-model | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: world-model
 
 - name: "world-model | check the Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"

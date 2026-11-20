@@ -9,15 +9,10 @@
 - name: "dify | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-- name: "dify | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _dify_confidential_file
-
-- name: "dify | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _dify_confidential_file.stat.exists
+- name: "dify | load this cluster's confidential.yml if present"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: dify
 
 # The chart has no other file storage than the bucket: fail before anything is applied.
 - name: "dify | fail while the dedicated S3 bucket is not configured"

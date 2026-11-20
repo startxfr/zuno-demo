@@ -11,33 +11,25 @@
 # the configure Job has run. Every later Vault call in ansible/ logs in as a
 # ServiceAccount (configure Job: vault-configure; seed tasks:
 # ansible-seeder through ansible/tasks/vault_login.yml).
-- name: "vault | verify ansible/confidential.yml is present"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _vault_confidential_file
-
-- name: "vault | fail if ansible/confidential.yml is missing"
-  ansible.builtin.fail:
-    msg: >-
-      ansible/confidential.yml is missing. Copy
-      ansible/confidential.example.yml to ansible/confidential.yml and fill
-      in what this cluster needs - that file is the authority, 20 blocks with
-      per-variable prose, most of them optional, and fields left as xxxxxx
-      treated as not configured - before running `make d0 install vault`.
-      docs/platform/prerequisites.md lists what else must be true or decided
-      first.
-      This role reads it on every run, so the file can be deleted again
-      afterwards - unless Vault needs to be reinstalled later.
-  when: not _vault_confidential_file.stat.exists
-
 # ADR-0602 / WP-223: zuno_security_profile may be set per cluster; load that
 # file BEFORE confidential.yml so a local confidential.yml still wins.
 - name: "vault | load the committed per-cluster variables"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
 
-- name: "vault | load ansible/confidential.yml"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+# Required here (unlike every other caller): the loader fails when this
+# cluster has no confidential.yml. Copy ansible/confidential.example.yml to
+# ansible/inventories/<cluster>/confidential.yml and fill in what this cluster
+# needs - that file is the authority, 20 blocks with per-variable prose, most
+# of them optional, and fields left as xxxxxx treated as not configured -
+# before running `make d0 install vault`. docs/platform/prerequisites.md lists
+# what else must be true or decided first. This role reads it on every run,
+# so the file can be deleted again afterwards - unless Vault needs to be
+# reinstalled later.
+- name: "vault | load this cluster's confidential.yml (required)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_confidential_vars.yml"
+  vars:
+    load_confidential_caller: vault
+    load_confidential_required: true
 
 # vault seeds keycloak/demo-personas before the keycloak role runs, so the
 # hardened persona-password policy is asserted here too.
