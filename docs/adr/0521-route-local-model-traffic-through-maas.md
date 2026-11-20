@@ -170,9 +170,9 @@ considered, Migration/evolution and Review evidence.
 ## Amended (2026-11-20, owner decision): the route template is no longer a byte-for-byte mirror
 
 A dated note, not a rewrite. The text above says the user-managed route of each model is byte-for-byte what the KServe controller generates.
-That stops being true for the rule list once WP-314 lands (the 2026-11-21 window). The Kuadrant operator writes one wasm action set per route match and per listener into the EnvoyFilter
-`openshift-ingress/kuadrant-maas-default-gateway`, and since 2026-11-05 that object (3.92 MB desired) no longer fits the 3 MiB API request limit,
-so 11 of the 29 MaaS limits were never counted. `gitops/charts/models/templates/_llmisvc-route.tpl` is changed to keep 3 matches per model instead
+That stopped being true for the rule list on 2026-11-20, when WP-314 was applied. The Kuadrant operator writes one wasm action set per route match and per listener into the EnvoyFilter
+`openshift-ingress/kuadrant-maas-default-gateway`, and since 2026-11-05 that object (3.92 MB desired) no longer fit the 3 MiB API request limit (the real limit hit in the end was the 2 MiB gRPC request),
+so 11 of the 29 MaaS limits were never counted. `gitops/charts/models/templates/_llmisvc-route.tpl` keeps 3 matches per model instead
 of 15: the catch-all path rule, the catch-all `X-Gateway-Model-Name` rule and the pool anchor. The four per-endpoint rule pairs the controller
 generates are dropped; every backend is the same workload Service and the catch-all rules rewrite the same paths. The pool anchor of this ADR
-stays. See [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).
+stays. Applied 2026-11-20 by pushing the chart and patching the 4 generated HTTPRoutes, because the KServe LLMInferenceService reconciler was stopped; once it runs again, KServe regenerates the same 3-match routes from the LLMInferenceService's `spec.router.route.http.spec`, which is the chart template. See [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).

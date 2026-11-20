@@ -155,7 +155,7 @@ Checked against the repository and demo333 while closing WP-164. The decision st
 ## Amended (2026-11-20, owner decision): `<model>-agents` is not rendered on demo333
 
 A dated note, not a rewrite. Clause 2 still generates `gitops/charts/models/values.agents.generated.yaml` and the chart still validates it
-(clause 3 is unchanged), but WP-314 sets `maas.agentSubscriptionTier.enabled` to `false` on demo333 (applied in the 2026-11-21 window), so no `<model>-agents` MaaSSubscription is rendered from then on.
+(clause 3 is unchanged), but WP-314 set `maas.agentSubscriptionTier.enabled` to `false` on demo333 (applied on 2026-11-20), so no `<model>-agents` MaaSSubscription is rendered from then on.
 No agent calls MaaS with an `agent_*` identity: the ai-gateway always sends its own ServiceAccount (`MAAS_GATEWAY_IDENTITY`), so these
 subscriptions only gave humans of the `agent_*` groups direct access. They also outranked `/sales` (priority 10 against 1), so sale-01 landed on
 them and the two-tier contrast of ADR-0201 did not hold. Setting the value to `true` renders them again. See [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).

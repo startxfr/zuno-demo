@@ -228,7 +228,7 @@ gateways became `claude-sonnet-5-5` (the ai-gateway's `claude-3-5-sonnet-latest`
 
 ## Amended (2026-11-20): Praxis budgets on the ai-gateway subscription
 
-A dated note, not a rewrite. From the 2026-11-21 window, Praxis is no longer a second MaaS consumer with its own `<model>-praxis` subscription on the local models: its ServiceAccount is
+A dated note, not a rewrite. Since 2026-11-20, Praxis is no longer a second MaaS consumer with its own `<model>-praxis` subscription on the local models: its ServiceAccount is
 a second user of the `<model>-ai-gateway` subscription ([ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) note of the
 same date, [WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)). The two ServiceAccounts keep separate counters of the same size. A Praxis 429 falls back to the direct step by design, so a Praxis client
 does not see a MaaS 429. The SaaS routes of Praxis (Claude and Codestral) are unchanged.

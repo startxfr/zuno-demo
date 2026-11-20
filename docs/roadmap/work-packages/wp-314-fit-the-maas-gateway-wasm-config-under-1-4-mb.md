@@ -1,6 +1,6 @@
 # WP-314: Fit the MaaS gateway wasm config under 1.4 MB
 
-- **State:** Not started (2026-11-20: the repository change is committed and reviewed locally and is not in `devel` yet; it is pushed and applied in the 2026-11-21 KServe window, with the owner's go and a notice to zuno-demo-cluster)
+- **State:** Operator pending (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; left: the live sale-01 refusal on the qwen models (V4, the full check of 2026-11-22) and `make d2 check agents` on agents v1.1.7 (V6), by zuno-demo-cluster)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** none
 - **Related:** [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md), [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md), [WP-306](wp-306-give-the-stress-runs-their-own-identity-and-budget.md), [WP-313](wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md)
@@ -14,14 +14,13 @@ enough under the API request limit that the next model or subscription does not 
 
 ## What was found (measured 2026-11-20)
 
-- The EnvoyFilter has been stuck at generation 3 since 2026-11-05. The desired object is 3.92 MB, over the 3 MiB API request limit and the 1.5 MiB etcd
-  request limit, so the Kuadrant operator logs "failed to update envoyfilter object" on every change and the data plane serves the 2026-11-05 config.
+- The EnvoyFilter has been stuck at generation 3 since 2026-11-05. The desired object is 3.92 MB, over the 3 MiB API request limit and the 2 MiB gRPC request limit (1.5 MiB in etcd), so the Kuadrant operator logs "failed to update envoyfilter object" on every change and the data plane serves the 2026-11-05 config.
 - Kuadrant writes one wasm action set per route **match** and per **listener** (about 3.6 KB each) plus a reserve/commit pair per **limit** (about 3.9 KB).
   The size model is calibrated on the 73 action sets live.
 - 11 of the 29 limits were never counted: `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops`, the `*-praxis` limits and the `*-load` limits. The descriptor
   key comes from the subscription's name, so a subscription re-created under a name that existed on 2026-11-05 (`sales`, `agents`) was still counted.
 
-## The change (owner decision 2026-11-20; commit c7c69b65 on the local branch `maas-wasm-fit`, pushed during the window)
+## The change (owner decision 2026-11-20; chart commit 43f9eb0a)
 
 1. **Route matches** (`gitops/charts/models/templates/_llmisvc-route.tpl`): 15 matches per model go down to 3. The four per-endpoint rule pairs the KServe
    controller generates are dropped; the catch-all path rule, the catch-all `X-Gateway-Model-Name` rule and the pool anchor remain. Every backend is the same
@@ -38,42 +37,37 @@ Result with the live `zuno-models-d1` values: 28 subscriptions become 17; limits
 Estimated wasm config about 0.68 MB with both listeners; 27 objects pass a server dry-run. The second listener `https-external` stays: `maas-api` takes the external URL from it
 and the portal's API keys page needs it. No Keycloak change and no zuno-demo-agents change.
 
-New tools (zuno-demo-coder, commit cdb39c0b): `platform/models/maas_wasm_size.py` (the size estimate, with a CI gate at 1.4 MB for demo333's shape) and `platform/models/check_maas_wasm.py`
+New tools (zuno-demo-coder, commit 7839b666): `platform/models/maas_wasm_size.py` (the size estimate, with a CI gate at 1.4 MB for demo333's shape) and `platform/models/check_maas_wasm.py`
 (a read-only live check: generation, size, COUNTED or NOT USED per limit, the operator's failed-update count), with their tests and a step in `lint.yml`.
 
-## Steps (2026-11-21, KServe window)
+## How it was applied (2026-11-20 between 12:25 and 12:27 UTC)
 
-The window is run by zuno-demo-cluster, with the owner's go per step in its session. The commits are on the local branch `maas-wasm-fit` (c7c69b65 chart, 6bc7d4c2 comments of
-`ansible/clusters/demo333.yml`, cdb39c0b the two tools); their SHAs can change when that branch is rebased before the push.
+Applied on 2026-11-20 by pushing the chart change and patching the 4 generated HTTPRoutes (`zuno-ai-run/<model>-kserve-route`) to the 3-rule spec rendered from the new LLMInferenceService spec, because the KServe LLMInferenceService reconciler is stopped while its component is being deleted (since 2026-11-19). The chart commits are on `devel` (43f9eb0a chart, 957bd699 comments of `ansible/clusters/demo333.yml`, 7839b666 the two tools; pushed
+`5efff7fbc..7839b6661`); the four routes were patched at 12:27:18 to 12:27:21 UTC and the EnvoyFilter was written at 12:27:26 UTC. No Ansible run was needed: every change is in the
+chart and the d1 Application values are unchanged. The last refusal of the Kuadrant operator (12:27:11 UTC) was the intermediate state, 2,585,274 bytes against the real gRPC maximum of 2,097,152
+bytes, before the route patch.
 
-1. **Backups, then the guard G2.** zuno-demo-cluster creates a ValidatingAdmissionPolicy and its binding that refuse UPDATE and DELETE of the EnvoyFilter
-   `openshift-ingress/kuadrant-maas-default-gateway`. While the four LLMInferenceServices are deleted their routes are gone, and the Kuadrant operator would otherwise write a small
-   filter without the action set of the model routes. G2 keeps generation 3 meanwhile. The names are in zuno-demo-cluster's window plan.
-2. **Freeze and delete.** Auto-sync of the Application `zuno-models-d1` is frozen, the 4 LLMInferenceServices are deleted, the KServe finalizers are released, the new `default-kserve` is applied.
-3. **Push the WP-314 commits to `devel`**, verified with `git ls-remote`. Nothing happens on the cluster yet because the auto-sync of `zuno-models-d1` is frozen. No Ansible run is
-   needed: every change is in the chart (templates and chart `values.yaml`) and the d1 Application values are unchanged.
-4. **Lift G2** (the policy and its binding are deleted), **restore the auto-sync of `zuno-models-d1` and sync it.** It is the only Application that changes; the MaaS gateway
-   (`zuno-openshift-ai-d1`) is untouched. The models come back with 3-match routes, the maas-controller recompiles the 17 subscriptions into the `maas-trlp-*` policies, and the
-   Kuadrant operator writes the full EnvoyFilter.
+**After the Saturday window**, KServe regenerates each route from `spec.router.route.http.spec` of its LLMInferenceService. That is the user-managed route of ADR-0521, that is the chart template,
+now with 3 rules and 3 matches. It rebuilds the same 3-match routes, not the 15-match routes the controller would generate on its own; the direct patch only anticipated what the reconciler will write.
 
-## Checks
+## Checks (results of 2026-11-20)
 
-| # | Check | Expected |
-|---|---|---|
-| V1 | `python3 platform/models/check_maas_wasm.py` | `kuadrant-maas-default-gateway` at generation 4 or more, size under 1,400,000 bytes (estimate 675,739), every limit COUNTED (17 MaaS, the default deny and 2 workstation), 0 "failed to update envoyfilter object" in the last 30 minutes, `RESULT OK` |
-| V2 | Per model, a call without a token to `https://maas.<cluster domain>/zuno-ai-run/<model>/v1/models`; the golden-path probes through the ai-gateway | 401 (or 403) without a token; 200 through the ai-gateway |
-| V3 | Limitador counters: `oc -n kuadrant-system exec deploy/limitador-limitador -- curl -s localhost:8080/counters/zuno-ai-run%2F<model>-kserve-route` | After one ai-gateway call and one Praxis call, two counters under the `<model>-ai-gateway` limit (two identities, two budgets); after one `loadtest` call, a counter under `<model>-load`; after one call with ai-dev-01's portal key, a counter under `gpt-oss-20b-ocp-ai-dev`. The last limit by name on each route (`load` on the qwen models, `sales` on gpt-oss-20b) must show a counter; if it does not, put `/sales` back on the three qwen models as the trailing limit (`maas.salesSubscriptions.models`), on the owner's go |
-| V4 | The ADR-0201 contrast | sale-01 gets 200 on gpt-oss-20b with a counter under `gpt-oss-20b-sales` (5,000 tokens an hour), and 403 on qwen36-27b-instruct (no subscription) |
-| V5 | Clients: `python3 evaluations/golden_path_probe.py` on every moment, Lightspeed included; one Praxis call per local model; `make demo status` for maas-portal-api-keys, genai-playground, quotas and external-models | Probes pass; the Praxis log shows `sub-request complete step="maas" status=200`; the demo statuses are clean |
-| V6 | `make d2 check agents`, run by zuno-demo-cluster | The acceptance gate passes |
+| # | Check | Expected | Result |
+|---|---|---|---|
+| V1 | `python3 platform/models/check_maas_wasm.py` | generation 4 or more, size under 1,400,000 bytes, every limit COUNTED, no failed update after the write, `RESULT OK` | Generation 4 written at 12:27:26 UTC, 674,956 bytes (estimate 675,739), 50 action sets; 20 limits COUNTED, 0 NOT USED, 0 NO-KEY (the 17 MaaS subscription limits, the default deny `maas-api-route` and the 2 workstation per-user limits on `zuno-agent-gateway`); no failed-update line after the write |
+| V2 | A call without a token, then with the ai-gateway, Praxis and `ai-gateway-stress` ServiceAccount tokens, on each model through the maas Route | 401 without a token; 200 with them | 401 on all 4 models; 200 on all 4 with the three tokens |
+| V3 | Limitador counters of each local route | Two counters under `<model>-ai-gateway` (the ai-gateway and Praxis identities), one under `<model>-load`, and the last limit by name counted | On each local route: 3 counters, two under `<model>-ai-gateway` with separate budgets and one under `<model>-load`; `-load`, the last limit by name on the qwen routes, is counted, so the Kuadrant shim defect does not touch the subscription limits |
+| V4 | The ADR-0201 contrast, live | sale-01 gets 200 on gpt-oss-20b with a counter under `gpt-oss-20b-sales` and 403 on qwen36-27b-instruct | **Not run live** (it needs sale-01's credentials). Verified on the configuration only: `gpt-oss-20b-sales` exists (5,000 tokens an hour) and the qwen MaaSAuthPolicies have no group subject. The live test is in the full check of 2026-11-22 |
+| V5 | Clients: the golden-path probes, `make demo status` of the affected scenarios | Probes pass; statuses clean | 14 of 14 golden-path probes PASS; `make demo status` PASS for maas-portal-api-keys, genai-playground, quotas, external-models and multi-gateway. Praxis had no client traffic during the checks; its ServiceAccount got 200 directly |
+| V6 | `make d2 check agents` on agents v1.1.7, run by zuno-demo-cluster | The acceptance gate passes | Pending |
 
 ## Rollback
 
-- **The write still fails (the estimate was wrong).** Generation 3 stays. Its catch-all predicates still match the 3-match routes, so authentication keeps working. Stop and analyse; re-arm G2.
-- **A subscription problem.** Revert the values part of c7c69b65, or set the chart values back: `altGatewayPeers.praxis.ownSubscription: true`, `maas.agentSubscriptionTier.enabled: true`,
+- **The write still fails (the estimate was wrong).** Generation 3 stays. Its catch-all predicates still match the 3-match routes, so authentication keeps working. Stop and analyse.
+- **A subscription problem.** Revert the values part of 43f9eb0a, or set the chart values back: `altGatewayPeers.praxis.ownSubscription: true`, `maas.agentSubscriptionTier.enabled: true`,
   `maas.salesSubscriptions.models: []`. The filter still fits.
-- **Do not revert the route template.** It re-inflates the desired object and the write fails again; the reduced filter already written still covers every model path. Fix forward.
-- **Authentication broken by the new filter.** zuno-demo-cluster re-applies its generation-3 backup (`oc replace`) and re-arms G2.
+- **Do not revert the route template.** It re-inflates the desired object and the write fails again (the real limit is the 2 MiB gRPC request); the reduced filter already written still covers every model path. Fix forward.
+- **Authentication broken by the new filter.** zuno-demo-cluster re-applies its generation-3 backup (`oc replace`).
 
 ## After the demo, in this order
 
