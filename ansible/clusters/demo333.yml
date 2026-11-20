@@ -484,7 +484,7 @@ zuno_ai_gateway_quota_ledger_store: redis
 # the ai-gateway ServiceAccount whose budget the experiences share (drained by the stresstest of 2026-11-19 00:21Z).
 # One switch for the models and llm roles. Needs the image built from 01079893 or later.
 zuno_ai_gateway_stress_credentials: true
-# The `loadtest` class group: inert until an admitted agents release defines the class.
+# The `loadtest` class group. The class is in the admitted agents release since v1.1.3 (policies/quotas/quota-policy.yaml).
 zuno_ai_gateway_quota_loadtest_group: zuno-loadtest
 # ADR-0624 / WP-308 and WP-310 (owner go 2026-11-19): the stress campaign Job may reach the Dify and kagent token proxies
 # (it replays their clients' path), and runs as zuno-stress-reader: get-only on the objects the demos' checks name
@@ -500,7 +500,11 @@ zuno_stress_chaos_rbac_enabled: true
 # written since 2026-11-05: the desired object is over etcd's 1.5 MiB request limit (3.9 MB with 28 subscriptions, still
 # 2.9 MB without the persona-group and /sales ones, because every route rule is emitted once per gateway listener).
 # Dropping those 8 subscriptions bought nothing and cut the direct MaaS access of agent_* and sales, so the owner had
-# them restored the same day (both true). Fix pending: one listener or a Kuadrant/RHOAI correction (bug filed).
+# them restored the same day (both true).
+# WP-314 (owner decision 2026-11-20, applied 2026-11-21): the fix is in the models chart, not here. The model routes have
+# 3 matches instead of 15, Praxis shares the ai-gateway subscription, /sales is on gpt-oss-20b only and the generated
+# <model>-agents subscriptions are not rendered (chart values maas.agentSubscriptionTier.enabled false,
+# maas.salesSubscriptions.models). These two switches stay true: they still pass the generated groups and keep /sales.
 zuno_maas_persona_group_subscriptions: true
 zuno_maas_sales_subscriptions: true
 # WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
