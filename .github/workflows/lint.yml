@@ -94,6 +94,9 @@ jobs:
       # check_docs: the paths a live ADR's Status line cites must exist or be named by an Amended note.
       - name: ADR status path tests
         run: python3 platform/docs/tests/test_adr_status_paths.py
+      # Lot 3 of the best-practices audit: a role's defaults file and its inline `| default('...')` must agree.
+      - name: role defaults tests
+        run: python3 platform/docs/tests/test_role_defaults_match_inline.py
       # check_docs: every copy of the platform map (HLD) equals the reference in docs/architecture/README.md.
       - name: HLD copies tests
         run: python3 platform/docs/tests/test_hld_copies.py

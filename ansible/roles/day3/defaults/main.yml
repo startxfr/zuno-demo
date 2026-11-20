@@ -1,0 +1,7 @@
+---
+# Best-practices audit, lot 3: the literal that the tasks of this role repeat as `{var} | default('<literal>')` is declared here
+# once, with the SAME value. The inline defaults stay where they are (so nothing changes if a value is overridden or this file is
+# ignored); platform/docs/tests/test_role_defaults_match_inline.py fails when an inline default and this file disagree.
+
+# namespace of the OpenShift Lightspeed operand the Day 3 health check reads
+lightspeed_namespace: openshift-lightspeed
