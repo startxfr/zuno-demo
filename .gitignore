@@ -44,6 +44,7 @@ gitops/charts/*/charts/
 # produced by evaluations/benchmark.py against a live candidate, never
 # hand-authored/committed. See evaluations/benchmarks/README.md.
 evaluations/benchmarks/*.json
+evaluations/day2-reports/stress
 
 # Editors / OS
 .DS_Store
