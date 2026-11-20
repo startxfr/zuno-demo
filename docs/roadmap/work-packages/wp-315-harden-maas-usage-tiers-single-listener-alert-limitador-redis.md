@@ -37,10 +37,15 @@ Result to record: applied, or deferred with the reason.
 
 ## 3. Alert on the wasm config
 
-A CronJob runs `platform/models/check_maas_wasm.py` every 15 minutes, and the PrometheusRule `ZunoMaasWasmConfigNotApplied` fires when the EnvoyFilter is not the generation the operator wants,
-is over the size gate or has a limit NOT USED (zuno-demo-coder). The runbook lines (what to do when it fires) are written here once the alert exists.
+Code on `devel` (969bf8e9), inert on the cluster until the roles run (`make d1 install argocd`, then `connectivity-link`, then `namespaces`).
+Switch: `maasWasmCheck.enabled` in `gitops/apps/connectivity-link/application-d1.yaml`.
 
-Result: pending.
+- **Check:** the CronJob `kuadrant-system/maas-wasm-check` runs `check_maas_wasm.py --in-cluster` every 15 minutes (log window 20 minutes, at most 1,400,000 bytes per EnvoyFilter, image `zuno-ai-build/python:3.11-slim`).
+  A run fails when a limit is NOT USED, an EnvoyFilter is above 1.4 MB, or the operator logged a real `failed to update envoyfilter object`. Optimistic conflicts (`the object has been modified`) are ignored: one was seen live at 15:06 UTC right after the tiers sync.
+- **Alert:** the PrometheusRule `kuadrant-system/maas-wasm-check` (group `zuno-maas-wasm`) fires `ZunoMaasWasmConfigNotApplied` (warning, `for: 20m`) when the newest failed Job is newer than the last success, when there has been no success for 45 minutes, or when the CronJob never succeeded.
+- **When it fires:** read the log of the latest job, `oc logs -n kuadrant-system job/<latest maas-wasm-check job>`, then run `python3 platform/models/check_maas_wasm.py` from a workstation to see which limit, size or operator message is behind it. A limit NOT USED or a size over the gate means the wasm config is not the one the operator wants: apply the size method of [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).
+
+Result: code on `devel`; applied on the cluster: pending.
 
 ## 4. Limitador on disk (decision of 2026-11-20, about 14:50 UTC)
 
@@ -48,11 +53,13 @@ Limitador keeps its counters on a PersistentVolumeClaim (1 Gi, the default `gp3-
 The owner replaced the first plan, a Redis dedicated to Limitador: the disk adds no component and no outage to handle. The price is one replica, as today.
 The chart only asserts `spec.storage.disk` (`Prune=false`, `Delete=false`); it is applied by `make d1 install argocd`, then `connectivity-link`, then `namespaces`. The file name of this brief keeps the first plan's word `redis` so that links stay valid.
 
-Result: pending.
+Code on `devel` (d768b27e), inert until the roles run. Switch: `kuadrant.limitadorDisk.enabled` in `application-d1.yaml`; the operator rolls Limitador with a Recreate (one replica, a short gap while it restarts).
+
+Result: code on `devel`; applied on the cluster: pending.
 
 ## Related work
 
-The image-proof guard (a ValidatingAdmissionPolicy and a deny-all NetworkPolicy) belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). The aggressive chaos run, first planned for the evening of 2026-11-20, is moved to after the demonstration (owner's decision of the same day); it is not part of this work package, and its evidence file will go under `docs/roadmap/evidence/` when it runs.
+The image-proof guard belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). It is on `devel` (ee879b59), inert until the roles run: in the namespace `zuno-stress-admission`, a ValidatingAdmissionPolicy and its Binding (`stress-image-proof-dry-run-only`) deny every pod creation unless it is a dry run, a deny-all NetworkPolicy blocks traffic, and a Role and RoleBinding (`stress-image-proof`) let the `stress-reader` ServiceAccount create pods there only. Switches in `ansible/clusters/demo333.yml`: `zuno_stress_image_proof_enabled` and `zuno_stress_image_proof_guard_enabled`. The aggressive chaos run, first planned for the evening of 2026-11-20, is moved to after the demonstration (owner's decision of the same day); it is not part of this work package, and its evidence file will go under `docs/roadmap/evidence/` when it runs.
 
 ## Acceptance
 
