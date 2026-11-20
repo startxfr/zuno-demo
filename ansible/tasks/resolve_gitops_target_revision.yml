@@ -1,0 +1,31 @@
+---
+# 2026-11-20 (zuno-demo-assist, for zuno-demo): the FALLBACK when neither -e, confidential.yml nor branch-pin.yml set
+# it - a worktree run or any AAP job. Job 1482 that day re-applied connectivity-link d0/d1 at targetRevision main, and 6
+# more Applications drifted the same way from worktree runs. The branch a cluster deploys from is a property of the
+# CLUSTER, so it lives in the committed ansible/clusters/<cluster>.yml, which exists on devel AND main: no merge in
+# either direction can drop it (branch-pin.yml was removed at the 2026-09-08 merge to main, and every later
+# main-into-devel merge would remove it again). Only this ONE variable is read (a namespaced include_vars), so the
+# rest of the cluster file does not leak into roles that do not load it themselves; anything set earlier wins.
+- name: "gitops | the cluster's committed target revision (fallback)"
+  when: zuno_gitops_target_revision is not defined
+  block:
+    - name: "gitops | resolve this cluster's short name"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
+
+    - name: "gitops | check for ansible/clusters/{{ cluster_name }}.yml"
+      ansible.builtin.stat:
+        path: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
+      register: _gitops_cluster_file
+
+    - name: "gitops | read ansible/clusters/{{ cluster_name }}.yml into a private namespace"
+      ansible.builtin.include_vars:
+        file: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
+        name: _gitops_cluster_file_vars
+      when: _gitops_cluster_file.stat.exists
+
+    - name: "gitops | take its zuno_gitops_target_revision"
+      ansible.builtin.set_fact:
+        zuno_gitops_target_revision: "{{ _gitops_cluster_file_vars.zuno_gitops_target_revision }}"
+      when:
+        - _gitops_cluster_file.stat.exists
+        - _gitops_cluster_file_vars.zuno_gitops_target_revision | default('') | length > 0
