@@ -1,6 +1,6 @@
 """ADR-0595 acceptance tests for the demo password scheme.
 
-Renders ansible/inventories/demo/group_vars/all/passwords.yml with ansible itself
+Renders ansible/inventories/demo333/group_vars/all/passwords.yml with ansible itself
 and checks what must hold for the scheme to be safe in a public repository:
 
   * no weak literal is committed: with no shared variable every password is a
@@ -34,8 +34,8 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-INVENTORY = REPO_ROOT / "ansible/inventories/demo/hosts.yml"
-PASSWORDS = REPO_ROOT / "ansible/inventories/demo/group_vars/all/passwords.yml"
+INVENTORY = REPO_ROOT / "ansible/inventories/demo333/hosts.yml"
+PASSWORDS = REPO_ROOT / "ansible/inventories/demo333/group_vars/all/passwords.yml"
 
 ADMIN_VARS = [
     "zuno_admin_password",

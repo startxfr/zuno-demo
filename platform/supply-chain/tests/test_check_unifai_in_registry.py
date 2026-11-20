@@ -83,7 +83,7 @@ class PinGateTests(unittest.TestCase):
 
     def test_the_committed_demo333_file_reads_the_internal_quay(self):
         root = HERE.parents[2]
-        self.assertTrue(c.mirror_prefix(root / "ansible" / "clusters" / "demo333.yml").endswith("/zuno"))
+        self.assertTrue(c.mirror_prefix(root / "ansible" / "inventories" / "demo333" / "cluster.yml").endswith("/zuno"))
 
     def test_a_cluster_that_reads_quay_io_gets_no_gate_and_a_notice(self):
         seen = []

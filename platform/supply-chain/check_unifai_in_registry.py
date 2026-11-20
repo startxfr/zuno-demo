@@ -91,7 +91,7 @@ def pin_gate(cluster_file: pathlib.Path, mirror_to: Optional[str] = None, dry_ru
     """
     prefix = mirror_prefix(cluster_file)
     if not prefix:
-        log(f"{cluster_file.name} has no {HOST_KEY}: the admission reads the signatures from quay.io, no internal registry check")
+        log(f"{cluster_file.parent.name if cluster_file.name == 'cluster.yml' else cluster_file.name} has no {HOST_KEY}: the admission reads the signatures from quay.io, no internal registry check")
         return None
     copy = None
     if mirror_to and not dry_run:

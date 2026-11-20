@@ -5,11 +5,11 @@ A `UnifaiStack` on a Zuno cluster uses `identity.external` against the Foundatio
 `identity.keycloak` would run a second Keycloak with its own admin user, an unreviewed identity silo, so it is
 refused in the two places that can set it:
 
-- `zuno_unifai_values.stack.identity` of every `ansible/clusters/*.yml`;
+- `zuno_unifai_values.stack.identity` of every `ansible/inventories/*/cluster.yml`;
 - the chart `gitops/charts/unifai/templates/` (which must also declare `external:`).
 
 Run from the repository root:
-    python3 platform/supply-chain/check_unifai_identity.py [ansible/clusters/<cluster>.yml ...]
+    python3 platform/supply-chain/check_unifai_identity.py [ansible/inventories/<cluster>/cluster.yml ...]
 """
 from __future__ import annotations
 
@@ -21,7 +21,8 @@ from typing import List
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-CLUSTERS_DIR = REPO_ROOT / "ansible" / "clusters"
+# One directory per cluster (per-cluster inventories): ansible/inventories/<cluster>/cluster.yml.
+INVENTORIES_DIR = REPO_ROOT / "ansible" / "inventories"
 CHART_TEMPLATES = REPO_ROOT / "gitops" / "charts" / "unifai" / "templates"
 KEYCLOAK_KEY = re.compile(r"^\s*keycloak\s*:", re.M)
 EXTERNAL_KEY = re.compile(r"^\s*external\s*:", re.M)
@@ -49,11 +50,16 @@ def check_chart(templates: pathlib.Path) -> List[str]:
     return findings
 
 
+def cluster_name(path: pathlib.Path) -> str:
+    """demo333 for ansible/inventories/demo333/cluster.yml (and for a legacy demo333.yml given as an argument)."""
+    return path.parent.name if path.name == "cluster.yml" else path.stem
+
+
 def main(argv: List[str]) -> int:
-    paths = [REPO_ROOT / a for a in argv] if argv else sorted(CLUSTERS_DIR.glob("*.yml"))
+    paths = [REPO_ROOT / a for a in argv] if argv else sorted(INVENTORIES_DIR.glob("*/cluster.yml"))
     findings: List[str] = []
     for path in paths:
-        findings += check_cluster(path.stem, yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+        findings += check_cluster(cluster_name(path), yaml.safe_load(path.read_text(encoding="utf-8")) or {})
     findings += check_chart(CHART_TEMPLATES)
     print(f"Checked {len(paths)} cluster file(s) and the unifai chart templates.")
     for finding in findings:

@@ -1,7 +1,7 @@
 ---
 # ADR-0609 (WP-242): create or remove a work package's canary namespace on the cluster.
 #
-#   ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/canary_namespace.yml \
+#   ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/canary_namespace.yml \
 #     -e canary_wp=WP-211 [-e canary_state=absent] [-e '{"canary_egress": [...]}']
 #
 # A cluster change: it needs the owner's go, and none is created or removed inside a freeze

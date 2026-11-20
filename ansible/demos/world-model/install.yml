@@ -10,14 +10,14 @@
   ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
   vars:
     run_reads:
-      - "git show origin/devel:ansible/clusters/demo333.yml | grep -E '^zuno_world_model_enabled:'"
+      - "git show origin/devel:ansible/inventories/demo333/cluster.yml | grep -E '^zuno_world_model_enabled:'"
 - name: "world-model install | is the demo switched on"
   ansible.builtin.set_fact:
     _world_model_on: "{{ ((demo_unit_commands | last).output | default('')) is search('zuno_world_model_enabled: *true') }}"
 - name: "world-model install | refuse while the flag is not true on origin/devel"
   ansible.builtin.fail:
     msg: >-
-      REFUSED: zuno_world_model_enabled is not true on origin/devel (ansible/clusters/demo333.yml, as of the last git
+      REFUSED: zuno_world_model_enabled is not true on origin/devel (ansible/inventories/demo333/cluster.yml, as of the last git
       fetch). Nothing is installed. The demo is off: use the recording (page, Start).
   when: not _world_model_on
 - name: "world-model install | what exists now"

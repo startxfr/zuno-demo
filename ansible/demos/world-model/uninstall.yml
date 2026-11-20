@@ -13,5 +13,5 @@
     demo_unit_messages: >-
       {{ demo_unit_messages + [
       'Nothing was removed. Owner, by hand, after the session (page, Uninstall): 1. make d2 uninstall world-model;
-      2. set zuno_world_model_enabled: false in ansible/clusters/demo333.yml, commit and push; 3. make d0 uninstall
+      2. set zuno_world_model_enabled: false in ansible/inventories/demo333/cluster.yml, commit and push; 3. make d0 uninstall
       world-model-gpu, which terminates the world-model GPU node only.'] }}

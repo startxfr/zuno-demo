@@ -2,7 +2,7 @@
 # `make demo <action|step|rehearse>` (ADR-0616 clauses 3, 7 and 12, WP-270): the one runner playbook of the presenter
 # lifecycle. platform/demo/runner.py writes a vars file and runs, locally and never through AAP:
 #
-#   ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
+#   ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
 #
 # Vars: demo_id, demo_dir (ansible/demos/<id>), demo_lib (ansible/demos/_lib), demo_readonly
 # (platform/demo/readonly.py), demo_units ([{name, file, kind}]: an action such as "status" or a step time such as

@@ -474,7 +474,7 @@ def plan_make(env_prefix: Dict[str, str], argv: List[str], display: str, root: p
     if len(words) >= 2 and DAY_CHECK_RE.match(words[0]) and words[1] == "check" and len(words) <= 3 and not make_vars:
         day = DAY_CHECK_RE.match(words[0]).group(1)
         component = words[2] if len(words) == 3 else "all"
-        playbook = ["ansible-playbook", "-i", str(root / "ansible/inventories/demo/hosts.yml"),
+        playbook = ["ansible-playbook", "-i", str(root / "ansible/inventories/demo333/hosts.yml"),
                     str(root / f"ansible/playbooks/day{day}_check.yml"), "-e", f"target_component={component}"]
         if day == "3":
             playbook += ["-e", "report_format=text"]

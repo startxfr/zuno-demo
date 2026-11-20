@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ADR-0586 policy-as-code check: a cluster that verifies its UnifAI images pins them by digest.
 
-Reads `ansible/clusters/*.yml`. For a cluster whose `zuno_unifai_verify_images` is not
+Reads `ansible/inventories/*/cluster.yml`. For a cluster whose `zuno_unifai_verify_images` is not
 `false` (the default is on), the five application images of `zuno_unifai_values.stack.images`
 (backend, identity, multiagent, rag, ui) and the third-party services (docling, mongodb, qdrant,
 rabbitmq, redis, redisInsight, temporal) and the backup Jobs' two images (stack.backup.images.awsCli, .mongo)
@@ -14,7 +14,7 @@ A cluster that switches verification off says so in its own file; it is reported
 failed, so the switch stays visible until it is turned back on.
 
 Run from the repository root:
-    python3 platform/supply-chain/check_unifai_pins.py [ansible/clusters/<cluster>.yml ...]
+    python3 platform/supply-chain/check_unifai_pins.py [ansible/inventories/<cluster>/cluster.yml ...]
 """
 from __future__ import annotations
 
@@ -26,7 +26,8 @@ from typing import List, Tuple
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-CLUSTERS_DIR = REPO_ROOT / "ansible" / "clusters"
+# One directory per cluster (per-cluster inventories): ansible/inventories/<cluster>/cluster.yml.
+INVENTORIES_DIR = REPO_ROOT / "ansible" / "inventories"
 APPLICATION_IMAGES = ("backend", "identity", "multiagent", "rag", "ui")
 # The images of the backup CronJobs and restore Jobs, `stack.backup.images` (operator >= 0.1.36).
 BACKUP_IMAGES = ("awsCli", "mongo")
@@ -75,15 +76,20 @@ def check_cluster(name: str, doc: dict) -> Tuple[List[str], List[str]]:
     return findings, []
 
 
+def cluster_name(path: pathlib.Path) -> str:
+    """demo333 for ansible/inventories/demo333/cluster.yml (and for a legacy demo333.yml given as an argument)."""
+    return path.parent.name if path.name == "cluster.yml" else path.stem
+
+
 def main(argv: List[str]) -> int:
-    paths = [REPO_ROOT / a for a in argv] if argv else sorted(CLUSTERS_DIR.glob("*.yml"))
+    paths = [REPO_ROOT / a for a in argv] if argv else sorted(INVENTORIES_DIR.glob("*/cluster.yml"))
     findings: List[str] = []
     notes: List[str] = []
     for path in paths:
-        f, n = check_cluster(path.stem, yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+        f, n = check_cluster(cluster_name(path), yaml.safe_load(path.read_text(encoding="utf-8")) or {})
         findings += f
         notes += n
-    print(f"Checked {len(paths)} cluster file(s) under ansible/clusters/.")
+    print(f"Checked {len(paths)} cluster file(s) under ansible/inventories/*/cluster.yml.")
     for note in notes:
         print(f"  - {note}")
     for finding in findings:

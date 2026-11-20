@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Copy the pinned UnifAI images into the internal Red Hat Quay (ADR-0612 clause 7c, WP-248 family c).
 
-What the cluster runs is a set of digests: the five application images in `ansible/clusters/<cluster>.yml`
+What the cluster runs is a set of digests: the five application images in `ansible/inventories/<cluster>/cluster.yml`
 (`stack.images`), the operator catalog in `gitops/charts/unifai/values.yaml`, and the operator and its bundle of the
 catalog's version. Each one is verified at its source with the policy of ADR-0586 (signature, provenance, signed SBOM),
 copied by digest with its `.sig`, `.att` and `.sbom` tags and the signature of the SBOM artifact, then verified again
@@ -153,7 +153,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
-        refs = pinned_references(REPO_ROOT / "ansible" / "clusters" / f"{args.cluster}.yml",
+        refs = pinned_references(REPO_ROOT / "ansible" / "inventories" / args.cluster / "cluster.yml",
                                  REPO_ROOT / "gitops" / "charts" / "unifai" / "values.yaml")
         refs["unifai-operator"] = resolve_tag(FAMILY + "unifai-operator", f"v{args.version}")
         refs["unifai-operator-bundle"] = resolve_tag(FAMILY + "unifai-operator-bundle", f"v{args.version}")

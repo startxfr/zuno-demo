@@ -5,7 +5,7 @@ SHELL := /usr/bin/env bash
 .DELETE_ON_ERROR:
 
 ANSIBLE_PLAYBOOK ?= ansible-playbook
-INVENTORY ?= ansible/inventories/demo/hosts.yml
+INVENTORY ?= ansible/inventories/demo333/hosts.yml
 EXTRA_VARS ?=
 
 # ADR-0056/ADR-0060/ADR-0421: Day 0 (bare cluster prerequisites plus the

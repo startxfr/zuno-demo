@@ -120,7 +120,7 @@ class Pin(unittest.TestCase):
 
     def test_it_rewrites_the_committed_demo333_file_identically_when_pins_do_not_change(self):
         root = pathlib.Path(__file__).resolve().parents[3]
-        text = (root / "ansible/clusters/demo333.yml").read_text(encoding="utf-8")
+        text = (root / "ansible/inventories/demo333/cluster.yml").read_text(encoding="utf-8")
         pins = {c: f"quay.io/zuno/unifai-{c}@sha256:" + "f" * 64 for c in p.APPLICATION_IMAGES}
         out = p.rewrite(text, pins, "devel-x")
         self.assertEqual(out.count("@sha256:" + "f" * 64), 5)

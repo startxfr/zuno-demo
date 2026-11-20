@@ -105,10 +105,12 @@ class TargetRevisionPin(unittest.TestCase):
                          "a namespaced include_vars: the rest of the cluster file must not leak into every role")
 
     def test_every_cluster_file_names_its_branch(self):
-        for path in sorted((ANSIBLE / "clusters").glob("*.yml")):
+        paths = sorted((ANSIBLE / "inventories").glob("*/cluster.yml"))
+        self.assertTrue(paths, "no ansible/inventories/<cluster>/cluster.yml")
+        for path in paths:
             value = (yaml.safe_load(path.read_text()) or {}).get("zuno_gitops_target_revision")
-            self.assertIsInstance(value, str, f"{path.name} must set zuno_gitops_target_revision")
-            self.assertRegex(value, r"^[A-Za-z0-9._/-]+$", path.name)
+            self.assertIsInstance(value, str, f"{path.parent.name}/cluster.yml must set zuno_gitops_target_revision")
+            self.assertRegex(value, r"^[A-Za-z0-9._/-]+$", f"{path.parent.name}/cluster.yml")
 
 
 if __name__ == "__main__":

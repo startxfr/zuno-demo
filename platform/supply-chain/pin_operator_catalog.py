@@ -13,7 +13,7 @@ bundle `quay.io/zuno/unifai-operator-bundle:vX.Y.Z` (resolved to digests) and up
 comment. Nothing is written if anything is refused.
 
 Copy before pin (WP-248, WP-282): when the cluster's admission policies read the signatures from the internal Quay
-(`zuno_unifai_signature_mirror_host` in `ansible/clusters/<cluster>.yml`), every digest must be there, with its `.sig` tag,
+(`zuno_unifai_signature_mirror_host` in `ansible/inventories/<cluster>/cluster.yml`), every digest must be there, with its `.sig` tag,
 before the pin is written; the missing ones are listed and nothing is written. `--mirror-to <registry>/zuno` copies them
 first (the push robot's DOCKER_CONFIG). A dry run copies nothing: it lists what the real run has to copy.
 
@@ -140,7 +140,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="copy the missing digests with their signatures into the internal Quay before the check, e.g. "
                              "quay-quay-zuno-registry.apps.demo333.startx.fr/zuno (push robot in DOCKER_CONFIG; ADR-0612)")
     args = parser.parse_args(argv)
-    cluster_file = REPO_ROOT / "ansible" / "clusters" / f"{args.cluster}.yml"
+    cluster_file = REPO_ROOT / "ansible" / "inventories" / args.cluster / "cluster.yml"
     if not cluster_file.is_file():
         parser.error(f"{cluster_file} does not exist")
     try:

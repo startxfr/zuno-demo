@@ -657,11 +657,13 @@ jobs:
       # ansible/requirements.yml (installed to ~/.ansible/collections, which
       # takes precedence over the copies bundled in the ansible package).
       - run: pip install ansible==12.3.0 && ansible-galaxy collection install -r ansible/requirements.yml
-      - name: Syntax-check every playbook
+      - name: Syntax-check every playbook against every cluster inventory
         run: |
           set -e
-          for playbook in ansible/playbooks/*.yml; do
-            ansible-playbook -i ansible/inventories/demo/hosts.yml "$playbook" --syntax-check
+          for inventory in ansible/inventories/*/hosts.yml; do
+            for playbook in ansible/playbooks/*.yml; do
+              ansible-playbook -i "$inventory" "$playbook" --syntax-check
+            done
           done
       # .ansible-lint (profile safety) and its baseline .ansible-lint-ignore: a NEW finding fails, the old debt does not.
       - name: ansible-lint

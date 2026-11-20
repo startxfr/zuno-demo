@@ -56,7 +56,7 @@
       zuno-vault/vault-bootstrap-credentials exists: this Vault was initialized
       before ADR-0602/WP-223 (file storage, Shamir seal, stored root token).
       Migrate it first - docs/platform/vault-kms-raft-migration.md, i.e.
-      `ansible-playbook -i ansible/inventories/demo/hosts.yml
+      `ansible-playbook -i ansible/inventories/demo333/hosts.yml
       ansible/playbooks/vault_migrate_kms_raft.yml` - then re-run
       `make d0 install vault`.
   when:

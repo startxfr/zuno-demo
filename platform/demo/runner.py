@@ -1,6 +1,6 @@
 """Run a demo's action and step files through the one runner playbook, locally (ADR-0616 clauses 3 and 12, WP-270).
 
-    ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
+    ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
 
 Never through AAP: a checkout without ansible/confidential.yml would route `make dN` there, and AAP runs `devel` from
 git, not this tree. The vars file (mode 0600, under $XDG_RUNTIME_DIR) names the units to run; the playbook writes one
@@ -26,7 +26,7 @@ from typing import List, Optional
 import session
 
 ENGINE_ROOT = pathlib.Path(os.environ.get("ZUNO_REPO_ROOT") or pathlib.Path(__file__).resolve().parents[2])
-INVENTORY = "ansible/inventories/demo/hosts.yml"
+INVENTORY = "ansible/inventories/demo333/hosts.yml"
 PLAYBOOK = "ansible/playbooks/demo_run.yml"
 
 

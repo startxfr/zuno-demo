@@ -1,4 +1,11 @@
 ---
+# This inventory's cluster (per-cluster inventories: one ansible/inventories/<cluster>/ per demo cluster). It must
+# equal the directory name (platform/gitops/tests/test_cluster_inventories.py) and the name the live apps domain gives:
+# ansible/tasks/resolve_cluster_name.yml refuses to run this inventory against another cluster. It also selects
+# ansible/inventories/demo333/cluster.yml and confidential.yml. AAP never reads this file: there the name comes from
+# the apps domain.
+zuno_cluster_name: demo333
+
 zuno_org: zuno
 zuno_orgId: zn
 

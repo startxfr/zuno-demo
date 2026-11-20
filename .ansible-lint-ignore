@@ -1,8 +1,8 @@
 # This file contains ignores rule violations for ansible-lint
-ansible/clusters/demo333.yml yaml[indentation]
-ansible/inventories/demo/group_vars/all/auto.yml jinja[spacing]
-ansible/inventories/demo/group_vars/all/auto.yml var-naming[pattern]
-ansible/inventories/demo/group_vars/all/main.yml var-naming[pattern]
+ansible/inventories/demo333/cluster.yml yaml[indentation]
+ansible/inventories/demo333/group_vars/all/auto.yml jinja[spacing]
+ansible/inventories/demo333/group_vars/all/auto.yml var-naming[pattern]
+ansible/inventories/demo333/group_vars/all/main.yml var-naming[pattern]
 ansible/playbooks/aap_launch.yml name[template]
 ansible/playbooks/day3_check.yml var-naming[no-role-prefix]
 ansible/playbooks/day3_release.yml name[template]

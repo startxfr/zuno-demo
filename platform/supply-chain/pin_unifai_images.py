@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pin the five UnifAI application images of a cluster to a CI-built `devel-<sha>` (ADR-0586).
 
-A UnifAI deployment is a commit that changes five digests in `ansible/clusters/<cluster>.yml`.
+A UnifAI deployment is a commit that changes five digests in `ansible/inventories/<cluster>/cluster.yml`.
 This resolves the digest of `quay.io/zuno/unifai-<component>:devel-<sha>` for the five
 components (skopeo), verifies every one with the same policy the `unifai` role applies
 (`verify_unifai_images.verify_image`: signature, provenance, signed SBOM, identity of the fork's
@@ -122,7 +122,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--no-admission-preflight", action="store_true",
                         help="do not ask the cluster's admission webhook about the digests (WP-178)")
     args = parser.parse_args(argv)
-    path = REPO_ROOT / "ansible" / "clusters" / f"{args.cluster}.yml"
+    path = REPO_ROOT / "ansible" / "inventories" / args.cluster / "cluster.yml"
     if not path.is_file():
         parser.error(f"{path} does not exist")
     try:

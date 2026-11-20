@@ -10,7 +10,7 @@
 # logged in with `oc login` as cluster-admin, with the four zuno_vault_kms_*
 # values filled in ansible/confidential.yml:
 #
-#   ansible-playbook -i ansible/inventories/demo/hosts.yml \
+#   ansible-playbook -i ansible/inventories/demo333/hosts.yml \
 #     ansible/playbooks/vault_migrate_kms_raft.yml
 #
 # Not a `make` target on purpose: it runs once per cluster, pauses for a
