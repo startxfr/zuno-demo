@@ -1,6 +1,6 @@
 # WP-314: Fit the MaaS gateway wasm config under 1.4 MB
 
-- **State:** Operator pending (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; `make d2 check agents` on agents v1.1.7 passes after the change; left: the live sale-01 refusal on the qwen models (V4, the full check of 2026-11-22))
+- **State:** Done (2026-11-20: applied between 12:25 and 12:27 UTC, the EnvoyFilter is at generation 4 and all 20 limits are counted; V4 and V6 passed; the re-check of V1 to V3 and of the regenerated routes after the KServe window of the same day is to be recorded below)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** none
 - **Related:** [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md), [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md), [WP-306](wp-306-give-the-stress-runs-their-own-identity-and-budget.md), [WP-313](wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md)
@@ -47,7 +47,7 @@ Applied on 2026-11-20 by pushing the chart change and patching the 4 generated H
 chart and the d1 Application values are unchanged. The last refusal of the Kuadrant operator (12:27:11 UTC) was the intermediate state, 2,585,274 bytes against the real gRPC maximum of 2,097,152
 bytes, before the route patch.
 
-**After the Saturday window**, KServe regenerates each route from `spec.router.route.http.spec` of its LLMInferenceService. That is the user-managed route of ADR-0521, that is the chart template,
+**After the KServe window**, KServe regenerates each route from `spec.router.route.http.spec` of its LLMInferenceService. That is the user-managed route of ADR-0521, that is the chart template,
 now with 3 rules and 3 matches. It rebuilds the same 3-match routes, not the 15-match routes the controller would generate on its own; the direct patch only anticipated what the reconciler will write.
 
 ## Checks (results of 2026-11-20)
@@ -57,9 +57,11 @@ now with 3 rules and 3 matches. It rebuilds the same 3-match routes, not the 15-
 | V1 | `python3 platform/models/check_maas_wasm.py` | generation 4 or more, size under 1,400,000 bytes, every limit COUNTED, no failed update after the write, `RESULT OK` | Generation 4 written at 12:27:26 UTC, 674,956 bytes (estimate 675,739), 50 action sets; 20 limits COUNTED, 0 NOT USED, 0 NO-KEY (the 17 MaaS subscription limits, the default deny `maas-api-route` and the 2 workstation per-user limits on `zuno-agent-gateway`); no failed-update line after the write |
 | V2 | A call without a token, then with the ai-gateway, Praxis and `ai-gateway-stress` ServiceAccount tokens, on each model through the maas Route | 401 without a token; 200 with them | 401 on all 4 models; 200 on all 4 with the three tokens |
 | V3 | Limitador counters of each local route | Two counters under `<model>-ai-gateway` (the ai-gateway and Praxis identities), one under `<model>-load`, and the last limit by name counted | On each local route: 3 counters, two under `<model>-ai-gateway` with separate budgets and one under `<model>-load`; `-load`, the last limit by name on the qwen routes, is counted, so the Kuadrant shim defect does not touch the subscription limits |
-| V4 | The ADR-0201 contrast, live | sale-01 gets 200 on gpt-oss-20b with a counter under `gpt-oss-20b-sales` and 403 on qwen36-27b-instruct | **Not run live** (it needs sale-01's credentials). Verified on the configuration only: `gpt-oss-20b-sales` exists (5,000 tokens an hour) and the qwen MaaSAuthPolicies have no group subject. The live test is in the full check of 2026-11-22 |
+| V4 | The ADR-0201 contrast, live | sale-01 gets 200 on gpt-oss-20b with a counter under `gpt-oss-20b-sales` and 403 on qwen36-27b-instruct | Passed live on 2026-11-20 (13:53 to 13:54 UTC) with `stress-sale-01`, the twin of sale-01 in the `/sales` group, signed in through the OpenShift `openshift` IdP (a twin, so that no demo persona can be locked). One 5-token chat on gpt-oss-20b returned 200 and the Limitador counter of `gpt-oss-20b-sales` went from 5,000 to 4,925 remaining: the `/sales` tier (5,000 tokens an hour) is counted. On qwen36-27b-instruct it got 403 (no subscription for `/sales` there). Cleanup: its OAuth access token, Identity, User and the 5 groups the login created were deleted; the OpenShift group list is identical to the snapshot taken before |
 | V5 | Clients: the golden-path probes, `make demo status` of the affected scenarios | Probes pass; statuses clean | 14 of 14 golden-path probes PASS; `make demo status` PASS for maas-portal-api-keys, genai-playground, quotas, external-models and multi-gateway. Praxis had no client traffic during the checks; its ServiceAccount got 200 directly |
 | V6 | `make d2 check agents` on agents v1.1.7, run by zuno-demo-cluster after the change | The acceptance gate passes | OVERALL PASS, failed 0: quality 18/19, security 14/14, gate checks 5/5. The one failure, #11 (RAG citation), was already there on agents v1.1.6 before this change. A real Praxis client call (OpenClaw, consultant-02) also returned 200, with `step="maas" status=200` in the Praxis log |
+
+**To record after the KServe window of 2026-11-20** (it moved to the day of the change, after V4): a re-check of V1 to V3 and that KServe regenerated the 3-rule routes from the LLMInferenceService spec, by zuno-demo-assist.
 
 ## Rollback
 

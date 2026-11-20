@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 14 | 11 | 51 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313, WP-314 |
+| v0.17 | 14 | 11 | 51 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-304, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1233,7 +1233,7 @@ Blender and world-model.
 | WP-311 | [wp-311](work-packages/wp-311-inflict-bounded-disruptions-beside-the-stress-load.md) | 0624 | WP-305, WP-307, WP-312 | Repo work in review | owner's go: the AdminNetworkPolicy grant for the AAP installer (optional), a first aggressive run with CHAOS_CONFIRM |
 | WP-312 | [wp-312](work-packages/wp-312-report-the-campaigns-and-read-the-limitador-counters.md) | 0624 | WP-307, WP-309 | Repo work in review | owner's go: a first standard run and its report |
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
-| WP-314 | [wp-314](work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) | 0624 | none | Operator pending | applied 2026-11-20 12:27 UTC (generation 4, 674,956 bytes, 20 limits counted); `make d2 check agents` on v1.1.7 passes after it; left: V4 the live sale-01 refusal (2026-11-22 full check) |
+| WP-314 | [wp-314](work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) | 0624 | none | Done (2026-11-20) | applied 12:27 UTC (generation 4, 674,956 bytes, 20 limits counted); V4 (sale-01 live) and V6 (`make d2 check agents`, v1.1.7) passed; the re-check after the KServe window of the same day is to be recorded |
 
 ### OKF stream phases
 
