@@ -1,6 +1,6 @@
 # WP-315: MaaS hardening: usage tiers, single-listener test, wasm-config alert, Limitador on disk
 
-- **State:** Operator pending (2026-11-20: the usage tiers are live and measured since 15:33 UTC; the single-listener test is done; the alert, the Limitador disk and the guard are on `devel` and waiting to be applied: the d1 installs through AAP stop at the prechecks until the installer's missing read grants are added; the results are recorded below as they come)
+- **State:** Done (2026-11-20: the usage tiers, the wasm-config alert, Limitador on disk and the image-proof guard are live and measured; the single-listener test is done and the change itself is deferred until after the demonstration, by the owner's decision)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)
 - **Related:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md), [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md)
@@ -57,7 +57,7 @@ The model routes are attached to both listeners and answer 401 without a token. 
 
 ## 3. Alert on the wasm config
 
-Code on `devel` (969bf8e9), inert on the cluster until the roles run (`make d1 install argocd`, then `connectivity-link`, then `namespaces`).
+Code on `devel` (969bf8e9), applied by `make d1 install argocd`, then `connectivity-link`, then `namespaces`.
 Switch: `maasWasmCheck.enabled` in `gitops/apps/connectivity-link/application-d1.yaml`.
 
 - **Check:** the CronJob `kuadrant-system/maas-wasm-check` runs `check_maas_wasm.py --in-cluster` every 15 minutes (log window 20 minutes, at most 1,400,000 bytes per EnvoyFilter, image `zuno-ai-build/python:3.11-slim`).
@@ -65,7 +65,7 @@ Switch: `maasWasmCheck.enabled` in `gitops/apps/connectivity-link/application-d1
 - **Alert:** the PrometheusRule `kuadrant-system/maas-wasm-check` (group `zuno-maas-wasm`) fires `ZunoMaasWasmConfigNotApplied` (warning, `for: 20m`) when the newest failed Job is newer than the last success, when there has been no success for 45 minutes, or when the CronJob never succeeded.
 - **When it fires:** read the log of the latest job, `oc logs -n kuadrant-system job/<latest maas-wasm-check job>`, then run `python3 platform/models/check_maas_wasm.py` from a workstation to see which limit, size or operator message is behind it. A limit NOT USED or a size over the gate means the wasm config is not the one the operator wants: apply the size method of [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md).
 
-Result: code on `devel`; applied on the cluster: pending.
+Result: **live since 2026-11-20 16:30 UTC.** The CronJob, the PrometheusRule, the ConfigMap, the ServiceAccount and its RBAC are in `kuadrant-system`. A manual run (`maas-wasm-check-manual-1630`) succeeded: RESULT OK, 15 limits counted, 0 NOT USED, EnvoyFilter at generation 20, 549,033 bytes, no failed update in 20 minutes.
 
 ## 4. Limitador on disk (decision of 2026-11-20, about 14:50 UTC)
 
@@ -73,13 +73,21 @@ Limitador keeps its counters on a PersistentVolumeClaim (1 Gi, the default `gp3-
 The owner replaced the first plan, a Redis dedicated to Limitador: the disk adds no component and no outage to handle. The price is one replica, as today.
 The chart only asserts `spec.storage.disk` (`Prune=false`, `Delete=false`); it is applied by `make d1 install argocd`, then `connectivity-link`, then `namespaces`. The file name of this brief keeps the first plan's word `redis` so that links stay valid.
 
-Code on `devel` (d768b27e), inert until the roles run. Switch: `kuadrant.limitadorDisk.enabled` in `application-d1.yaml`; the operator rolls Limitador with a Recreate (one replica, a short gap while it restarts).
+Code on `devel` (d768b27e). Switch: `kuadrant.limitadorDisk.enabled` in `application-d1.yaml`; the operator rolls Limitador with a Recreate (one replica, a short gap while it restarts).
 
-Result: code on `devel`; applied on the cluster: pending.
+Result: **live since 2026-11-20 16:30 UTC.**
+
+- The PersistentVolumeClaim `limitador-limitador` is Bound (`gp3-csi`, 1 Gi); the Deployment is `Recreate`, 1 replica, Ready; the limits written by the operator are kept.
+- **Persistence proven:** the counter of `gpt-oss-20b-platform` read 999,925 before and after a Limitador pod deletion; 401 without a token and 200 with one, unchanged after the restart.
+- **Caveat:** a pod deleted by hand crash-loops for about 30 seconds, because the terminating pod still holds the RocksDB lock on the ReadWriteOnce volume. A rollout does not have this gap (Recreate). Do not delete the Limitador pod by hand during a demonstration.
+- One fix on the way (10dd9739): the CRD takes `persistentVolumeClaim.resources.requests` as one quantity (`requests: 1Gi`), not a map; the first sync was refused and applied nothing.
+
+**How the three items were applied:** through AAP (jobs 1485 and 1488) with the extra variable `zuno_gitops_target_revision=devel`. Two findings on the way: the AAP installer lacked 8 read grants that the Day-1 prechecks need (fixed by 6dec157a);
+and an install launched from AAP without that variable resets the Application to `targetRevision: main` (job 1482 did it to `connectivity-link` d0 and d1, corrected by job 1485, no damage). The lasting fix for the second is planned after the demonstration.
 
 ## Related work
 
-The image-proof guard belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). It is on `devel` (ee879b59), inert until the roles run: in the namespace `zuno-stress-admission`, a ValidatingAdmissionPolicy and its Binding (`stress-image-proof-dry-run-only`) deny every pod creation unless it is a dry run, a deny-all NetworkPolicy blocks traffic, and a Role and RoleBinding (`stress-image-proof`) let the `stress-reader` ServiceAccount create pods there only. Switches in `ansible/clusters/demo333.yml`: `zuno_stress_image_proof_enabled` and `zuno_stress_image_proof_guard_enabled`. The aggressive chaos run, first planned for the evening of 2026-11-20, is moved to after the demonstration (owner's decision of the same day); it is not part of this work package, and its evidence file will go under `docs/roadmap/evidence/` when it runs.
+The image-proof guard belongs to the mutating drivers of [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md). It is live since 2026-11-20 16:36 UTC (code ee879b59): in the namespace `zuno-stress-admission`, a ValidatingAdmissionPolicy and its Binding (`stress-image-proof-dry-run-only`) deny every pod creation unless it is a dry run, a deny-all NetworkPolicy blocks traffic, and a Role and RoleBinding (`stress-image-proof`) let the `stress-reader` ServiceAccount create pods there only. Switches in `ansible/clusters/demo333.yml`: `zuno_stress_image_proof_enabled` and `zuno_stress_image_proof_guard_enabled`. Proof as `zuno-stress-reader`: a real pod creation is refused by the admission policy and no pod exists; a creation in `zuno-ai-run` is refused by RBAC; a dry run with an unsigned image pinned by digest reaches the image-signature policy and is refused ("signature keyless validation failed"), and with a tag instead of a digest it is refused ("must be an image digest"). The aggressive chaos run, first planned for the evening of 2026-11-20, is moved to after the demonstration (owner's decision of the same day); it is not part of this work package, and its evidence file will go under `docs/roadmap/evidence/` when it runs.
 
 ## Acceptance
 
