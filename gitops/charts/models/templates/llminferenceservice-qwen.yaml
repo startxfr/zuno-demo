@@ -147,6 +147,9 @@ spec:
     {{- end }}
     containers:
       - name: main
+        {{- with $.Values.vllmImage }}
+        image: {{ . }}
+        {{- end }}
         # ADR-0517 live finding (demo333, 2026-09-07): vLLM 0.24.0+rhaiv.9
         # auto-disables its DeepGemm FP8 kernels for model_type qwen3_5
         # ("DeepGemm E8M0 scale format causes accuracy degradation") but

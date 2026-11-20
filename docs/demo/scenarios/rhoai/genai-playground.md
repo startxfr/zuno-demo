@@ -17,7 +17,7 @@ in [Appendix B](#appendix-b---lld).
 **The message:** "Developers and operators try our models, their own documents and our tools in Red Hat's playground.
 The platform still decides which model budget and which tools each person gets."
 
-![The 5-minute version of the GenAI playground demo, recorded live as ai-ops-01 in the OpenShift AI portal: the playground of the Zuno Playground project with its model and subscription, one question answered by the local model with its speed, and the MCP settings where the tool gateway is listed, not connected in this browser. Rows 1:45 and 3:00, the tool call, are not in the recording.](../../../assets/img/demo/genai-playground.gif)
+![The 5-minute version of the GenAI playground demo, recorded live as ai-ops-01 in the OpenShift AI portal: the playground of the Zuno Playground project with its model and subscription, one question answered by the local model with its speed, and the MCP settings where the tool gateway is listed, not connected in this browser. Rows 1:45 and 3:00, the tool call, are not in the recording. Recorded again on 2026-11-20 after the usage tiers (subscription `gpt-oss-20b-builders`); the project is picked in the Project dropdown, because the portal otherwise stays on its last project (`ai-tenants`) and offers "Create playground".](../../../assets/img/demo/genai-playground.gif)
 
 ## Personas
 
@@ -82,8 +82,10 @@ The file prepares nothing; the two browser windows are the presenter's. What onl
   - window 2: **ai-dev-01** (15-minute version only).
 - [ ] In each window open `https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal/` and sign in. It is the
   **OpenShift** sign-in, with Keycloak behind it.
-- [ ] Open **Playground** and pick the project **Zuno Playground**. Never press **Create playground** in any other
-  project.
+- [ ] Open **Playground** and pick the project **Zuno Playground** in the **Project** dropdown, even when the address
+  already ends in `/playground/zuno-playground`: the portal keeps its last project (seen on 2026-11-20 with
+  **MaaS AI Tenants**, a project without a playground) and then offers **Create your playground**. Never press it,
+  in any project.
 - [ ] **Settings**, **Model**: `publishers/zuno-ai-run/models/gpt-oss-20b`. The subscription shown is `gpt-oss-20b-builders`, the one subscription of the three operator groups. Until 2026-11-20 the portal sometimes showed `gpt-oss-20b-agents` instead (seen on 2026-11-16, five minutes apart); that subscription is no longer rendered. Check it before you start.
   It is the same subscription in both windows (ai-ops-01 and ai-dev-01). The human subscription covers gpt-oss-20b only.
 - [ ] Warm the model: ask one question in window 1 before the audience arrives.
@@ -141,7 +143,7 @@ Run the 5-minute version, then:
 | Symptom | Fallback | Say |
 |---|---|---|
 | **Playground** shows "To begin you must deploy a model", or the project is **Startx default project** | Pick the project **Zuno Playground**. The portal's own **Playground** and **AI asset endpoints** list only models flagged as AI assets in the `Startx default project`; the Zuno models live in `zuno-ai-run`. | |
-| The page offers **Create playground** | You are in another project. Do not press it: that copy loops on its CA bundle and never becomes Ready (WP-220, section 15). Switch to **Zuno Playground**. | "This release has a defect on that path; we ship our own copy instead." |
+| The page offers **Create playground** or **Create your playground**, even under the title **Zuno Playground** | The portal kept its last project (on 2026-11-20: **MaaS AI Tenants**). Pick **Zuno Playground** in the **Project** dropdown: the playground appears with the model gpt-oss-20b and the subscription `gpt-oss-20b-builders`. You are in another project. Do not press it: that copy loops on its CA bundle and never becomes Ready (WP-220, section 15). Switch to **Zuno Playground**. | "This release has a defect on that path; we ship our own copy instead." |
 | The chat answers "Server error" | Check `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` and `oc get httproute zuno-portal-genai -n redhat-ods-applications`: without that route the stack's model proxy answers 404 (WP-220, section 16). Show the screenshots of the 5-minute rows instead. | "The model behind the playground is not answering; the screenshots show the same flow." |
 | The model list shows only a greyed reranker | The OGX server is not Ready: `oc get ogxserver,pods -n zuno-playground`. | |
 | A qwen model returns an error | Use gpt-oss-20b. The human subscriptions cover that model only. | |

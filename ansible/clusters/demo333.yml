@@ -17,6 +17,13 @@
 # value set in confidential.yml still overrides it locally. Real secrets
 # (access keys, passwords) NEVER belong here - they stay in
 # confidential.yml and reach the cluster through Vault seeding + ESO.
+#
+# The branch every Argo CD Application of demo333 follows (ADR-0517; d1 moved from main to devel on 2026-10-24). Read by
+# ansible/tasks/apply_gitops_app.yml as the fallback when -e, confidential.yml and branch-pin.yml do not set it: AAP
+# jobs and worktree runs re-applied Applications at the manifests' `main` until 2026-11-20 (connectivity-link d0/d1
+# by job 1482, six more from worktrees). Also the branch the aap_config role points the AAP Project at. A property of
+# the cluster, not of the branch: this line is the same on devel and main. Change it only to move demo333 to main.
+zuno_gitops_target_revision: devel
 zuno_models_s3_bucket: "zuno-demo-sources"
 zuno_models_s3_prefix: "models"
 # zuno_models_tekos_lora_source_s3_uri deliberately unset: a from-scratch

@@ -178,18 +178,47 @@ async function signIn({ page, base, mark, keycloak }) {
   await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
 }
 
-// The playground of Zuno Playground, by its menu link, then its address when the link led to another project.
+// 2026-11-20: the portal keeps its last project (ai-tenants, a namespace RHOAI generates, with no playground) even on
+// .../playground/zuno-playground: the page shows "Zuno Playground" but asks the BFF about ai-tenants and offers "Create
+// playground". A presenter picks the project in the Project dropdown; so does the take, once. Never the user menu.
+const PROJECT_TOGGLE = "button.pf-v6-c-menu-toggle, button.pf-v5-c-menu-toggle";
+const PROJECT_OPTION = [`[role='menuitem']:has-text('${PROJECT}')`, `[role='option']:has-text('${PROJECT}')`,
+                        `button:text-is('${PROJECT}')`, `li:has-text('${PROJECT}') button`];   // guess, read by the scout
+
+async function pickProject(page) {
+  const toggles = page.locator(PROJECT_TOGGLE);
+  const n = await toggles.count();
+  for (let i = 0; i < n; i++) {
+    const toggle = toggles.nth(i);
+    if (!(await toggle.isVisible().catch(() => false))) continue;
+    const text = ((await toggle.innerText().catch(() => "")) || "").trim();
+    if (!text || text === persona || text.startsWith("publishers/")) continue;
+    await click(toggle, { changes });
+    const option = await waitUntil(page, { what: `the project ${PROJECT} in the Project dropdown`, timeoutMs: 15000,
+      done: async () => (await firstVisible(page, PROJECT_OPTION)) || undefined });
+    await click(option, { changes });
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    return `${text} -> ${PROJECT} (${option.matched})`;
+  }
+  return "";
+}
+
+// The playground of Zuno Playground, by its menu link, then its address when the link led to another project, then the
+// Project dropdown when the page still shows "Create playground".
 async function playground(page, base) {
   const from = await clickNav(page);
   if (!page.url().includes(PLAYGROUND)) await page.goto(`${base}${PLAYGROUND}`);
+  let picked = null;
   await waitUntil(page, { what: "the playground of Zuno Playground", timeoutMs: 60000, done: async () => {
     if (await firstVisible(page, CREATE)) {
-      throw new Error(`the project ${PROJECT} shows "Create playground" instead of its playground: never pressed (the page's rule); the playground must exist`);
+      if (picked === null) { picked = await pickProject(page); return undefined; }
+      throw new Error(`the project ${PROJECT} shows "Create playground" instead of its playground`
+        + `${picked ? ` (also after the Project dropdown: ${picked})` : " (no Project dropdown found)"}: never pressed (the page's rule); the playground must exist`);
     }
     return ((await page.getByText(PROJECT).first().isVisible().catch(() => false)) && (await firstVisible(page, INPUT))) || undefined;
   } });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  return { menu: from, url: new URL(page.url()).pathname };
+  return { menu: from, project: picked || "from the address", url: new URL(page.url()).pathname };
 }
 
 async function clickNav(page) {

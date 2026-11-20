@@ -14,7 +14,7 @@ subscription. Its company tools come from the mcp-gateway, called with the conso
 **The message:** "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what
 the person asking may see."
 
-![The 5-minute version of the OpenShift Lightspeed demo, recorded live as consultant-02: the assistant panel in the OpenShift console, a one-sentence answer from the local model, the names of the pods of a Zuno namespace read with the persona's own rights, and the refusal for a namespace the persona may not read.](../../../assets/img/demo/lightspeed.gif)
+![The 5-minute version of the OpenShift Lightspeed demo, recorded live as consultant-02: the assistant panel in the OpenShift console, a one-sentence answer from the local model, the names of the pods of a Zuno namespace read with the persona's own rights, and the refusal for a namespace the persona may not read. Recorded again on 2026-11-20.](../../../assets/img/demo/lightspeed.gif)
 
 ## Personas
 
@@ -71,8 +71,9 @@ The file checks that `gpt-oss-20b` is Ready in `zuno-ai-run`. Lightspeed has no 
 - [ ] 15-minute version: a terminal logged in as **paas-ops-01** or `kube:admin`, large font.
 - [ ] Budget: 200,000 tokens per hour on one subscription, for every console user and the probe together. Ask at
   most two or three rehearsal questions in the hour before the session.
-- Known warning: "Lightspeed stopped the operation because a tool result failed the safety inspection". About 3
-  documentation questions in 10 end like this on this model (measured on 2026-10-25). Ask again in other words.
+- Lightspeed's screening of tool results is switched off on this cluster since 2026-11-20, so the message "Lightspeed
+  stopped the operation because the tool-result safety inspection could not be completed" should not appear. If it
+  does, the setting came back: see the fallback table.
 
 ### Stop
 
@@ -113,7 +114,7 @@ Run the 5-minute version, then:
 
 | Symptom | Fallback | Say |
 |---|---|---|
-| "Lightspeed stopped the operation because a tool result failed the safety inspection" | Ask again in other words, or move on. Lightspeed's checker of tool results calls our model with a fixed 128-token limit and refuses the category `unknown` ([evidence](../../../roadmap/evidence/lightspeed-tool-result-inspection-2026-10-25.md)). | "Lightspeed checks every tool result for prompt injection, and its checker is too strict with our model. It is a known vendor defect." |
+| "Lightspeed stopped the operation because the tool-result safety inspection could not be completed" (or "failed the safety inspection") | The screening of tool results is on again. Check `oc get olsconfig cluster -o jsonpath='{.spec.ols.guardrails}'`: the chart sets `toolResultInspection.enabled` to `false` (`gitops/charts/lightspeed-config/values.yaml`). On stage, ask a question that needs no tool, or move on. | "Lightspeed can screen every tool result with the model. With our local model that screening fails about one time in two, so it is off here. The tools still run with my own rights." |
 | "Not authorized" in the panel | The persona's OpenShift group does not exist yet. Sign the persona in once, then reload. Only `consultant`, `sales` and cluster administrators may ask. | |
 | No answer, an error or an endless spinner | Check `ApiReady` in the `OLSConfig` (it was False on 2026-11-12 from 21:27 UTC). Do not debug on stage: show the 15-minute configuration steps instead. | "The console assistant is down; the platform behind it is not." |
 | An answer about a quota, or HTTP 429 | The 200,000 tokens of the hour are spent, by the audience, the rehearsal or the probe. Show the subscription step instead. | "That is the budget at work: Lightspeed is a governed MaaS tenant." |
@@ -124,6 +125,7 @@ Run the 5-minute version, then:
 
 ## Limits
 
+- **The screening of tool results is off.** Since Lightspeed 2.0 every tool result is screened by a classifier that asks the active model (gpt-oss-20b) for a strict JSON answer. On this model server about one such call in two comes back empty, and after three attempts Lightspeed stops the answer. Measured on 2026-11-20: three recordings out of three failed on the question that lists pods; with the screening off, three calls out of three pass. The setting is `toolResultInspection.enabled: false` in the `lightspeed-config` chart since 2026-11-20. What stays: the tools run with the signed-in user's own rights, and the approval of tool calls is unchanged. It is switched on again after the demonstration, once an option of the model server has been tested. The earlier measurement of 2026-10-25 is in [the evidence](../../../roadmap/evidence/lightspeed-tool-result-inspection-2026-10-25.md).
 - **Not through the ai-gateway.** No data classification, no ai-gateway guardrails, no per-person budget and no
   `zuno_model_*` metrics. Every console user shares one subscription. No Zuno dashboard shows Lightspeed's model calls.
 - **One model.** The `OLSConfig` names gpt-oss-20b only: when it is not Ready, Lightspeed cannot answer. A rollback to

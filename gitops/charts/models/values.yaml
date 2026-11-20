@@ -255,6 +255,14 @@ resources:
 minReplicas: 1
 maxReplicas: 1
 
+# 2026-11-20 (KServe window): the image of the `main` vLLM container of every LLMInferenceService of this chart, set over
+# the one its baseRef's config carries. Empty = the baseRef's image. RHOAI 3.6.0-ea.2 kept only the v3-6-0-ea-2-* configs
+# when default-kserve was recreated, and their single-node NVIDIA/CUDA config carries a NEWER vLLM
+# (rhaii-fast/vllm-cuda-rhel9@sha256:97c7d6f6…) than the one the models ran on until 2026-11-20 (below, from the v3-5-0
+# config). The vLLM args of the templates were verified against this one: it stays pinned until after the 2026-11-24 demo,
+# then the pin is removed together with an agents check and a golden-path run.
+vllmImage: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
+
 # ADR-0521 (WP-076): qwen3.6-27b-instruct as an LLMInferenceService - same
 # shape as gptOssModel.llmInferenceService below, factored out because this
 # IS the top-level/default model's own config (see inferenceServiceName
@@ -274,7 +282,7 @@ llmInferenceService:
   # merge-to-main this flip re-renders its LLM workloads - treat it as
   # an ADR-0547 clause-4 live change (expect a rolling restart of every
   # LLM predictor there, verify the GA preset exists first).
-  baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
+  baseRef: v3-6-0-ea-2-kserve-config-llm-single-node-template-nvidia-cuda
   # Same gpt-oss-20b routing constraint (see gptOssModel.llmInferenceService
   # below for the full "why not a dedicated gateway" history) - MaaS
   # mandates route adoption on maas-default-gateway itself.
@@ -612,6 +620,12 @@ embeddingModel:
 # gitops/charts/namespaces/values.yaml).
 gptOssModel:
   inferenceServiceName: gpt-oss-20b
+  # 2026-11-20 (owner's go, TESTED AND REJECTED): vLLM --structured-outputs-config.enable_in_reasoning=true applies the
+  # json_schema grammar from the first token (templates/llminferenceservice-gptoss.yaml). Live on vLLM 0.24.0+rhaiv.13
+  # with --reasoning-parser=openai_gptoss it made json_schema WORSE: 0/10 valid (content AND reasoning null - the model
+  # emits the JSON without any Harmony channel, and the parser drops it), against ~5/10 without it; plain chat, tool
+  # calls and streaming were unchanged. Kept off; OLS tool-result inspection stays off (lightspeed-config).
+  structuredOutputsInReasoning: false
   # Server-side default Harmony reasoning effort (low | medium | high; empty = vLLM's own default, medium).
   # vLLM only reads the effort from the request, and --default-chat-template-kwargs does not reach the Harmony
   # path (measured 2026-10-25), so a client that cannot send it - Lightspeed's tool-result classifier, a hard-coded
@@ -706,7 +720,7 @@ gptOssModel:
     # generic serving image, not qwen-specific.
     # ADR-0517: GA preset name - see the first baseRef above for the full
     # ea.2-rename story and the demo222 merge caveat.
-    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
+    baseRef: v3-6-0-ea-2-kserve-config-llm-single-node-template-nvidia-cuda
     # templates/s3-serving-credentials-gptoss.yaml's existing SA/Secret
     # pair (unchanged by this ADR - already the right serving.kserve.io/
     # s3-* annotated shape LLMInferenceService's storage-initializer
@@ -896,7 +910,7 @@ weshModel:
       manage: false
     # ADR-0517: GA preset name - see the first baseRef above for the full
     # ea.2-rename story and the demo222 merge caveat.
-    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
+    baseRef: v3-6-0-ea-2-kserve-config-llm-single-node-template-nvidia-cuda
     serviceAccountName: qwen35-9b-wesh-s3
     # Same EPP-port sidecar exclusion every LLMInferenceService here needs
     # (ADR-0201/WP-27) - see gptOssModel's schedulerAnnotations comment.
@@ -996,7 +1010,7 @@ qwen35Model:
       manage: false
     # ADR-0517: GA preset name - see the first baseRef above for the full
     # ea.2-rename story and the demo222 merge caveat.
-    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
+    baseRef: v3-6-0-ea-2-kserve-config-llm-single-node-template-nvidia-cuda
     serviceAccountName: qwen35-9b-s3
     schedulerAnnotations:
       traffic.sidecar.istio.io/excludeInboundPorts: "9002"
