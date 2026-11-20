@@ -26,6 +26,10 @@ stressReader:
 stressImageProof:
   enabled: false
   namespace: zuno-stress-admission
+  # Owner's decision 2026-11-20: with the namespace, also render a ValidatingAdmissionPolicy that denies every pod CREATE there
+  # unless it is a dry run, and a deny-all NetworkPolicy. Needs stressImageProof.enabled. Off by default.
+  guard:
+    enabled: false
 
 # ADR-0602 / WP-224: the cluster's apps domain, for the EgressFirewall rules
 # that name Keycloak's public host and this cluster's own Routes

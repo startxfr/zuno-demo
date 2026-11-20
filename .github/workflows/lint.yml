@@ -466,6 +466,8 @@ jobs:
         run: python3 platform/gitops/tests/test_machines_gpu_golden.py
       - name: the in-cluster MaaS wasm check renders (switch, script copy, RBAC, alert)
         run: python3 platform/gitops/tests/test_maas_wasm_check_chart.py
+      - name: the image-proof namespace guard renders (dry-run-only policy, deny-all NetworkPolicy)
+        run: python3 platform/gitops/tests/test_stress_image_proof_guard.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

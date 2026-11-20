@@ -128,6 +128,9 @@ PROJECT_OVERLAYS: Dict[str, Dict[str, Any]] = {
     "zuno-postgresql-d1": {"postgresCluster": {"enabled": True}},
     "zuno-mlflow-d1": {"mlflowConfig": {"enabled": True}},
     # ADR-0614: the per-component infra-node switches, committed off and flipped one at a time during the rollout.
+    # ansible/roles/namespaces/tasks/install_d1.yml: the image-proof namespace and its guard (ADR-0624), committed off.
+    "zuno-namespaces-d1": {"policy": {"enabled": True}, "stressReader": {"enabled": True},
+                           "stressImageProof": {"enabled": True, "guard": {"enabled": True}}},
     "zuno-machines-d0": {"infraPlacement": {"registry": True, "userWorkloadMonitoring": True, "gitops": True}},
 }
 

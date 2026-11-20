@@ -49,4 +49,61 @@ subjects:
   - kind: ServiceAccount
     name: {{ .Values.stressReader.serviceAccount }}
     namespace: {{ .Values.stressReader.namespace }}
+{{- if .Values.stressImageProof.guard.enabled }}
+---
+# The guard (owner's decision 2026-11-20): nothing may ever be STORED in {{ .Values.stressImageProof.namespace }}. The Role above lets the
+# stress ServiceAccount create pods; this policy refuses every pod CREATE that is not a dry run (request.dryRun is the
+# AdmissionRequest's field), so even a driver bug, or an unsigned image the webhook failed to refuse, creates nothing. A dry run
+# still goes through the whole admission chain, the image-signing webhook included: the proof is unchanged.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: stress-image-proof-dry-run-only
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "request.dryRun == true"
+      message: "{{ .Values.stressImageProof.namespace }} accepts dry-run pod creates only (ADR-0624): nothing may be stored here"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: stress-image-proof-dry-run-only
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-59"
+spec:
+  policyName: stress-image-proof-dry-run-only
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Values.stressImageProof.namespace }}
+---
+# Whatever runs, nothing reaches it and it reaches nothing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: {{ .Values.stressImageProof.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+{{- end }}
 {{- end }}
