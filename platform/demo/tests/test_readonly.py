@@ -204,6 +204,10 @@ class RepositoryFileReads(unittest.TestCase):
         "cat .git/config": "never read",
         "cat ansible/confidential.yml": "never read",
         "cat ansible/confidential/vault.yml": "never read",
+        "cat ansible/inventories/demo333/confidential.yml": "never read",
+        "cat ansible/inventories/demo222/confidential.yml.back": "never read",
+        "head ansible/inventories/demo333/vault-recovery-demo333.json": "never read",
+        "cat ansible/vault-recovery-demo333.json": "never read",
         "cat docs/.env": "never read",
         "cat docs/x.env": "never read",
         "wc --files0-from=list.txt": "other files",
@@ -243,6 +247,13 @@ class RepositoryFileReads(unittest.TestCase):
                     r.plan(f"cat docs/{name}", root=root)
             with self.assertRaises(r.Denied):
                 r.plan("cat ansible/confidential/a.yml", root=root)
+            (root / "ansible" / "inventories" / "demo333").mkdir(parents=True)
+            for name in ("confidential.yml", "confidential.yml.back", "vault-recovery-demo333.json", "hosts.yml"):
+                (root / "ansible" / "inventories" / "demo333" / name).write_text("x")
+            for name in ("confidential.yml", "confidential.yml.back", "vault-recovery-demo333.json"):
+                with self.assertRaises(r.Denied, msg=name):
+                    r.plan(f"cat ansible/inventories/demo333/{name}", root=root)
+            r.plan("cat ansible/inventories/demo333/hosts.yml", root=root)
             r.plan("cat docs/notes.txt", root=root)
 
     def test_a_symlink_cannot_leave_the_repository_or_reach_a_secret(self):

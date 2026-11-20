@@ -5,7 +5,7 @@ Allowed, as written on the page:
 - pipes into `grep awk sort uniq head tail wc cut jq`;
 - `git log|show`;
 - `grep|tail|head|cat|wc` as the FIRST segment, on regular files of the repository only (a relative path with no `..`,
-  no symlink out of the repository, never under `ansible/confidential*`, `.git`, or a name holding `secret`, `.env`,
+  no symlink out of the repository, never a `confidential*` or `vault-recovery*` name under `ansible/`, `.git`, or a name holding `secret`, `.env`,
   a key or a certificate);
 - GET-only `curl`, with `$(oc whoami -t)` resolved in this process and masked in everything printed;
 - `make help`, `make demo`, `make demo list`, `[ONLY=x] make demo golden-path`, `make dN check [component]` (run as
@@ -362,8 +362,12 @@ def _repo_file(arg: str, root: pathlib.Path) -> None:
         raise Denied(f"`{arg}` resolves outside the repository")
     for rel in (pathlib.PurePosixPath(arg), pathlib.PurePosixPath(resolved.relative_to(base).as_posix())):
         low = [part.lower() for part in rel.parts]
-        if len(low) >= 2 and low[0] == "ansible" and low[1].startswith("confidential"):
-            raise Denied(f"`{arg}` is under ansible/confidential*: never read")
+        # Any confidential* or vault-recovery* name anywhere under ansible/: the legacy ansible/confidential.yml,
+        # each per-cluster ansible/inventories/<cluster>/confidential.yml, their .back copies, and the Vault
+        # recovery keys the vault role writes next to them.
+        if len(low) >= 2 and low[0] == "ansible" and any(
+                part.startswith(("confidential", "vault-recovery")) for part in low[1:]):
+            raise Denied(f"`{arg}` is an ansible/**/confidential* or vault-recovery* file: never read")
         for part in low:
             if (part == ".git" or "secret" in part or part == ".env" or part.startswith(".env.")
                     or part.endswith(".env") or part.endswith(SENSITIVE_SUFFIXES)):

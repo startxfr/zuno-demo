@@ -11,6 +11,13 @@ kubeconfig
 vault-password*
 ansible/confidential.yml
 ansible/confidential*.back
+# Per-cluster inventories (ansible/inventories/<cluster>/): each cluster's own
+# vault-encrypted confidential.yml and its .back copies never reach git. The
+# single public template stays ansible/confidential.example.yml (not matched).
+ansible/inventories/*/confidential*.yml
+!ansible/inventories/*/confidential.example*.yml
+ansible/inventories/*/confidential*.back
+ansible/inventories/*/vault-recovery*
 # ADR-0602 clause 1 / WP-223: Vault recovery keys + init root token, written
 # once to the Ansible controller by ansible/roles/vault (and its .bak copies).
 ansible/vault-recovery*
