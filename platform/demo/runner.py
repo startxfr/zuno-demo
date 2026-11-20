@@ -1,6 +1,6 @@
 """Run a demo's action and step files through the one runner playbook, locally (ADR-0616 clauses 3 and 12, WP-270).
 
-    ansible-playbook -i ansible/inventories/demo333/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
+    ansible-playbook -i ansible/inventories/${ZUNO_CLUSTER:-demo333}/hosts.yml ansible/playbooks/demo_run.yml -e @<vars file>
 
 Never through AAP: a checkout without ansible/confidential.yml would route `make dN` there, and AAP runs `devel` from
 git, not this tree. The vars file (mode 0600, under $XDG_RUNTIME_DIR) names the units to run; the playbook writes one
@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import re
 import pathlib
 import shutil
 import subprocess
@@ -26,7 +27,16 @@ from typing import List, Optional
 import session
 
 ENGINE_ROOT = pathlib.Path(os.environ.get("ZUNO_REPO_ROOT") or pathlib.Path(__file__).resolve().parents[2])
-INVENTORY = "ansible/inventories/demo333/hosts.yml"
+# Per-cluster inventories: ansible/inventories/<ZUNO_CLUSTER>/hosts.yml, demo333 by default (the Makefile's CLUSTER).
+DEFAULT_CLUSTER = "demo333"
+
+
+def cluster_inventory() -> str:
+    """The inventory of the cluster named by ZUNO_CLUSTER (a bare name such as demo333, never a path)."""
+    cluster = os.environ.get("ZUNO_CLUSTER") or DEFAULT_CLUSTER
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", cluster):
+        raise ValueError(f"ZUNO_CLUSTER={cluster!r} is not a cluster name (ansible/inventories/<name>/)")
+    return f"ansible/inventories/{cluster}/hosts.yml"
 PLAYBOOK = "ansible/playbooks/demo_run.yml"
 
 
@@ -192,7 +202,7 @@ def run_units(demo_id: str, demo_dir: pathlib.Path, units: List[Unit], *, confir
     fd = os.open(str(vars_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(data, handle)
-    cmd = ["ansible-playbook", "-i", str(engine_root / INVENTORY), str(engine_root / PLAYBOOK), "-e", f"@{vars_path}"]
+    cmd = ["ansible-playbook", "-i", str(engine_root / cluster_inventory()), str(engine_root / PLAYBOOK), "-e", f"@{vars_path}"]
     env = dict(os.environ)
     env.setdefault("ANSIBLE_NOCOLOR", "1") if not stream else None
     try:

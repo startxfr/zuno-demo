@@ -1,6 +1,7 @@
-"""ansible/confidential.yml may be ansible-vault encrypted (ADR-0603 M22).
+"""A cluster's confidential.yml may be ansible-vault encrypted (ADR-0603 M22).
 
-The Makefile reads zuno_make_aap_mode from it before any playbook runs. These tests extract the real shell
+The Makefile reads zuno_make_aap_mode from it before any playbook runs: ansible/inventories/$(CLUSTER)/confidential.yml,
+else the deprecated ansible/confidential.yml. These tests extract the real shell
 functions from the Makefile and run them on a plain file, an encrypted file, an encrypted file without its
 passphrase and an invalid value: a failed read must stop the routing, never guess local or remote.
 """
@@ -17,6 +18,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 PASSPHRASE = "unit-test-passphrase"
+CLUSTER = "demo333"
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ansible-vault") is None or shutil.which("bash") is None,
@@ -29,6 +31,7 @@ def _functions() -> str:
     body = text.split("define AAP_ROUTING_SHELL_FUNCS\n", 1)[1].split("\nendef", 1)[0]
     body = body.replace("$$", "$")
     body = body.replace("$(ANSIBLE_PLAYBOOK)", "true").replace("$(INVENTORY)", "x").replace("$(EXTRA_VARS)", "")
+    body = body.replace("$(CLUSTER)", CLUSTER)
     return re.sub(r" \\\n", "\n", body)
 
 
@@ -42,8 +45,10 @@ def workdir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _write(workdir: Path, content: str, encrypt: bool) -> None:
-    target = workdir / "ansible" / "confidential.yml"
+def _write(workdir: Path, content: str, encrypt: bool, legacy: bool = False) -> None:
+    target = (workdir / "ansible" / "confidential.yml" if legacy
+              else workdir / "ansible" / "inventories" / CLUSTER / "confidential.yml")
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
     if encrypt:
         subprocess.run(
@@ -69,7 +74,7 @@ def test_plain_file_local_mode_is_not_routed(workdir: Path) -> None:
 
 def test_encrypted_file_is_read_through_ansible_vault(workdir: Path) -> None:
     _write(workdir, "zuno_make_aap_mode: local\nsecret: x\n", encrypt=True)
-    assert (workdir / "ansible" / "confidential.yml").read_text().startswith("$ANSIBLE_VAULT;")
+    assert (workdir / "ansible" / "inventories" / CLUSTER / "confidential.yml").read_text().startswith("$ANSIBLE_VAULT;")
     assert _route(workdir, workdir / "pass")[1] == 99
 
 
@@ -88,6 +93,17 @@ def test_encrypted_file_without_passphrase_stops(workdir: Path) -> None:
 def test_invalid_mode_stops_instead_of_defaulting_to_remote(workdir: Path) -> None:
     _write(workdir, "zuno_make_aap_mode: bogus\n", encrypt=False)
     assert _route(workdir, workdir / "pass")[1] == 2
+
+
+def test_the_deprecated_ansible_confidential_yml_is_still_read(workdir: Path) -> None:
+    _write(workdir, "zuno_make_aap_mode: local\n", encrypt=True, legacy=True)
+    assert _route(workdir, workdir / "pass")[1] == 99
+
+
+def test_the_cluster_file_wins_over_the_deprecated_one(workdir: Path) -> None:
+    _write(workdir, "zuno_make_aap_mode: bogus\n", encrypt=False, legacy=True)
+    _write(workdir, "zuno_make_aap_mode: local\n", encrypt=False)
+    assert _route(workdir, workdir / "pass")[1] == 99
 
 
 def test_vault_pass_script_never_fails_without_a_passphrase_file(tmp_path: Path) -> None:

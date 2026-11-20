@@ -8,7 +8,7 @@
     argv:
       - ansible-playbook
       - -i
-      - "{{ zuno_repo_root }}/ansible/inventories/demo333/hosts.yml"
+      - "{{ zuno_repo_root }}/ansible/inventories/{{ zuno_cluster_name | default('demo333') }}/hosts.yml"
       - "{{ zuno_repo_root }}/ansible/playbooks/aap_launch.yml"
       - -e
       - '{"aap_launch_type": "job", "aap_launch_template": "zuno-day0-check", "aap_launch_extra_vars": {}}'

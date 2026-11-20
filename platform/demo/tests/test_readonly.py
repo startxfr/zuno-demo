@@ -294,6 +294,15 @@ class MakeVerbsRunLocally(unittest.TestCase):
         self.assertTrue(argv[3].endswith("ansible/playbooks/day2_check.yml"))
         self.assertIn("target_component=ai-gateway", argv)
         self.assertNotIn("make", argv)
+        self.assertTrue(argv[2].endswith("ansible/inventories/demo333/hosts.yml"), argv[2])
+
+    def test_day_check_uses_the_inventory_of_zuno_cluster(self):
+        with mock.patch.dict("os.environ", {"ZUNO_CLUSTER": "demo222"}):
+            argv = r.plan("make d2 check ai-gateway", ROOT).pipeline[0]
+        self.assertTrue(argv[2].endswith("ansible/inventories/demo222/hosts.yml"), argv[2])
+        for bad in ("../x", "demo333/../../etc", "Demo 333"):
+            with mock.patch.dict("os.environ", {"ZUNO_CLUSTER": bad}), self.assertRaises(r.Denied):
+                r.plan("make d2 check ai-gateway", ROOT)
 
     def test_day_check_defaults_to_all_and_day3_report_format(self):
         self.assertIn("target_component=all", r.plan("make d0 check", ROOT).pipeline[0])

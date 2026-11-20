@@ -42,6 +42,18 @@ OUTPUT_LINES = 40
 READ_TIMEOUT = 120
 MAKE_TIMEOUT = 600
 
+# Per-cluster inventories: ansible/inventories/<ZUNO_CLUSTER>/hosts.yml, demo333 by default (the Makefile's CLUSTER).
+DEFAULT_CLUSTER = "demo333"
+
+
+def cluster_inventory() -> str:
+    """The inventory of the cluster named by ZUNO_CLUSTER (a bare name such as demo333, never a path)."""
+    cluster = os.environ.get("ZUNO_CLUSTER") or DEFAULT_CLUSTER
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", cluster):
+        raise Denied(f"ZUNO_CLUSTER={cluster!r} is not a cluster name (ansible/inventories/<name>/)")
+    return f"ansible/inventories/{cluster}/hosts.yml"
+
+
 OC_VERBS = {"get", "describe", "logs", "explain", "whoami", "api-resources", "version"}
 OC_GLOBAL_WITH_VALUE = {"-n", "--namespace", "--context", "--cluster", "--user", "--kubeconfig", "--request-timeout"}
 PIPE_FILTERS = {"grep", "awk", "sort", "uniq", "head", "tail", "wc", "cut", "jq"}
@@ -474,7 +486,7 @@ def plan_make(env_prefix: Dict[str, str], argv: List[str], display: str, root: p
     if len(words) >= 2 and DAY_CHECK_RE.match(words[0]) and words[1] == "check" and len(words) <= 3 and not make_vars:
         day = DAY_CHECK_RE.match(words[0]).group(1)
         component = words[2] if len(words) == 3 else "all"
-        playbook = ["ansible-playbook", "-i", str(root / "ansible/inventories/demo333/hosts.yml"),
+        playbook = ["ansible-playbook", "-i", str(root / cluster_inventory()),
                     str(root / f"ansible/playbooks/day{day}_check.yml"), "-e", f"target_component={component}"]
         if day == "3":
             playbook += ["-e", "report_format=text"]

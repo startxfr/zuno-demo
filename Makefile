@@ -5,7 +5,14 @@ SHELL := /usr/bin/env bash
 .DELETE_ON_ERROR:
 
 ANSIBLE_PLAYBOOK ?= ansible-playbook
-INVENTORY ?= ansible/inventories/demo333/hosts.yml
+# One inventory per demo cluster: ansible/inventories/<CLUSTER>/ holds its hosts.yml, group_vars (zuno_cluster_name),
+# the committed cluster.yml and the gitignored confidential.yml. `make CLUSTER=demo222 d1 check` selects another one;
+# resolve_cluster_name.yml refuses to run when the inventory's zuno_cluster_name is not the cluster `oc` points at.
+# ZUNO_CLUSTER (the environment name platform/demo/runner.py and readonly.py read) is accepted too, and exported so
+# `make demo ...` plays against the same inventory.
+CLUSTER ?= $(or $(ZUNO_CLUSTER),demo333)
+export ZUNO_CLUSTER := $(CLUSTER)
+INVENTORY ?= ansible/inventories/$(CLUSTER)/hosts.yml
 EXTRA_VARS ?=
 
 # ADR-0056/ADR-0060/ADR-0421: Day 0 (bare cluster prerequisites plus the
@@ -159,7 +166,9 @@ DEMO_VERBS := list use status check install start stop uninstall step freeze reh
 # from this shell. Defined once here (not duplicated per recipe) since
 # each DAYn_RECIPE's `define...endef` body runs as its own separate shell
 # invocation - shell functions can't be shared any other way in this file.
-# resolve_aap_mode() reads ansible/confidential.yml directly: the Makefile
+# resolve_aap_mode() reads this cluster's confidential.yml directly
+# (ansible/inventories/$(CLUSTER)/confidential.yml, else the deprecated
+# ansible/confidential.yml - the same order load_confidential_vars.yml uses): the Makefile
 # has no other way to reach an Ansible-sourced variable before deciding
 # whether to invoke ansible-playbook at all, and this decision must happen
 # here, in the shell, before any playbook runs. When the file is
@@ -192,20 +201,23 @@ DEMO_VERBS := list use status check install start stop uninstall step freeze reh
 # dict rather than a string needing `from_json`.
 define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
-  local mode="auto"; \
-  if [[ -f ansible/confidential.yml ]]; then \
+  local mode="auto" conf=""; \
+  for f in ansible/inventories/$(CLUSTER)/confidential.yml ansible/confidential.yml; do \
+    if [[ -f "$$f" ]]; then conf="$$f"; break; fi; \
+  done; \
+  if [[ -n "$$conf" ]]; then \
     local val txt; \
-    if head -n 1 ansible/confidential.yml | grep -q '^[$$]ANSIBLE_VAULT;'; then \
-      txt="$$(ansible-vault view ansible/confidential.yml 2>/dev/null)" || { echo "Cannot decrypt ansible/confidential.yml (ansible.cfg vault_password_file, see ansible/README.md)" >&2; echo "undecryptable"; return 0; }; \
+    if head -n 1 "$$conf" | grep -q '^[$$]ANSIBLE_VAULT;'; then \
+      txt="$$(ansible-vault view "$$conf" 2>/dev/null)" || { echo "Cannot decrypt $$conf (ansible.cfg vault_password_file, see ansible/README.md)" >&2; echo "undecryptable"; return 0; }; \
     else \
-      txt="$$(cat ansible/confidential.yml)"; \
+      txt="$$(cat "$$conf")"; \
     fi; \
     val="$$(printf '%s' "$$txt" | python3 -c "import sys, yaml; d=yaml.safe_load(sys.stdin) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
     [[ -n "$$val" ]] && mode="$$val"; \
   fi; \
   case "$$mode" in \
     local|remote|auto) ;; \
-    *) echo "Invalid zuno_make_aap_mode in ansible/confidential.yml: '$$mode' (expected local|remote|auto)" >&2; exit 2 ;; \
+    *) echo "Invalid zuno_make_aap_mode in $$conf: '$$mode' (expected local|remote|auto)" >&2; exit 2 ;; \
   esac; \
   echo "$$mode"; \
 }; \
@@ -241,6 +253,8 @@ help:
 	  '  call - no separate credentials to export.' \
 	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
+	  '  CLUSTER=<name> (default demo333) selects ansible/inventories/<name>/; a play' \
+	  '  refuses when that inventory names another cluster than the one logged in.' \
 	  '' \
 	  '  make day0|d0 check [component]      Check one/all Day 0 components'"'"' install state' \
 	  '  make day0|d0 install [component]    Install one/all Day 0 prerequisites' \
