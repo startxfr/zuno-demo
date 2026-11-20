@@ -271,6 +271,15 @@ jobs:
           for chart in gitops/charts/*/; do
             helm lint "$chart"
           done
+      # The Kuadrant wasm EnvoyFilter of the MaaS gateway grows with matches x limits x listeners; past a size the API server
+      # refuses its update and the limits are silently NOT USED. Estimated from the models chart rendered the way demo333 runs it:
+      # the d1 Application turns on the second listener, the Praxis and the stress subscriptions (not the chart defaults).
+      - name: MaaS wasm EnvoyFilter size estimate (demo333's shape)
+        run: |
+          helm template m gitops/charts/models -f gitops/charts/models/values.agents.generated.yaml \
+            --set altGatewayPeers.praxis.enabled=true --set altGatewayPeers.stress.enabled=true \
+            --set maas.saasSubscriptions.gatewayOnly=true \
+            | python3 platform/models/maas_wasm_size.py - --listeners 2 --max-bytes 1400000
 
   python:
     runs-on: ubuntu-latest
