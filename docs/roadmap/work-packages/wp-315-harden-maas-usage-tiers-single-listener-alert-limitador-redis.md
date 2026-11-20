@@ -1,6 +1,6 @@
 # WP-315: MaaS hardening: usage tiers, single-listener test, wasm-config alert, Limitador on disk
 
-- **State:** Operator pending (2026-11-20: the usage tiers are live and measured since 15:33 UTC; the single-listener test is done; the alert, the Limitador disk and the guard are on `devel` and being applied by the roles; the results are recorded below as they come)
+- **State:** Operator pending (2026-11-20: the usage tiers are live and measured since 15:33 UTC; the single-listener test is done; the alert, the Limitador disk and the guard are on `devel` and waiting to be applied: the d1 installs through AAP stop at the prechecks until the installer's missing read grants are added; the results are recorded below as they come)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-314](wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)
 - **Related:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0201](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md), [WP-310](wp-310-evaluate-the-demos-state-checks-from-the-stress-job.md)
@@ -50,9 +50,10 @@ Result: **live and measured on 2026-11-20 at 15:33 UTC** (chart on `devel` since
 A throwaway route attached to the `https` listener only, called through the maas Route, to learn whether the model routes can stay on one listener (`sectionName`), which would halve the wasm config again.
 The second listener `https-external` stays for now: `maas-api` takes the external URL from it and the portal's API keys page needs it.
 
-Result: **the test is done; the change itself is deferred until after the demonstration** (recommendation of zuno-demo-assist, the owner's confirmation is awaited).
-A call on the external host to a route attached to the `https` listener only reached the backend, so one listener is enough for routing. The change is not applied for two reasons: at 549 KB there is no size need,
-and the way the gateway's default authentication policy reaches a new route has to be examined first (the model routes do answer 401 without a token). The throwaway route was deleted at 15:36 UTC.
+Result: **the test is done; the change itself is deferred until after the demonstration** (owner's decision, 2026-11-20 about 15:58 UTC).
+A call on the external host to a route attached to the `https` listener only reached the backend, so one listener is enough for routing. Two throwaway tests (15:35 and 15:44 UTC, both routes deleted) showed why the change is not a simple move:
+the wasm configuration holds one copy of each route's rules per listener hostname, and a call is matched on the most specific hostname with no fallback. The policies of a route attached only to the listener without a hostname are therefore not selected for calls on the MaaS hostname.
+The model routes are attached to both listeners and answer 401 without a token. Moving to one listener needs either the MaaS-owned API route off the hostname listener or a fallback in the wasm shim: a topic for after the demonstration, with Red Hat or upstream. At 549 KB there is no size need.
 
 ## 3. Alert on the wasm config
 
