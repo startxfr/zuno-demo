@@ -21,7 +21,7 @@
 # through it would fail an otherwise perfect Day 0 install. Same shape as
 # check_gitops_app_state.yml, which sets a fact and lets its callers decide.
 #
-# SECRETS: no probe registers or prints a value from ansible/confidential.yml.
+# SECRETS: no probe registers or prints a value from a confidential.yml.
 # P5 reports variable NAMES and set/unset booleans only, computed inside a
 # task-scoped `vars:` so nothing survives the task. There is deliberately no
 # no_log anywhere here - the protection is structural (the facts hold no values)
@@ -69,7 +69,7 @@
       resource: "StorageClass (cluster-scoped)"
       state: "{{ _readiness_default_scs | default([]) | length }} class(es) annotated is-default-class"
       cause: "resolve_cluster_default_storage_class.yml requires exactly one default StorageClass and refuses to guess, because PVC storageClassName is immutable once bound - picking wrong strands every volume this platform creates. Five applies read it (postgresql, mariadb, grafana, models, and postgresql's restore)."
-      solution: "Annotate exactly one StorageClass with storageclass.kubernetes.io/is-default-class=true, or set zuno_cluster_storage_class in ansible/confidential.yml to name the class this platform should use."
+      solution: "Annotate exactly one StorageClass with storageclass.kubernetes.io/is-default-class=true, or set zuno_cluster_storage_class in ansible/inventories/<cluster>/confidential.yml to name the class this platform should use."
       auto_fix: "manual only - choosing a storage class is a cluster decision"
       blocking: true
   when:
@@ -292,7 +292,7 @@
       resource: "Certificate {{ _absent }}"
       state: "ACME consumer flips enabled, but these Certificates do not exist yet"
       cause: "ADR-0517 B11 - acme-cluster-patches.yaml points IngressController/default at router-wildcard-tls and adds an APIServer named certificate for api-server-tls. Pointing either at a Secret that does not exist breaks Console and route serving, which is why the chart flips them only after `oc get certificate -A` shows Ready."
-      solution: "Set zuno_certmanager_router_default_cert and zuno_certmanager_api_server_named_cert to false in ansible/confidential.yml, complete ADR-0211's staged rollout (enable ACME, rehearse on the staging issuer, cut over to letsencrypt-route53), then flip the consumers once all three Certificates are Ready."
+      solution: "Set zuno_certmanager_router_default_cert and zuno_certmanager_api_server_named_cert to false in ansible/inventories/<cluster>/confidential.yml, complete ADR-0211's staged rollout (enable ACME, rehearse on the staging issuer, cut over to letsencrypt-route53), then flip the consumers once all three Certificates are Ready."
       auto_fix: "manual only - ADR-0211's rollout is staged deliberately"
       blocking: true
   when:
@@ -391,10 +391,10 @@
   vars:
     _finding:
       component: mariadb
-      resource: "ansible/confidential.yml keys {{ _readiness_unset_mariadb }}"
+      resource: "{{ _readiness_conf_path | replace(zuno_repo_root ~ '/', '') }} keys {{ _readiness_unset_mariadb }}"
       state: "unset"
       cause: "ADR-0517 B8 - with any of the five unset, backups.s3.enabled stays false, the ExternalSecret is never rendered, and NO MariaDB backup schedule exists at all. This cluster ran that way silently until 2026-09-02 because the variables were undocumented."
-      solution: "Fill in all five zuno_mariadb_backup_s3_* keys in ansible/confidential.yml - the block in confidential.example.yml names both traps: the _access_key_id/_secret_access_key suffixes, and the camelCase Vault properties."
+      solution: "Fill in all five zuno_mariadb_backup_s3_* keys in this cluster's confidential.yml - the block in confidential.example.yml names both traps: the _access_key_id/_secret_access_key suffixes, and the camelCase Vault properties."
       auto_fix: "manual only - fill in the five keys, then re-run the vault and mariadb installs"
       blocking: false
   when:
@@ -407,10 +407,10 @@
   vars:
     _finding:
       component: cert-manager
-      resource: "ansible/confidential.yml keys {{ _readiness_unset_route53 }}"
+      resource: "{{ _readiness_conf_path | replace(zuno_repo_root ~ '/', '') }} keys {{ _readiness_unset_route53 }}"
       state: "unset while zuno_certmanager_acme_enabled resolves to true"
       cause: "These are the IAM credentials that WRITE the DNS-01 TXT records. Without them cert-manager cannot solve the challenge, so no Let's Encrypt certificate ever issues - while every other check still passes."
-      solution: "Set zuno_aws_route53_access_key_id and zuno_aws_route53_secret_access_key in ansible/confidential.yml, scoped to the hosted zone named by zuno_certmanager_route53_hosted_zone_id. A mismatch between the two gives AccessDenied at solve time and nowhere else."
+      solution: "Set zuno_aws_route53_access_key_id and zuno_aws_route53_secret_access_key in this cluster's confidential.yml, scoped to the hosted zone named by zuno_certmanager_route53_hosted_zone_id. A mismatch between the two gives AccessDenied at solve time and nowhere else."
       auto_fix: "manual only - these are operator credentials"
       blocking: true
   when:
@@ -448,7 +448,7 @@
       resource: "S3 buckets declared for cluster '{{ zuno_s3_bucket_owner_cluster }}'"
       state: "this cluster resolves as '{{ cluster_name | default('unknown') }}'"
       cause: "ADR-0517 B12 - the bucket names in ansible/confidential.yml and the charts are not namespaced by cluster, so installing here would write this cluster's RAG corpus, database backups, RHOAI traces and MLflow artifacts into '{{ zuno_s3_bucket_owner_cluster }}'s buckets. That breaks the existing cluster, not this one, and violates ADR-0517's own criterion that demo222 is left untouched."
-      solution: "Give this cluster its own buckets and credentials before installing - ADR-0546 decides the convention and WP-131 executes it. Until WP-131 lands, provision them by hand and point every bucket variable in ansible/confidential.yml at the new set, then update zuno_s3_bucket_owner_cluster to this cluster's name."
+      solution: "Give this cluster its own buckets and credentials before installing - ADR-0546 decides the convention and WP-131 executes it. Until WP-131 lands, provision them by hand and point every bucket variable in ansible/inventories/<cluster>/confidential.yml at the new set, then update zuno_s3_bucket_owner_cluster to this cluster's name."
       auto_fix: "manual only - provisioning S3 buckets is outside this repository"
       blocking: true
   when:
@@ -495,7 +495,7 @@
       resource: "Application {{ _readiness_placeholder_apps }}"
       state: "helm values still contain a 'mycluster' placeholder"
       cause: "ADR-0547 clause 3 - chart defaults are deliberately invalid placeholders so a lost value fails loudly rather than binding to the wrong thing. A placeholder reaching a live Application means the Ansible parameter that should have replaced it never resolved. ADR-0517 B13 is the worked example: a role that read three variables without loading ansible/confidential.yml, so the default() chain silently supplied the chart."
-      solution: "Find the role that applies this Application and check that it loads ansible/confidential.yml and that the variable is actually set - `python3 platform/docs/check_docs.py` catches the missing-loader case directly. Re-run that component's install once the value resolves."
+      solution: "Find the role that applies this Application and check that it loads this cluster's confidential.yml (ansible/tasks/load_confidential_vars.yml) and that the variable is actually set - `python3 platform/docs/check_docs.py` catches the missing-loader case directly. Re-run that component's install once the value resolves."
       auto_fix: "manual only - the missing value has to be identified first"
       blocking: true
   when: (_readiness_placeholder_apps | default([]) | length) > 0
