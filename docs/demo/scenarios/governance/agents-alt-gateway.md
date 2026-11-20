@@ -131,6 +131,7 @@ Run the 5-minute version, then:
   edited date. Put the model back at the end.
 - **The agent keeps its tools.** The tools stay behind the mcp-gateway, which is the same on both roads. Only the model
   call changes road.
+- **A Praxis 429 from MaaS.** It falls back to the direct KServe step by design ([ADR-0619](../../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)), so a client on that road never sees a MaaS 429.
 - **Praxis is alpha.** Its configuration can change between releases.
 
 ## Appendix A - HLD

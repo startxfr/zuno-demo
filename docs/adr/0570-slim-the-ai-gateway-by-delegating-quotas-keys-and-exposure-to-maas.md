@@ -345,7 +345,7 @@ amends the decision to accept the ai-gateway quota ledger as the permanent desig
 
 ## Amended (2026-11-20, owner decision): Praxis shares the ai-gateway subscription, `/sales` only on gpt-oss-20b
 
-A dated note, not a rewrite. To keep the gateway's wasm config under the API request limit ([WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)): Praxis's ServiceAccount becomes a second user of each
+A dated note, not a rewrite, applied in the 2026-11-21 window. To keep the gateway's wasm config under the API request limit ([WP-314](../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md)): Praxis's ServiceAccount becomes a second user of each
 local `<model>-ai-gateway` subscription (`altGatewayPeers.praxis.ownSubscription: false`) instead of a `<model>-praxis` copy; the limits count by
 `auth.identity.userid`, so the two identities keep separate counters of the same size. The hand-written `/sales` subscriptions are rendered on
 gpt-oss-20b only (`maas.salesSubscriptions.models`), and the generated `<model>-agents` subscriptions are not rendered (ADR-0581 note of the same date).

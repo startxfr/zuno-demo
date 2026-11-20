@@ -130,6 +130,7 @@ Run the 5-minute version, then:
   - the classification floors and the signed tool-result markers;
   - the per-agent routing policy;
   - the Zuno cost metrics. It has its own request metrics and its own optional token limit.
+- **A Praxis 429 from MaaS.** It falls back to the direct KServe step by design ([ADR-0619](../../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)), so a client on that road never sees a MaaS 429.
 - **It does not replace the Zuno gateways.** The signed delegation chain, the signed agent bundles and the per-call
   assertions stay in the Zuno gateways. Tools stay behind the mcp-gateway.
 - **Identity.** A client that sends the user's token is seen by name on both roads. A client behind a proxy is seen as

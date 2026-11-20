@@ -1,6 +1,6 @@
 # WP-314: Fit the MaaS gateway wasm config under 1.4 MB
 
-- **State:** Not started (2026-11-20: the repository change is committed and reviewed locally; it is applied in the 2026-11-21 KServe window, with the owner's go and a notice to zuno-demo-cluster)
+- **State:** Not started (2026-11-20: the repository change is committed and reviewed locally and is not in `devel` yet; it is pushed and applied in the 2026-11-21 KServe window, with the owner's go and a notice to zuno-demo-cluster)
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** none
 - **Related:** [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md), [ADR-0619](../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md), [WP-306](wp-306-give-the-stress-runs-their-own-identity-and-budget.md), [WP-313](wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md)
@@ -21,7 +21,7 @@ enough under the API request limit that the next model or subscription does not 
 - 11 of the 29 limits were never counted: `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops`, the `*-praxis` limits and the `*-load` limits. The descriptor
   key comes from the subscription's name, so a subscription re-created under a name that existed on 2026-11-05 (`sales`, `agents`) was still counted.
 
-## The change (commit c7c69b65, owner decision 2026-11-20)
+## The change (owner decision 2026-11-20; commit c7c69b65 on the local branch `maas-wasm-fit`, pushed during the window)
 
 1. **Route matches** (`gitops/charts/models/templates/_llmisvc-route.tpl`): 15 matches per model go down to 3. The four per-endpoint rule pairs the KServe
    controller generates are dropped; the catch-all path rule, the catch-all `X-Gateway-Model-Name` rule and the pool anchor remain. Every backend is the same
