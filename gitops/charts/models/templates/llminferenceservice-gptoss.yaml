@@ -110,6 +110,9 @@ spec:
     serviceAccountName: {{ .Values.gptOssModel.llmInferenceService.serviceAccountName }}
     containers:
       - name: main
+        {{- with $.Values.vllmImage }}
+        image: {{ . }}
+        {{- end }}
         args:
           - --max-model-len={{ .Values.gptOssModel.maxModelLen }}
           # ADR-0415: same generate_image tool-calling requirement as

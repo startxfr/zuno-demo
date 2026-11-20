@@ -158,6 +158,9 @@ spec:
     {{- end }}
     containers:
       - name: main
+        {{- with $.Values.vllmImage }}
+        image: {{ . }}
+        {{- end }}
         args:
           # Reduced well below the 32768 the 48GB models use - see this
           # file's header comment for the memory arithmetic.

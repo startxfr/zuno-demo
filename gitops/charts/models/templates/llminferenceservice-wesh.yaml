@@ -87,6 +87,9 @@ spec:
     serviceAccountName: {{ .Values.weshModel.llmInferenceService.serviceAccountName }}
     containers:
       - name: main
+        {{- with $.Values.vllmImage }}
+        image: {{ . }}
+        {{- end }}
         args:
           - --max-model-len={{ .Values.weshModel.maxModelLen }}
           # Same three as llminferenceservice-qwen.yaml, and for the same
