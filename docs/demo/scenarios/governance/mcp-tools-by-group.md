@@ -1,5 +1,7 @@
 # Scenario: mcp-gateway - the same tools for every experience, filtered by who you are
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 The mcp-gateway is the one door to company tools: Confluence, the technical documentation, Drive, Gmail, Git, AAP,

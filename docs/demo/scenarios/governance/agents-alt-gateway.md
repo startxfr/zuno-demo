@@ -1,5 +1,7 @@
 # Scenario: Agents on an alternative gateway - one setting, no code change
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 An agent is a set of instructions and tools on top of a model. Where the model comes from is a setting. This scenario
@@ -206,9 +208,10 @@ flowchart TB
 
 ## Appendix B - LLD
 
-The road of the two agents. Drawn from the design records and the work-package briefs: the proxy's alternate routes and
-the alternative gateway's chart are not in the repository yet, so the names are the planned ones and are to be checked
-against them when they exist.
+The road of the two agents. Drawn from `gitops/charts/kagent/templates/alt-gateways.yaml` (the second model setting
+`zuno-model-praxis` and the Agent), the `altGateways` list of `gitops/charts/zuno-token-proxy`, `gitops/charts/praxis`
+and the alternative-gateway lists of `ansible/clusters/demo333.yml`. The page was not played: check the names against
+the live objects.
 
 ```mermaid
 flowchart LR
@@ -258,7 +261,7 @@ The decisions this page rests on:
 
 Evidence: the work packages of the two clients:
 [kagent](../../../roadmap/work-packages/wp-297-give-kagent-the-alternative-gateways-through-the-token-proxy.md) and
-[Dify](../../../roadmap/work-packages/wp-300-give-dify-the-alternative-gateways.md). Neither is done yet.
+[Dify](../../../roadmap/work-packages/wp-300-give-dify-the-alternative-gateways.md). Both are Done since 2026-11-19; the page itself was not played.
 
 ## Page status
 

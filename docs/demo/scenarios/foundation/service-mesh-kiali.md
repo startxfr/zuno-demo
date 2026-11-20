@@ -5,17 +5,17 @@
 Zuno runs Red Hat OpenShift Service Mesh 3 (the Sail operator, Istio 1.30.3) with one control plane in `zuno-mesh`
 (see [Appendix A](#appendix-a---hld)). A sidecar next to each meshed pod encrypts its traffic and presents a workload
 identity: a certificate for the pod's ServiceAccount, valid one hour. istiod's own CA is off. The certificates come
-from Vault's PKI, through `cert-manager-istio-csr` and the ClusterIssuer `vault-issuer-istio`. The three namespaces
-that hold the platform's data, identities and AI runtime refuse plaintext. Kiali and a Grafana dashboard read the
+from Vault's PKI, through `cert-manager-istio-csr` and the ClusterIssuer `vault-issuer-istio`. The four namespaces
+that hold the platform's data, identities, AI runtime and alternative AI gateway refuse plaintext. Kiali and a Grafana dashboard read the
 mesh's own Prometheus. How the parts connect is in [Appendix B](#appendix-b---lld).
 
 | Part | On demo333 |
 |---|---|
 | Control plane | `Istio` `default` and `IstioCNI` in `zuno-mesh`; istiod with `ENABLE_CA_SERVER: "false"` |
 | Certificate authority | `cert-manager-istio-csr` (2 replicas, one leader) asks Vault, through cert-manager, to sign each workload certificate: SPIFFE ID `spiffe://cluster.local/ns/<namespace>/sa/<serviceaccount>`, one hour |
-| Meshed workloads | 7 namespaces labelled for injection, plus the gateway pods of `openshift-ingress`: 71 pods on 2026-11-13 |
-| Mutual TLS enforced | `PeerAuthentication` `STRICT` in `zuno-ai-run`, `zuno-auth`, `zuno-data`; 12 PERMISSIVE ports, each naming its caller |
-| Observability | Kiali, the mesh Prometheus (`MonitoringStack` `mesh-monitoring`, 24 h), the Grafana dashboard **Mesh & gateway**, traces to Tempo |
+| Meshed workloads | 8 namespaces labelled for injection, plus the gateway pods of `openshift-ingress`: 77 running pods on 2026-11-20 |
+| Mutual TLS enforced | `PeerAuthentication` `STRICT` in `zuno-ai-run`, `zuno-ai-gateways`, `zuno-auth`, `zuno-data`; 13 PERMISSIVE ports, each naming its caller |
+| Observability | Kiali, the mesh Prometheus (`MonitoringStack` `mesh-monitoring`, 7 days), the Grafana dashboard **Mesh & gateway**, traces to Tempo |
 | Gateways | `maas-default-gateway` and `zuno-agent-gateway` (Kubernetes Gateway API, class `istio`), programmed by the same istiod |
 
 **The message:** "Inside Zuno, the services that hold data, identities and models accept only mutual TLS, and each
@@ -30,7 +30,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 23 Zuno namespaces, `zuno-mesh`, `zuno-ai-run`, `zuno-auth`, `zuno-data` and `zuno-monitoring` included; not `openshift-ingress`), `agent_tekos`, `openwebui_admin`. | Signs in to Kiali with OpenShift; Kiali checks the user's own rights per namespace, so it shows the Zuno namespaces and not the gateways of `openshift-ingress`. Passes Grafana's gate (`get pods` in `zuno-monitoring`). | Opens Kiali (3:15, 5:00) and Grafana (6:30). |
+| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 18 namespaces, `zuno-ai-run` and `zuno-monitoring` included; no rights in `zuno-mesh`, `zuno-auth`, `zuno-data` or `openshift-ingress`), `agent_tekos`, `openwebui_admin`. | Signs in to Kiali with OpenShift; Kiali checks the user's own rights per namespace, so it shows `zuno-ai-run` and the other namespaces ai-ops-01 administers, and not `zuno-auth`, `zuno-data` or the gateways of `openshift-ingress`. Passes Grafana's gate (`get pods` in `zuno-monitoring`). | Opens Kiali (3:15, 5:00) and Grafana (6:30). |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads every mesh object in every namespace. In Kiali it would also see `openshift-ingress`. | The presenter's `oc` terminal in both versions. |
 
 Other identities, none of which signs in on stage:
@@ -98,10 +98,10 @@ Nothing to do.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Terminal: `oc get istio,istiocni,deploy -n zuno-mesh` | "Zuno runs Red Hat OpenShift Service Mesh 3: one Istio control plane. Each meshed pod gets a sidecar that encrypts its traffic and proves who it is. The certificates do not come from Istio: they come from our Vault." | `istio.sailoperator.io/default` `Healthy` `v1.30.3`; `istiocni.sailoperator.io/default` `Healthy`; `cert-manager-istio-csr` 2/2, `istiod` 1/1, `kiali` 1/1, `ossmconsole` 1/1. |
-| 1:00 | `oc get peerauthentication -A` | "Three namespaces refuse plaintext: the databases, Keycloak, and the AI runtime with its gateways and models. A caller without a mesh certificate is turned away. Each exception opens one port of one workload, and must say who needs it." | `default` `STRICT` in `zuno-ai-run`, `zuno-auth` and `zuno-data`. Twelve exceptions without a mode, such as `ai-gateway-from-unmeshed-clients`, `keycloak-http-from-router`, `postgres-instance-exporter-and-patroni`: they keep `STRICT` except on their port. |
+| 0:00 | Terminal: `oc get istio,istiocni,deploy -n zuno-mesh` | "Zuno runs Red Hat OpenShift Service Mesh 3: one Istio control plane. Each meshed pod gets a sidecar that encrypts its traffic and proves who it is. The certificates do not come from Istio: they come from our Vault." | `istio.sailoperator.io/default` `Healthy` `v1.30.3`; `istiocni.sailoperator.io/default` `Healthy`; `cert-manager-istio-csr` 2/2, `istiod` 1/1 or more (HPA 1 to 5; 2/2 on 2026-11-20), `kiali` 1/1, `ossmconsole` 1/1. |
+| 1:00 | `oc get peerauthentication -A` | "Four namespaces refuse plaintext: the databases, Keycloak, the AI runtime with its gateways and models, and the alternative AI gateway. A caller without a mesh certificate is turned away. Each exception opens one port of one workload, and must say who needs it." | `default` `STRICT` in `zuno-ai-gateways`, `zuno-ai-run`, `zuno-auth` and `zuno-data`. Thirteen exceptions without a mode, such as `ai-gateway-from-unmeshed-clients`, `keycloak-http-from-router`, `postgres-instance-exporter-and-patroni`: they keep `STRICT` except on their port. |
 | 2:15 | `oc get certificaterequests -n zuno-mesh -o custom-columns='IDENTITY:.metadata.annotations.istio\.cert-manager\.io/identities,ISSUER:.spec.issuerRef.name,DURATION:.spec.duration' \| grep spiffe \| sort -u -k1,1 \| head -5` | "Each service proves who it is with a certificate for its own ServiceAccount, valid one hour and signed by Vault. There is no password between services, and a stolen certificate is useless within the hour." | Up to five different identities `spiffe://cluster.local/ns/<namespace>/sa/<serviceaccount>`, one line each, with `vault-issuer-istio` and `1h0m0s`. The list reads the requests still kept in `zuno-mesh`, not one per pod, and keeps one line per identity: one pod that restarts often leaves many requests for the same identity. |
-| 3:15 | Profile **ai-ops-01**: Kiali, **Overview** | "Kiali, the mesh console, reads the same configuration and the mesh's own metrics. It shows ai-ops-01 only the namespaces ai-ops-01 may read." | Not checked on 2026-11-13. Expected: one card per Zuno namespace, with an mTLS indicator on `zuno-ai-run`, `zuno-auth` and `zuno-data`. If the page does not match, stay on the terminal. |
+| 3:15 | Profile **ai-ops-01**: Kiali, **Overview** | "Kiali, the mesh console, reads the same configuration and the mesh's own metrics. It shows ai-ops-01 only the namespaces ai-ops-01 may read." | Not checked on 2026-11-13. Expected: one card per namespace ai-ops-01 administers, with an mTLS indicator on `zuno-ai-run`. `zuno-auth`, `zuno-data` and `zuno-mesh` are not shown to ai-ops-01: the `ocp-ai-ops` group has no rights there since 2026-11-14. If the page does not match, stay on the terminal. |
 | 4:15 | Close | "Inside Zuno, the services that hold data, identities and models accept only mutual TLS, and each proves who it is with a one-hour certificate from our own PKI." | |
 
 ## 15-minute version
@@ -110,12 +110,12 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Kiali, **Traffic Graph**, namespaces `zuno-ai-run`, `zuno-auth`, `zuno-data`, last 1 hour, **Display**: **Security** | "The graph is drawn from what the sidecars report. A padlock on an edge means the calls on it used mutual TLS." | Not rehearsed. Expected: edges such as ai-gateway to the models and to Keycloak, with padlocks. On 2026-11-06 the mesh Prometheus scraped only 3 of about 30 sidecars ([WP-224 evidence](../../../roadmap/evidence/wp-224-live-rehearsal-2026-11-07.md), section 2), so expect few edges. |
+| 5:00 | Kiali, **Traffic Graph**, namespaces `zuno-ai-run`, `zuno-auth`, `zuno-data`, last 1 hour, **Display**: **Security** | "The graph is drawn from what the sidecars report. A padlock on an edge means the calls on it used mutual TLS." | Not rehearsed. As ai-ops-01 only `zuno-ai-run` can be selected (no rights on `zuno-auth` and `zuno-data` since 2026-11-14). Expected: edges such as ai-gateway to the models and to Keycloak, with padlocks. On 2026-11-06 the mesh Prometheus scraped only 3 of about 30 sidecars ([WP-224 evidence](../../../roadmap/evidence/wp-224-live-rehearsal-2026-11-07.md), section 2), so expect few edges. |
 | 6:30 | Grafana, **Mesh & gateway**, row **Mesh traffic & control plane**: panels **mTLS coverage (rate, by connection security policy)**, **Mesh requests (rate, by destination service/response code)**, **Mesh control plane health (istiod)** | "Grafana reads the same mesh Prometheus. The first panel splits requests by the security of the connection: mutual TLS or none." | Not rehearsed. Expected: a `mutual_tls` series and possibly `none` on the first panel. Same coverage caveat as 5:00. |
-| 7:45 | `oc get ns -l istio-injection=enabled -o name`, then `oc get networkpolicy zuno-default-deny-other-namespaces -n zuno-mesh -o jsonpath='{range .spec.ingress[*].from[*]}{.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name}{" "}{end}{"\n"}'` | "Injection is not membership. The label gives a namespace its sidecars. The sidecars can only fetch their certificate and configuration if `zuno-mesh` lets that namespace in. Forget the second list and the new pods hang at start, with an error that points at the wrong namespace. It happened several times; each entry in the list names its incident." | Seven namespaces: `redhat-ods-applications`, `rhoai-model-registries`, `zuno-ai-build`, `zuno-ai-run`, `zuno-auth`, `zuno-data`, `zuno-mlops`. Then the allowlist (after two empty entries, the router and host-network groups): those seven, plus `openshift-console`, `zuno-monitoring`, `openshift-ingress`. |
+| 7:45 | `oc get ns -l istio-injection=enabled -o name`, then `oc get networkpolicy zuno-default-deny-other-namespaces -n zuno-mesh -o jsonpath='{range .spec.ingress[*].from[*]}{.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name}{" "}{end}{"\n"}'` | "Injection is not membership. The label gives a namespace its sidecars. The sidecars can only fetch their certificate and configuration if `zuno-mesh` lets that namespace in. Forget the second list and the new pods hang at start, with an error that points at the wrong namespace. It happened several times; each entry in the list names its incident." | Eight namespaces: `redhat-ods-applications`, `rhoai-model-registries`, `zuno-ai-build`, `zuno-ai-gateways`, `zuno-ai-run`, `zuno-auth`, `zuno-data`, `zuno-mlops`. Then the allowlist (after two empty entries, the router and host-network groups): those eight, plus `openshift-console`, `zuno-monitoring`, `openshift-ingress`. |
 | 9:00 | `oc get certificate istiod -n zuno-mesh -o jsonpath='{.spec.issuerRef.name}{"  notAfter "}{.status.notAfter}{"  renewal "}{.status.renewalTime}{"\n"}'`, then `oc get clusterissuer vault-issuer-istio` | "istiod has no CA of its own here. Its serving certificate and every workload certificate come from Vault through cert-manager. If issuance stops, running pods keep their certificate until it expires, but no new meshed pod can start. During the Vault migration of 7 November, that lasted about 25 minutes." | `vault-issuer-istio`, `notAfter` within the hour, renewal 30 minutes earlier. `vault-issuer-istio` `READY True`. The [Vault and PKI scenario](./vault-pki.md) shows the issuer side. |
 | 10:00 | `oc get gateway -n openshift-ingress -o custom-columns='NAME:.metadata.name,CLASS:.spec.gatewayClassName,PROGRAMMED:.status.conditions[?(@.type=="Programmed")].status'`, then `oc get pod -n openshift-ingress -l gateway.networking.k8s.io/gateway-name=maas-default-gateway -o jsonpath='{range .items[0].spec.containers[0].env[?(@.name=="PROXY_CONFIG")]}{.value}{"\n"}{end}'` | "The MaaS gateway, the door to our models, is an Istio gateway declared with the Kubernetes Gateway API. The same control plane programs it, and its identity comes from the same CA." | `maas-default-gateway` and `zuno-agent-gateway`, class `istio`, `True`; `data-science-gateway` on OpenShift's own class. Then `{"discoveryAddress":"istiod.zuno-mesh.svc:15012","meshId":"zuno01"}`. The [MaaS scenario](../rhoai/maas-portal-api-keys.md) uses this gateway. |
-| 11:15 | `oc get peerauthentication vllm-workloads-own-tls -n zuno-ai-run -o jsonpath='{.metadata.annotations.zuno\.io/permissive-reason}{"\n"}'` | "An exception has to say who needs it. vLLM serves its own TLS, and its callers send that TLS rather than Istio's. A check in the build fails any exception without a reason, and any PeerAuthentication outside the three namespaces." | One sentence that names the callers of port 8000: the MaaS gateway, the ai-gateway, OpenShift Lightspeed and the OpenShift and RHOAI monitoring scrapes, which "send TLS, never Istio mTLS". |
+| 11:15 | `oc get peerauthentication vllm-workloads-own-tls -n zuno-ai-run -o jsonpath='{.metadata.annotations.zuno\.io/permissive-reason}{"\n"}'` | "An exception has to say who needs it. vLLM serves its own TLS, and its callers send that TLS rather than Istio's. A check in the build fails any exception without a reason, and any PeerAuthentication outside the four namespaces." | One sentence that names the callers of port 8000: the MaaS gateway, the ai-gateway, OpenShift Lightspeed and the OpenShift and RHOAI monitoring scrapes, which "send TLS, never Istio mTLS". |
 | 12:15 | `oc get destinationrule -n zuno-ai-run -o custom-columns='NAME:.metadata.name,HOST:.spec.host,TLS:.spec.trafficPolicy.tls.mode,ONLY_FOR:.spec.workloadSelector.matchLabels' \| grep -E 'NAME\|mistral\|ovhcloud'` | "A mesh can also break things quietly. OpenShift AI generates a rule telling every sidecar to wrap TLS around calls to Mistral and OVHcloud. The ai-gateway already speaks TLS, so its calls were wrapped twice. Until 3 September they all failed, and every request fell back to a local model with no alert. Our rule turns the wrapping off for the ai-gateway only." | `mistral-large` and `gpt-oss-120b-ovhcloud`: `SIMPLE`, no selector (generated). `mistral-large-plaintext` and `gpt-oss-120b-ovhcloud-plaintext`: `DISABLE`, only for `app.kubernetes.io/name:ai-gateway`. See [external models](../rhoai/external-models.md). |
 | 13:30 | Say only | "Two lessons from running it. A TCP connect from a meshed pod always succeeds, because the sidecar answers locally: only a real TLS or HTTP request proves a firewall rule. And the mesh depends on the API server. When etcd is slow, for example on a master short of disk, the CA's leader loses its lease and restarts, and new pods wait for their certificate. Running pods keep working while their current certificate lasts." | |
 | 14:15 | Close | Repeat the message. | |
@@ -130,13 +130,13 @@ Run the 5-minute version, then:
 | Kiali does not sign in, or shows no namespace | Check the profile and the provider (`openshift`). Otherwise stay on the terminal. | |
 | Grafana mesh panels show "No data" | Same cause as an empty graph. **Mesh control plane health (istiod)** is scraped inside `zuno-mesh`; show it if it has data. | |
 | A direct HTTPS call to Mistral or OVHcloud from a pod other than the ai-gateway gets "connection reset" | That is the generated `SIMPLE` rule (12:15), not an outage. Test through the ai-gateway. | |
-| `forbidden` on cluster-scoped objects or `-A` | The terminal is not **paas-ops-01**. As **ai-ops-01**, run the steps in `zuno-mesh` and `zuno-ai-run` (`oc get deploy -n zuno-mesh`, `oc get peerauthentication -n zuno-ai-run`, 2:15, 7:45 second command, 9:00 first command, 11:15, 12:15). Skip 10:00. | |
+| `forbidden` on cluster-scoped objects or `-A` | The terminal is not **paas-ops-01**. As **ai-ops-01**, only the `zuno-ai-run` steps work (`oc get peerauthentication -n zuno-ai-run`, 11:15, 12:15): the `ocp-ai-ops` group has no rights in `zuno-mesh` since 2026-11-14. Skip the others. | |
 
 ## Limits
 
-- **Mutual TLS is enforced in three namespaces only.** `redhat-ods-applications` and the other injected namespaces
+- **Mutual TLS is enforced in four namespaces only.** `redhat-ods-applications` and the other injected namespaces
   have no PeerAuthentication: they are vendor-managed or carry no secret data (ADR-0602 clause 4). The unmeshed
-  namespaces (`zuno-unifai`, the experiences, the router, monitoring) reach meshed pods on the 12 named PERMISSIVE
+  namespaces (`zuno-unifai`, the experiences, the router, monitoring) reach meshed pods on the 13 named PERMISSIVE
   ports. `zuno-vault` is deliberately not meshed: its PKI signs the mesh's certificates.
 - **Identity is presented, not checked per call.** There is no AuthorizationPolicy: no service checks the caller's
   SPIFFE ID. NetworkPolicy decides who may connect (decision of 2026-11-06).
@@ -154,10 +154,10 @@ Run the 5-minute version, then:
   (`leaderElectionNamespace: zuno-mesh`). When the API server or etcd is slow, for example a master short of disk or a
   slow etcd member, the leader loses the lease and restarts. The `istio-csr` lease had changed holder 171 times by
   2026-11-13, and both pods restarted 30 times in the three hours after the 2026-11-12 cordon; their logs were not
-  read. istiod runs one replica (HPA up to 5); on 2026-11-08 a canary load made it restart within two minutes
+  read. istiod runs one to five replicas (HPA; two on 2026-11-20); on 2026-11-08 a canary load made it restart within two minutes
   ([demo day](../../demo-day-2026-11-09.md)).
-- **Kiali shows what the signed-in user may read.** ai-ops-01 does not see `openshift-ingress`, so the MaaS gateway
-  is missing from its graph.
+- **Kiali shows what the signed-in user may read.** ai-ops-01 does not see `openshift-ingress`, `zuno-auth` or `zuno-data`, so the MaaS gateway,
+  Keycloak and the databases are missing from its graph.
 - **`data-science-gateway` is not in this mesh.** It belongs to OpenShift's own Gateway API controller
   (`istiod-openshift-gateway` in `openshift-ingress`).
 - **Traces are sampled at 100 %** (`Telemetry` `mesh-default`), right for a demo's volume, not for production; see
@@ -252,8 +252,8 @@ flowchart LR
   subgraph MESH["zuno-mesh: mesh zuno01, trust domain cluster.local"]
     ISTIOD["istiod, HPA 1 to 5<br/>xDS :15012, CA server off<br/>Gateway API controller, class istio"]
     CSR["cert-manager-istio-csr, 2 replicas<br/>leader lease istio-csr<br/>workload certs 1 h"]
-    NPM["NetworkPolicy zuno-default-deny-other-namespaces<br/>allowlist: 7 injected namespaces,<br/>openshift-ingress, openshift-console, zuno-monitoring"]
-    PROM["MonitoringStack mesh-monitoring<br/>Prometheus x2, 24 h<br/>PodMonitor sidecars :15090, ServiceMonitor istiod"]
+    NPM["NetworkPolicy zuno-default-deny-other-namespaces<br/>allowlist: 8 injected namespaces,<br/>openshift-ingress, openshift-console, zuno-monitoring"]
+    PROM["MonitoringStack mesh-monitoring<br/>Prometheus x2, 7 d<br/>PodMonitor sidecars :15090, ServiceMonitor istiod"]
     KIALI["Kiali, auth openshift<br/>Route passthrough"]
   end
   CNI["IstioCNI DaemonSet<br/>one pod per node"]
@@ -263,7 +263,7 @@ flowchart LR
   VAULT[("Vault zuno-vault, not meshed<br/>PKI root zuno-demo.internal")]
   CSR -->|"CertificateRequest per SPIFFE ID"| VII -->|"SA cert-manager"| VAULT
   ISTIOD -. "Certificate istiod, 1 h" .-> VII
-  subgraph STRICTNS["PeerAuthentication default STRICT: zuno-ai-run, zuno-auth, zuno-data"]
+  subgraph STRICTNS["PeerAuthentication default STRICT: zuno-ai-run, zuno-ai-gateways, zuno-auth, zuno-data"]
     GWS["ai-, mcp-, a2a-gateway<br/>sidecar"]
     MCPSRV["MCP servers<br/>from mcp-gateway only"]
     VLLM["vLLM workloads :8000<br/>own TLS, PERMISSIVE port"]
@@ -299,6 +299,8 @@ The decisions this page rests on:
   `STRICT` on `zuno-data`, `zuno-auth` and `zuno-ai-run` only, not mesh-wide; every exception is one workload's port
   with a `zuno.io/permissive-reason`; `platform/security/check_mesh_mtls.py` enforces both. No fine-grained
   AuthorizationPolicy (decision of 2026-11-06).
+- [ADR-0619](../../../adr/0619-run-praxis-ai-as-an-alternative-ai-gateway-next-to-the-default-zuno-ai-gateway.md)
+  clause 2: `zuno-ai-gateways`, the namespace of the alternative AI gateway, joins the `STRICT` namespaces.
 - [ADR-0037](../../../adr/0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md): MCP servers
   accept traffic only from the MCP gateway, enforced by NetworkPolicy and workload identity.
 - [ADR-0603](../../../adr/0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md): M2

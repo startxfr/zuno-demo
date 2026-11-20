@@ -1,5 +1,7 @@
 # Scenario: Observability - one turn traced, every call counted
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Every Zuno service sends its traces and metrics over OTLP to one OpenTelemetry collector in `zuno-monitoring` (see

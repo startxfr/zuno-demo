@@ -1,5 +1,7 @@
 # Scenario: Ansible Automation Platform - audited operations
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Ansible Automation Platform (AAP) 2.7 is where Zuno's operations can run as recorded jobs. The Day 0 check and the Day
@@ -18,6 +20,7 @@ GitOps, AAP Day 0-3" (see [Appendix A](#appendix-a---hld)). Its pods, identities
 | `zuno-day1-check`, `zuno-day2-check`, `zuno-day3-check`, `zuno-day3-test` | the read-only checks of `make` | `zuno-cluster-reader` | yes |
 | `zuno-day1-build`, `zuno-day2-build` | in-cluster image builds (a build rolls the pods that run `:latest`) | `zuno-aap-installer` | never |
 | `zuno-day1-install`, `zuno-day1-reconcile`, `zuno-day2-install` | installs and remediations | `zuno-aap-installer` | never |
+| `zuno-day3-stresstest-collect` | reads the rows of one stress campaign | `zuno-cluster-reader` | never |
 | `zuno-day3-stresstest`, `zuno-day3-backup`, `zuno-day3-restore`, `zuno-day3-run`, `zuno-day3-release` | operations on the running platform | `zuno-aap-installer` | never |
 | `zuno-day3-scenario-failover-node-inject`, `zuno-day3-scenario-failover-node-restore` | the GPU node failover drill, run as a workflow with an approval node between them | `zuno-aap-installer` | never |
 
@@ -47,7 +50,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | Keycloak group | Members | In AAP |
 |---|---|---|
 | `aap_admin` | consultant-01, paas-ops-01 | superuser, through an authenticator map (no Team) |
-| `aap_ops` | consultant-02, paas-dev-01; also the service accounts `service-account-dify` and `service-account-openclaw-consultant-02`, which copy consultant-02's groups and never sign in to AAP | Team `aap-ops-team`: view and execute on all 17 job templates and 8 workflow templates, approve on the workflows, view and sync on the project |
+| `aap_ops` | consultant-02, paas-dev-01; also the service accounts `service-account-dify` and `service-account-openclaw-consultant-02`, which copy consultant-02's groups and never sign in to AAP | Team `aap-ops-team`: view and execute on all 18 job templates and 8 workflow templates, approve on the workflows, view and sync on the project |
 | `aap_reader` | consultant-03 | Team `aap-reader-team`: view only |
 | none | everyone else | can sign in, sees nothing |
 
@@ -57,7 +60,7 @@ Other identities:
   `zuno-day0-check` and nothing else (403 on any other template). Its token is in Vault at `aap/mcp-token`.
   AAP shows the agents' jobs as launched by `zuno-mcp`.
 - The ServiceAccounts jobs run as: `aap-day0-check` (credential `zuno-cluster-reader`, ClusterRole `cluster-reader`)
-  for checks and tests, and `aap-installer` (credential `zuno-aap-installer`, ClusterRole `zuno-aap-installer`, limited
+  for checks, tests and the stress campaign read, and `aap-installer` (credential `zuno-aap-installer`, ClusterRole `zuno-aap-installer`, limited
   to the repository's operator kinds and Applications, no RBAC write) for everything else.
 - The local AAP `admin` account (Vault `aap/admin`): used by the `aap_config` role's API calls and as a break-glass
   sign-in. Never on stage.
@@ -127,7 +130,7 @@ Profile **consultant-03**.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Open `https://aap.apps.demo333.startx.fr`, sign in with Keycloak | "This is where our platform operations run and are recorded. I sign in with my company account. My Keycloak group decides what I can see and do." | The AAP home page, user consultant-03. Scouted on 2026-11-16: the Keycloak sign-in to AAP works on demo333. |
-| 0:45 | **Automation Execution**, **Templates** | "Every operation of the platform is here as a template: the checks, the installs, the backups, the GPU failover drill. They are declared in Git, not clicked together." | 25 templates for this reader, listed 10 per page (job templates and workflow templates ending in `-workflow`), from `zuno-day0-check`. Later templates are on the next pages. The launch buttons are greyed out. Seen on 2026-11-16. No launch action: consultant-03 is in `aap_reader`. |
+| 0:45 | **Automation Execution**, **Templates** | "Every operation of the platform is here as a template: the checks, the installs, the backups, the GPU failover drill. They are declared in Git, not clicked together." | 26 templates for this reader, listed 10 per page (job templates and workflow templates ending in `-workflow`), from `zuno-day0-check`. Later templates are on the next pages. The launch buttons are greyed out. Seen on 2026-11-16 with 25 templates, before `zuno-day3-stresstest-collect` was added. No launch action: consultant-03 is in `aap_reader`. |
 | 2:00 | **Jobs**, filter on `zuno-day0-check`, open the latest run launched by `zuno-mcp`, tab **Details** | "Each run is a record: what ran, from which commit, who launched it, and the full output is one tab away. This one was launched by an agent, at a person's request, through the platform's own account." | A `zuno-day0-check` job launched by `zuno-mcp`, on its **Details** tab: status, template, project, revision, launched by. Its Output tab is not shown on stage: it may print node names or paths, and the GIF goes into a public repository. On 2026-11-16, consultant-03 saw 20 `zuno-day0-check` runs, 14 of them launched by `zuno-mcp`, so a reader does see jobs it did not launch. If the list shows no run launched by `zuno-mcp`, switch to the consultant-02 profile. |
 | 3:15 | **Projects**, `zuno-demo` | "The automation comes from the same repository and the same branch as the cluster itself. Nobody runs a script from a laptop that the platform cannot see." | Source `https://github.com/startxfr/zuno-demo.git`, branch `devel`, a recent revision. |
 | 4:15 | Close | "Our operations run as jobs defined in Git, and each job is recorded with who launched it. People get the rights of their group. An agent may read that history and launch one read-only audit, nothing more." | |
@@ -138,7 +141,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Terminal **paas-ops-01**: `oc get jobtemplates.tower.ansible.com,workflowtemplates.tower.ansible.com -n zuno-aap` | "The templates are Kubernetes resources. A chart renders them and Argo CD keeps them, like every other part of the platform." | 17 `jobtemplate.tower.ansible.com/zuno-...` and 8 `workflowtemplate.tower.ansible.com/...-workflow`. |
+| 5:00 | Terminal **paas-ops-01**: `oc get jobtemplates.tower.ansible.com,workflowtemplates.tower.ansible.com -n zuno-aap` | "The templates are Kubernetes resources. A chart renders them and Argo CD keeps them, like every other part of the platform." | 18 `jobtemplate.tower.ansible.com/zuno-...` and 8 `workflowtemplate.tower.ansible.com/...-workflow`. |
 | 6:00 | `oc get ansibleprojects.tower.ansible.com zuno-demo -n zuno-aap -o jsonpath='{.spec.repo} {.spec.branch}{"\n"}'` | "The role writes the cluster's branch into the project, so AAP runs exactly what Argo CD deploys." | `https://github.com/startxfr/zuno-demo.git devel` |
 | 6:45 | Profile **consultant-02**: **Templates**, `zuno-day0-check`, **Launch**. Terminal: `oc get pods -n zuno-aap -w` | "consultant-02 is in the ops group, so it may launch. A check runs with a read-only cluster identity. Each job is a fresh pod that disappears when it ends; the record stays." | The job page streams its output; an `automation-job-<id>-...` pod appears in the terminal. A read-only template: it adds a job record and a temporary pod, nothing else. Never launch an install, reconcile, build, release, restore or stresstest template on stage. |
 | 8:00 | Show the group table of [Personas](#personas) | "Three Keycloak groups: admin, ops, reader. The boundary is the group, not the template: the ops group may launch every template, installs included." | |
@@ -181,8 +184,8 @@ Run the 5-minute version, then:
 - **The `tower.ansible.com` resources can report `Successful` while creating nothing:** the resource operator ignores
   the API errors: a dead token once left them green while the `zuno` inventory was missing
   (`ansible/roles/aap_config/tasks/install.yml`). Judge AAP by a job that runs.
-- **EDA has no content from this repository:** no rulebook, activation or event stream is declared. The webhook segment
-  of the [AAP HLD walkthrough](../../../architecture/aap-hld.md) used a sample project set up by hand on demo222.
+- **EDA has no content from this repository:** no rulebook, activation or event stream is declared. The
+  [AAP HLD walkthrough](../../../architecture/aap-hld.md) shows EDA as available capacity, not as a live flow.
   Whether demo333's EDA holds anything was not checked.
 - **Reinstalling AAP is destructive.** The Gateway's and EDA's encryption keys belong to their custom resources and are
   regenerated, so `make d0 uninstall aap` drops the `aap` and `aap-eda` databases
@@ -194,8 +197,8 @@ Run the 5-minute version, then:
   Secrets ([operations](../../../platform/operations.md)).
 - **One replica of each component** (ADR-0354), and no ServiceMonitor in `zuno-aap`: AAP's metrics are not in
   Prometheus.
-- **The [AAP HLD](../../../architecture/aap-hld.md) describes demo222:** Day 1, branch `main` and 18 job templates. On
-  demo333 AAP is Day 0, the project follows `devel`, and the chart declares 17 job templates.
+- **The [AAP HLD](../../../architecture/aap-hld.md) counts 17 job templates.** The chart declares 18 since
+  `zuno-day3-stresstest-collect` was added on 2026-11-19, and demo333 held 18 on 2026-11-20.
 
 ## Appendix A - HLD
 
@@ -291,7 +294,7 @@ flowchart LR
   subgraph NS["namespace zuno-aap: AnsibleAutomationPlatform aap, AAP 2.7, one replica each"]
     RT["Route aap.apps.demo333.startx.fr"]
     GW["aap-gateway<br/>authenticator Keycloak zuno<br/>aap_admin: superuser<br/>aap_ops: aap-ops-team, view and launch<br/>aap_reader: aap-reader-team, view"]
-    CTRL["Controller 4.8.13<br/>organization zuno, inventory zuno<br/>17 job templates, 8 workflows<br/>Project zuno-demo, branch devel"]
+    CTRL["Controller 4.8.13<br/>organization zuno, inventory zuno<br/>18 job templates, 8 workflows<br/>Project zuno-demo, branch devel"]
     JOB["automation-job pod, one per run<br/>credential zuno-cluster-reader: checks, tests<br/>credential zuno-aap-installer: the rest"]
     EDA["EDA: api, workers, event-stream<br/>no rulebook in the repository"]
     HUB["Automation Hub<br/>storage_type s3"]

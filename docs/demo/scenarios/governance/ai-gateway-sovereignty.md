@@ -1,5 +1,7 @@
 # Scenario: ai-gateway - data classification keeps sovereign data on local models
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Every model call in Zuno goes through the ai-gateway, the platform's single policy router (see
@@ -29,9 +31,9 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Runs the golden-path probe, which reads the probe credentials and executes a call inside the ai-gateway pod. | The presenter's `oc` terminal in both versions: runs the probe and the `oc get` steps. |
-| `eval-consultant-01` | Evaluation copy of consultant-01: group `consultant`, entitled to Arkos (`agent_arkos`) and Tekos. Used by the probes only. | Its token calls Arkos and Tekos through the gateway, with a forged `C1` header. | The "caller who lies" of the 5-minute version. It never signs in on stage; its result line is what the audience sees. |
+| `eval-consultant-01` | Evaluation copy of consultant-01: group `consultant`, entitled to Arkos (`agent_arkos`) and Tekos. Used by the probes only. | Signs in to UnifAI for the probe `unifai-tekos` of Check. | Never on stage. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana and the Tempo search UI. | Shows the trace of the call and the skipped candidates in the 15-minute version. |
-| **consultant-01**, **consultant-02** | Consultants and architects, front office. Entitled to Arkos. | Use Arkos in UnifAI to draft architecture documents (DAT) for clients. | Named only: they are the real users whose client data the C3 floor protects. Not signed in during this scenario. |
+| **consultant-01**, **consultant-02** | Consultants and architects, front office. Entitled to Arkos; consultant-01 also to Tekos. | Use Arkos in UnifAI to draft architecture documents (DAT) for clients. The probe `sovereignty` calls Arkos and Tekos through the gateway with a token of consultant-01 (Keycloak client `zuno-evaluations`) and a forged `C1` header. | consultant-01 is the "caller who lies" of the 5-minute version: the result line is what the audience sees. Both are the real users whose client data the C3 floor protects. Not signed in during this scenario. |
 
 ## Presenter lifecycle
 

@@ -1,10 +1,12 @@
 # Scenario: Open WebUI - a familiar chat on governed models and tools
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Open WebUI is the general-purpose chat of Zuno: the screen any employee already knows. In Zuno it is only a
 **presentation layer** over the governed backend (see [Appendix A](#appendix-a---hld)). It holds no model key, no
-policy, no RAG and no tool credential. Every answer comes from the ai-gateway and every tool from the mcp-gateway,
+policy, no RAG and no tool credential. Every answer of this page comes from the ai-gateway and every tool from the mcp-gateway,
 called with the signed-in user's own Keycloak token (see [Appendix B](#appendix-b---lld)). The platform therefore
 decides which model answers, which tools the user may call and what the turn costs. The same decisions apply in the
 six other experiences.
@@ -115,6 +117,9 @@ Run the 5-minute version, then:
 
 ## Limits
 
+- **The model picker lists more than this page uses.** Since 2026-11-17 it also lists the models of the alternative
+  gateway Praxis, prefixed `praxis.` and tagged "Praxis", called with the same user token. This page uses **Zuno** and
+  **Zuno Code** only. See the [multi-gateway scenario](../governance/multi-gateway.md).
 - **No RAG, uploads, web search, image generation or code execution** in Open WebUI. They are turned off by
   ADR-0588; documents are searched through the platform's tools instead.
 - **Classification markers never verify in Open WebUI.** It rewrites tool results, so every tool turn counts as an

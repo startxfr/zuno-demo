@@ -1,5 +1,7 @@
 # Scenario: Multi-gateway - the same clients on the default gateway and on an alternative one
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Zuno sends every model call of every client through one governed gateway: the ai-gateway. This scenario shows that a
@@ -59,7 +61,7 @@ The file prepares nothing on the cluster. What only a person does:
 
 - [ ] A browser profile for **ai-ops-01**, signed in to Open WebUI and to kagent. A Keycloak session of another persona
   in the same browser gets a 403 from the kagent front door.
-- [ ] In Open WebUI, a new chat. The model picker lists "Zuno" and "Praxis · auto".
+- [ ] In Open WebUI, a new chat. The model picker lists "Zuno" and, among the models tagged "Praxis", `praxis.auto`.
 - [ ] In kagent, the agents `zuno-sre` and `zuno-diagnose-praxis` are listed.
 - [ ] 15-minute version:
   - a terminal logged in with `oc` as **paas-ops-01**;
@@ -81,9 +83,9 @@ Profile **ai-ops-01**, signed in to Open WebUI.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Open the model picker of a new chat | "This is the chat everyone knows. It has two connections: Zuno, our governed gateway, and Praxis, an alternative one we added next to it." | Two entries: "Zuno" and "Praxis · auto" (labels to confirm at the first rehearsal). |
+| 0:00 | Open the model picker of a new chat | "This is the chat everyone knows. It has two connections: Zuno, our governed gateway, and Praxis, an alternative one we added next to it." | "Zuno", "Zuno Code" and "Zuno wesh" from the default gateway, then the models of the alternative one, prefixed `praxis.` and tagged "Praxis": `praxis.auto`, the four local models, `praxis.claude` and `praxis.codestral-latest` (the list is the one read from Open WebUI's API on 2026-11-17; how the picker displays it is to confirm at the first rehearsal). |
 | 0:45 | Pick **Zuno** and ask: `In two sentences, what does a Kubernetes liveness probe do?` | "A public question, on purpose. Only public content goes down the alternative road." | A short answer. |
-| 1:30 | Pick **Praxis · auto** and ask the same question | "Same sign-in, same screen, same question. The model name `auto` is mapped to a local model by the alternative gateway." | A short answer of the same kind. The wording differs. |
+| 1:30 | Pick **praxis.auto** and ask the same question | "Same sign-in, same screen, same question. The model name `auto` is mapped to a local model by the alternative gateway." | A short answer of the same kind. The wording differs. |
 | 2:15 | Open kagent, agent **zuno-sre**. Ask: `What does it mean when a pod is in CrashLoopBackOff? Answer in two sentences and call no tool.` | "kagent is the second client. This agent uses the default road, through the token proxy." | A short answer, no tool call. |
 | 3:00 | Open the agent **zuno-diagnose-praxis** and ask the same question | "Same agent, same instructions. Its model setting points to the alternative gateway." | A short answer, no tool call. |
 | 3:45 | Say what the alternative road does not do | "On that road, my token budget is not counted, nothing raises the data class, and no per-agent policy applies. That is why we send public questions only." | |
@@ -111,7 +113,7 @@ Run the 5-minute version, then:
 
 | Symptom | Fallback | Say |
 |---|---|---|
-| The picker lists no "Praxis · auto" | The connection is not configured, or the alternative gateway is not Ready. Terminal: `oc get pods -n zuno-ai-gateways`. Show the Zuno road and the traces of an earlier take. | "The alternative gateway is optional. The default road does not depend on it." |
+| The picker lists no `praxis.auto` | The connection is not configured, or the alternative gateway is not Ready. Terminal: `oc get pods -n zuno-ai-gateways`. Show the Zuno road and the traces of an earlier take. | "The alternative gateway is optional. The default road does not depend on it." |
 | The Praxis answer is slow or fails | Retry once. The alternative gateway is an alpha product. Continue with the Zuno answer and the trace of the earlier take. | "It is alpha. That is part of what we say when we show it." |
 | kagent answers with a tool call | The prompt asked for none. Ask again, or continue: the point is the model setting, not the answer. | |
 | 403 from the kagent front door | The browser holds a session of a persona outside `ocp-ai-ops`. Use the ai-ops-01 profile or a private window. | "The door admits the operations group only." |
@@ -215,9 +217,10 @@ flowchart TB
 
 ## Appendix B - LLD
 
-The two roads of one client, and what each one checks. Drawn from the design records and the work-package briefs of the
-alternative gateways: the chart of the alternative gateway is not in the repository yet, so the names are the planned
-ones and are to be checked against the chart when it exists.
+The two roads of one client, and what each one checks. Drawn from `gitops/charts/praxis` (the models, the `auto` alias,
+the JWT check), the `altGateways` lists of the client charts (`gitops/charts/open-webui`, `gitops/charts/kagent`,
+`gitops/charts/zuno-token-proxy`) and their values in `ansible/clusters/demo333.yml`. The page was not played: check
+the names against the live objects.
 
 ```mermaid
 flowchart LR
@@ -276,7 +279,8 @@ Evidence: the work packages of the clients:
 [Dify](../../../roadmap/work-packages/wp-300-give-dify-the-alternative-gateways.md),
 [OpenClaw](../../../roadmap/work-packages/wp-301-give-openclaw-the-alternative-gateways.md),
 [Blender](../../../roadmap/work-packages/wp-302-give-the-blender-add-on-the-alternative-gateways.md),
-[world model](../../../roadmap/work-packages/wp-303-give-world-model-the-alternative-gateways.md). None is done yet.
+[world model](../../../roadmap/work-packages/wp-303-give-world-model-the-alternative-gateways.md). On 2026-11-20 the
+first five are Done, Blender is not started and the world model waits for its live proof.
 
 ## Page status
 

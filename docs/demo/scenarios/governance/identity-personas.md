@@ -1,5 +1,7 @@
 # Scenario: Keycloak - one identity, groups drive every entitlement
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Zuno has one identity provider: the Keycloak realm `zuno`, run by the Red Hat build of Keycloak operator in
@@ -60,8 +62,8 @@ pod `zuno-0`, the UnifaiStack `unifai`, and the Deployments `zuno-token-proxy` (
 
 ### Check
 
-Nothing to do when it passes. This page has no golden-path probe: rehearse it the same day, and rehearse the sale-01
-workspace step (1:30) in particular, which is not in a recorded run. The file runs the demo's own reads instead:
+Nothing to do when it passes. This page has no golden-path probe: rehearse it the same day. The sale-01
+workspace step (1:30) is in the recorded take of 2026-11-16. The file runs the demo's own reads instead:
 
 - the Keycloak CR `zuno` and the KeycloakRealmImport `zuno-realm` (`Done`);
 - the Jobs `zuno-keycloak-client-reconcile` and `zuno-keycloak-eval-personas` (`Complete`);
@@ -133,7 +135,7 @@ Run the 5-minute version, then:
 | 8:15 | The tool policy on GitHub, entry `search_confluence` | "Inside an agent, the business role decides the tools. The agent group only opens the door: that is why the two dimensions are separate." | `allowed_groups`: `consultant`, `board`, `cdp`, `lightspeed_readonly`, `ocp-ai-ops`. No `sales`. |
 | 9:15 | Show the two fixture accounts in the Personas table above, and the check names in [`evaluations/tekos/security_checks.py`](../../../../evaluations/tekos/security_checks.py) | "We test that separation with fixture accounts. One has the agent group only, the other the business role only. Both must be refused." | `entitlement_without_business_role_denied_confluence` (the mcp-gateway answers 403) and `business_role_without_entitlement_denied_by_unifai`. |
 | 10:15 | `oc get deploy zuno-token-proxy -n zuno-dify -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' \| grep -E 'CLIENT_ID\|HEADERS'` | "Dify cannot pass a user's token. A small proxy beside it fetches a token for the Keycloak client `dify`. Its service account carries exactly consultant-02's groups and a `persona` claim, so the quota and the audit count it as consultant-02." | `CLIENT_ID=dify`, `AI_HEADERS={"X-Zuno-Agent":"dify",...}` and `MCP_HEADERS={...}`. |
-| 11:30 | Say only | "Other applications read the same token. `aap_ops` puts consultant-02 in an AAP team that may view and run the job templates. `openwebui_admin` makes ai-ops-01 an Open WebUI administrator. The MaaS subscriptions are bound to the `ocp-*` groups and to `sales`." | |
+| 11:30 | Say only | "Other applications read the same token. `aap_ops` puts consultant-02 in an AAP team that may view and run the job templates. `openwebui_admin` makes ai-ops-01 an Open WebUI administrator. The MaaS subscriptions of people are bound to groups too: `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops` share one tier, and `sales` has its own." | |
 | 12:30 | `oc get configmap zuno-keycloak-clients -n zuno-auth -o jsonpath='{.data.realm-settings\.json}'` | "Password guessing is throttled. After 30 failures an account is locked for a minute, then longer, up to 15 minutes, never for good. A Job applies these settings to the live realm on every sync, because the realm import runs only once." | `"bruteForceProtected": true`, `"failureFactor": 30`, `"waitIncrementSeconds": 60`, `"maxFailureWaitSeconds": 900`, `"permanentLockout": false`. |
 | 13:45 | Close | Repeat the message. | |
 
@@ -273,7 +275,7 @@ flowchart LR
   KC -->|"client aap, bare group names"| AAPGW["AAP gateway<br/>authenticator maps"]
   USERAPPS & TPX --> GWS["ai-gateway, mcp-gateway,<br/>a2a-gateway"]
   GWS -->|"agent groups: which agent<br/>business roles: which tools, which data<br/>persona: which quota"| DEC["decisions per call"]
-  OAUTH -->|"User and Group objects<br/>created at first sign-in"| RB["RoleBindings on 23 zuno.io/managed namespaces<br/>view: consultant, sales<br/>edit: ocp-ai-dev, admin: ocp-ai-ops<br/>ClusterRoleBindings<br/>cluster-admin: ocp-paas-ops<br/>cluster-reader: ocp-paas-dev"]
+  OAUTH -->|"User and Group objects<br/>created at first sign-in"| RB["RoleBindings on the zuno.io/managed namespaces<br/>view: consultant, sales<br/>edit: ocp-ai-dev, admin: ocp-ai-ops<br/>ClusterRoleBindings<br/>cluster-admin: ocp-paas-ops<br/>cluster-reader: ocp-paas-dev"]
   OAUTH --> OTHERS["Grafana, Argo CD, Lightspeed,<br/>MaaS subscriptions by group"]
   AAPGW -->|"aap_admin: superuser<br/>aap_ops: aap-ops-team<br/>aap_reader: aap-reader-team"| AAPT["AAP Controller teams"]
 ```

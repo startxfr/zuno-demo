@@ -133,7 +133,7 @@ Run the 5-minute version, then:
 | 9:15 | Terminal: `oc get ogxserver,deploy,pvc -n zuno-playground`, then `oc get rs -n zuno-playground --no-headers \| wc -l` | "This playground is ours, in Git. The portal would create its own copy. On this release the operator rewrites that copy's CA bundle every second in a different order, and each rewrite restarts the server. Ours has no TLS block and stays up." | OGXServer `lsd-genai-playground` `Ready`; Deployments `genai-pgvector` and `lsd-genai-playground` 1/1; PVC `genai-pgvector-storage` Bound; 9 ReplicaSets (2026-11-13). |
 | 10:30 | `oc get cm gen-ai-aa-mcp-servers -n redhat-ods-applications -o jsonpath='{.data}'`, then `oc get deploy mcp-gateway -n zuno-ai-run -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="MCP_FRONTDOOR_CAPABILITIES")].value}'` | "The playground's MCP catalogue holds one entry: the front door of our gateway, with no secret in it. The gateway offers at most nine tools on that door. Eight read; one launches the cluster health-check job in Ansible Automation Platform." | The entry `zuno-mcp-gateway`, url `http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp`. The nine capabilities: `confluence.page.search`, `confluence.page.read`, `knowledge.tech.search`, `aap.platform.audit`, `aap.cluster.audit`, `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read`, `k8s.logs.read`. |
 | 11:45 | Open the tool policy of the agents release: [policies/tools/tool-policy.yaml](https://github.com/startxfr/zuno-demo-agents/blob/main/policies/tools/tool-policy.yaml), the `k8s.*` entries | "Who gets which tool is written in the signed agents release, not in the playground. The four cluster reads list `ocp-ai-ops` only. Confluence, technical docs and the AAP audits list it too. `ocp-ai-dev` is on none of them: default deny." | `allowed_groups: [ocp-ai-ops]` on `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read` and `k8s.logs.read`. |
-| 13:00 | Optional *(not rehearsed)*: OpenShift console as **paas-ops-01**, **Observe**, **Dashboards**, project `redhat-ods-monitoring`, dashboard **Usage**, subscription `gpt-oss-20b-ocp-ai-ops` | "The playground's chats are metered like any other MaaS call, per user and per subscription." | **Total tokens** and **Token consumption chart** for the subscription in the range. |
+| 13:00 | Optional *(not rehearsed)*: OpenShift console as **paas-ops-01**, **Observe**, **Dashboards**, project `redhat-ods-monitoring`, dashboard **Usage**, subscription `gpt-oss-20b-builders` | "The playground's chats are metered like any other MaaS call, per user and per subscription." | **Total tokens** and **Token consumption chart** for the subscription in the range. |
 | 14:15 | Close | Repeat the message. | |
 
 ## If something goes wrong
@@ -144,7 +144,7 @@ Run the 5-minute version, then:
 | The page offers **Create playground** | You are in another project. Do not press it: that copy loops on its CA bundle and never becomes Ready (WP-220, section 15). Switch to **Zuno Playground**. | "This release has a defect on that path; we ship our own copy instead." |
 | The chat answers "Server error" | Check `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` and `oc get httproute zuno-portal-genai -n redhat-ods-applications`: without that route the stack's model proxy answers 404 (WP-220, section 16). Show the screenshots of the 5-minute rows instead. | "The model behind the playground is not answering; the screenshots show the same flow." |
 | The model list shows only a greyed reranker | The OGX server is not Ready: `oc get ogxserver,pods -n zuno-playground`. | |
-| A qwen model returns an error | Use gpt-oss-20b. The three human subscriptions cover that model only. | |
+| A qwen model returns an error | Use gpt-oss-20b. The human subscriptions cover that model only. | |
 | MCP connection fails or the gateway answers 401 | The token expired (24 hours) or belongs to the other persona. Fetch a new one in the same window. | |
 | The model answers without calling a tool | Ask the prompt tested on 2026-11-06: `Cherche dans Confluence une page sur le portail MaaS et donne-moi le titre.` It produced a **Tool response: confluence.page.search** block; Confluence found no page, which is fine: the call is the proof. | "The platform decides which tools are offered; the model decides whether to call one." |
 | `Vector_store 'vs_...' not found`, or the uploaded file is gone | The OGX pod restarted: its vector-store registry is a local SQLite file, lost at each restart. Upload the file again. | |
@@ -287,7 +287,7 @@ flowchart LR
   UI -.->|"reads"| CAT
   BFF -->|"responses API"| OGX
   OGX -->|"provider genai-bff-proxy, remote::passthrough<br/>publishers/zuno-ai-run/models/name<br/>X-MaaS-Subscription"| BFF
-  BFF -->|"subscription gpt-oss-20b-ocp-*"| GW --> LLM
+  BFF -->|"subscription gpt-oss-20b-builders"| GW --> LLM
   OGX -->|"upload: 512-token chunks,<br/>128 overlap"| EMB --> PGV
   OGX -.-> KV
   OGX -->|"tool runtime model-context-protocol<br/>user's OpenShift token"| FD

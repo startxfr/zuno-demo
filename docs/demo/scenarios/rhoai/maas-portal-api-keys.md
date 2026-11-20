@@ -1,12 +1,15 @@
 # Scenario: RHOAI Models-as-a-Service - a self-service API key with a governed budget
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Models-as-a-Service (MaaS) is the part of Red Hat OpenShift AI that publishes models behind one gateway, with API keys,
 subscriptions and token limits. In Zuno it is the **model access plane** under everything else (see
 [Appendix A](#appendix-a---hld)):
 - the ai-gateway reaches the local models through it;
-- a developer, OpenShift Lightspeed or a tool such as Claude Code reaches them directly with a MaaS key.
+- a developer or a tool such as Claude Code reaches them directly with a MaaS key, and OpenShift Lightspeed with the
+  token of its own service account.
 
 A developer signs in to the consumer portal, creates a key on the subscription of their group, and calls an
 OpenAI-compatible endpoint. The key is valid only for the models and budget of that subscription, and it can be
@@ -30,8 +33,8 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the MaaS objects outside the AI namespaces (`models-as-a-service`, `openshift-ingress`). | The presenter's `oc` terminal for the subscription and policy steps of the 15-minute version. |
 | **sale-01** | Salesperson, front office. Group `sales`. | Subscription `gpt-oss-20b-business`: 5,000 tokens per hour, on gpt-oss-20b only; no subscription on the other models, so a call there is refused with 403 (tested live on 2026-11-20 with the twin `stress-sale-01`: 200 and counted on gpt-oss-20b, 403 on qwen36-27b-instruct). | Named only, as the contrast of budgets by group. Not signed in during this scenario. |
 
-Other identities: the ai-gateway's service account holds its own subscription (1,000,000 tokens per hour, and the only
-one on the SaaS models). It carries the traffic of every chat experience.
+Other identities: the ai-gateway's service account holds the platform subscriptions (1,000,000 tokens per hour, shared
+with Praxis on the local models, and the only one on the SaaS models). It carries the traffic of every chat experience.
 
 ## Presenter lifecycle
 
@@ -53,7 +56,7 @@ There is no golden-path probe for this scenario: rehearse it the same day. The f
 conditions of the DSC `zuno-dsc` (`ModelsAsAServiceReady`, `MaaSConsumerPortalAvailable`), the Gateway
 `maas-default-gateway` (`Programmed`), the MaaSSubscription `gpt-oss-20b-builders`
 (`Ready`), the AuthPolicy `maas-gateway-auth` (`Enforced`), and the `LLMInferenceService` `gpt-oss-20b` `Ready`
-(`oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`). The three human subscriptions cover this model only: when
+(`oc get llminferenceservice gpt-oss-20b -n zuno-ai-run`). The human subscriptions cover this model only: when
 it is not Ready, a key has nothing to call (on 2026-11-12 it was not Ready). See
 [If something goes wrong](#if-something-goes-wrong).
 
@@ -137,8 +140,8 @@ Run the 5-minute version, then:
   (`MAAS_EXTERNAL_EGRESS_ENABLED=false`, checked 2026-11-13). The ExternalModels are published for a later cutover (WP-219).
   See [external models](external-models.md).
 - **Each new limit adds to the gateway's Kuadrant EnvoyFilter**, which must stay under the request limits (3 MiB for the API, 2 MiB for gRPC). It could not be written between 2026-11-05 and
-  2026-11-20, so 11 of the 29 limits were never counted; since [WP-314](../../../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) (3 route matches per model, 17 subscriptions) it is at generation 4, 674,956 bytes,
-  with a CI gate at 1.4 MB, and every limit is counted.
+  2026-11-20, so 11 of the 29 limits were never counted; since [WP-314](../../../roadmap/work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) (3 route matches per model) and the usage tiers of 2026-11-20 (12 subscriptions) it is at generation 14, 549,033 bytes
+  (measured on 2026-11-20 at 15:33 UTC), with a CI gate at 1.4 MB, and every limit is counted.
   Adding subscriptions on stage is not part of this scenario. The steps and subscription list of this page follow that change and have not been rehearsed since.
 
 ## Appendix A - HLD

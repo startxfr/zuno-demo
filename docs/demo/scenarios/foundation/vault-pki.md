@@ -12,7 +12,7 @@ the parts connect is in [Appendix B](#appendix-b---lld).
 | Part | What it does on demo333 |
 |---|---|
 | Vault `zuno-vault` | Raft storage, AWS KMS auto-unseal, TLS listener with an OpenShift service-CA certificate. Engines: KV `zuno/`, PKI `pki/`, Transit `transit/`, Kubernetes auth |
-| External Secrets Operator | 97 ExternalSecrets, 20 SecretStores `vault` (one per namespace), refreshed every hour |
+| External Secrets Operator | 101 ExternalSecrets and 21 SecretStores `vault` (one per namespace) on 2026-11-20, refreshed every hour |
 | cert-manager | Let's Encrypt (DNS-01 on Route53) for the router, the API server and Keycloak; Vault PKI for istiod and every mesh workload |
 | Vault Transit | Signs the agent chain of the a2a-gateway (key `agent-chain`) and the tool-call assertion of the mcp-gateway (key `mcp-call-assertion`) |
 
@@ -29,11 +29,11 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
 | **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Lists ExternalSecrets, SecretStores, ClusterIssuers and Certificates in every namespace; reads the Vault ConfigMaps. It could read Secrets: this page never does. | The presenter's `oc` terminal in both versions. |
-| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 23 Zuno namespaces, `zuno-vault`, `zuno-ai-run` and `zuno-mesh` included), `agent_tekos`, `openwebui_admin`. | Reads the objects of `zuno-vault` and `zuno-ai-run`. May create an ExternalSecret in `zuno-ai-run`: the store of that namespace limits it to 18 Vault keys. Cannot list across namespaces. | Fallback terminal for the namespaced steps. Named in the 15-minute version (6:00). |
+| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 18 namespaces, `zuno-ai-run` included; no rights in `zuno-vault` or `zuno-mesh`), `agent_tekos`, `openwebui_admin`. | Reads the objects of `zuno-ai-run`, not those of `zuno-vault`. May create an ExternalSecret in `zuno-ai-run`: the store of that namespace limits it to 18 Vault keys. Cannot list across namespaces. | Fallback terminal for the `zuno-ai-run` steps. Named in the 15-minute version (6:00). |
 | **ai-dev-01** | AI developer, back office. Groups `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`. | Same ExternalSecret right in `zuno-ai-run`. | Named only: the 2026-11-06 finding that made per-namespace stores necessary. |
 
 Other identities, none of which signs in on stage:
-- In each of the 20 namespaces, the ServiceAccount `vault-reader`. Its store logs in to Vault with the Kubernetes auth
+- In each of the 21 namespaces, the ServiceAccount `vault-reader`. Its store logs in to Vault with the Kubernetes auth
   role `ns-<namespace>`. No pod runs as it.
 - The ServiceAccount `cert-manager` logs in to Vault for both Vault ClusterIssuers (roles `cert-manager-issuer` and
   `istio-issuer`).
@@ -101,8 +101,8 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Terminal: `oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version` | "Every credential of the platform lives in one Vault. It seals with an AWS key that the cluster does not hold. When its pod restarts, it unseals itself: nobody types a key, and no unseal key is stored in the cluster." | `zuno-vault-0` 1/1 Running, `VAULT-SEALED false`, `VAULT-ACTIVE true`, `1.17.2`. Next to it the three `external-secrets` pods. On 2026-11-13 the pod was about 3 hours old: it had restarted during a master cordon and unsealed itself. |
-| 1:00 | `oc get externalsecrets -A --no-headers \| awk '{print $(NF-1)}' \| sort \| uniq -c`, then `oc get externalsecrets -n zuno-ai-run` | "No application gets a credential from Git. Each ExternalSecret names a Vault path. The operator copies the value into the namespace and refreshes it every hour." | `97 SecretSynced` (on 2026-11-13). In `zuno-ai-run`, 24 lines, all `READY True`: provider keys (`llm-provider-mistral`...), the S3 credentials of each model, `quay-pull`, with `STORE vault` and `REFRESH 1h`; one generator line without a store. |
-| 2:15 | `oc get secretstores -A`, then `oc get clustersecretstores` | "Each namespace has its own store, and the store logs in to Vault as that namespace. Its policy lists the exact keys the namespace may read. Before 7 November, one shared store could read everything." | 20 stores named `vault`, `Valid`, `READY True`. Then `No resources found`. |
+| 1:00 | `oc get externalsecrets -A --no-headers \| awk '{print $(NF-1)}' \| sort \| uniq -c`, then `oc get externalsecrets -n zuno-ai-run` | "No application gets a credential from Git. Each ExternalSecret names a Vault path. The operator copies the value into the namespace and refreshes it every hour." | `101 SecretSynced` (on 2026-11-20; 97 on 2026-11-13). In `zuno-ai-run`, 24 lines, all `READY True`: provider keys (`llm-provider-mistral`...), the S3 credentials of each model, `quay-pull`, with `STORE vault` and `REFRESH 1h`; one generator line without a store. |
+| 2:15 | `oc get secretstores -A`, then `oc get clustersecretstores` | "Each namespace has its own store, and the store logs in to Vault as that namespace. Its policy lists the exact keys the namespace may read. Before 7 November, one shared store could read everything." | 21 stores named `vault`, `Valid`, `READY True`. Then `No resources found`. |
 | 3:15 | `oc get certificates -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name,READY:.status.conditions[?(@.type=="Ready")].status,EXPIRES:.status.notAfter' \| grep -E 'NAMESPACE\|letsencrypt\|vault-issuer'` | "Certificates are issued and renewed, never copied. The routes, Keycloak and the API server carry a Let's Encrypt wildcard, proven through DNS. The service mesh gets its certificates from Vault's own PKI, one hour at a time." | `api-server-tls`, `router-wildcard-tls`, `keycloak-wildcard-tls` on `letsencrypt-route53`, `True`, expiring 2027-02-04 (on 2026-11-13). `istiod` on `vault-issuer-istio`, `True`, expiring within the hour. |
 | 4:15 | Close | "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the cluster does not hold, and its signing keys never leave it." | |
 
@@ -112,7 +112,7 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | `oc get cm zuno-vault-config -n zuno-vault -o jsonpath='{.data.extraconfig-from-values\.hcl}' \| grep -E '^(storage\|seal\|listener)'`, then `oc get route -n zuno-vault` | "Three lines carry the design: Raft storage, the AWS KMS seal, a TLS listener. The KMS key is used by an IAM user that may only encrypt and decrypt with that one key. The web UI is off: every client is inside the cluster." | `listener "tcp" {`, `storage "raft" {`, `seal "awskms" {`. Then `No resources found in zuno-vault namespace.` Do not print the whole ConfigMap: it shows the KMS key identifier. |
+| 5:00 | `oc get cm zuno-vault-config -n zuno-vault -o jsonpath='{.data.extraconfig-from-values\.hcl}' \| grep -E '^(storage\|seal\|listener)'`, then `oc get route -n zuno-vault` | "Three lines carry the design: Raft storage, the AWS KMS seal, a TLS listener. The KMS key is used by an IAM user that may only encrypt and decrypt with that one key. The web UI is off: every client is inside the cluster." | `listener "tcp" {`, `storage "raft" {`, `seal "awskms" {`. Then `No resources found in zuno-vault namespace.` On 2026-11-20 the command listed a Route `vault` (passthrough, created on 2026-11-17, not rendered by the chart): tell the platform owner before the session. Do not print the whole ConfigMap: it shows the KMS key identifier. |
 | 6:00 | `oc get cm vault-configure-secret-access -n zuno-vault -o jsonpath='{.data.ns-zuno-ai-run\.hcl}' \| grep '^path'` | "This is the Vault policy of the `zuno-ai-run` store: 18 paths, read only. It is generated from one table in Git, and a check fails the build if an ExternalSecret asks for a key the table does not list. ai-ops-01 and ai-dev-01 may create ExternalSecrets here, so this list is all they could ever pull." | 18 lines, from `path "zuno/data/aap/mcp-token" {` to `path "zuno/data/smtp/technical" {`. Paths only, no values. |
 | 7:15 | `oc get externalsecret llm-provider-mistral -n zuno-ai-run -o jsonpath='{.spec.secretStoreRef.kind}/{.spec.secretStoreRef.name}{"  "}{.spec.data[*].remoteRef.key}{"  "}{.status.refreshTime}{"\n"}'` | "One example: the ai-gateway's Mistral key. The manifest in Git names a path. The value is fetched by the operator and refreshed every hour." | `SecretStore/vault  providers/mistral  <a time within the last hour>`. |
 | 8:15 | `oc get deploy a2a-gateway mcp-gateway -n zuno-ai-run -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .spec.template.spec.containers[0].env[*]}{"  "}{.name}={.value}{"\n"}{end}{end}' \| grep -E 'gateway$\|SIGNER\|VAULT_(AUTH_ROLE\|TRANSIT_KEY\|ADDR)'` | "Two private keys used to sit in Secrets: one signs the agent chain of a delegation, one signs every tool call. Now Vault Transit signs. The gateway sends the bytes, Vault returns a signature, and the key never leaves Vault. If Vault does not answer, nothing is signed another way: the tool call is refused, the delegation goes without a chain." | `a2a-gateway`: `AGENT_CHAIN_SIGNER=transit`, `VAULT_ADDR=https://zuno-vault.zuno-vault.svc:8200`, `VAULT_AUTH_ROLE=a2a-gateway`, `VAULT_TRANSIT_KEY=agent-chain`. `mcp-gateway`: `MCP_CALL_ASSERTION_SIGNER=transit`, role `mcp-gateway`, key `mcp-call-assertion`. |
@@ -129,9 +129,9 @@ Run the 5-minute version, then:
 |---|---|---|
 | `zuno-vault-0` shows `VAULT-SEALED true`, or is not Ready for minutes | Do not try to unseal on stage: with the KMS seal, no key typed by a person can unseal it. Show the [runbook](../../../platform/vault-kms-raft-migration.md#what-changed). After the session the owner checks that AWS KMS is reachable and the IAM key in `vault-aws-kms` is valid. | "Applications keep the Secrets they already have. What waits is the next refresh, new certificates and every signature." |
 | Some ExternalSecrets show `SecretSyncedError` | `oc describe externalsecret <name> -n <namespace>` (read-only) and read the last event. After a Vault outage, the owner re-syncs the Applications and the ExternalSecrets, with a go ([runbook](../../../platform/vault-kms-raft-migration.md#after-the-migration), item 4). | "The value in the namespace is the last good one. The operator retries." |
-| A count differs from this page (97, 20, 18) | Say the number you see. It moves when a component is installed or removed. | |
+| A count differs from this page (101, 21, 18) | Say the number you see. It moves when a component is installed or removed. | |
 | A Certificate is not Ready | `oc describe certificate <name> -n <namespace>`. The current certificate keeps serving until its `notAfter`. | "Renewal starts 30 days before expiry, so a failed attempt has time to be fixed." |
-| `forbidden` on `-A`, cluster issuers, the router or the API server | The terminal is not **paas-ops-01**, or its group was never created. Run 0:00, 6:00 to 9:30 and 12:30 as **ai-ops-01** (admin in `zuno-vault` and `zuno-ai-run`). Skip 1:00 (first command), 2:15, 3:15, 10:30 (first command) and 11:30. | |
+| `forbidden` on `-A`, cluster issuers, the router or the API server | The terminal is not **paas-ops-01**, or its group was never created. Run 1:00 (second command), 7:15 and 8:15 as **ai-ops-01** (admin in `zuno-ai-run`; the `ocp-ai-ops` group has no rights in `zuno-vault` since 2026-11-13). Skip the others. | |
 | Someone asks to see a secret value | Refuse and show the path instead (6:00). | "A path is not a credential. The value stays in Vault." |
 
 ## Limits
@@ -267,7 +267,7 @@ flowchart LR
   VAULT --- ENG
   CFG --> VAULT
   BAK --> VAULT
-  subgraph NS["each of 20 namespaces, for example zuno-ai-run"]
+  subgraph NS["each of 21 namespaces, for example zuno-ai-run"]
     ES["ExternalSecret<br/>remoteRef.key = Vault path, refresh 1 h"]
     SS["SecretStore vault<br/>ServiceAccount vault-reader<br/>role ns-namespace: read on listed keys"]
     SEC["Kubernetes Secret"]

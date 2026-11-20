@@ -1,5 +1,7 @@
 # Scenario: ai-gateway - one token budget per persona across the experiences
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Every model call of every experience goes through the ai-gateway (see [Appendix A](#appendix-a---hld)). Before it
@@ -17,6 +19,7 @@ The classes come from the signed agents release
 | `evaluation` | members of `zuno-evaluation` (the `eval-*` and `stress-*` personas) | 20,000,000 per 24 h | 200,000,000 per 24 h | open |
 | `intensive` | no task opts in today; only a trusted platform client can ask for it | 500,000 per 24 h | 5,000,000 per 24 h | closed |
 | `stresstest` | members of the group named by `QUOTA_STRESSTEST_GROUP` (off), or the trusted client `zuno-stresstest` when it asks for it | 2,000 per 5 min | 8,000 per 5 min | closed |
+| `loadtest` | members of the group named by `QUOTA_LOADTEST_GROUP` (`zuno-loadtest` on demo333: the stress personas that carry load) | 250,000 per 1 h | 1,000,000 per 1 h | closed |
 
 MaaS also counts tokens, but per subscription and per model, not per person. Since the amendment of 2026-11-05 to
 the decision that delegates quotas, keys and exposure to MaaS, the per-person and per-group budgets live in the gateway's ledger only, by design.
@@ -58,13 +61,12 @@ a persona's token budget (see Start).
 
 Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1` and `zuno-redis-d0`/`-d1`, the Deployment
 `ai-gateway` and its quota environment (`QUOTA_LEDGER_STORE=redis`, `QUOTA_FAIL_MODES_ENFORCED=true`,
-`QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `PERSONA_CLAIM_CLIENTS`, and no
-`QUOTA_STRESSTEST_GROUP`), the StatefulSet `zuno-redis-master` with its volume
+`QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `MAAS_QUOTA_429_PASSTHROUGH=true`, `PERSONA_CLAIM_CLIENTS`), the StatefulSet `zuno-redis-master` with its volume
 (the PersistentVolumeClaim `redis-data-zuno-redis-master-0`, `Bound`), the MaaS subscription
 `gpt-oss-20b-platform`, the Deployment `grafana-deployment`, the pod `tempo-tempo-0` and the `LLMInferenceService`
 local models in `zuno-ai-run` (and how many are Ready). If one is missing or not Healthy, stop and tell the
-platform owner: this demo installs nothing. If `QUOTA_STRESSTEST_GROUP` is set, an old replay was not reverted: tell
-the platform owner before the session.
+platform owner: this demo installs nothing. The Check lists every `QUOTA` variable: if `QUOTA_STRESSTEST_GROUP` is
+among them, an old replay was not reverted: tell the platform owner before the session.
 
 ### Check
 
@@ -135,8 +137,8 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Open `policies/quotas/quota-policy.yaml` in the agents release | "The budgets are declared in the signed agents release, beside the tool policy. The gateway reads a slice generated from it and never defines an amount itself." | Four classes. `standard` and `evaluation` with `fail_mode: open`, `intensive` and `stresstest` with `fail_mode: closed`. |
-| 6:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' \| grep -E '^(QUOTA\|PERSONA\|MAAS_QUOTA)'` | "The ledger writes to Redis, so a restart does not give anyone a fresh budget. Fail modes are enforced. The tight test class is off." | `MAAS_QUOTA_429_PASSTHROUGH=true`, `QUOTA_FAIL_MODES_ENFORCED=true`, `PERSONA_CLAIM_CLIENTS=openclaw-*,dify,kagent`, `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `QUOTA_LEDGER_STORE=redis`. No `QUOTA_STRESSTEST_GROUP`. |
+| 5:00 | Open `policies/quotas/quota-policy.yaml` in the agents release | "The budgets are declared in the signed agents release, beside the tool policy. The gateway reads a slice generated from it and never defines an amount itself." | Five classes. `standard` and `evaluation` with `fail_mode: open`, `intensive`, `stresstest` and `loadtest` with `fail_mode: closed`. |
+| 6:30 | `oc get deploy ai-gateway -n zuno-ai-run -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' \| grep -E '^(QUOTA\|PERSONA\|MAAS_QUOTA)'` | "The ledger writes to Redis, so a restart does not give anyone a fresh budget. Fail modes are enforced. The tight test class is off." | `MAAS_QUOTA_429_PASSTHROUGH=true`, `QUOTA_FAIL_MODES_ENFORCED=true`, `PERSONA_CLAIM_CLIENTS=openclaw-*,dify,kagent`, `QUOTA_CLOSED_CLASS_MAAS_ONLY=true`, `QUOTA_LEDGER_STORE=redis`, `QUOTA_LOADTEST_GROUP=zuno-loadtest` (the class of the stress personas). No `QUOTA_STRESSTEST_GROUP`. |
 | 8:00 | Explain the persona key with [Appendix B](#appendix-b---lld) | "Open WebUI and UnifAI call with my own token. OpenClaw, Dify and kagent call as service accounts, whose tokens carry a signed `persona` claim. The ledger keys my budget on that persona, so the three paths meet on one counter." | The Redis key in Appendix B: `zuno:quota:<class>:user:<persona>:<bucket>`. |
 | 9:00 | `oc get maassubscriptions.maas.opendatahub.io gpt-oss-20b-platform -n models-as-a-service -o jsonpath='{.spec}'` | "MaaS counts too, but per subscription and per model. Everything the gateway sends draws on the platform tier subscription. Per-person budgets exist only in the ledger: that is the 2026-11-05 decision." | `tokenRateLimits` of 1,000,000 tokens per `1h`, owner users `system:serviceaccount:zuno-ai-run:ai-gateway` and the Praxis ServiceAccount. |
 | 10:00 | Say what each refusal means | "A 429 that names `dimension: user` or `group` comes from the ledger. One that names `dimension: maas` comes from a MaaS subscription limit." | |
@@ -188,7 +190,7 @@ Run the 5-minute version, then:
 - **Fixed windows.** Buckets follow the clock: the 24-hour budgets restart at 00:00 UTC, the 5-minute ones at :00, :05,
   and so on.
 - **Redis is best effort.** A Redis fault is logged and the pod's own counter applies; it never fails a request. The
-  ai-gateway runs one replica.
+  ai-gateway runs two replicas since 2026-11-13: during a Redis fault each pod counts on its own.
 - **No per-person metric.** Since WP-225 lot B (ADR-0603 M15) no metric carries a `user` label. The dashboards count
   by group; one person's calls are on the trace (`zuno.persona`) and in the ledger.
 - **MaaS does not count per person.** Through the gateway, every persona draws on the gateway's subscription
@@ -199,8 +201,8 @@ Run the 5-minute version, then:
 - **The request-rate limits of the policy are not enforced** for the in-cluster experiences. The only live
   request-rate limit is the workstation route's (`ai-gateway-workstation`, 60 requests per user per 5 minutes, used by
   Blender).
-- **The per-turn ceiling is opt-in and UnifAI only.** No agent of release 0.14.3 sets `max_tokens_per_turn`, and the
-  corp limits policy sets no ceiling. The cap is checked before each model call, so the last call can pass it (1,893
+- **The per-turn ceiling is opt-in and UnifAI only.** No agent sheet sets `max_tokens_per_turn` (agents repository read on
+  2026-11-20), and the corp limits policy sets no ceiling. The cap is checked before each model call, so the last call can pass it (1,893
   tokens against 300), and a single-call turn is never cut. The other experiences have no per-turn ceiling.
 - **Evaluation personas run out quickly.** A delegating Arkos turn costs about 65,000 tokens, and on 2026-11-03 a few
   such turns ended in a rate limit of about 16 minutes
@@ -294,7 +296,7 @@ flowchart TB
   REQ["POST /v1/chat/completions"]
   subgraph GW["ai-gateway pod, namespace zuno-ai-run"]
     ID["1. Persona<br/>persona claim (openclaw-*, dify, kagent),<br/>else preferred_username, else sub"]
-    CLS["2. Quota class<br/>stresstest: in QUOTA_STRESSTEST_GROUP (off)<br/>evaluation: in zuno-evaluation<br/>else standard; the header counts only<br/>from a trusted client (zuno-stresstest)"]
+    CLS["2. Quota class<br/>loadtest: in QUOTA_LOADTEST_GROUP<br/>stresstest: in QUOTA_STRESSTEST_GROUP (off)<br/>evaluation: in zuno-evaluation<br/>else standard; the header counts only<br/>from a trusted client (zuno-stresstest)"]
     CHK{"3. Ledger check<br/>group set first, then persona:<br/>budget left in this window?"}
     D429["429 quota_exceeded<br/>class, dimension, budget, window<br/>and Retry-After"]
     ROUTE["4. Candidates<br/>closed class: MaaS only,<br/>no direct sibling, no SaaS"]

@@ -1,5 +1,7 @@
 # Scenario: Supply chain - signed images, admission policy and the internal Quay
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Zuno signs what it runs and checks the signature before it runs it. Red Hat Trusted Artifact Signer (RHTAS) runs in
@@ -109,7 +111,7 @@ Run the 5-minute version, then:
 | 6:00 | `oc get clusterimagepolicies.policy.sigstore.dev zuno-unifai-images-unifai-ui -o jsonpath='{.spec.authorities[0].keyless.identities[*].subjectRegExp}{"\n"}{.spec.authorities[0].source[0].oci}{"\n"}'` | "UnifAI is built and signed by its own CI on GitHub. We trust named workflows, not a key: release tags, and the `devel` branch because this cluster runs it. The signature is read from our Quay." | Regular expressions on `github.com/startxfr/UnifAI/.github/workflows/` (`publish-images.yml`, `unifai-operator-release.yml`, `release.yml`), then `quay-quay-zuno-registry.apps.demo333.startx.fr/zuno/unifai-ui`. |
 | 7:15 | `oc get pods -n zuno-unifai -o jsonpath='{range .items[*]}{.spec.containers[*].image}{"\n"}{end}' \| grep unifai-` | "Every UnifAI image is pinned by digest. In an opted-in namespace the webhook also refuses a tag." | `quay.io/zuno/unifai-backend@sha256:...`, `unifai-identity`, `unifai-multiagent`, `unifai-rag`, `unifai-ui`. |
 | 8:15 | Show [WP-178](../../../roadmap/work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md), step 4 | "Before we switched to enforce, on 2026-10-25, we sent unsigned digests and a tag through the real webhook as dry runs. They were refused; a CI-signed digest was admitted. Before each new pin, the pin script asks the webhook the same question." | `admission webhook "policy.rhtas.com" denied the request ... no signatures found`. |
-| 9:15 | `oc get quayregistry -n zuno-registry`, then `oc get imagedigestmirrorset` | "One Red Hat Quay, its blobs in an S3 bucket. It holds the agents release with its signatures, the UnifAI images and 20 public image repositories we depend on. Why not OpenShift's own registry? It has no OCI referrers API, so a signature copied there cannot be found: we measured it." | `quay` `v3.18.3` `AVAILABLE True`; `zuno-public-via-registry` and `zuno-unifai-via-registry`. |
+| 9:15 | `oc get quayregistry -n zuno-registry`, then `oc get imagedigestmirrorset` | "One Red Hat Quay, its blobs in an S3 bucket. It holds the agents release with its signatures, the UnifAI images, 20 public image repositories we depend on and eight large Red Hat product images. Why not OpenShift's own registry? It has no OCI referrers API, so a signature copied there cannot be found: we measured it." | `quay` `v3.18.3` `AVAILABLE True`; `zuno-public-via-registry`, `zuno-redhat-via-registry` and `zuno-unifai-via-registry`. |
 | 10:30 | `oc get job supply-chain-verify-images -n zuno-ai-build` | "Admission is the second guard. The first one is a check, `make d2 check supply-chain`: a Job verifies the live digest of every image we build against Fulcio and Rekor, and checks the release ledger. Its last run passed." | `Complete` `1/1`, with its age. |
 | 11:30 | `grep -c 'release_tag' platform/supply-chain/pinned-releases.yaml`, then `grep -A8 'release_tag: v0.15.0' platform/supply-chain/pinned-releases.yaml` | "A named release rebuilds every component from its tag, signs it and writes its digest in an append-only ledger. The ledger is the evidence; it changes nothing that runs." | `12`; then `release_tag: v0.15.0`, `pinned_at: '2026-11-11T16:25:00Z'`, a digest and `signed: true`. |
 | 12:45 | `oc get validatingwebhookconfiguration policy.rhtas.com -o jsonpath='{.webhooks[0].failurePolicy} {.webhooks[0].timeoutSeconds}{"\n"}'` | "One honest limit: if the webhook is down or slower than ten seconds, the pod is admitted without a check. The verification before each deployment and the drift check are the main guard." | `Ignore 10`. |
@@ -276,7 +278,7 @@ flowchart TB
   subgraph REG["namespace zuno-registry"]
     QUAY[("Red Hat Quay v3.18.3<br/>quay-quay-zuno-registry/zuno<br/>blobs in S3, PostgreSQL 15")]
   end
-  IDMS["ImageDigestMirrorSets<br/>zuno-unifai-via-registry: 8 sources<br/>zuno-public-via-registry: 20 sources<br/>AllowContactingSource"]
+  IDMS["ImageDigestMirrorSets<br/>zuno-unifai-via-registry: 8 sources<br/>zuno-public-via-registry: 20 sources<br/>zuno-redhat-via-registry: 8 sources<br/>AllowContactingSource"]
   NODE["node CRI-O<br/>pulls quay.io/zuno/... by digest"]
   IDMS -.-> NODE
   NODE -->|"mirror first"| QUAY

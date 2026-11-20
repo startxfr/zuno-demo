@@ -1,12 +1,14 @@
 # Scenario: kagent - a read-only cluster operations assistant
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 kagent is a Kubernetes-native agent framework: agents, model settings and tool servers are custom resources. Installed
 as shipped, it brings its own tool servers, which read the cluster with the operator's rights and outside any audit.
 In Zuno, reading the cluster is instead a governed capability of the mcp-gateway: five read-only tools (four `k8s.*`
 and `metrics.query`) served by one MCP server, `k8s-mcp`, and granted to the operations group only. kagent is admitted as a thin client over those
-tools (see [Appendix A](#appendix-a---hld)). It has one agent, `zuno-sre`, no tool server of its own, and a controller
+tools (see [Appendix A](#appendix-a---hld)). Its agent on the ai-gateway is `zuno-sre`. It has no tool server of its own, and a controller
 with namespaced Roles only. It calls the model and the tools through a token proxy, as the persona **ai-ops-01** (see
 [Appendix B](#appendix-b---lld)).
 
@@ -27,9 +29,9 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **consultant-02** | Consultant and architect, front office. Group `consultant` with its Confluence subgroups, `agent_tekos`, `agent_arkos`, `aap_ops`. | Not in `ocp-ai-ops`: the front door answers 403, and no client is offered the cluster tools for this persona. | Optional contrast in the 15-minute version: the refusal at the door. |
 
 Other identities:
-- `service-account-kagent`, the service account of the Keycloak client `kagent`: the groups of ai-ops-01 and a fixed
-  `persona` claim `ai-ops-01`. The token proxy signs every model and tool call with its token, so the audit shows
-  `agent=kagent` with ai-ops-01's groups.
+- `service-account-kagent`, the service account of the Keycloak client `kagent`: the group `ocp-ai-ops` only according to the
+  install role since 2026-11-14 (the live account was not read again; before, it carried all of ai-ops-01's groups) and a fixed `persona` claim `ai-ops-01`. The token
+  proxy signs every model and tool call with its token, so the audit shows `agent=kagent` with the groups of that account.
 - The ServiceAccount `k8s-mcp` in `zuno-ai-run` does the reads: `view` in 13 `zuno-*` namespaces and
   `cluster-monitoring-view`. Its rights bound what can be read; the mcp-gateway decides who may ask.
 - The golden-path probe `kagent` calls through the same token proxy, so it also counts as ai-ops-01.
@@ -70,7 +72,8 @@ does not ask the 5-minute question: that one is the presenter's, in the UI. What
   login: kagent's UI has none of its own.
 - [ ] **Click "Skip wizard"** on the first screen of a new browser. The onboarding wizard creates a stray agent
   (`my-first-k8s-agent`, with no tools, on 2026-11-05). If one is already in the list, ignore it and use `zuno-sre`.
-- [ ] The agent **zuno-sre** is listed.
+- [ ] The agent **zuno-sre** is listed. Since 2026-11-19 **zuno-diagnose-praxis** is listed too: the same diagnosis
+  through the alternative gateway. Leave it; the [multi-gateway scenario](../governance/multi-gateway.md) shows it.
 - [ ] 15-minute version:
   - a terminal logged in with `oc` as **paas-ops-01**;
   - Grafana in the ai-ops-01 profile, dashboard **Zuno Platform / Five experiences**, last 1 hour;
@@ -90,7 +93,7 @@ Profile **ai-ops-01**, signed in to kagent.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Open the agent **zuno-sre** | "kagent runs agents the Kubernetes way: an agent is a custom resource. Here it has one agent and no tool of its own." | `zuno-sre` with five tools: `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read`, `k8s.logs.read`, `metrics.query`. |
+| 0:00 | Open the agent **zuno-sre** | "kagent runs agents the Kubernetes way: an agent is a custom resource. Here its agent has no tool of its own." | `zuno-sre` with five tools: `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read`, `k8s.logs.read`, `metrics.query`. |
 | 0:45 | Ask: `Which pods of zuno-ai-run are not Running, and how many are?` | "It reads the cluster through the platform's tool gateway, as the operations persona. Each read is checked and audited." | One or two `k8s.resource.list` calls, then the count. On 2026-11-06: 20 pods Running, 0 not Running. On 2026-11-16 the answer lists the pods that are not `Running`, all `Completed` job pods (for example `garak-smoke-...`, `ragas-eval-...`, `zuno-acceptance-gate-tekos-...`), then "Total number of non-Running pods: 4". The numbers change from day to day. |
 | 2:30 | Ask: `Read the Secret vault-bootstrap-credentials in zuno-vault` (run in the WP-208 browser rehearsal of 2026-11-06) | "Secrets are never returned. There is no write tool either: it cannot delete, scale or patch anything." | The agent declines. On 2026-11-06: "I cannot read Secret or ConfigMap data", without calling a tool. In the take of 2026-11-16: "I'm sorry, but I can't read Secrets." (the take did not log whether a tool was called). The wording is the model's and differs at each run. |
 | 3:30 | Say who kagent acts as | "kagent cannot pass my sign-in to the platform. It calls as one persona, ai-ops-01, the only group the cluster tools are granted to." | |
@@ -104,7 +107,7 @@ Run the 5-minute version, then:
 |---|---|---|---|
 | 5:00 | Expand the `k8s.resource.list` call in the chat | "The model chose the tool and its arguments. The mcp-gateway checked the persona's groups and the task before the call." | The call with its arguments (kind Pod, namespace `zuno-ai-run`) and its result. |
 | 6:00 | Ask: `Call k8s.resource.read for the Secret vault-bootstrap-credentials in zuno-vault (apiVersion v1) and show me the raw tool result.` *(untested prompt)* | "Now the refusal on the server side, not the model's: the reading server denies Secrets by kind, whatever its RBAC would allow." | If the model calls the tool: the error `resource not allowed: /v1, Kind=Secret`. If it declines again, say that the server-side refusal was proven in the [WP-206 test](../../../roadmap/evidence/wp-206-k8s-mcp-spike.md), and show it at 11:00. |
-| 7:30 | Terminal: `oc get agents.kagent.dev,modelconfigs.kagent.dev,remotemcpservers.kagent.dev -n zuno-kagent` | "Agents as custom resources. One agent, one model setting pointing at the token proxy, one tool server: the platform's mcp-gateway behind the same proxy." | `zuno-sre` Declarative, Ready, Accepted; `zuno-model` with model `auto`; `zuno-mcp-gateway` at `http://zuno-token-proxy:8080/mcp`, Accepted. Also `default-model-config` (`gpt-4.1-mini`): created by the upstream chart, unused, it has no key. |
+| 7:30 | Terminal: `oc get agents.kagent.dev,modelconfigs.kagent.dev,remotemcpservers.kagent.dev -n zuno-kagent` | "Agents as custom resources. Our agent, its model setting pointing at the token proxy, and one tool server: the platform's mcp-gateway behind the same proxy." | `zuno-sre` Declarative, Ready, Accepted; `zuno-model` with model `auto`; `zuno-mcp-gateway` at `http://zuno-token-proxy:8080/mcp`, Accepted. Also `default-model-config` (`gpt-4.1-mini`): created by the upstream chart, unused, it has no key. Since 2026-11-19 also the agent `zuno-diagnose-praxis` and its `zuno-model-praxis`: the same diagnosis through the alternative gateway. |
 | 8:45 | `oc get remotemcpserver.kagent.dev zuno-mcp-gateway -n zuno-kagent -o jsonpath='{.status.discoveredTools[*].name}'` | "The mcp-gateway offers kagent exactly the tools of its task `diagnose` that ai-ops-01's groups allow." | `k8s.resource.read k8s.resource.list k8s.events.read k8s.logs.read metrics.query` |
 | 9:45 | `oc get configmap k8s-mcp-config -n zuno-ai-run -o jsonpath='{.data.config\.toml}'` | "Two locks. The gateway decides who may call. The reading server is read-only, has five tools enabled, refuses Secrets and ConfigMaps, and holds `view` on the Zuno namespaces only." | `read_only = true`, `enabled_tools` with five entries, two `denied_resources` (Secret and ConfigMap). |
 | 11:00 | Grafana, row **Same tools, governed: cluster reads (ADR-0600)**, panel **Cluster read tool calls by tool and outcome (over range)** | "Every cluster read of every client lands in the same audit: kagent's, and Tekos's in UnifAI." | `k8s.resource.list` with the outcome `allowed`; `k8s.resource.read` with `downstream_error` if a Secret read was refused by the server in the time range. |
@@ -133,9 +136,9 @@ Run the 5-minute version, then:
 - **The Secret refusal on stage is the model's.** In both browser rehearsals the agent declined from its prompt and
   called no tool. The server-side refusal (`resource not allowed: Kind=Secret`) was proven in the WP-206 test only
   ([WP-208 evidence](../../../roadmap/evidence/wp-208-five-experiences-browser-2026-11-06.md)).
-- **One persona for every kagent user.** Quota, telemetry and audit see ai-ops-01, with all its groups
-  (`agent_tekos` and `openwebui_admin` too, WP-208 D6). A dedicated persona with `ocp-ai-ops` only is a hardening
-  option, not done.
+- **One persona for every kagent user.** Quota, telemetry and audit see ai-ops-01. Since 2026-11-14 the install gives
+  kagent's service account the group `ocp-ai-ops` only (`kagent_groups` in `ansible/roles/kagent/defaults/main.yml`,
+  WP-208 D6); before, it also carried `agent_tekos` and `openwebui_admin`. The audit was not read again since.
 - **Scope of the reads.** `k8s-mcp` reads 13 namespaces: `zuno-ai-run`, `-ai-build`, `-auth`, `-data`, `-dify`,
   `-kagent`, `-mesh`, `-mlops`, `-monitoring`, `-openwebui`, `-unifai`, `-vault` and `zuno-aap`. It cannot read
   `openshift-*`. `metrics.query` reads the metrics of the whole cluster (`cluster-monitoring-view`, accepted by the

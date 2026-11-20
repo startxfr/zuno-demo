@@ -25,7 +25,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads the MaaS objects in `zuno-ai-run` and `models-as-a-service`. MaaS subscription `gpt-oss-20b-ocp-paas-ops` on gpt-oss-20b only: no SaaS model. | The presenter's `oc` terminal in both versions. In the 15-minute version its own OpenShift token is refused on a SaaS model. |
+| **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads the MaaS objects in `zuno-ai-run` and `models-as-a-service`. MaaS subscription `gpt-oss-20b-builders` on gpt-oss-20b only: no SaaS model. | The presenter's `oc` terminal in both versions. In the 15-minute version its own OpenShift token is refused on a SaaS model. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana. | Shows in the 15-minute version which SaaS providers served calls. |
 | **finance-01** | Finance, middle office. Groups `finance`, `agent_finage`. | Its agent, Finage, is excluded from gpt-oss-120b. The ai-gateway enforces it. | Named only. |
 | **consultant-01** | Consultant and architect, front office. Group `consultant` and its Confluence subgroups. | Open WebUI user; **Zuno Code** goes to Codestral first. | Named only: asked the question of the Codestral-down drill of 2026-11-05. |
@@ -69,7 +69,7 @@ The step file resolves the variable `$MAAS` (the 15-minute version, row 7:30) fr
 `https://maas.<cluster domain>/zuno-ai-run`), not from a read of the MaaS Route. The presenter no longer exports it. What only a person does:
 
 - [ ] A terminal logged in with `oc` as **paas-ops-01**, at the repository root, large font. Not `kube:admin`: the policy
-  `gpt-oss-20b-entitlement` admits the groups `sales`, `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops` and the agent groups, so
+  `gpt-oss-20b-entitlement` admits the groups `sales`, `ocp-ai-dev`, `ocp-ai-ops` and `ocp-paas-ops`, so
   row 7:30 returns `403` for `kube:admin` and `200` for a member. If **paas-ops-01** has
   never signed in to the OpenShift console (on 2026-11-13 it had not), sign in once in a browser first, then log the
   terminal in.
@@ -246,7 +246,7 @@ flowchart LR
     DRP["DestinationRule *-plaintext<br/>ai-gateway pods only, TLS DISABLE"]
   end
   subgraph MNS["namespace models-as-a-service"]
-    SUB["MaaSSubscription model-ai-gateway<br/>owner: service account ai-gateway only<br/>1,000,000 tokens per hour, priority 100"]
+    SUB["MaaSSubscription model-platform<br/>owner: service account ai-gateway only<br/>1,000,000 tokens per hour, priority 100"]
     MAP["MaaSAuthPolicy model-entitlement<br/>subject: service account ai-gateway"]
   end
   subgraph ING["namespace openshift-ingress"]

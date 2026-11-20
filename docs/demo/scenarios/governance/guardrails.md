@@ -1,5 +1,7 @@
 # Scenario: ai-gateway - guardrails on every model call
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Guardrails are detectors that look at what goes into a model and what comes out of it. In Zuno they run inside the

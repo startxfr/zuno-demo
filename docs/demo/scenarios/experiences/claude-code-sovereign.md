@@ -1,5 +1,7 @@
 # Scenario: Claude Code on sovereign models - a coding agent that stays in the cluster
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Claude Code is a coding agent made by a SaaS vendor. By default it sends its model calls to that vendor's API. Here it
@@ -109,7 +111,7 @@ Profile **ai-dev-01**, on the workstation.
 |---|---|---|---|
 | 0:00 | Terminal: run the login wrapper (`~/.config/zuno/praxis-login.sh`) | "No key is stored on this laptop. The helper asks Keycloak for a one-time code." | A Keycloak address and a short code, then the terminal waits. |
 | 0:15 | Open the link in a new private window. Sign in as **ai-dev-01**, then accept the consent | "I sign in as myself, in the browser. The gateway will receive my token, not a shared key." | The sign-in page, "Grant Access to Claude Code on sovereign models", "Device Login Successful". The terminal prints "Signed in. Claude Code can start." |
-| 0:45 | Run the start script of the editor window. Stay on the `settings.json` tab | "Claude Code is a SaaS product's client. Here it points at our own gateway, with local models only." | `ANTHROPIC_BASE_URL` with the Praxis host, `qwen3.6-27b-instruct` for every alias, `apiKeyHelper`, and no key. |
+| 0:45 | Run the start script of the editor window. Stay on the `settings.json` tab | "Claude Code is a SaaS product's client. Here it points at our own gateway, with local models only." | `ANTHROPIC_BASE_URL` with the Praxis host, `qwen3.6-27b-instruct` for the main, opus and sonnet aliases and `qwen3.5-9b` for haiku, `apiKeyHelper`, and no key. |
 | 1:15 | Claude Code panel: new conversation, `/status` | "Claude Code confirms where it sends its calls and with which model." | The Praxis host as Anthropic base URL, `apiKeyHelper` as auth token, `qwen3.6-27b-instruct` as model. The mode selector reads "Manual". |
 | 1:45 | Send: `Write a Python function that returns the n-th Fibonacci number in fib.py, and a unittest test in test_fib.py. Run the test with python3 -m unittest.` | "A small coding task, on our own model. It thinks first: about 30 seconds." | Claude Code thinks, then proposes the file `fib.py`. |
 | 2:30 | Accept each request: write `fib.py`, write `test_fib.py`, run `python3 -m unittest` | "The tools run here, on the laptop, and each one waits for my approval. Only the model calls leave the laptop, and they stay in the cluster." | Three approval prompts, then "Ran 4 tests" and a summary. The wording and the number of tests differ at each run. |

@@ -1,5 +1,7 @@
 # Scenario: OpenClaw - one personal assistant per persona
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 OpenClaw is an open-source personal assistant: a long-lived agent with its own chat, sessions and memory. Its own
@@ -139,6 +141,9 @@ Run the 5-minute version, then:
   Calling with the person's own token is a no-go for now
   ([WP-190 spike](../../../roadmap/evidence/wp-190-openclaw-user-token-spike.md)): the assistant also works in the
   background, when there is no browser session.
+- **The model selector lists one more entry.** Since 2026-11-19 each assistant also has a provider `praxis`, the
+  alternative gateway, reached through the same proxy with the same client token. This page uses `zuno` and `zuno-code`
+  only. See the [multi-gateway scenario](../governance/multi-gateway.md).
 - **Two personas only.** consultant-02 and sale-01 have an assistant; any other persona would need a namespace, a
   Keycloak client and Vault paths.
 - **Two sign-ins.** OpenClaw has no OIDC, and the operator forbids its trusted-proxy mode. Its device check is off and

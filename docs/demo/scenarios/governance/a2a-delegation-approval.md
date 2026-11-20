@@ -1,5 +1,7 @@
 # Scenario: a2a-gateway - agent-to-agent delegation with a human approval
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Zuno agents can ask other agents for help. Arkos, the architecture agent, may ask Tekos, the technical agent, through

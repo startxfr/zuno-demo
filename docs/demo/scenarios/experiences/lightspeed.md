@@ -1,5 +1,7 @@
 # Scenario: OpenShift Lightspeed - the console assistant served by MaaS
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 OpenShift Lightspeed is Red Hat's assistant inside the OpenShift web console. It answers from the official

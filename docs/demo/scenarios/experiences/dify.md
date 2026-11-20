@@ -1,14 +1,16 @@
 # Scenario: Dify - a no-code canvas on the governed backend
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 Dify is an open-source canvas on which a business user draws an LLM application: an agent, a chat flow or a workflow,
 built from model, knowledge, tool and logic boxes. In Zuno it is an experience client of the one governed backend (see
 [Appendix A](#appendix-a---hld)). It holds no model key, no document store and no tool credential. Its Community
 Edition has no single sign-on and cannot pass a user token. Every call therefore leaves Dify through a **token proxy**
-that signs it as one persona, **consultant-02**. Models come from the ai-gateway, tools from the mcp-gateway, and
-knowledge from a small adapter over the same mcp-gateway (see [Appendix B](#appendix-b---lld)). Three example
-applications are imported at every install.
+that signs it as one persona, **consultant-02**. The example applications take their models from the ai-gateway,
+their tools from the mcp-gateway, and their knowledge from a small adapter over the same mcp-gateway (see
+[Appendix B](#appendix-b---lld)). Three example applications are imported at every install.
 
 **The message:** "Business users can draw their own AI apps. The models, tools, documents and budget behind them stay
 the platform's."
@@ -144,6 +146,9 @@ Run the 5-minute version, then:
   OpenAI-compatible one (pinned by sha256), the code sandbox and the code node, the agent backend (needed by Dify's
   newer `agent` type; the example uses the legacy Agent type), web search and HTTP to the internet. The EgressFirewall
   allows only Keycloak and Dify's S3 bucket.
+- **A second model, not shown here.** Since 2026-11-19 Dify also lists a model `praxis-auto`, served by the
+  alternative gateway Praxis through the same token proxy. The three example applications use `auto` and stay on the
+  ai-gateway. See the [multi-gateway scenario](../governance/multi-gateway.md).
 - **No cluster tools in Dify.** The `k8s.*` tools are not in Dify's task `chat`, and the policy grants them to
   `ocp-ai-ops` only. See the [kagent scenario](kagent.md).
 - **The token proxy does not check its callers on demo333.** Its inbound key (ADR-0602 clause 10) is off: any pod of
@@ -239,7 +244,7 @@ flowchart LR
     API["dify-api<br/>console API, local sign-in<br/>dify-admin@zuno.local"]
     WRK["dify-worker<br/>Celery, 4 gevent slots<br/>runs the workflows"]
     BEAT["dify-beat<br/>scheduled tasks"]
-    PD["dify-plugin-daemon<br/>openai_api_compatible 0.0.73<br/>models auto, zuno-code"]
+    PD["dify-plugin-daemon<br/>openai_api_compatible 0.0.73<br/>models auto, zuno-code, praxis-auto"]
     REDIS[("dify-redis<br/>cache, Celery broker")]
     APPS["3 applications from DSL files<br/>Zuno Agent, Zuno Technical Documentation,<br/>Zuno Confluence Search"]
     KN["zuno-dify-knowledge :8080<br/>POST /retrieval, static key<br/>no store, no copy"]

@@ -1,5 +1,7 @@
 # Scenario: ai-gateway - model routing and fallback
 
+Last reviewed: 2026-11-20
+
 ## Introduction
 
 The ai-gateway is the only router between the experiences and the models (see [Appendix A](#appendix-a---hld)). For
@@ -26,7 +28,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
-| **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | Open WebUI user. Sees two models, **Zuno** and **Zuno Code**. Its calls are routed under the client `open-webui`, task `chat` or `code`. | The everyday employee of the 5-minute version: asks a code question with **Zuno Code**. |
+| **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | Open WebUI user. Picks between **Zuno** and **Zuno Code** on the default gateway (the picker also lists **Zuno wesh** and the `praxis.` models of the alternative gateway, not used here). Its calls are routed under the client `open-webui`, task `chat` or `code`. | The everyday employee of the 5-minute version: asks a code question with **Zuno Code**. |
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana and the Tempo search UI, both behind the OpenShift sign-in. | Shows which provider served each call (5-minute version), the skipped candidates and the trace (15-minute version). |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Runs the golden-path probe and reads the routing ConfigMaps and the model status. | The presenter's `oc` terminal in the 15-minute version. |
 
@@ -94,10 +96,10 @@ Nothing to do.
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 0:00 | Profile 1, **sale-01**: open the model picker | "Two models only. I do not pick a provider: I pick a kind of work. The platform owns the list of models behind each one." | **Zuno** and **Zuno Code**. |
+| 0:00 | Profile 1, **sale-01**: open the model picker | "Zuno and Zuno Code. I do not pick a provider: I pick a kind of work. The platform owns the list of models behind each one." | **Zuno** and **Zuno Code**. Since 2026-11-17 the picker also lists **Zuno wesh** and the models prefixed `praxis.` (the alternative gateway): leave them. |
 | 0:45 | New chat, **Zuno Code**, ask: `write Python code that checks the format of an email address` | "A code question goes to a code model, Mistral Codestral. If Codestral is down, a model running on our GPUs answers instead." | A Python function with a regular expression, in a few seconds. |
 | 2:00 | Profile 2, Grafana, row **Same models, same routing**, panel **Which provider served each experience (over range)** | "Here is the proof. The code question went to Codestral. The other line is the model on our own GPUs, which takes over if Codestral is down. Same chat, same user: the task chose." | For `open-webui`: `mistral-codestral` with outcome `success`. Seen in the take of 2026-11-16: the panel alone, filtered on the client `open-webui`, with the columns Time, client, outcome, provider and Value: `mistral-codestral` `success` 2.01, and `local-gpt-oss-maas` `success` 0. The take asked no warm-up question, so the local line has no call to show; the panel title says "over range", so the Value is computed over the time range (how, not checked); do not read it as a count of questions. |
-| 3:15 | Say what happens when a model is down | "If a local model stops, its controller says so and the gateway skips it in milliseconds. Before this rule, the same situation cost each experience up to fifteen minutes." | |
+| 3:15 | Say what happens when a model is down | "If a local model stops, its controller says so and the gateway skips it in milliseconds. Before this rule, the same situation made an Open WebUI chat wait about ten minutes." | |
 | 4:15 | Close | "The platform picks the model for each task, falls back when a model is down, and never waits on a model that is not there." | |
 
 ## 15-minute version
@@ -263,7 +265,7 @@ flowchart TB
     EFAIL["502, or 503 if every candidate was skipped<br/>all eligible providers failed"]
   end
   REL[("agents release<br/>policies/model-routing,<br/>experience-clients/*/tasks")]
-  CMR[("ConfigMap ai-gateway-model-routing<br/>30 preferences")]
+  CMR[("ConfigMap ai-gateway-model-routing<br/>32 preferences")]
   CMP[("ConfigMap zuno-provider-routing<br/>14 providers: role, eligible_for,<br/>inference_service, timeout")]
   LIS[("LLMInferenceService Ready<br/>polled every 10 s")]
   REDIS[("Redis in zuno-auth<br/>routing decision, 120 s")]
