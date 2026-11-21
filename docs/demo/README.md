@@ -1,6 +1,6 @@
 # Demo catalogue
 
-Last reviewed: 2026-11-19
+Last reviewed: 2026-11-21
 
 This directory holds the demonstrations of the Zuno platform:
 
@@ -132,6 +132,16 @@ shows what it will change and asks you to type the demo id.
 | [Observability and traces](scenarios/foundation/observability-trace.md) | A Tekos turn found in Tempo with its span tags, the Run Trace dashboard, usage and cost per experience, the collector pipeline, two counting traps, Perses in the console | consultant-02, ai-ops-01, paas-ops-01 | `trace` (with `unifai-tekos`) | written (wave 4) | 5: PASS, 15: PASS |
 | [AAP audited operations](scenarios/foundation/aap-audited-operations.md) | Job templates and workflows from Git, reader versus ops rights in the AAP UI, a check job and its pod, the agents' audit tools and their rate limit | consultant-03, consultant-02, paas-ops-01 | none (rehearse first) | written (wave 4) | 5: PASS, 15: PASS |
 
+### Resilience
+
+Both pages were written on 2026-11-21 from the design. They have not run on a cluster yet: the first live validation is
+planned for 2026-11-22. A chaos run starts only after a person approves it in AAP, and one chaos run at a time.
+
+| Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
+|---|---|---|---|---|---|
+| [Chaos on the infrastructure](scenarios/resilience/chaos-infrastructure.md) | The health signal, a chaos run approved in AAP, one Prometheus, one router and one API server pod deleted and replaced, the ClusterOperators still Available; in 15 minutes, CPU, memory and network pressure on one infra node | paas-ops-01 | none (not show-ready: never run on a cluster; rehearse first) | written (2026-11-21, from the design) | not rehearsed |
+| [Chaos on the AI platform](scenarios/resilience/chaos-platform.md) | A person keeps chatting in Open WebUI while one pod of each gateway is killed after an approval in AAP; in 15 minutes, Open WebUI, UnifAI, Keycloak, the OpenShift AI controllers, a cut to the SaaS provider and, optional, the gpt-oss-20b model pod | paas-ops-01, sale-01, consultant-02 | none (not show-ready: never run on a cluster; rehearse first) | written (2026-11-21, from the design) | not rehearsed |
+
 ## Workshops (presenter-led)
 
 | Workshop | Built from | Duration | Page | Rehearsed on 2026-11-15 |
@@ -167,6 +177,8 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | blender-3d | `blender-3d`, `blender-3d-state` | replayed (device sign-in, then the workstation entry); skipped when the entry is off |
 | world-model | `world-model-state` | state only (one assertion); not deployed on demand, no replay driver |
 | aap-audited-operations | `aap-audited-operations-state` | state only |
+| chaos-infrastructure | `chaos-infrastructure-state` | state only (the chaos component, its Pipelines and the AAP workflow; the `make d3 check recovery` read of its check is not replayed). The chaos runs are launched through AAP, never by a stress driver; a stress and chaos run together is planned for 2026-11-22 |
+| chaos-platform | `chaos-platform-state` | state only (the chaos component, the gateways, Open WebUI, gpt-oss-20b, the Pipelines and the AAP workflow); same note as chaos-infrastructure |
 | gitops-day0-3 | `gitops-day0-3-state` | state only |
 | image-signing-admission | `image-signing-admission-state`, `image-signing-refusal` | state check in the profiles; `image-signing-refusal` is opt-in (profile `mutating`) and stores nothing: it offers an unsigned, tag-referenced image as a dry-run pod create to the namespace `zuno-stress-admission`, and the admission webhook must refuse it. The namespace and its one pod-create grant exist only when `stressImageProof.enabled` is set (default off) |
 | observability-trace | `observability-trace`, `observability-trace-state` | replayed (a Tekos turn, then its trace read in Tempo by run id) |
