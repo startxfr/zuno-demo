@@ -161,6 +161,12 @@ jobs:
           python3 evaluations/tests/test_stress_report.py
           python3 evaluations/tests/test_stress_state.py
           python3 evaluations/tests/test_dashboard_coverage.py
+      # Day 2 component chaos: the closed target catalogue (platform/chaos/targets.yaml), the plan of a run and the chart
+      # values generated from the catalogue. The helm render cases of test_chart.py skip here (no helm in this job).
+      - name: Chaos target catalogue and chart values tests
+        run: |
+          python3 platform/chaos/tests/test_targets.py
+          python3 platform/chaos/tests/test_chart.py
       # ADR-0616 (WP-274): how the unifai-live-rag demo's start and stop drive the UnifAI RAG API (fake client, no
       # network, no httpx).
       - name: UnifAI RAG library tests (ADR-0616)

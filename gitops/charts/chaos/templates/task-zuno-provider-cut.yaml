@@ -1,0 +1,180 @@
+{{- if and .Values.zuno.enabled .Values.zuno.providerCut.enabled }}
+{{- $z := .Values.zuno }}
+{{- $cut := $z.providerCut }}
+# The SaaS provider cut, kept as a Zuno task when everything else moved to krkn (owner's decision on WP-311, 2026-11-21).
+# action=cut denies the IPv4 addresses of ONE external provider to the pods of ONE subject for a bounded time, with an
+# AdminNetworkPolicy (same shape as platform/testing/stress_chaos.py anp_manifest: a Deny on the egress of the named pods,
+# nothing else), then removes it whatever happens: an EXIT/INT/TERM trap deletes it, and the zuno-chaos-provider-cut
+# Pipeline runs action=reap in `finally`, which deletes every left-over policy labelled zuno.io/chaos=true (the PipelineRun
+# lock of ansible/roles/chaos means no other chaos run owns one at that moment).
+# The host and the subject are checked against the chart's allow-list here, not only in platform/chaos/targets.yaml: any
+# identity that may create a PipelineRun in zuno-chaos reaches this task.
+# The host is resolved inside the cluster, by the cluster's DNS, so the addresses denied are the ones the ai-gateway pods
+# would dial (each /32; a provider behind a CDN may move during the cut, the row says how many addresses were denied).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: zuno-provider-cut
+  namespace: {{ $z.namespace }}
+  labels:
+    app.kubernetes.io/name: zuno-provider-cut-task
+    {{- include "zuno-chaos.labels" . | nindent 4 }}
+  annotations:
+    tekton.dev/displayName: "Zuno provider cut"
+    tekton.dev/tags: "chaos, zuno, network"
+spec:
+  description: >-
+    Deny one external provider to the pods of one subject for a bounded time with an AdminNetworkPolicy, then remove it
+    (action=cut), or remove every chaos AdminNetworkPolicy left over (action=reap).
+  params:
+    - name: action
+      type: string
+      description: cut or reap
+      default: cut
+    - name: run-id
+      type: string
+      description: Name of the PipelineRun, written on the policy (label zuno.io/chaos-run)
+    - name: target-id
+      type: string
+      description: Id of the target in platform/chaos/targets.yaml (the policy is zuno-chaos-<target-id>)
+      default: ""
+    - name: host
+      type: string
+      description: The external provider's host name (one of the chart's allowed hosts)
+      default: ""
+    - name: subject-namespace
+      type: string
+      description: Namespace of the pods whose egress is denied
+      default: ""
+    - name: subject-selector
+      type: string
+      description: Label selector of those pods, k=v[,k=v]
+      default: ""
+    - name: duration
+      type: string
+      description: How long the provider stays denied (seconds, at most {{ $cut.maxDuration }})
+      default: "0"
+  results:
+    - name: status
+      description: passed or failed
+    - name: addresses
+      description: Number of addresses denied
+  steps:
+    - name: provider-cut
+      image: {{ include "zuno-chaos.image" $z.images.tools | quote }}
+      imagePullPolicy: IfNotPresent
+      computeResources:
+        {{- toYaml $z.resources | nindent 8 }}
+      securityContext:
+        {{- include "zuno-chaos.securityContext" . | nindent 8 }}
+      env:
+        - name: ACTION
+          value: "$(params.action)"
+        - name: RUN_ID
+          value: "$(params.run-id)"
+        - name: TARGET_ID
+          value: "$(params.target-id)"
+        - name: HOST
+          value: "$(params.host)"
+        - name: SUBJECT_NAMESPACE
+          value: "$(params.subject-namespace)"
+        - name: SUBJECT_SELECTOR
+          value: "$(params.subject-selector)"
+        - name: DURATION
+          value: "$(params.duration)"
+        - name: RESULT_STATUS
+          value: "$(results.status.path)"
+        - name: RESULT_ADDRESSES
+          value: "$(results.addresses.path)"
+        - name: ALLOWED_HOSTS
+          value: {{ join " " $cut.allowedHosts | quote }}
+        - name: ALLOWED_SUBJECTS
+          value: {{ join " " $cut.allowedSubjects | quote }}
+        - name: MAX_DURATION
+          value: {{ $cut.maxDuration | quote }}
+        - name: ANP_PRIORITY
+          value: {{ $cut.anpPriority | quote }}
+      script: |
+        #!/bin/bash
+        set -u
+        printf 'failed' > "${RESULT_STATUS}"
+        printf '0' > "${RESULT_ADDRESSES}"
+        fail() { echo "zuno-provider-cut: $*" >&2; exit 1; }
+        reap() {
+          oc delete adminnetworkpolicy -l zuno.io/chaos=true --ignore-not-found --wait=true
+          left="$(oc get adminnetworkpolicy -l zuno.io/chaos=true -o name 2>/dev/null)"
+          [ -z "${left}" ] || { echo "still present: ${left}" >&2; return 1; }
+        }
+        if [ "${ACTION}" = "reap" ]; then
+          reap || fail "a chaos AdminNetworkPolicy is still present"
+          echo "no chaos AdminNetworkPolicy left"
+          printf 'passed' > "${RESULT_STATUS}"
+          exit 0
+        fi
+        [ "${ACTION}" = "cut" ] || fail "action must be cut or reap, not '${ACTION}'"
+        # The allow-list of the chart, whatever the PipelineRun asks.
+        [[ "${TARGET_ID}" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]] || fail "target-id '${TARGET_ID}' is not a catalogue id"
+        case " ${ALLOWED_HOSTS} " in *" ${HOST} "*) ;; *) fail "host '${HOST}' is not an allowed provider (${ALLOWED_HOSTS})" ;; esac
+        case " ${ALLOWED_SUBJECTS} " in
+          *" ${SUBJECT_NAMESPACE}|${SUBJECT_SELECTOR} "*) ;;
+          *) fail "subject '${SUBJECT_NAMESPACE}|${SUBJECT_SELECTOR}' is not an allowed subject (${ALLOWED_SUBJECTS})" ;;
+        esac
+        [[ "${DURATION}" =~ ^[0-9]+$ ]] && [ "${DURATION}" -ge 1 ] && [ "${DURATION}" -le "${MAX_DURATION}" ] \
+          || fail "duration must be 1..${MAX_DURATION} seconds, not '${DURATION}'"
+        addresses="$(getent ahostsv4 "${HOST}" | awk '{print $1}' | sort -u)"
+        [ -n "${addresses}" ] || fail "${HOST} resolves to no IPv4 address: nothing to cut"
+        count="$(printf '%s\n' "${addresses}" | wc -l | tr -d ' ')"
+        name="zuno-chaos-${TARGET_ID}"
+        rule="deny-$(printf '%s' "${HOST}" | tr '.' '-')"
+        pod_labels=""
+        IFS=',' read -ra pairs <<< "${SUBJECT_SELECTOR}"
+        for pair in "${pairs[@]}"; do
+          pod_labels="${pod_labels}            ${pair%%=*}: \"${pair#*=}\""$'\n'
+        done
+        networks=""
+        for a in ${addresses}; do networks="${networks}            - ${a}/32"$'\n'; done
+        removed=0
+        cleanup() {
+          trap - EXIT INT TERM
+          [ "${removed}" -eq 1 ] && return
+          echo "removing AdminNetworkPolicy ${name}"
+          oc delete adminnetworkpolicy "${name}" --ignore-not-found --wait=true && removed=1
+        }
+        trap cleanup EXIT INT TERM
+        cat > /tmp/anp.yaml <<ANPEOF
+        apiVersion: policy.networking.k8s.io/v1alpha1
+        kind: AdminNetworkPolicy
+        metadata:
+          name: ${name}
+          labels:
+            zuno.io/chaos: "true"
+            zuno.io/stress-chaos: "true"
+            zuno.io/chaos-run: "${RUN_ID}"
+        spec:
+          priority: ${ANP_PRIORITY}
+          subject:
+            pods:
+              namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: ${SUBJECT_NAMESPACE}
+              podSelector:
+                matchLabels:
+        ${pod_labels}  egress:
+            - name: ${rule}
+              action: Deny
+              to:
+                - networks:
+        ${networks}
+        ANPEOF
+        cat /tmp/anp.yaml
+        oc apply -f /tmp/anp.yaml || fail "the AdminNetworkPolicy could not be applied"
+        printf '%s' "${count}" > "${RESULT_ADDRESSES}"
+        echo "${HOST} (${count} address(es)) denied to ${SUBJECT_SELECTOR} in ${SUBJECT_NAMESPACE} for ${DURATION}s"
+        # In the background, so a TERM (TaskRun timeout, PipelineRun cancel) reaches the trap at once.
+        sleep "${DURATION}" &
+        wait $!
+        cleanup
+        if oc get adminnetworkpolicy "${name}" -o name >/dev/null 2>&1; then fail "${name} is still present"; fi
+        echo "${HOST} allowed again"
+        printf 'passed' > "${RESULT_STATUS}"
+{{- end }}
