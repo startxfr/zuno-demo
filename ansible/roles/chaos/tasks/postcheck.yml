@@ -74,13 +74,32 @@
       # failed_when: false - a reader identity may not list them: the row then says "unknown", it does not pass.
       failed_when: false
 
+    # The AAP reader credential may not list AdminNetworkPolicies: the run's own `reap` task (finally) then answers,
+    # it deleted every policy labelled zuno.io/chaos=true and checked none was left.
+    - name: "chaos | the run's reap task"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: TaskRun
+        namespace: "{{ chaos_namespace }}"
+        label_selectors:
+          - "tekton.dev/pipelineRun={{ _chaos_pr.metadata.name }}"
+          - "tekton.dev/pipelineTask=reap"
+      register: _chaos_reap
+      when: _chaos_anps.resources is not defined
+
     - name: "chaos | record the policies"
       ansible.builtin.set_fact:
         _chaos_failures: >-
-          {{ _chaos_failures + ([] if (_chaos_anps.resources is defined and _chaos_anps.resources | length == 0)
-             else ['a chaos AdminNetworkPolicy is left or could not be listed: '
-                   ~ (_chaos_anps.resources | default([]) | map(attribute='metadata.name') | list | string)
-                   ~ ' ' ~ (_chaos_anps.msg | default('') | truncate(120))]) }}
+          {{ _chaos_failures + ([] if _clean else
+             ['a chaos AdminNetworkPolicy is left, or neither listable nor reaped by the run: '
+              ~ (_chaos_anps.resources | default([]) | map(attribute='metadata.name') | list | string)]) }}
+        _chaos_rows: "{{ _chaos_rows + [{'check': 'adminnetworkpolicies', 'whole': _clean, 'listed': _chaos_anps.resources is defined}] }}"
+      vars:
+        _listed_clean: "{{ _chaos_anps.resources is defined and _chaos_anps.resources | length == 0 }}"
+        _reaped: >-
+          {{ (_chaos_reap.resources | default([]) | map(attribute='status.conditions') | flatten
+              | selectattr('type', 'equalto', 'Succeeded') | map(attribute='status') | list) == ['True'] }}
+        _clean: "{{ (_listed_clean | bool) or (_chaos_anps.resources is not defined and (_reaped | bool)) }}"
 
 # ---------------------------------------------------------------- infra: nodes and helper pods
 - name: "chaos | the nodes"
