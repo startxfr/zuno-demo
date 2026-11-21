@@ -1,12 +1,12 @@
 dependencies:
 - name: operator
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.379
+  version: 21.3.392
 - name: project
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.379
+  version: 21.3.392
 - name: cluster-prometheus
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.379
-digest: sha256:ccc41a0a7aefe5e880becb033f3143d326d0e6b6f72dc1a091a9786f64a501fe
-generated: "2026-11-19T16:54:49.828800535+01:00"
+  version: 21.3.392
+digest: sha256:4e0adfac65728c33bfd040996941cd0ad171814462a131798b979a9c37b3a5fd
+generated: "2026-11-21T15:55:02.68064746+01:00"
