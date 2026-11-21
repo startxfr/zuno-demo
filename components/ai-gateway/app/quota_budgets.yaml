@@ -16,6 +16,18 @@ classes:
       project:
         budget: 50000000
         window: 24h
+  light:
+    fail_mode: open
+    tokens:
+      user:
+        budget: 2000000
+        window: 24h
+      group:
+        budget: 20000000
+        window: 24h
+      project:
+        budget: 10000000
+        window: 24h
   intensive:
     fail_mode: closed
     tokens:
