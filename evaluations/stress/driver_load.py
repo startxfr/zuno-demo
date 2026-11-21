@@ -14,9 +14,11 @@ Where the demo drivers prove that a path works, these push on it:
                          crossed. It needs a token Prometheus accepts: grant the Job's ServiceAccount
                          `cluster-monitoring-view` (the row says so when Thanos answers 401 or 403).
 
-The load drivers send `X-Zuno-Quota-Class` from STRESS_QUOTA_CLASS (default `stresstest`, the small fail-closed class: only
-the zuno-stresstest client may choose a class). With the `loadtest` class of WP-306 rolled, set it to `loadtest`, or leave
-the header to the persona's group. Direct MaaS calls per model are not here: the ai-gateway reaches MaaS with the stress
+load-ai-gateway sends `X-Zuno-Quota-Class` from STRESS_LOAD_QUOTA_CLASS (default `loadtest`, the class of WP-306: 250,000
+tokens an hour per user, fail-closed; only the zuno-stresstest client may choose a class). Until 2026-11-21 it asked for
+`stresstest` (2,000 tokens per 5 minutes per user), the class of the functional drivers, which is no budget for a load. An
+empty value sends no header and leaves the class to the persona's group. The class is read by stress_runner.quota_headers,
+the one place the drivers take it from. Direct MaaS calls per model are not here: the ai-gateway reaches MaaS with the stress
 class's own credential (WP-306), which is the path a user takes; a driver holding a MaaS token itself would test another one.
 """
 from __future__ import annotations
@@ -35,9 +37,10 @@ sys.path.insert(0, str(_EVALUATIONS / "common"))
 
 import golden_path_probe as gpp  # noqa: E402
 import unifai_target as ut  # noqa: E402
-from stress_runner import register, row  # noqa: E402
+from stress_runner import quota_headers, register, row  # noqa: E402
 
 DEFAULT_AGENTS = "tekos,arkos,comage"
+LOAD_MAX_TOKENS = 256  # the completion allowance of one load-ai-gateway call
 QUERIES = ("onboarding", "kubernetes", "openshift", "architecture", "runbook", "security", "gpu", "release notes")
 _CORPUS = {}
 
@@ -71,11 +74,6 @@ def scenario_corpus(env) -> list:
 def pick(corpus: list, i: int, worker: int = 0):
     """The corpus entry of iteration `i`: round-robin, offset by the worker so concurrent workers do not repeat one prompt."""
     return corpus[(i + worker * 7) % len(corpus)] if corpus else None
-
-
-def _quota_headers(ctx) -> dict:
-    cls = (ctx.env.get("STRESS_QUOTA_CLASS", "stresstest") or "").strip()
-    return {"X-Zuno-Quota-Class": cls} if cls else {}
 
 
 def _unifai_url(ctx) -> str:
@@ -117,10 +115,13 @@ async def load_ai_gateway(ctx, i):
     prompt = entry[1] if entry else "Say OK."
     token = await ctx.token()
     headers = {"Authorization": "Bearer " + token, "X-Zuno-Data-Classification": "C1", "X-Zuno-Agent": "tekos",
-               "X-Zuno-Task": "answer-technical-question", **_quota_headers(ctx), **ctx.trace_headers("load-ai-gateway", i)}
+               "X-Zuno-Task": "answer-technical-question", **quota_headers(ctx, "load"), **ctx.trace_headers("load-ai-gateway", i)}
     started = time.monotonic()
+    # max_tokens 256, not 64 (2026-11-21): gpt-oss spends most of a small allowance on its reasoning, and 16 % of the answers
+    # of the aggressive campaign ended by length, empty or cut. A call now costs up to four times the completion tokens:
+    # size the profile's budget.max_tokens with that in mind.
     r = await ctx.http.post(f"{ctx.ai_gateway}/v1/chat/completions", headers=headers, timeout=180, json={
-        "model": "auto", "max_tokens": 64, "stream": False, "messages": [{"role": "user", "content": prompt}]})
+        "model": "auto", "max_tokens": LOAD_MAX_TOKENS, "stream": False, "messages": [{"role": "user", "content": prompt}]})
     ms = (time.monotonic() - started) * 1000
     answered = False
     if r.status_code == 200:

@@ -140,7 +140,7 @@ def judge_guardrails_outcome(outcome: str):
 async def guardrails(ctx, i):
     token = await ctx.token()
     run_id = ctx.request_id("guardrails", i)
-    headers = {"Authorization": "Bearer " + token, "X-Zuno-Quota-Class": "stresstest", "X-Zuno-Data-Classification": "C1",
+    headers = {"Authorization": "Bearer " + token, **sr.quota_headers(ctx, "guardrails"), "X-Zuno-Data-Classification": "C1",
                "X-Zuno-Agent": "tekos", "X-Zuno-Task": "answer-technical-question", "X-Zuno-Run-Id": run_id,
                **ctx.trace_headers("guardrails", i)}
     started = time.monotonic()

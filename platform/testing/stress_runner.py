@@ -22,6 +22,11 @@ A *budget guard* protects the shared model budgets: a driver stops after `max_co
 429/5xx answers (or timeouts), after `max_429` rejected calls in all, and the whole run stops once the drivers have
 reported `max_tokens` tokens through `ctx.add_tokens()`. A tripped guard is a failing row that says so.
 
+Order of a run (2026-11-21): the drivers run one after the other, except the families a profile lists under
+`parallel_families`, whose drivers run together (see run_stages). `duration` is PER DRIVER: every driver it applies to
+loops for that long, so a run lasts the sum of the sequential loops plus the longest loop of the parallel group.
+`--plan-deadline` prints the Job deadline that follows from it (plan_deadline), for the Ansible plan task.
+
 Environment (all optional except where a driver needs a call):
   STRESS_PROFILE        profile name (profile_<name>.yaml next to this file) or a path; default `smoke`
   STRESS_OVERRIDES      JSON object: iterations, concurrency, duration, rate, ramp, timeout, families, drivers, shards,
@@ -35,10 +40,13 @@ Environment (all optional except where a driver needs a call):
   STRESS_PERSONAS       comma list of personas (default stress-consultant-01); WP-190 keys a budget by persona, so
                         concurrency N wants N personas
   AI_GATEWAY_URL, MCP_GATEWAY_URL   in-cluster service URLs
+  STRESS_LOAD_QUOTA_CLASS   the X-Zuno-Quota-Class of the `load` family (default `loadtest`); empty = no header
+  STRESS_QUOTA_CLASS        the class of every other driver that names one (default `stresstest`); empty = no header
 
     python3 platform/testing/stress_runner.py --list
     python3 platform/testing/stress_runner.py --dry-run --profile standard
     python3 platform/testing/stress_runner.py --summarize rows.json
+    python3 platform/testing/stress_runner.py --plan-deadline --profile aggressive --dir evaluations/stress
 """
 from __future__ import annotations
 
@@ -118,6 +126,31 @@ def register(id: str, family: str, description: str = "", needs: Iterable[str] =
 SHARED_BUDGET_PROBES: List[Callable[[Any], Optional[float]]] = []
 
 
+class SharedBudgetUnknown(Exception):
+    """Raised by a shared-budget probe that cannot tell, with the reason as its message (2026-11-21: the warning row of an
+    aggressive campaign said "could not be read" and nothing else, so the cause had to be looked for on the cluster)."""
+
+
+async def read_shared_budget(ctx: Any) -> Tuple[List[Optional[float]], List[str]]:
+    """Calls every probe: (their answers, None = unknown; why each unknown one could not tell)."""
+    fractions: List[Optional[float]] = []
+    reasons: List[str] = []
+    for probe in SHARED_BUDGET_PROBES:
+        try:
+            fraction = await asyncio.to_thread(probe, ctx)
+            if fraction is None:
+                reasons.append("the probe returned no value and no reason")
+        except SharedBudgetUnknown as exc:
+            fraction = None
+            reasons.append(str(exc)[:400])
+        except Exception as exc:  # noqa: BLE001 - an unreadable counter must not stop the run
+            print(f"[stress] shared-budget probe failed: {type(exc).__name__}: {str(exc)[:120]}", file=sys.stderr, flush=True)
+            fraction = None
+            reasons.append(f"the probe raised {type(exc).__name__}: {str(exc)[:160]}")
+        fractions.append(fraction)
+    return fractions, reasons
+
+
 def shared_budget_verdict(profile: Dict[str, Any], family: str, fractions: List[Optional[float]]) -> str:
     """'' when the driver may run, else the reason it is skipped. `fractions` are the probes' answers (None = unknown)."""
     guard = profile.get("shared_budget_guard") or {}
@@ -173,6 +206,29 @@ def load_failure_rows() -> List[Day2Result]:
 
 def row(driver: str, layer: str, id: str, category: str, passed: bool, detail: str = "", ms: float = 0.0) -> Day2Result:
     return Day2Result(agent=driver, layer=layer, id=id, category=category, passed=passed, detail=detail, duration_ms=round(ms, 1))
+
+
+# The quota class a driver asks for with the trusted header X-Zuno-Quota-Class (honoured only for the zuno-stresstest
+# client). One helper instead of a string per driver (2026-11-21): the `load` family pushes, so it asks for `loadtest`
+# (250,000 tokens an hour per user) where it used to ask for `stresstest` (2,000 tokens per 5 minutes per user), a
+# budget far too small for a load. Every other driver stays on `stresstest`: the functional drivers spend a few tokens,
+# and `quotas` proves the 429 by exhausting that small budget.
+QUOTA_HEADER = "X-Zuno-Quota-Class"
+LOAD_FAMILY = "load"
+
+
+def quota_class(env: Dict[str, str], family: str = "") -> str:
+    """The class of a driver of `family`: STRESS_LOAD_QUOTA_CLASS (default `loadtest`) for the load family,
+    STRESS_QUOTA_CLASS (default `stresstest`) for the others. An empty value means "send no header"."""
+    if family == LOAD_FAMILY:
+        return (env.get("STRESS_LOAD_QUOTA_CLASS", "loadtest") or "").strip()
+    return (env.get("STRESS_QUOTA_CLASS", "stresstest") or "").strip()
+
+
+def quota_headers(ctx: Any, family: str = "") -> Dict[str, str]:
+    """{X-Zuno-Quota-Class: <class>} for a driver of `family`, or {} when the class is empty (the persona's group decides)."""
+    cls = quota_class(ctx.env, family)
+    return {QUOTA_HEADER: cls} if cls else {}
 
 
 # -- profiles and the plan ---------------------------------------------------------------------------------------
@@ -287,6 +343,75 @@ def build_plan(profile: Dict[str, Any], overrides: Dict[str, Any], registry: Dic
     return plans, warnings
 
 
+def parallel_families(profile: Dict[str, Any]) -> List[str]:
+    """The families whose drivers run together (profile key `parallel_families`, default none)."""
+    return _as_list(profile.get("parallel_families"))
+
+
+def run_stages(plans: List[Plan], profile: Dict[str, Any]) -> List[List[Plan]]:
+    """The plans in the order they run, as stages: a stage of one plan is a sequential driver, the stage of several is
+    the parallel group. Every plan whose driver family is listed in `parallel_families` joins ONE group (the listed
+    families run together, not family by family), placed where its first member stood; the other plans keep their order.
+    Without the key every stage holds one plan: the behaviour before 2026-11-21."""
+    together = set(parallel_families(profile))
+    stages: List[List[Plan]] = []
+    group: Optional[List[Plan]] = None
+    for plan in plans:
+        if plan.driver.family in together:
+            if group is None:
+                group = []
+                stages.append(group)
+            group.append(plan)
+        else:
+            stages.append([plan])
+    return stages
+
+
+DEADLINE_MARGIN = 900  # seconds beside the loops: the pod start (pip install), the sign-ins, the samplers' last read
+
+
+def plan_deadline(profile: Dict[str, Any], overrides: Dict[str, Any], registry: Dict[str, Driver],
+                  margin: int = DEADLINE_MARGIN) -> Dict[str, Any]:
+    """The Job deadline a campaign needs, from the profile, the overrides and the drivers they select. Pure.
+
+    `duration` is per driver, so the loops add up: a sequential driver in a duration loop lasts its duration plus one
+    timeout (the iterations in flight when the loop ends are allowed to finish), and the parallel group lasts as long as
+    its longest member. Before 2026-11-21 the deadline was max(profile deadline, duration + 900) whatever the number of
+    drivers: DURATION=3600 on five families gave a Job that could not finish in time.
+
+      no duration loop              the profile's job.deadline_seconds (sized for its iteration counts)
+      only duration loops           max(profile deadline, loops + margin)
+      loops and iteration drivers   profile deadline + loops (the profile deadline covers the iteration drivers)
+
+    Returns {"deadline", "loops", "sequential_loops", "parallel_loops", "iteration_drivers", "detail"}; samplers do
+    not count (they run beside the load)."""
+    base = int((profile.get("job") or {}).get("deadline_seconds") or 1800)
+    plans, _warnings = build_plan(profile, overrides, registry)
+    plans = [p for p in plans if not p.driver.sampler]
+    total = 0.0
+    sequential = parallel = iteration = 0
+    for stage in run_stages(plans, profile):
+        looping = [p for p in stage if p.duration > 0]
+        iteration += len(stage) - len(looping)
+        if not looping:
+            continue
+        total += max(p.duration + p.timeout for p in looping)
+        if len(stage) > 1:
+            parallel += len(looping)
+        else:
+            sequential += 1
+    loops = int(math.ceil(total))
+    if not loops:
+        deadline, how = base, "no duration loop: the profile's deadline"
+    elif iteration:
+        deadline, how = base + loops, f"profile deadline {base}s for {iteration} iteration driver(s) + {loops}s of loops"
+    else:
+        deadline, how = max(base, loops + margin), f"max(profile deadline {base}s, {loops}s of loops + {margin}s)"
+    return {"deadline": int(deadline), "loops": loops, "sequential_loops": sequential, "parallel_loops": parallel,
+            "iteration_drivers": iteration,
+            "detail": f"{sequential} sequential loop(s), {parallel} loop(s) in the parallel group: {how}"}
+
+
 # -- the run context ---------------------------------------------------------------------------------------------
 
 
@@ -302,6 +427,7 @@ class Ctx:
         self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]  # a profile's pool is passed in
         self._client = client
         self._tokens: Dict[str, Tuple[str, float]] = {}
+        self._token_locks: Dict[str, asyncio.Lock] = {}
         self.tokens_used = 0
         self.max_tokens = 0
         self.guard_note = ""
@@ -339,16 +465,22 @@ class Ctx:
             return cached[0]
         if not self.keycloak:
             raise RuntimeError("KEYCLOAK_URL is not set")
-        r = await self.http.post(
-            f"{self.keycloak}/realms/zuno/protocol/openid-connect/token",
-            data={"grant_type": "password", "client_id": self.env.get("EVAL_CLIENT_ID", "zuno-stresstest"),
-                  "client_secret": self.env.get("EVAL_CLIENT_SECRET", ""), "username": persona,
-                  "password": self.env.get("DEMO_PERSONA_PASSWORD", "")})
-        if r.status_code != 200:
-            raise RuntimeError(f"Keycloak refused the token of {persona}: status={r.status_code}")
-        body = r.json()
-        self._tokens[persona] = (body["access_token"], time.time() + max(int(body.get("expires_in", 300)) - 30, 30))
-        return body["access_token"]
+        # One sign-in per persona at a time (2026-11-21): the drivers of a parallel group share the persona pool, and
+        # Keycloak's brute-force protection counts concurrent sign-ins of one user (see the blocking sign-ins below).
+        async with self._token_locks.setdefault(persona, asyncio.Lock()):
+            cached = self._tokens.get(persona)
+            if cached and cached[1] > time.time():
+                return cached[0]
+            r = await self.http.post(
+                f"{self.keycloak}/realms/zuno/protocol/openid-connect/token",
+                data={"grant_type": "password", "client_id": self.env.get("EVAL_CLIENT_ID", "zuno-stresstest"),
+                      "client_secret": self.env.get("EVAL_CLIENT_SECRET", ""), "username": persona,
+                      "password": self.env.get("DEMO_PERSONA_PASSWORD", "")})
+            if r.status_code != 200:
+                raise RuntimeError(f"Keycloak refused the token of {persona}: status={r.status_code}")
+            body = r.json()
+            self._tokens[persona] = (body["access_token"], time.time() + max(int(body.get("expires_in", 300)) - 30, 30))
+            return body["access_token"]
 
     def for_worker(self, index: int) -> "WorkerCtx":
         return WorkerCtx(self, index)
@@ -667,7 +799,9 @@ async def _finish_sampler(driver: Driver, ctx: Ctx, samples: List[Any]) -> List[
 async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], overrides: Dict[str, Any],
                   shard_index: int, shards: int, flush_seconds: float = 300.0,
                   emit: Callable[[List[Day2Result]], None] = _emit) -> List[Day2Result]:
-    """Runs the plans one driver after the other (the load is each driver's own concurrency) and returns every row.
+    """Runs the plans and returns every row: one driver after the other (the load is each driver's own concurrency),
+    except the drivers of the profile's `parallel_families`, which run together as one stage (run_stages). Each driver has
+    its own Guard and its own summary row either way; the token cap is one count for the whole run.
     Rows are also emitted in checkpoints of `flush_seconds` and at the end of each driver."""
     out: List[Day2Result] = []
     pending: List[Day2Result] = []
@@ -677,40 +811,37 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
     stop = asyncio.Event()
     sampling = {p.driver.id: ([], asyncio.ensure_future(_sample_loop(p.driver, ctx, stop))) for p in samplers}
 
+    def flush() -> None:
+        emit(list(pending))
+        pending.clear()
+        last_flush[0] = time.monotonic()
+
     def sink(rows: List[Day2Result]) -> None:
         out.extend(rows)
         pending.extend(rows)
         if time.monotonic() - last_flush[0] >= flush_seconds:
-            emit(list(pending))
-            pending.clear()
-            last_flush[0] = time.monotonic()
+            flush()
 
-    warned_unreadable = False
-    for plan in plans:
-        s = settings(profile, overrides, plan.driver.id, plan.driver.family)
-        ctx.max_tokens = int(s["max_tokens"])
+    warned_unreadable = [False]
+    guarded_families = (profile.get("shared_budget_guard") or {}).get("families") or []
+
+    async def run_one(plan: Plan, s: Dict[str, Any]) -> None:
         guard = Guard(s["max_consecutive_failures"], s["max_429"])
         if ctx.token_budget_spent:
             sink([row(plan.driver.id, "stress", "token-budget", "guard", False,
                       f"skipped: {ctx.tokens_used} tokens already reported, cap is {ctx.max_tokens}")])
-            continue
-        if SHARED_BUDGET_PROBES and plan.driver.family in ((profile.get("shared_budget_guard") or {}).get("families") or []):
-            fractions: List[Optional[float]] = []
-            for probe in SHARED_BUDGET_PROBES:
-                try:
-                    fractions.append(await asyncio.to_thread(probe, ctx))
-                except Exception as exc:  # noqa: BLE001 - an unreadable counter must not stop the run
-                    print(f"[stress] shared-budget probe failed: {type(exc).__name__}: {str(exc)[:120]}", file=sys.stderr, flush=True)
-                    fractions.append(None)
-            if not any(f is not None for f in fractions) and not warned_unreadable:
-                warned_unreadable = True  # one row per run, not one per driver
+            return
+        if SHARED_BUDGET_PROBES and plan.driver.family in guarded_families:
+            fractions, reasons = await read_shared_budget(ctx)
+            if not any(f is not None for f in fractions) and not warned_unreadable[0]:
+                warned_unreadable[0] = True  # one row per run, not one per driver
                 sink([row(plan.driver.id, "stress", "shared-budget-unknown", "guard", False,
-                          "WARNING: the shared ai-gateway budget could not be read (Limitador unreachable or no counter of the shared "
-                          "ServiceAccount): the guard is SKIPPED and the drivers of its families run without it")])
+                          "WARNING: the shared ai-gateway budget could not be read: " + "; ".join(reasons)
+                          + ". The guard is SKIPPED and the drivers of its families run without it")])
             why = shared_budget_verdict(profile, plan.driver.family, fractions)
             if why:
                 sink([row(plan.driver.id, "stress", "shared-budget", "guard", False, f"status=429 skipped: {why}")])
-                continue
+                return
         mode = f"{plan.duration:g}s loop" if plan.duration > 0 else f"{plan.iterations} iteration(s)"
         print(f"[stress] {plan.driver.id} ({plan.driver.family}): {mode}, concurrency {plan.concurrency}", file=sys.stderr, flush=True)
         stats = await run_plan(plan, ctx, guard, sink, shard_index)
@@ -722,9 +853,17 @@ async def run_all(plans: List[Plan], ctx: Ctx, profile: Dict[str, Any], override
                              f"stopped: {ctx.tokens_used} tokens reported, cap is {ctx.max_tokens}"))
         summary = summary_row(plan.driver, stats, guard, shard_index, shards, mode)
         sink(extra + [summary])
-        emit(list(pending))
-        pending.clear()
-        last_flush[0] = time.monotonic()
+        flush()
+
+    for stage in run_stages(plans, profile):
+        knobs = [settings(profile, overrides, p.driver.id, p.driver.family) for p in stage]
+        # The token cap lives on the shared Ctx. A sequential driver sets its own; the drivers of the parallel group
+        # share one count, so the group runs under the smallest cap its members declare (0, no cap, when none does).
+        caps = [int(k["max_tokens"]) for k in knobs if int(k["max_tokens"]) > 0]
+        ctx.max_tokens = min(caps) if caps else 0
+        if len(stage) > 1:
+            print(f"[stress] parallel group: {', '.join(p.driver.id for p in stage)}", file=sys.stderr, flush=True)
+        await asyncio.gather(*(run_one(p, k) for p, k in zip(stage, knobs)))
     stop.set()
     for plan in samplers:
         samples, task = sampling[plan.driver.id]
@@ -754,6 +893,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--list", action="store_true", help="list the registered drivers and exit")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and exit, call nothing")
     ap.add_argument("--summarize", metavar="FILE", help="merge the summary rows of a collected run ('-' = stdin) and print the table")
+    ap.add_argument("--plan-deadline", action="store_true",
+                    help="print the Job deadline of the profile and STRESS_OVERRIDES as one JSON object and exit, call nothing")
     args = ap.parse_args(argv)
 
     if args.summarize:
@@ -779,6 +920,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     except ValueError as exc:
         print(f"stress_runner: {exc}", file=sys.stderr)
         return 2
+    if args.plan_deadline:
+        answer = plan_deadline(profile, overrides, REGISTRY)
+        # A driver module that does not import here (a workstation without httpx) hides its drivers from the count: say so,
+        # and never go below what the deadline was before this helper (duration + margin).
+        answer["unloaded"] = sorted(LOAD_FAILURES)
+        if LOAD_FAILURES and "duration" in overrides:
+            answer["deadline"] = max(answer["deadline"], int(float(overrides["duration"])) + DEADLINE_MARGIN)
+        print(json.dumps(answer))
+        return 0
     shards = int(os.environ.get("STRESS_SHARDS") or overrides.get("shards") or settings(profile, overrides)["shards"])
     index = int(os.environ.get("JOB_COMPLETION_INDEX", "0"))
     plans, warnings = build_plan(profile, overrides, REGISTRY, index, shards)
@@ -788,7 +938,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         for p in plans:
             print(f"{p.driver.id:<28} {p.driver.family:<12} iterations={p.iterations} concurrency={p.concurrency} "
                   f"duration={p.duration:g} rate={p.rate:g} ramp={p.ramp:g} timeout={p.timeout:g}")
-        print(f"profile={profile['name']} shard={index}/{shards} drivers={len(plans)}")
+        together = parallel_families(profile)
+        print(f"profile={profile['name']} shard={index}/{shards} drivers={len(plans)}"
+              + (f" parallel_families={','.join(together)}" if together else ""))
         return 0
     personas = _as_list(overrides.get("personas")) or _as_list(profile.get("personas"))
     ctx = Ctx(personas=personas or None)

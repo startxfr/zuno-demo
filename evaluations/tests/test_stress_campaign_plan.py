@@ -79,10 +79,23 @@ class CampaignPlan(unittest.TestCase):
         facts, _ = plan(stress_profile="soak")
         self.assertFalse(facts["wait"])
         self.assertEqual(facts["deadline"], 15600)
+        # 2026-11-21: the deadline comes from stress_runner.py --plan-deadline. Soak runs its three drivers together
+        # (parallel_families), so one loop counts: 20000 s + one 180 s timeout + 900 s of margin.
         facts, _ = plan(stress_profile="soak", stress_duration="20000")
-        self.assertEqual(facts["deadline"], 20900)
+        self.assertEqual(facts["deadline"], 21080)
         facts, _ = plan(stress_profile="soak", stress_wait="true")
         self.assertTrue(facts["wait"])
+
+    def test_the_deadline_counts_every_sequential_duration_loop(self):
+        # The campaign of 2026-11-21 (DURATION=3600 on load, models, tools): the three load drivers run together (the longest,
+        # load-unifai-scenarios, has a 300 s timeout), then the two models drivers and the tools driver one after the other.
+        # Before, the deadline was 3600 + 900 = 4500 s, for a run of more than four hours.
+        facts, output = plan(stress_profile="aggressive", stress_duration="3600", stress_families="load,models,tools,saturation,counters")
+        self.assertIsNotNone(facts, output)
+        self.assertEqual(facts["deadline"], 3900 + 3 * 3780 + 900)
+        self.assertIn("3 sequential loop(s), 3 loop(s) in the parallel group", output)
+        facts, _ = plan(stress_profile="aggressive", stress_duration="3600", stress_families="load,saturation,counters")
+        self.assertEqual(facts["deadline"], 3900 + 900)
 
     def test_aggressive_runs_on_two_shards(self):
         self.assertEqual(plan(stress_profile="aggressive")[0]["shards"], 2)

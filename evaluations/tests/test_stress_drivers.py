@@ -9,6 +9,7 @@ Run from the repository root:
 from __future__ import annotations
 
 import asyncio
+import json
 import pathlib
 import sys
 import time
@@ -33,6 +34,7 @@ import driver_load as load  # noqa: E402
 import driver_network as net  # noqa: E402
 import driver_demos as demos  # noqa: E402
 import driver_unifai as uni  # noqa: E402
+import driver_counters as cnt  # noqa: E402
 
 ENV = {"KEYCLOAK_URL": "https://kc", "DEMO_PERSONA_PASSWORD": "pw", "CLUSTER_BASE_DOMAIN": "apps.test"}
 
@@ -381,15 +383,45 @@ class LoadDrivers(unittest.TestCase):
         ctx = self.gateway(handler)
         for i in range(3):
             self.assertTrue(one("load-ai-gateway", ctx, i)[0].passed)
-        self.assertEqual({cls for cls, _ in seen}, {"stresstest"})  # the default: the small class
+        # 2026-11-21: the load family asks for `loadtest` by default, not the functional drivers' small `stresstest`
+        self.assertEqual({cls for cls, _ in seen}, {"loadtest"})
         self.assertEqual(len({body for _, body in seen}), 3)
+        self.assertEqual({json.loads(body)["max_tokens"] for _, body in seen}, {256})  # gpt-oss reasons first: 64 was cut short
         self.assertEqual(ctx.tokens_used, 90)
         seen.clear()
-        one("load-ai-gateway", self.gateway(handler, {"STRESS_QUOTA_CLASS": "loadtest"}))
-        self.assertEqual(seen[0][0], "loadtest")
+        one("load-ai-gateway", self.gateway(handler, {"STRESS_QUOTA_CLASS": "evaluation"}))
+        self.assertEqual(seen[0][0], "loadtest")  # the functional drivers' variable does not move the load family
         seen.clear()
-        one("load-ai-gateway", self.gateway(handler, {"STRESS_QUOTA_CLASS": ""}))
+        one("load-ai-gateway", self.gateway(handler, {"STRESS_LOAD_QUOTA_CLASS": "stresstest"}))
+        self.assertEqual(seen[0][0], "stresstest")
+        seen.clear()
+        one("load-ai-gateway", self.gateway(handler, {"STRESS_LOAD_QUOTA_CLASS": ""}))
         self.assertIsNone(seen[0][0])  # empty: no header, the persona's group decides
+
+    def test_one_helper_gives_every_driver_its_class(self):
+        self.assertEqual(sr.quota_class({}, "load"), "loadtest")
+        for family in ("models", "quota", "guardrails", ""):
+            self.assertEqual(sr.quota_class({}, family), "stresstest", family)
+        self.assertEqual(sr.quota_class({"STRESS_QUOTA_CLASS": " evaluation "}, "models"), "evaluation")
+        self.assertEqual(sr.quota_headers(SimpleNamespace(env={"STRESS_QUOTA_CLASS": ""}), "models"), {})
+        # no driver hard-codes a class any more: they all go through the helper
+        for path in STRESS_DIR.glob("driver_*.py"):
+            self.assertNotIn('"X-Zuno-Quota-Class": "', path.read_text(), path.name)
+
+    def test_the_functional_drivers_keep_the_stresstest_class_and_follow_its_variable(self):
+        seen = []
+
+        def handler(request):
+            if request.url.path == "/v1/chat/completions":  # the routing read-back that follows carries no class
+                seen.append(request.headers.get("x-zuno-quota-class"))
+            return httpx.Response(200, json={"choices": [{"message": {"content": "def f(s): return s[::-1]"}}],
+                                             "usage": {"total_tokens": 3}})
+
+        one("ai-gateway-routing", self.gateway(handler))
+        self.assertEqual(set(seen), {"stresstest"})
+        seen.clear()
+        one("ai-gateway-routing", self.gateway(handler, {"STRESS_QUOTA_CLASS": "evaluation", "STRESS_LOAD_QUOTA_CLASS": "x"}))
+        self.assertEqual(set(seen), {"evaluation"})
 
     def test_load_ai_gateway_reports_a_429_with_its_status(self):
         rows = one("load-ai-gateway", self.gateway(lambda r: httpx.Response(429, text="quota")))
@@ -496,6 +528,11 @@ class SaturationSampler(unittest.TestCase):
         launch = (REPO / "ansible/roles/day3/tasks/stresstest_campaign_launch.yml").read_text()
         self.assertIn("-scenarios.yaml", launch)
         self.assertIn("name: STRESS_QUOTA_CLASS", launch)
+        self.assertIn("name: STRESS_LOAD_QUOTA_CLASS", launch)
+        self.assertIn("stress_load_quota_class | default('loadtest')", launch)
+        # 2026-11-21: Limitador's address is explicit in the Job, with the reader's own default
+        self.assertIn("name: LIMITADOR_URL", launch)
+        self.assertIn(f"stress_limitador_url | default('{cnt.LIMITADOR_DEFAULT}')", launch)
 
 
 class NetworkDrivers(unittest.TestCase):

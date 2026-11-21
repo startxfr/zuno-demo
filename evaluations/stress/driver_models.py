@@ -5,7 +5,8 @@
   ai-gateway-sovereignty  Arkos (floor C3) must be routed to a local model at C3 and a Tekos control call must answer
                           (the golden-path moment `sovereignty`, ansible/demos/ai-gateway-sovereignty)
 
-Every call carries `X-Zuno-Quota-Class: stresstest` (only the zuno-stresstest client may pick a class) and a few tokens:
+Every call carries `X-Zuno-Quota-Class: stresstest` (stress_runner.quota_headers, STRESS_QUOTA_CLASS; only the zuno-stresstest
+client may pick a class) and a few tokens:
 the stresstest class is a small, fail-closed budget, so a smoke run cannot drain the shared MaaS budget. The tokens each
 answer costs are reported with ctx.add_tokens() for the runner's token cap.
 """
@@ -18,7 +19,7 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import golden_path_probe as gpp  # noqa: E402
-from stress_runner import register, row  # noqa: E402
+from stress_runner import quota_headers, register, row  # noqa: E402
 
 CODE_PROMPT = "Write a Python one-liner that reverses a string."
 SAY_OK = "Say OK."
@@ -27,7 +28,7 @@ SAY_OK = "Say OK."
 async def _chat(ctx, driver: str, i: int, step: str, token: str, model: str, prompt: str, agent: str, task: str,
                 level: str = "C1", max_tokens: int = 32):
     """POST one chat completion; returns (response, request id, milliseconds)."""
-    headers = {"Authorization": "Bearer " + token, "X-Zuno-Quota-Class": "stresstest", "X-Zuno-Data-Classification": level,
+    headers = {"Authorization": "Bearer " + token, **quota_headers(ctx, "models"), "X-Zuno-Data-Classification": level,
                "X-Zuno-Agent": agent, "X-Zuno-Task": task, **ctx.trace_headers(driver, i, step)}
     started = time.monotonic()
     r = await ctx.http.post(f"{ctx.ai_gateway}/v1/chat/completions", headers=headers, timeout=180, json={

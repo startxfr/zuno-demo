@@ -333,12 +333,179 @@ class Samplers(unittest.TestCase):
 
         with mock.patch.object(sr, "run_all", fake_run_all):
             sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
-            self.assertEqual(seen["personas"], [f"stress-load-{n:02d}" for n in range(1, 9)])
+            # ten since 2026-11-21: one persona per worker at CONCURRENCY=10
+            self.assertEqual(seen["personas"], [f"stress-load-{n:02d}" for n in range(1, 11)])
             with mock.patch.dict("os.environ", {"STRESS_OVERRIDES": '{"personas": ["p9"]}'}):
                 sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
             self.assertEqual(seen["personas"], ["p9"])
             sr.main(["--dir", str(STRESS_DIR), "--profile", "smoke"])
             self.assertEqual(seen["personas"], ["stress-consultant-01"])
+
+    def test_every_persona_of_the_aggressive_pool_is_declared_in_the_loadtest_group(self):
+        values = yaml.safe_load((REPO / "gitops/charts/keycloak/values.yaml").read_text())
+        declared = {p["username"]: p for p in values["evalPersonas"]}
+        for persona in sr.load_profile("aggressive", STRESS_DIR)["personas"]:
+            self.assertIn(persona, declared)
+            self.assertEqual(declared[persona]["copyOf"], "consultant-01", persona)
+            self.assertIn("/zuno-loadtest", declared[persona].get("extraGroups") or [], persona)
+
+
+class ParallelFamilies(unittest.TestCase):
+    """2026-11-21: `parallel_families` runs the drivers of the listed families together; the others keep their order."""
+
+    @staticmethod
+    def plans(*families):
+        return [plan_of(fake(f"{fam}-{n}", family=fam)) for n, fam in enumerate(families)]
+
+    def test_stages_keep_the_order_and_put_the_group_where_its_first_member_stood(self):
+        plans = self.plans("experiences", "load", "models", "load", "tools", "unifai")
+        ids = lambda stages: [[p.driver.id for p in st] for st in stages]  # noqa: E731
+        self.assertEqual(ids(sr.run_stages(plans, {})), [[p.driver.id] for p in plans])  # no key: as before
+        self.assertEqual(ids(sr.run_stages(plans, {"parallel_families": ["load"]})),
+                         [["experiences-0"], ["load-1", "load-3"], ["models-2"], ["tools-4"], ["unifai-5"]])
+        # several families listed: ONE group, at the position of the first of them
+        self.assertEqual(ids(sr.run_stages(plans, {"parallel_families": "tools,load"})),
+                         [["experiences-0"], ["load-1", "load-3", "tools-4"], ["models-2"], ["unifai-5"]])
+
+    def test_the_group_runs_together_each_with_its_own_guard_and_summary(self):
+        running = {"now": 0, "peak": 0}
+        order = []
+
+        def driver(id, family, ok=True, pause=0.05):
+            async def run(ctx, i):
+                running["now"] += 1
+                running["peak"] = max(running["peak"], running["now"])
+                order.append(id)
+                await asyncio.sleep(pause)
+                running["now"] -= 1
+                return [sr.row(id, "load", "x", family, ok, "status=200" if ok else "status=429")]
+            return sr.Driver(id=id, family=family, run=run)
+
+        profile = {"name": "t", "parallel_families": ["load"], "budget": {"max_consecutive_failures": 2, "max_429": 10}}
+        plans = [plan_of(driver("first", "experiences"), iterations=1),
+                 plan_of(driver("la", "load"), iterations=3), plan_of(driver("lb", "load", ok=False), iterations=3),
+                 plan_of(driver("last", "tools"), iterations=1)]
+        rows = asyncio.run(sr.run_all(plans, sr.Ctx(env={}), profile, {}, 0, 1, emit=lambda r: None))
+        self.assertEqual(running["peak"], 2)                          # la and lb overlapped, nothing else did
+        self.assertEqual(order[0], "first")
+        self.assertEqual(order[-1], "last")
+        summaries = {r.agent: r for r in rows if r.layer == sr.SUMMARY_LAYER}
+        self.assertEqual(set(summaries), {"first", "la", "lb", "last"})
+        self.assertTrue(summaries["la"].passed)                       # lb's tripped guard is lb's alone
+        self.assertFalse(summaries["lb"].passed)
+        self.assertIn("BUDGET GUARD", summaries["lb"].detail)
+        self.assertEqual([r.agent for r in rows if r.id.endswith("budget-guard")], ["lb"])
+
+    def test_a_sequential_run_is_unchanged_without_the_key(self):
+        running = {"now": 0, "peak": 0}
+
+        async def run(ctx, i):
+            running["now"] += 1
+            running["peak"] = max(running["peak"], running["now"])
+            await asyncio.sleep(0.01)
+            running["now"] -= 1
+            return [sr.row("x", "load", "x", "load", True, "status=200")]
+
+        plans = [plan_of(sr.Driver(id=f"l{n}", family="load", run=run), iterations=2) for n in range(3)]
+        asyncio.run(sr.run_all(plans, sr.Ctx(env={}), {"name": "t"}, {}, 0, 1, emit=lambda r: None))
+        self.assertEqual(running["peak"], 1)
+
+    def test_the_group_shares_the_token_cap_and_stops_together(self):
+        async def spend(ctx, i):
+            ctx.add_tokens(10)
+            await asyncio.sleep(0.01)
+            return [sr.row("s", "load", "x", "load", True, "status=200")]
+
+        profile = {"name": "t", "parallel_families": ["load"], "budget": {"max_tokens": 1000},
+                   "drivers": {"b": {"max_tokens": 50}}}
+        plans = [plan_of(sr.Driver(id=d, family="load", run=spend), iterations=100) for d in ("a", "b")]
+        ctx = sr.Ctx(env={})
+        rows = asyncio.run(sr.run_all(plans, ctx, profile, {}, 0, 1, emit=lambda r: None))
+        self.assertEqual(ctx.max_tokens, 50)                          # the smallest cap of the group
+        self.assertLess(ctx.tokens_used, 100)
+        self.assertEqual(sorted(r.agent for r in rows if r.id.endswith("token-budget")), ["a", "b"])
+
+    def test_the_shared_budget_warning_is_once_per_run_in_a_group_too(self):
+        def unknown(ctx):
+            raise sr.SharedBudgetUnknown("no counter whose identity matches X: 3 counter(s) seen")
+
+        saved = list(sr.SHARED_BUDGET_PROBES)
+        sr.SHARED_BUDGET_PROBES[:] = [unknown]
+        profile = {"name": "t", "parallel_families": ["experiences"],
+                   "shared_budget_guard": {"families": ["experiences"], "max_used": 0.5}}
+        try:
+            rows = asyncio.run(sr.run_all(self.plans("experiences", "experiences", "experiences"), sr.Ctx(env={}), profile, {},
+                                          0, 1, emit=lambda r: None))
+        finally:
+            sr.SHARED_BUDGET_PROBES[:] = saved
+        warnings = [r for r in rows if r.id == "shared-budget-unknown"]
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("3 counter(s) seen", warnings[0].detail)
+        self.assertEqual(len([r for r in rows if r.layer == sr.SUMMARY_LAYER]), 3)
+
+    def test_concurrent_sign_ins_of_one_persona_ask_keycloak_once(self):
+        calls = []
+
+        async def handler(request):
+            calls.append(1)
+            await asyncio.sleep(0.02)
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 300})
+
+        async def go():
+            ctx = sr.Ctx(env={"KEYCLOAK_URL": "https://kc"}, client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+            return await asyncio.gather(*(ctx.token("stress-load-01") for _ in range(5)))
+
+        self.assertEqual(asyncio.run(go()), ["tok"] * 5)
+        self.assertEqual(len(calls), 1)
+
+
+class PlanDeadline(unittest.TestCase):
+    """`duration` is per driver: the Job deadline counts the sequential loops and the longest loop of the parallel group."""
+
+    REG = {d.id: d for d in (sr.Driver(id="la", family="load", run=None), sr.Driver(id="lb", family="load", run=None),
+                             sr.Driver(id="m1", family="models", run=None), sr.Driver(id="t1", family="tools", run=None),
+                             sr.Driver(id="sat", family="saturation", run=None, sampler=True))}
+
+    def deadline(self, profile, overrides=None):
+        return sr.plan_deadline(dict({"name": "t", "defaults": {"timeout": 100}, "job": {"deadline_seconds": 1800}}, **profile),
+                                overrides or {}, self.REG)
+
+    def test_no_loop_keeps_the_profile_deadline(self):
+        self.assertEqual(self.deadline({})["deadline"], 1800)
+
+    def test_sequential_loops_add_up(self):
+        d = self.deadline({}, {"duration": 3600})
+        self.assertEqual((d["sequential_loops"], d["parallel_loops"]), (4, 0))   # the sampler does not count
+        self.assertEqual(d["deadline"], 4 * 3700 + sr.DEADLINE_MARGIN)
+
+    def test_the_parallel_group_counts_once_by_its_longest_member(self):
+        d = self.deadline({"parallel_families": ["load"], "drivers": {"lb": {"timeout": 300}}}, {"duration": 3600})
+        self.assertEqual((d["sequential_loops"], d["parallel_loops"]), (2, 2))
+        self.assertEqual(d["deadline"], 3900 + 2 * 3700 + sr.DEADLINE_MARGIN)
+        d = self.deadline({"parallel_families": ["load"]}, {"duration": 3600, "families": ["load"]})
+        self.assertEqual(d["deadline"], 3700 + sr.DEADLINE_MARGIN)
+
+    def test_a_long_profile_deadline_still_wins(self):
+        d = self.deadline({"job": {"deadline_seconds": 20000}, "parallel_families": ["load"]}, {"duration": 60, "families": ["load"]})
+        self.assertEqual(d["deadline"], 20000)
+
+    def test_loops_beside_iteration_drivers_extend_the_profile_deadline(self):
+        d = self.deadline({"drivers": {"la": {"duration": 600}}})
+        self.assertEqual((d["sequential_loops"], d["iteration_drivers"]), (1, 3))
+        self.assertEqual(d["deadline"], 1800 + 700)
+
+    def test_the_cli_prints_one_json_object(self):
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        env = {"STRESS_OVERRIDES": json.dumps({"duration": 3600, "families": ["load", "models", "tools", "saturation", "counters"]})}
+        with mock.patch.dict("os.environ", env), contextlib.redirect_stdout(out):
+            self.assertEqual(sr.main(["--dir", str(STRESS_DIR), "--plan-deadline", "--profile", "aggressive"]), 0)
+        answer = json.loads(out.getvalue())
+        # the campaign of 2026-11-21: three load drivers together, then three models/tools drivers one after the other
+        self.assertEqual((answer["parallel_loops"], answer["sequential_loops"], answer["unloaded"]), (3, 3, []))
+        self.assertGreater(answer["deadline"], 4 * 3600)
 
 
 class LoadDriversTwice(unittest.TestCase):

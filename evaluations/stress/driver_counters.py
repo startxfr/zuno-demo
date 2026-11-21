@@ -9,7 +9,8 @@
 It reuses the reader of platform/testing/quota_counters_probe.py (WP-177): `GET /counters/<url-encoded namespace>` on the
 Limitador Service, one namespace at a time. The namespaces are discovered from the `limitador_namespace` labels of
 Limitador's own /metrics, so no route is hard-coded. In-cluster URL: LIMITADOR_URL, default
-http://limitador-limitador.kuadrant-system.svc:8080. kuadrant-system has no NetworkPolicy of this repository, but an
+http://limitador-limitador.kuadrant-system.svc:8080; the campaign Job sets it explicitly from `stress_limitador_url`
+(stresstest_campaign_launch.yml, 2026-11-21). kuadrant-system has no NetworkPolicy of this repository, but an
 installation may add one: when the sampler cannot connect it says so in one row, and the same read works from a workstation
 with LIMITADOR_URL pointing at a port-forward (`oc -n kuadrant-system port-forward svc/limitador-limitador 8080`).
 
@@ -112,9 +113,36 @@ def moved_fraction(first: dict, last: dict, identity: str = SHARED_SA):
     return best
 
 
+def why_unknown(counters_by_namespace: dict, url: str, identity: str = SHARED_SA) -> str:
+    """Why `spent_fraction` has no answer for a read that worked: which of the cases it was, with what was seen instead.
+    The counter naming is NOT guessed here (2026-11-21): the row lists the identities Limitador does report, so the next
+    read on the cluster says what SHARED_SA should be matched against."""
+    if not counters_by_namespace:
+        return (f"no namespace found in /metrics: Limitador answered at {url} but its /metrics carries no limitador_namespace "
+                "label, the label the namespaces are discovered from")
+    counters = [c for cs in counters_by_namespace.values() for c in cs]
+    mine = [c for c in counters if identity_of(c) == identity]
+    if mine:
+        return f"{len(mine)} counter(s) of {identity} at {url}, none with a positive limit"
+    seen = sorted({identity_of(c)[:80] or "(no identity)" for c in counters})
+    others = f", under {len(seen)} other identit(ies): {', '.join(seen[:5])}{' ...' if len(seen) > 5 else ''}" if seen else ""
+    return (f"no counter whose identity matches {identity}: {len(counters)} counter(s) seen in {len(counters_by_namespace)} "
+            f"namespace(s) at {url}{others}")
+
+
 def shared_budget_probe(ctx):
-    """Blocking probe of the runner's shared-budget guard: how much of the shared ai-gateway ServiceAccount's budget is spent."""
-    return spent_fraction(read_all(ctx.env.get("LIMITADOR_URL") or LIMITADOR_DEFAULT))
+    """Blocking probe of the runner's shared-budget guard: how much of the shared ai-gateway ServiceAccount's budget is spent.
+    When it cannot tell it raises sr.SharedBudgetUnknown with the case it met, which the guard's warning row repeats:
+    Limitador not read (the exception class), no namespace in /metrics, or no counter of the shared ServiceAccount."""
+    url = ctx.env.get("LIMITADOR_URL") or LIMITADOR_DEFAULT
+    try:
+        counters = read_all(url)
+    except Exception as exc:  # noqa: BLE001 - every way of not reading Limitador is the same case for the guard
+        raise sr.SharedBudgetUnknown(f"connection error reading Limitador at {url}: {type(exc).__name__}: {str(exc)[:160]}") from exc
+    fraction = spent_fraction(counters)
+    if fraction is None:
+        raise sr.SharedBudgetUnknown(why_unknown(counters, url))
+    return fraction
 
 
 if shared_budget_probe not in sr.SHARED_BUDGET_PROBES:
