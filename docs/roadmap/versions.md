@@ -32,6 +32,7 @@ state are not restated here.
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
 | v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610); alternative AI gateways next to the Zuno ai-gateway, Praxis AI first (ADR-0619 to ADR-0623) |
 | v0.18 | planned | | chaos engineering with krkn and Tekton pipelines, approved in AAP (ADR-0626), its two demos, and the stress tool and platform limits found on 2026-11-21 (WP-316 to WP-318) |
+| v0.19 | planned | | proposal under review: sovereignty profiles, data and model governance, and a Core / Enterprise / Labs split, qualified by evidence (ADR-0625, Proposed; WP-319 to WP-329) |
 
 ## MVP / v0
 
@@ -363,6 +364,18 @@ carries the changes to the stress tool and the platform limits found by the stre
 **1 ADR: ADR-0626 `Proposed`.** Open work packages: WP-316 (the chaos component and the two demos), WP-317 (the stress
 tool), WP-318 (quotas, memory, batch queue, metrics) (Phase 59). Nothing had run on a cluster on 2026-11-21; the first
 live validation is planned for 2026-11-22.
+
+## v0.19
+
+A proposal, not a plan (added 2026-11-21). ADR-0625 proposes to deepen the platform's sovereignty and operational
+maturity instead of adding components: data and model governance (an AI DLP capability, a data catalog and lineage, a
+verifiable supply chain for models and datasets), four named deployment profiles (Hybrid, European, Sovereign and
+Air-Gapped AI) that are enforced and checked live, and a split into Core, Enterprise and Labs layers. The band exists so
+the proposal has its own place: v0.18 is taken by the chaos work of ADR-0626, under review on its own branch on
+2026-11-21. The review of ADR-0625 decides the band, or splits the record.
+
+**1 ADR: ADR-0625 `Proposed`.** Open work packages: WP-319 to WP-329 (Phase 60), all `Not started` and none approved.
+The ADR's horizons count from the start of an approved initiative; no date is committed.
 
 ## OKF stream
 

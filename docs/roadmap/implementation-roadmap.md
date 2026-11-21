@@ -39,8 +39,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 15 | 12 | 54 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313, WP-317, WP-318 |
+| v0.17 | 14 | 11 | 54 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313, WP-317, WP-318 |
 | v0.18 | 1 | 1 | 3 | WP-316, WP-317, WP-318 |
+| v0.19 | 1 | 1 | 11 | WP-319, WP-320, WP-321, WP-322, WP-323, WP-324, WP-325, WP-326, WP-327, WP-328, WP-329 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1251,6 +1252,29 @@ this phase had run on a cluster on 2026-11-21; the first live validation is plan
 | WP-317 | [wp-317](work-packages/wp-317-improve-the-stress-tool-after-the-2026-11-21-campaign.md) | 0624, 0626 | WP-305, WP-307, WP-312 | Repo work in review | owner's go: a live campaign with the changed tool; the Keycloak personas `stress-load-09` and `-10` |
 | WP-318 | [wp-318](work-packages/wp-318-lift-the-limits-found-by-the-2026-11-21-stress-campaign.md) | 0624, 0626 | none | Not started | owner's go: the memory of the crash-looping pods before 2026-11-24; the quotas (a zuno-demo-agents release) after |
 
+### Phase 60 — sovereignty profiles, data governance and modularity, proposed by ADR-0625 (added 2026-11-21)
+
+ADR-0625 is `Proposed`: it approves nothing. These work packages turn the workstreams of its indicative roadmap into
+rows, so the size of the proposal shows here. All are `Not started`, and the review of the ADR accepts, changes or drops
+each one. The ADR's horizons (Day 0-30 to Day 90-180) count from the start of an approved initiative; they are not
+calendar dates. WP-319 and WP-320 come first, WP-321 to WP-323 next, then WP-324 and WP-325, then WP-326 and WP-327;
+WP-328 and WP-329 run across the horizons. The phase number leaves 59 to the chaos phase of ADR-0626, under review on
+its own branch on 2026-11-21.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-319 | [wp-319](work-packages/wp-319-review-the-gateway-and-trust-boundary-controls-and-write-their-acceptance-tests.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-320 | [wp-320](work-packages/wp-320-inventory-the-capabilities-and-propose-the-core-enterprise-labs-overlays.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-321 | [wp-321](work-packages/wp-321-prove-an-ai-dlp-detector-on-the-gateway-path.md) | 0625 | WP-319 | Not started | review of ADR-0625 first |
+| WP-322 | [wp-322](work-packages/wp-322-qualify-a-fully-local-profile-and-check-it-live.md) | 0625 | WP-319, WP-320 | Not started | review of ADR-0625 first |
+| WP-323 | [wp-323](work-packages/wp-323-extend-the-verifiable-supply-chain-to-models-datasets-and-deployable-artifacts.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-324 | [wp-324](work-packages/wp-324-pilot-data-governance-on-one-rag-corpus.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-325 | [wp-325](work-packages/wp-325-deploy-and-qualify-the-platform-without-aws-services.md) | 0625 | WP-320 | Not started | review of ADR-0625 first |
+| WP-326 | [wp-326](work-packages/wp-326-qualify-an-air-gapped-installation-update-and-recovery.md) | 0625 | WP-323, WP-325 | Not started | review of ADR-0625 first |
+| WP-327 | [wp-327](work-packages/wp-327-qualify-ha-recovery-load-and-slos-for-an-enterprise-deployment.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-328 | [wp-328](work-packages/wp-328-qualify-a-portfolio-of-european-models-served-locally.md) | 0625 | none | Not started | review of ADR-0625 first |
+| WP-329 | [wp-329](work-packages/wp-329-inventory-the-dependencies-and-licences-and-document-exit-paths.md) | 0625 | none | Not started | review of ADR-0625 first |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1395,6 +1419,7 @@ moving.
 
 ## Change log
 
+- 2026-11-21 — ADR-0625 (Proposed) gets its proposed work packages, WP-319 to WP-329 (Phase 60), all `Not started` and none approved; the ADR moves from v0.17 to a new band v0.19, so the v0.17 row counts 14 ADRs and 11 open. The owner's upload of the proposal was compared with the ADR and adds no recommendation.
 - 2026-11-20 — WP-304 Done: `multi-gateway` and `agents-alt-gateway` played live (owner's go): the Open WebUI list shows the `praxis.` models, `praxis.auto` and kagent's `zuno-diagnose-praxis` answer through Praxis's `maas` step (200); `praxis.auto` takes about 50 s (qwen3.6 reasons first). Dify's steps rest on WP-300.
 - 2026-11-19 — WP-303 prepared: world-model's demo333 entry lists Praxis and the web image is rebuilt (`world-model-web-6`); world-model stays off, so the live proof runs at its next switch-on (owner's choice).
 - 2026-11-19 — WP-301 Done: each OpenClaw persona (consultant-02, sale-01) gets a `praxis` provider next to `zuno`, through its claw proxy and its own `openclaw-<persona>` token; a C1 call from each assistant was served on Praxis's `maas` step (200, traces in Tempo), and the default OpenClaw road still passes its golden-path probe.
