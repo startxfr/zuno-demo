@@ -132,7 +132,8 @@ async def quotas(ctx, i):
     started = time.monotonic()
     token = await ctx.token()
     limit = int(ctx.env.get("QUOTA_BURST_MAX_CALLS", "30"))
-    headers = {"Authorization": "Bearer " + token, "X-Zuno-Quota-Class": "stresstest", "X-Zuno-Data-Classification": "C1",
+    # the class of the functional drivers (STRESS_QUOTA_CLASS, default `stresstest`): the 429 is that small budget running out
+    headers = {"Authorization": "Bearer " + token, **sr.quota_headers(ctx, "quota"), "X-Zuno-Data-Classification": "C1",
                **ctx.trace_headers("quotas", i)}
     statuses = []
     for _ in range(limit):  # sequential on purpose: the ledger checks before it consumes, a parallel burst only blurs the crossing

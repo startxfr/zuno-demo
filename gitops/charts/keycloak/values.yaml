@@ -198,8 +198,11 @@ agentGroups: []
 evalPersonasGroup: /zuno-evaluation
 # The eval personas Job's deadline. Was 600 s: with the stress twins and the WP-306 load pool (about 20 personas, each a
 # handful of kcadm calls of a few seconds) the Job ran out of time twice on 2026-11-19 (DeadlineExceeded 04:13Z and
-# 08:34Z) and left the pool partial (stress-load-08 missing).
-evalPersonasJobDeadlineSeconds: 1800
+# 08:34Z) and left the pool partial (stress-load-08 missing). 2026-11-21: 2400 s for 22 personas (stress-load-09 and -10
+# added). The cost is about two kcadm calls per membership: 188 memberships were ensured on 2026-11-19, the two new
+# copies of consultant-01 add 28 (about 15 % more), and how close the 1800 s run came to its deadline was not recorded.
+# A deadline only bounds a Job that fails, so the margin costs nothing on a healthy run.
+evalPersonasJobDeadlineSeconds: 2400
 # ADR-0624 clause 5 / WP-306: further top-level groups an evalPersonas entry may join through its own `extraGroups`
 # list, created by the Job when missing (same create-only rule as evalPersonasGroup). `/zuno-loadtest` is the group the
 # ai-gateway maps to the `loadtest` quota class (ai-gateway values quotaLoadtestGroup).
@@ -291,6 +294,15 @@ evalPersonas:
     extraGroups:
       - /zuno-loadtest
   - username: stress-load-08
+    copyOf: consultant-01
+    extraGroups:
+      - /zuno-loadtest
+  # 2026-11-21: two more, so a campaign at CONCURRENCY=10 has one persona per worker (a budget is keyed by persona).
+  - username: stress-load-09
+    copyOf: consultant-01
+    extraGroups:
+      - /zuno-loadtest
+  - username: stress-load-10
     copyOf: consultant-01
     extraGroups:
       - /zuno-loadtest

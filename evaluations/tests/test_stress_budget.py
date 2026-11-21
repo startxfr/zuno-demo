@@ -16,7 +16,10 @@ import asyncio
 import pathlib
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
+import httpx
 import yaml
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -136,6 +139,55 @@ class Guard(unittest.TestCase):
 
     def test_the_counters_driver_registers_its_probe(self):
         self.assertIn(cnt.shared_budget_probe, sr.SHARED_BUDGET_PROBES)
+
+
+class ProbeReasons(unittest.TestCase):
+    """2026-11-21: the warning row said "could not be read" and nothing else. The probe now names its case: Limitador not
+    read (with the exception class), no namespace in /metrics, or no counter of the shared ServiceAccount (with the count)."""
+
+    CTX = SimpleNamespace(env={"LIMITADOR_URL": "http://limitador.test:8080"})
+
+    def reason(self, read_all):
+        with mock.patch.object(cnt, "read_all", read_all):
+            with self.assertRaises(sr.SharedBudgetUnknown) as caught:
+                cnt.shared_budget_probe(self.CTX)
+        return str(caught.exception)
+
+    def test_a_connection_error_names_the_exception_class_and_the_url(self):
+        def refused(url):
+            raise httpx.ConnectError("[Errno 111] Connection refused")
+        why = self.reason(refused)
+        self.assertIn("connection error", why)
+        self.assertIn("ConnectError", why)
+        self.assertIn("http://limitador.test:8080", why)
+
+    def test_no_namespace_in_the_metrics(self):
+        why = self.reason(lambda url: {})
+        self.assertIn("no namespace found in /metrics", why)
+
+    def test_no_counter_of_the_shared_account_says_how_many_were_seen_and_whose(self):
+        why = self.reason(lambda url: {"ns-a": [counter(cnt.STRESS_SA, 10, 5), counter("someone", 10, 5)], "ns-b": []})
+        self.assertIn(f"no counter whose identity matches {cnt.SHARED_SA}", why)
+        self.assertIn("2 counter(s) seen in 2 namespace(s)", why)
+        self.assertIn(cnt.STRESS_SA, why)  # what Limitador does report, to match against on the cluster
+
+    def test_a_readable_counter_is_still_a_fraction(self):
+        with mock.patch.object(cnt, "read_all", lambda url: {"ns": [counter(cnt.SHARED_SA, 1000, 250)]}):
+            self.assertAlmostEqual(cnt.shared_budget_probe(self.CTX), 0.75)
+
+    def test_the_warning_row_carries_the_reason(self):
+        plan = sr.Plan(driver=sr.Driver(id="exp", family="experiences", run=lambda ctx, i: []), iterations=1, concurrency=1,
+                       duration=0.0, rate=0.0, ramp=0.0, timeout=5.0)
+        saved = list(sr.SHARED_BUDGET_PROBES)
+        sr.SHARED_BUDGET_PROBES[:] = [cnt.shared_budget_probe]
+        try:
+            with mock.patch.object(cnt, "read_all", lambda url: {}):
+                rows = asyncio.run(sr.run_all([plan], sr.Ctx(env={}), dict(Guard.PROFILE, name="t"), {}, 0, 1, emit=lambda r: None))
+        finally:
+            sr.SHARED_BUDGET_PROBES[:] = saved
+        warning = next(r for r in rows if r.id == "shared-budget-unknown")
+        self.assertIn("no namespace found in /metrics", warning.detail)
+        self.assertIn(cnt.LIMITADOR_DEFAULT, warning.detail)  # no LIMITADOR_URL in the Ctx: the default was read
 
 
 class Fractions(unittest.TestCase):

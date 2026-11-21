@@ -240,10 +240,19 @@
                     value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
                   - name: UNIFAI_VERIFY_TLS
                     value: "1"
-                  # WP-309: the quota class the load drivers ask for (honoured only for the zuno-stresstest client). `stresstest`
-                  # is the small fail-closed one; `loadtest` once the policy of WP-306 defines it.
+                  # The quota classes the drivers ask for (honoured only for the zuno-stresstest client), read by
+                  # stress_runner.quota_headers. 2026-11-21: the load family has its own, `loadtest` (WP-306, 250,000 tokens
+                  # an hour per user); until then it shared `stresstest` (2,000 tokens per 5 minutes per user) with the
+                  # functional drivers, which keep it: it is the budget the `quotas` driver exhausts to prove the 429.
+                  - name: STRESS_LOAD_QUOTA_CLASS
+                    value: "{{ stress_load_quota_class | default('loadtest') }}"
                   - name: STRESS_QUOTA_CLASS
                     value: "{{ stress_quota_class | default('stresstest') }}"
+                  # 2026-11-21: Limitador's address is set here instead of left to the default of driver_counters.py, so the
+                  # Job spec shows what the counters sampler and the shared-budget guard read (an aggressive campaign reported
+                  # "the shared ai-gateway budget could not be read"; the guard's row now says which case it met).
+                  - name: LIMITADOR_URL
+                    value: "{{ stress_limitador_url | default('http://limitador-limitador.kuadrant-system.svc:8080') }}"
                   - name: STRESS_PERSONAS
                     value: "{{ stress_personas | default('stress-consultant-01') }}"
                 volumeMounts:

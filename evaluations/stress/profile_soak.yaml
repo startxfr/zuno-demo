@@ -3,6 +3,9 @@
 name: soak
 description: 2 requests a minute per driver for 4 hours, async
 families: [tools, models, saturation, counters]
+# 2026-11-21: `duration` is per driver, so the three drivers of tools and models must run together for the run to last
+# 4 hours: one after the other they lasted 12, and the 4 h 20 min deadline below stopped the Job during the second loop.
+parallel_families: [tools, models]
 defaults:
   duration: 14400
   rate: 0.033

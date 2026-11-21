@@ -1,7 +1,7 @@
 # Aggressive: ramp each driver up until the budget guard stops it, on several shards. Chaos (WP-311) is listed here
-# and run beside the load by Ansible; until then the list is empty. First values, tuned after the first runs.
+# (the `chaos` key below) and run beside the load by Ansible, once confirmed. First values, tuned after the first runs.
 name: aggressive
-description: load ramp to saturation, stopped by the budget guard; chaos list empty until WP-311
+description: load ramp to saturation, stopped by the budget guard; the disruptions of WP-311 beside it when confirmed
 # `load` pushes (UnifAI scenario replay, ai-gateway and mcp-gateway at concurrency); `saturation` is a sampler that reads the
 # signals of a saturated platform while they run (it needs cluster-monitoring-view on the Job's ServiceAccount).
 # The `agents` family (the per-agent Jobs, which sign in as the stress-<persona> twins) is NOT in this profile: those Jobs
@@ -13,9 +13,17 @@ description: load ramp to saturation, stopped by the budget guard; chaos list em
 # model (for instance tekos #21, Codestral) fails BY DESIGN once the twins are in /zuno-loadtest; the report lists those rows as
 # "skipped: SaaS under loadtest", not as failures.
 families: [tools, models, unifai, guardrails, experiences, state, load, saturation, counters]
-# The load pool of WP-306: one persona per concurrent worker (a budget is keyed by persona), in the `loadtest` class once the
-# quota policy defines it. Needs the Keycloak personas Job to have run; without it the sign-in of each worker fails.
-personas: [stress-load-01, stress-load-02, stress-load-03, stress-load-04, stress-load-05, stress-load-06, stress-load-07, stress-load-08]
+# 2026-11-21: the drivers of these families run TOGETHER (each with its own guard and summary row); the others run one
+# after the other, as before, and the group runs where its first driver stood in the order (family, then id). A load is the
+# three load drivers at once, and `duration` is per driver: sequential, DURATION=3600 kept load-ai-gateway looping for an
+# hour while load-mcp-gateway and load-unifai-scenarios waited. Run together they share the persona pool below and the
+# token cap (budget.max_tokens is one count for the whole run).
+parallel_families: [load]
+# The load pool of WP-306: one persona per concurrent worker (a budget is keyed by persona), in the `loadtest` class (the
+# load drivers ask for it, STRESS_LOAD_QUOTA_CLASS, and the pool is in /zuno-loadtest). Ten since 2026-11-21, for
+# CONCURRENCY=10. Needs the Keycloak personas Job to have run; without it the sign-in of each worker fails.
+personas: [stress-load-01, stress-load-02, stress-load-03, stress-load-04, stress-load-05, stress-load-06, stress-load-07, stress-load-08,
+           stress-load-09, stress-load-10]
 defaults:
   iterations: 60
   concurrency: 8

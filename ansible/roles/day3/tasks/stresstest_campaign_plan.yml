@@ -2,7 +2,8 @@
 # The pure half of stresstest_campaign.yml: validates the campaign knobs, reads the profile and resolves the shape of the
 # run (families, drivers, shards, overrides, deadline, run id). No cluster call, so it runs offline and is tested by
 # evaluations/tests/test_stress_campaign_plan.py. Sets _stress_profile, _stress_families, _stress_drivers,
-# _stress_shards, _stress_wait, _stress_overrides, _stress_deadline, _stress_run_id.
+# _stress_shards, _stress_wait, _stress_overrides, _stress_deadline (and _stress_deadline_detail), _stress_run_id.
+# The one command it runs is local and offline: stress_runner.py --plan-deadline (2026-11-21).
 
 - name: "stress | validate the campaign knobs (they end up in a path, a label and a JSON env)"
   ansible.builtin.assert:
@@ -38,11 +39,34 @@
          | combine({'drivers': stress_drivers | split(',')} if (stress_drivers | default('')) | length > 0 else {})
          | combine({'personas': stress_personas | split(',')} if (stress_personas | default('')) | length > 0 else {}) }}
 
+# 2026-11-21: `duration` is per driver, so the deadline depends on how many drivers loop one after the other and on the
+# profile's `parallel_families`. This task file has no driver registry: stress_runner.py --plan-deadline computes the deadline
+# from the profile, the overrides and the drivers (plan_deadline, pure, no cluster call) and prints one JSON object. Before, it
+# was max(profile deadline, stress_duration + 900): DURATION=3600 on five families made a Job that could not end in time.
+# A driver module that does not import on this host is named in `unloaded`: its drivers are not counted, the plan says so.
+- name: "stress | the Job deadline from the profile, the overrides and the drivers"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ zuno_repo_root }}/platform/testing/stress_runner.py"
+      - --plan-deadline
+      - --profile
+      - "{{ stress_profile }}"
+      - --dir
+      - "{{ zuno_repo_root }}/evaluations/stress"
+  environment:
+    STRESS_OVERRIDES: "{{ _stress_overrides | to_json }}"
+  register: _stress_deadline_plan
+  changed_when: false
+  check_mode: false
+
 - name: "stress | the Job deadline and the run id"
   ansible.builtin.set_fact:
-    _stress_deadline: >-
-      {{ [ (_stress_profile.job | default({})).deadline_seconds | default(1800) | int,
-           ((stress_duration | default('') | string) | length > 0) | ternary((stress_duration | default(0) | int) + 900, 0) ] | max }}
+    _stress_deadline: "{{ (_stress_deadline_plan.stdout | from_json).deadline | int }}"
+    _stress_deadline_detail: >-
+      {{ (_stress_deadline_plan.stdout | from_json).detail }}{{
+         ('; WARNING, not counted: these driver modules do not import on this host: ' ~ ((_stress_deadline_plan.stdout | from_json).unloaded | join(', ')))
+         if (_stress_deadline_plan.stdout | from_json).unloaded else '' }}
     _stress_run_id: "{{ stress_profile }}-{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%d-%H%M%S') }}"
 
 # WP-311: the disruptions a profile lists run only when the operator types the profile name again (stress_chaos_confirm, make's
@@ -60,4 +84,5 @@
       - "profile {{ stress_profile }}: {{ _stress_profile.description | default('') }}"
       - "families {{ _stress_families }}; drivers {{ _stress_drivers or 'all of the families' }}; shards {{ _stress_shards }}; deadline {{ _stress_deadline }}s; wait {{ _stress_wait }}"
       - "overrides {{ _stress_overrides }}"
+      - "deadline: {{ _stress_deadline_detail }}"
       - "chaos {{ _stress_chaos_ids or 'none' }}{{ (' (confirmed)' if _stress_chaos_confirmed else ' (NOT confirmed: type CHAOS_CONFIRM=' ~ stress_profile ~ ' to run them)') if _stress_chaos_ids else '' }}"
