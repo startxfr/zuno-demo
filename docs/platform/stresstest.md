@@ -1,6 +1,6 @@
 # Running the stresstest
 
-Last reviewed: 2026-11-19
+Last reviewed: 2026-11-21
 
 [ADR-0624](../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md) (work packages WP-305 to
 WP-313). The Day 3 stresstest is a **campaign** of drivers that replay the demo scenarios, combined by a named profile,
@@ -44,13 +44,13 @@ Defined in `evaluations/stress/profile_<name>.yaml` (first values, to be tuned a
 |---|---|---|---|---|
 | `smoke` | tools, models, unifai, guardrails | each driver once, concurrency 1, 1 shard | 2 failures in a row, 2 x 429, 1,500 tokens | 15 min, waits |
 | `standard` | tools, models, unifai, guardrails, experiences, state, saturation, counters (`agents` is opt-in, see below) | 3 iterations at concurrency 2; the experience drivers 1 iteration at concurrency 1; `unifai-agents` and `observability-trace` 2 iterations; state once | 3 in a row, 5 x 429, 20,000 tokens | 45 min, waits, with the dashboard coverage |
-| `aggressive` | the standard families plus `load` (also without `agents`) | the load pool of 8 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4 | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
+| `aggressive` | the standard families plus `load` (also without `agents`) | the load pool of 10 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4; the three load drivers run together (`parallel_families: [load]`) | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
 | `mutating` | mutating only: `delegation-approval`, `unifai-live-rag`, `image-signing-refusal` | each once, concurrency 1, as the persona `stress-mutate-01` only (the one profile that sets `allow_mutating`) | 2 failures in a row, 2 x 429, 6,000 tokens | 40 min, waits |
-| `soak` | tools, models, saturation, counters | about 2 requests a minute per driver for 4 hours (`rate` 0.033, `duration` 14400) | 5 in a row, 30 x 429, 300,000 tokens | 4 h 20 min, asynchronous: it prints a run id |
+| `soak` | tools, models, saturation, counters | about 2 requests a minute per driver for 4 hours (`rate` 0.033, `duration` 14400), the three drivers together (`parallel_families: [tools, models]`) | 5 in a row, 30 x 429, 300,000 tokens | 4 h 20 min, asynchronous: it prints a run id |
 
 The `agents` family (the per-agent Jobs of ADR-0555) is **not in `standard` or `aggressive`**: those Jobs drained the shared ai-gateway ServiceAccount's MaaS budget on 2026-11-19, so they are opt-in with `FAMILIES=agents`. A per-agent Job that no longer exists (deleted by hand or by its TTL) is terminal: the wait stops and reports `job-missing` instead of waiting its whole budget.
 
-**The shared-budget guard.** `standard` and `aggressive` carry `shared_budget_guard` (families `experiences`, `unifai` and `guardrails`, `max_used: 0.5`): before such a driver runs, the runner reads the shared ai-gateway ServiceAccount's counter, and when more than half of its window budget is spent the driver is skipped with a guard row `shared-budget`, instead of draining what Open WebUI, Dify, kagent and OpenClaw share. When the counter cannot be read (Limitador unreachable, no counter), the driver runs and one `shared-budget-unknown` WARNING row says so.
+**The shared-budget guard.** `standard` and `aggressive` carry `shared_budget_guard` (families `experiences`, `unifai` and `guardrails`, `max_used: 0.5`): before such a driver runs, the runner reads the shared ai-gateway ServiceAccount's counter, and when more than half of its window budget is spent the driver is skipped with a guard row `shared-budget`, instead of draining what Open WebUI, Dify, kagent and OpenClaw share. When the counter cannot be read, the driver runs and one `shared-budget-unknown` WARNING row says so, and which case it met (since 2026-11-21): a connection error reading Limitador (with the exception class and the URL), no namespace found in Limitador's `/metrics`, or no counter whose identity matches `system:serviceaccount:zuno-ai-run:ai-gateway` (with the number of counters seen and the identities they carry). Limitador's address is `LIMITADOR_URL` in the Job, from the variable `stress_limitador_url` (default `http://limitador-limitador.kuadrant-system.svc:8080`).
 
 `smoke` is the first thing to run after any roll. `mutating` is the one deliberate way to run the three drivers that change state: `make d3 stresstest PROFILE=mutating`. Each cleans up what it creates (the delegated write approval is rejected, never approved, and its session cancelled; the uploaded document is deleted and checked gone; the unsigned pod is a dry run). The image proof needs the namespace `zuno-stress-admission` and one pod-create grant, which exist only when `stressImageProof.enabled` is set (default off, switch `zuno_stress_image_proof_enabled`); otherwise its row says what to enable. Run it outside a demo window. `aggressive` lists six disruptions (see [Chaos](#chaos)); they run
 only when the operator types the profile name again.
@@ -67,8 +67,8 @@ make d3 stresstest PROFILE=aggressive CHAOS_CONFIRM=aggressive   # load AND disr
 make d3 stresstest-collect RUN=soak-20261119-014500   # read one campaign (default: the newest)
 ```
 
-Overrides, all optional: `ITERATIONS`, `CONCURRENCY`, `DURATION` (seconds), `SHARDS`, `FAMILIES` (comma list),
-`DRIVERS` (comma list of driver ids). Without `PROFILE=`, `make d3 stresstest` runs the older per-agent stresstest
+Overrides, all optional: `ITERATIONS`, `CONCURRENCY`, `DURATION` (seconds, per driver: see below), `SHARDS`,
+`FAMILIES` (comma list), `DRIVERS` (comma list of driver ids). Without `PROFILE=`, `make d3 stresstest` runs the older per-agent stresstest
 (`BULK`, `CLEANUP`, `SEQUENTIAL`). `CHAOS_CONFIRM=<the profile name again>` is the only way to inflict disruptions:
 without it a profile that lists them runs its load and nothing else.
 
@@ -78,6 +78,45 @@ Through AAP: the Job Template `zuno-day3-stresstest` (gated by the launch RBAC o
 disruptions), and `stress_wait` to wait or not. The Template `zuno-day3-stresstest-collect` (read-only, credential `zuno-cluster-reader`) takes the run id.
 The launch is asynchronous, so the AAP job ends when the Job is created unless the profile or `stress_wait` asks to
 wait.
+
+### Order, duration and deadline
+
+The drivers of a shard run **one after the other**, except the families a profile lists under `parallel_families`: the
+drivers of those families run **together**, as one group placed where the first of them stood in the order (family, then
+driver id). Each driver of the group keeps its own budget guard and its own summary row; the token cap
+(`budget.max_tokens`) is one count for the whole run, and the group runs under the smallest cap its drivers declare.
+`aggressive` sets `parallel_families: [load]` and `soak` sets `[tools, models]`; without the key the order is the one of
+before 2026-11-21.
+
+`duration` (and `DURATION=`) is **per driver**: every driver it applies to loops that long. A run therefore lasts the sum
+of its sequential loops plus the longest loop of the group. On 2026-11-21, `DURATION=3600` on five families kept
+`load-ai-gateway` looping for an hour while the other load drivers waited, and the Job deadline (then the duration plus 900 s)
+could not cover the drivers after it. The deadline is now computed by
+`python3 platform/testing/stress_runner.py --plan-deadline --profile <name>` (the plan task runs it with
+`STRESS_OVERRIDES`; no cluster call):
+
+- no duration loop: the profile's `job.deadline_seconds`;
+- only duration loops: the larger of the profile's deadline and the loops plus 900 s;
+- loops beside drivers that run a number of iterations: the profile's deadline plus the loops.
+
+A loop counts as its duration plus one driver timeout (the calls in flight when it ends finish). The plan prints how the
+deadline was reached; a driver module that does not import where Ansible runs is named there and its drivers are not
+counted. The campaign of 2026-11-21 (`DURATION=3600 FAMILIES=load,models,tools,saturation,counters`) now gets
+16,140 s: the three load drivers together, then the two models drivers and the tools driver.
+
+### Quota classes
+
+The drivers ask for a quota class with the header `X-Zuno-Quota-Class`, which the ai-gateway honours only for the
+`zuno-stresstest` client. One helper (`stress_runner.quota_headers`) gives the class:
+
+- the `load` family: `STRESS_LOAD_QUOTA_CLASS`, from the variable `stress_load_quota_class`, default **`loadtest`**
+  (250,000 tokens an hour per user, fail-closed). Until 2026-11-21 the load drivers asked for `stresstest` (2,000 tokens
+  per 5 minutes per user), which throttled the load with its own class;
+- every other driver that names a class (`models`, `quotas`, `guardrails`): `STRESS_QUOTA_CLASS`, from
+  `stress_quota_class`, default `stresstest`. `quotas` proves the 429 by exhausting that small budget.
+
+An empty value sends no header: the class then follows the persona's group. `load-ai-gateway` asks for up to 256
+completion tokens a call (64 before 2026-11-21: gpt-oss spent them reasoning, and 16 % of the answers ended by length).
 
 ## What the switches of the cluster do
 
@@ -90,7 +129,7 @@ These are in `ansible/inventories/demo333/cluster.yml` (each is the owner's deci
 | `zuno_stress_clients_enabled: true` | The Dify and kagent token proxies admit the stress Job's pods, so the Job can replay those clients' path |
 | `zuno_stress_reader_enabled: true` | The Job runs as the ServiceAccount `zuno-stress-reader` (namespaces chart, `stressReader`): get-only on the objects the demos' state checks name, generated from the demos' own lists, no Secret, no write. Without it the Job runs as `acceptance-gate` and every state row fails with `status=403` and says what to enable |
 | `zuno_stress_reader_monitoring_view: true` | Adds the built-in `cluster-monitoring-view` to that ServiceAccount, for the `saturation` and `counters` samplers |
-| `chaosRbac.enabled` (chart `aap-config`, default off) | Gives the AAP execution identity the cluster role the disruptions need: delete one pod of the listed applications, create and delete an AdminNetworkPolicy. Needed to run `aggressive` with chaos through AAP; from `make`, your own login does it. The variable that sets it from `ansible/inventories/<cluster>/cluster.yml` was not found in the repository when this page was written |
+| `chaosRbac.enabled` (chart `aap-config`, default off) | Gives the AAP execution identity the cluster role the disruptions need: delete one pod of the listed applications, create and delete an AdminNetworkPolicy. Needed to run `aggressive` with chaos through AAP; from `make`, your own login does it. Set from the inventory by `zuno_stress_chaos_rbac_enabled` (`ansible/roles/aap_config/tasks/install.yml`), which `ansible/inventories/demo333/cluster.yml` sets to `true` (owner's go 2026-11-19) |
 
 ## Identities and budgets
 
@@ -98,9 +137,10 @@ These are in `ansible/inventories/demo333/cluster.yml` (each is the owner's deci
   `/zuno-evaluation`, signed in through the confidential client `zuno-stresstest`. Quota class `stresstest`
   (a cap, not a load: it proves a limit).
 - **`stress-mutate-01`**: the dedicated persona of the `mutating` profile, a copy of consultant-01 in `/zuno-evaluation`, without `/zuno-loadtest`. The mutating drivers never use another persona.
-- **`stress-load-01` to `stress-load-08`**: the load pool, in `/zuno-evaluation` and in `/zuno-loadtest`. A budget is
-  keyed by persona (WP-190), so a concurrency of N wants N personas. They exist after the Keycloak personas Job has
-  run; without it each worker fails to sign in. Quota class `loadtest`.
+- **`stress-load-01` to `stress-load-10`**: the load pool (ten since 2026-11-21, for `CONCURRENCY=10`), in
+  `/zuno-evaluation` and in `/zuno-loadtest`. A budget is keyed by persona (WP-190), so a concurrency of N wants N
+  personas. They exist after the Keycloak personas Job has run; without it each worker fails to sign in. Quota class
+  `loadtest`, by their group and by the class the load drivers ask for.
 - **`ai-gateway-stress`** and the `<model>-service` subscriptions (named `<model>-load` until 2026-11-20, WP-315): the MaaS side of both classes, with its own limit
   (200,000 tokens an hour per model in the work package's proposal; the numbers are the owner's decision). The traffic
   carries `X-Zuno-Traffic: stresstest`, recorded as the span attribute `zuno.traffic` on `model_call`, `guardrails_observe`
@@ -162,7 +202,7 @@ fails and says so, it never guesses another one.
   acceptance gate got HTTP 429 until about 01:22 UTC. Read the isolation rows of the first campaign after a roll before
   trusting the separation.
 - **The Keycloak brute-force lock.** The realm temporarily locks an account after 30 failures (60 s steps, 15 minutes
-  at most, never permanent). A wrong persona password in a load pool of eight personas locks them quickly and every
+  at most, never permanent). A wrong persona password in a load pool of ten personas locks them quickly and every
   later row then fails to sign in: check the password variable first, then wait.
 - Tell the cluster session before a live campaign, and keep the Job's name: it is the only handle for collecting.
 
