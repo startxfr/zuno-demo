@@ -6,6 +6,7 @@
 # Regenerate with: python3 platform/okf/generate_quota_enforcement.py
 classes:
   standard: open
+  light: open
   intensive: closed
   evaluation: open
   stresstest: closed
