@@ -19,6 +19,15 @@
 #                            "report_format": "text", "bulk_interactions":
 #                            10, "cleanup_test_data": 1}). Defaults to {}
 #                            (the template's own default survey answers).
+#   aap_launch_wait       - default true. false: launch, print the run's id
+#                            and return at once, without polling (a demo's
+#                            start launches a chaos workflow that then waits
+#                            at its approval node for a person, ADR-0626).
+#   aap_launch_attach     - default false. true: launch nothing; poll the
+#                            LATEST run of the template instead, and fail
+#                            as usual when it does not succeed (the demo's
+#                            stop waits for the run its start launched).
+#   aap_launch_poll_retries - default 360 (x 10 s): the bound of the poll.
 - name: "AAP: launch a Job/Workflow Template and wait for it to finish"
   hosts: localhost
   gather_facts: false
@@ -83,6 +92,7 @@
       when: (_aap_launch_template_lookup.json.count | default(0) | int) == 0
 
     - name: "Launch {{ aap_launch_template }}"
+      when: not (aap_launch_attach | default(false) | bool)
       ansible.builtin.uri:
         url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ aap_launch_api_path }}/{{ _aap_launch_template_lookup.json.results[0].id }}/launch/"
         method: POST
@@ -102,11 +112,43 @@
       register: _aap_launch_result
       no_log: true
 
+    - name: "Find the latest run of {{ aap_launch_template }} (aap_launch_attach)"
+      when: aap_launch_attach | default(false) | bool
+      ansible.builtin.uri:
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ aap_launch_api_path }}/{{ _aap_launch_template_lookup.json.results[0].id }}/{{ 'workflow_jobs' if aap_launch_type == 'workflow' else 'jobs' }}/?order_by=-id&page_size=1"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_launch_admin_password }}"
+        force_basic_auth: true
+        validate_certs: "{{ zuno_validate_route_certs | default(false) | bool }}"
+        status_code: 200
+      register: _aap_launch_latest
+      no_log: true
+
+    - name: Fail if there is no run to attach to
+      ansible.builtin.fail:
+        msg: "{{ aap_launch_type }} template '{{ aap_launch_template }}' has never run: nothing to wait for."
+      when:
+        - aap_launch_attach | default(false) | bool
+        - (_aap_launch_latest.json.count | default(0) | int) == 0
+
+    - name: Record the id of the run
+      ansible.builtin.set_fact:
+        _aap_launch_id: >-
+          {{ _aap_launch_latest.json.results[0].id if (aap_launch_attach | default(false) | bool)
+             else _aap_launch_result.json.id }}
+
     - name: Report the launch
       ansible.builtin.debug:
         msg: >-
-          Launched {{ aap_launch_type }} '{{ aap_launch_template }}' - job id
-          {{ _aap_launch_result.json.id }}, polling for completion...
+          {{ 'Attached to' if (aap_launch_attach | default(false) | bool) else 'Launched' }}
+          {{ aap_launch_type }} '{{ aap_launch_template }}' - job id
+          {{ _aap_launch_id }}{{ ', polling for completion...' if (aap_launch_wait | default(true) | bool)
+          else ', not waiting for its end (aap_launch_wait: false).' }}
+
+    - name: Return without waiting (aap_launch_wait false)
+      ansible.builtin.meta: end_play
+      when: not (aap_launch_wait | default(true) | bool)
 
     # Job Templates typically finish in minutes; Workflow Templates (a full
     # Day 1/Day 2 sequence) can run much longer - the same generous
@@ -123,7 +165,7 @@
     # keeps a real never-finished run a real failure.
     - name: Poll until the run reaches a terminal status
       ansible.builtin.uri:
-        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ 'workflow_jobs' if aap_launch_type == 'workflow' else 'jobs' }}/{{ _aap_launch_result.json.id }}/"
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ 'workflow_jobs' if aap_launch_type == 'workflow' else 'jobs' }}/{{ _aap_launch_id }}/"
         method: GET
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
@@ -132,7 +174,7 @@
         status_code: 200
       register: _aap_launch_status
       until: (_aap_launch_status.json.status | default('')) in ['successful', 'failed', 'error', 'canceled']
-      retries: 360
+      retries: "{{ aap_launch_poll_retries | default(360) | int }}"
       delay: 10
       failed_when: false
       no_log: true
@@ -141,8 +183,8 @@
       ansible.builtin.fail:
         msg: >-
           {{ aap_launch_type }} '{{ aap_launch_template }}' (id
-          {{ _aap_launch_result.json.id }}) never reached a terminal
-          status within 360x10s of polling - last observed:
+          {{ _aap_launch_id }}) never reached a terminal
+          status within {{ aap_launch_poll_retries | default(360) }}x10s of polling - last observed:
           '{{ _aap_launch_status.json.status | default('no JSON answer') }}'.
           Check the Controller UI/API and re-run once it settles.
       when: (_aap_launch_status.json.status | default('')) not in ['successful', 'failed', 'error', 'canceled']
@@ -151,7 +193,7 @@
         run's own stdout is empty; inspect its nodes individually via the
         Controller UI/API)"
       ansible.builtin.uri:
-        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/jobs/{{ _aap_launch_result.json.id }}/stdout/?format=txt"
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/jobs/{{ _aap_launch_id }}/stdout/?format=txt"
         method: GET
         url_username: admin
         url_password: "{{ _aap_launch_admin_password }}"
@@ -173,12 +215,12 @@
         msg: >-
           {{ aap_launch_type }} '{{ aap_launch_template }}' finished:
           {{ _aap_launch_status.json.status }} (id
-          {{ _aap_launch_result.json.id }})
+          {{ _aap_launch_id }})
 
     - name: Fail this playbook (and therefore the make invocation) if the run didn't succeed
       ansible.builtin.fail:
         msg: >-
           {{ aap_launch_type }} '{{ aap_launch_template }}' did not succeed:
           status={{ _aap_launch_status.json.status }} - see the Controller
-          UI/API (job id {{ _aap_launch_result.json.id }}) for detail.
+          UI/API (job id {{ _aap_launch_id }}) for detail.
       when: _aap_launch_status.json.status != 'successful'

@@ -95,7 +95,7 @@ MUTATING = (
                r"run|exec|rsh|debug|start-build|import-image|cp|rollout|adm\s+(?:cordon|uncordon|drain|taint)|"
                r"set\s+(?!env\b[^|]*--list))\b"),
     re.compile(r"^make\s+(?:day|d)[0-3]\s+(?:install|uninstall|reinstall|reconcile|build|all|run|release|backup|"
-               r"restore|stresstest|scenario-failover-node)\b"),
+               r"restore|stresstest|scenario-failover-node|chaos)\b"),
     re.compile(r"^make\s+demo\s+(?:install|uninstall|start|stop|rehearse|freeze)\b"),
     re.compile(r"^git\s+(?:push|commit|reset|checkout|merge|rebase|tag)\b"),
 )

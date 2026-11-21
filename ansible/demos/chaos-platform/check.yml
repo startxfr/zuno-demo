@@ -1,0 +1,19 @@
+---
+# chaos-platform check: the demo's own assertions, its golden-path probes and its browser check (ADR-0616 clause 9).
+# The page section `## Presenter lifecycle` > `### Check` says what the presenter does after it.
+# Written from the design of the chaos component (WP-316) before its first install.
+# No golden-path probe covers this demo: rehearse it the same day (status banner).
+- name: "chaos-platform check | the pipelines and the AAP workflow"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/cr_ready.yml"
+  vars:
+    cr_ready:
+      - {"api_version": "tekton.dev/v1", "kind": "Pipeline", "name": "chaos-application", "namespace": "zuno-chaos", "exists": true}
+      - {"api_version": "tekton.dev/v1", "kind": "Pipeline", "name": "zuno-chaos-provider-cut", "namespace": "zuno-chaos", "exists": true}
+      - {"api_version": "tower.ansible.com/v1alpha1", "kind": "WorkflowTemplate", "name": "zuno-day3-chaos-platform-workflow", "namespace": "zuno-aap", "exists": true}
+- name: "chaos-platform check | the cluster is healthy before any chaos"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "make d3 check recovery"
+- name: "chaos-platform check | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

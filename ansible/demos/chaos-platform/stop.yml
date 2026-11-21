@@ -1,0 +1,31 @@
+---
+# chaos-platform stop: waits for the latest run of `zuno-day3-chaos-platform-workflow` to end (the one start launched,
+# or a later one launched by hand), at most 120 x 10 s = 20 minutes, through ansible/playbooks/aap_launch.yml
+# (`aap_launch_attach: true`), and records its result: successful, or the status and the job id to open in AAP. It
+# approves, denies and cancels nothing: a run still waiting for its approval after 20 minutes is reported, and the
+# presenter denies it in AAP. Declared in demo.yml because it calls the AAP API, not because it changes the cluster.
+# The page section `## Presenter lifecycle` > `### Stop` says what the presenter does after it.
+- name: "chaos-platform stop | wait for the end of the chaos workflow and read its result"
+  ansible.builtin.command:
+    argv:
+      - ansible-playbook
+      - -i
+      - "{{ zuno_repo_root }}/ansible/inventories/{{ zuno_cluster_name | default('demo333') }}/hosts.yml"
+      - "{{ zuno_repo_root }}/ansible/playbooks/aap_launch.yml"
+      - -e
+      - '{"aap_launch_type": "workflow", "aap_launch_template": "zuno-day3-chaos-platform-workflow", "aap_launch_attach": true, "aap_launch_poll_retries": 120}'
+    chdir: "{{ zuno_repo_root }}"
+  register: _chaos_wait
+  changed_when: false
+  failed_when: false
+  timeout: 1500
+- name: "chaos-platform stop | record the result"
+  ansible.builtin.set_fact:
+    demo_unit_commands: >-
+      {{ demo_unit_commands + [{'cmd': 'ansible-playbook ansible/playbooks/aap_launch.yml -e aap_launch_template=zuno-day3-chaos-platform-workflow aap_launch_attach=true',
+                                'rc': _chaos_wait.rc, 'output': (_chaos_wait.stdout_lines | default([]) + _chaos_wait.stderr_lines | default([]))[-12:] | join(_chaos_nl),
+                                'truncated': false}] }}
+  vars:
+    _chaos_nl: "\n"
+- name: "chaos-platform stop | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"
