@@ -1,0 +1,36 @@
+---
+# WP-318 (2026-11-21 stress campaign): applies ONLY the memory sizing of the
+# OpenShift AI pods that OOM-loop, without the rest of the openshift_ai
+# role (no DSC, no Subscription, no wait on the DataScienceCluster):
+#   - module_manager_memory.yml: the feast, spark, dashboard and
+#     observability module managers (openshift_ai_module_manager_memory);
+#   - right_size_monitoring_stack.yml: the RHOAI TempoStack total
+#     (openshift_ai_tempostack_*), which sizes the compactor.
+# Both files are the same ones install.yml and reconcile.yml include, so
+# `make d1 reconcile openshift-ai` still applies them too; this playbook is
+# the narrow entry point for a change window.
+#
+#   ansible-playbook -i ansible/inventories/<cluster>/hosts.yml \
+#     ansible/playbooks/openshift_ai_memory.yml
+#
+# Both files are patch-only and never fail: a Deployment that does not
+# exist is a silent no-op, and the TempoStack step waits for the CR and
+# skips on timeout. Read the result back with
+# `oc -n redhat-ods-applications get deploy <name> -o jsonpath='{.spec.template.spec.containers[0].resources}'`.
+- name: "OpenShift AI: memory of the OOM-looping pods only"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: "openshift_ai | module managers memory"
+      ansible.builtin.include_role:
+        name: openshift_ai
+        tasks_from: module_manager_memory.yml
+
+    - name: "openshift_ai | TempoStack sizing"
+      ansible.builtin.include_role:
+        name: openshift_ai
+        tasks_from: right_size_monitoring_stack.yml

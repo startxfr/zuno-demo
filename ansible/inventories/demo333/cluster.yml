@@ -644,6 +644,12 @@ zuno_connectivity_link_token_rate_limits:
 # channel's 3.6.0-ea.2 has no upgrade edge from 3.5.2, so the CSV and
 # Subscription are deleted once by hand (see WP-195). No rollback.
 zuno_openshift_ai_version: "3.6.0-ea.2"
+# WP-318 (2026-11-21 stress campaign): the memory of the OOM-looping RHOAI pods, set here rather than left to the role
+# defaults so the cluster's sizing is read in one place. Applied alone with ansible/playbooks/openshift_ai_memory.yml.
+# - feast, spark, dashboard and observability module managers: 1536Mi (shipped 256Mi/512Mi; peak RSS 745Mi at 1536Mi).
+# - the RHOAI TempoStack total: 4cpu/4Gi (RHOAI 3.6.0-ea.2 resets it to 1cpu/1Gi; the compactor then gets 174Mi).
+openshift_ai_module_manager_memory: 1536Mi
+openshift_ai_tempostack_memory_limit: 4Gi
 # WP-195 step 4a (2026-11-04): rhcl 1.4.3 -> 1.4.4 on stable-1.4. Step 4b
 # (2026-11-05, user go): 1.4.4 -> 1.5.0 on stable-1.5 (skipRange >=1.4.4).
 # 1.5 deploys authorino/limitador/dns itself and removes their OLM

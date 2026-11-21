@@ -28,6 +28,14 @@
 #    component OOMKilled or CrashLoopBackOff on first reconcile. Confirmed
 #    live that patching spec.resources.total is NOT reverted by RHOAI's own
 #    reconciler: it is a value RHOAI never revisits after creating the CR.
+#    CORRECTION 2026-11-21: it is revisited when the operator's own desired
+#    value changes. The RHOAI 3.6.0-ea.2 upgrade (Monitoring Server-Side
+#    Apply at 2026-11-18 12:25Z, field manager `monitoring`, now owning
+#    spec.resources) put the total back to its new default, 1cpu/1Gi limits.
+#    That left the compactor 174Mi, and it OOM-looped (26 restarts by 11-21,
+#    10 of them in the stress hour). So re-run this file after every RHOAI
+#    upgrade, and check after the next one whether `monitoring` takes the
+#    field back again between upgrades.
 #
 # 2. ADR-0523/WP-081: even at 2Gi the same proportional split hands the
 #    gateway's opa-openshift authz sidecar ~40m/41Mi. That passed WP-080's
@@ -69,7 +77,10 @@
         # 4cpu/4Gi doubles the opa sidecar to ~80m/82Mi (measured live).
         # Raising it further would breach the namespace's zuno-platform-quota
         # limits.cpu (14, ~10.6 already used), so this is the ceiling until
-        # that quota grows.
+        # that quota grows. (2026-11-21: the quota is now limits.cpu 20 and
+        # limits.memory 40Gi, 9.9 and 10.7Gi used at the 1cpu/1Gi total, so
+        # 4cpu/4Gi fits; the Tempo operator's split gives the compactor
+        # about 17% of the total, ~700Mi at 4Gi.)
         resources:
           total:
             limits:
