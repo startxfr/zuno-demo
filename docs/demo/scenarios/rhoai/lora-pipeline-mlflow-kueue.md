@@ -334,7 +334,7 @@ Evidence:
 > - MachineSet `zuno-gpu-burst-a` at 0, with a MachineAutoscaler from 0 to 1.
 > - `MLflow/mlflow` Available, version 3.15.2, `status.address.url` ending in `/mlflow`. MLflowConfigs in `zuno-mlops`
 >   and `zuno-ai-run`.
-> - Kueue: ClusterQueue `default` (750m CPU and 1536Mi; MIG slices 4 x `1g.24gb` and 2 x `2g.48gb`), LocalQueues in
+> - Kueue: ClusterQueue `default` (1500m CPU and 1536Mi; MIG slices 4 x `1g.24gb` and 2 x `2g.48gb`), LocalQueues in
 >   `zuno-ai-build` and `zuno-ai-run` only, no Workload in `zuno-mlops`.
 > - **No ModelRegistry instance.** The DSC component `modelregistry` is Managed, but only the model catalog runs in
 >   `rhoai-model-registries`.
