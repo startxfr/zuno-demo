@@ -31,15 +31,9 @@ Nothing runs at install: the chart renders no PipelineRun. A run is created by `
 - The provider cut is not a krkn scenario: `zuno-chaos-provider-cut` runs the Zuno task, whose host and subject
   allow-list (`zuno.providerCut`) must equal the catalogue's (same test).
 
-## Dependencies: 21.3.392 is not published yet
+## Dependencies
 
-The chart needs `chaos-cerberus` and `chaos-pipeline` **21.3.392** (the `scenarios`, `recovery-time`, `node-selector` and
-`workload-namespace` parameters). On 2026-11-21 the stable index serves 21.3.391 at most, so this chart has **no
-`Chart.lock`** and `helm dependency build` fails on it. Until then:
-
-- render it offline from a local helm-repository checkout:
-  `helm package <helm-repository>/charts/chaos-pipeline <helm-repository>/charts/chaos-cerberus --version 21.3.392 -d gitops/charts/chaos/charts/`
-  (the `charts/` directory is gitignored, as for every chart here);
-- **vendor the tgz + Chart.lock once 21.3.392 is on the stable index**: `helm dependency update gitops/charts/chaos`, then
-  commit `Chart.lock` (the CI `helm` job runs `helm dependency build` on every chart with dependencies, and fails on this
-  one until then).
+`chaos-cerberus` and `chaos-pipeline` **21.3.392**, from the startx stable index (published 2026-11-21 14:19Z): the first
+release with the `scenarios`, `recovery-time`, `node-selector` and `workload-namespace` pipeline parameters. `Chart.lock`
+is committed; `helm dependency build gitops/charts/chaos` fetches the two packages into the gitignored `charts/`, as for
+every chart here.
