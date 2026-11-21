@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Retarget and new band (2026-11-21) - ADR-0625 moves from v0.17 to v0.19
+
+ADR-0625 (Proposed) entered the index on 2026-11-20 in v0.17, with a note that the band was provisional. Its eleven
+proposed work packages (WP-319 to WP-329) span horizons of up to 180 days from an approved start, which is not the
+content of v0.17 (platform modes and alternative gateways). The record takes a band of its own, v0.19; v0.18 is left to
+ADR-0626 (chaos engineering), under review on its own branch on the same day. The review of ADR-0625 can still move or
+split it.
+
 ## Renumbering and addition (2026-11-07) - the world-model ADR becomes ADR-0604, in v0.16
 
 The interactive generative world-model record was committed as a second `0602` file (a380cc77) while ADR-0602 already

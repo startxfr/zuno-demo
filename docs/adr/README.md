@@ -405,6 +405,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0622](0622-run-agent-router-as-an-alternative-ai-gateway.md) | Proposed | Run Agent Router as an alternative AI gateway |
 | [ADR-0623](0623-run-bifrost-as-an-alternative-ai-gateway.md) | Proposed | Run Bifrost as an alternative AI gateway |
 | [ADR-0624](0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md) | Accepted | Drive the Day 3 stresstest from scenario drivers and named profiles |
+
+## v0.19
+
+| ADR | Status | Decision |
+|---|---|---|
 | [ADR-0625](0625-evolve-zuno-toward-a-modular-sovereign-enterprise-ai-platform.md) | Proposed | Evolve Zuno toward a modular, sovereign enterprise AI platform |
 
 ## OKF v0.1

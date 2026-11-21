@@ -1,7 +1,7 @@
 # ADR-0625: Evolve Zuno toward a modular, sovereign enterprise AI platform
 
 - **Status:** Proposed
-- **Target:** v0.17
+- **Target:** v0.19
 - **Date:** 2026-11-20
 - **Decision owners:** Zuno Demo architecture team (review pending)
 - **Related:** [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md),
@@ -20,7 +20,11 @@
 
 > This record is an open architectural proposal. Every recommendation, candidate technology, deployment profile and
 > roadmap item below is subject to review. It approves no decision, no implementation commitment and no change to the
-> current platform. The target band (v0.17) is provisional: the review decides the band, or splits the record.
+> current platform. The target band (v0.19) is provisional: the review decides the band, or splits the record.
+>
+> 2026-11-21: the owner's upload of the proposal (dated 2026-11-20) was compared with this record, section by section.
+> It carries no recommendation that this record lacks. This pass added the table "Existing records each recommendation
+> builds on", moved the record from v0.17 to its own band, and opened the proposed work packages listed at the end.
 
 ## Context
 
@@ -57,6 +61,28 @@ each profile of section 3 has to replace.
 | F7 | A deployment can silently fall back to a weaker configuration. Until 2026-11-20, an AAP job or a run from a worktree re-applied Argo CD Applications at the manifests' `main`, because the branch pin lived only in the gitignored confidential.yml. The fix (572ada00) moves the pin into the committed cluster file. | ansible/tasks/resolve_gitops_target_revision.yml; AAP job 1482 |
 | F8 | One cluster, one inventory. demo222 was retired on 2026-10-23. Per-cluster values are split between ansible/clusters/demo333.yml, the inventory group_vars and confidential.yml. A per-cluster inventory layout is planned after the 2026-11-24 demo. | de7c36a4; [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md); ansible/inventories/demo/ |
 | F9 | Day-0 services can already run in internal or external mode. This is the existing switch a profile would set. | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md); `zuno_keycloak_mode`, `zuno_mariadb_mode`, `zuno_redis_mode`, `zuno_external_secrets_mode`, `zuno_cert_manager_mode` |
+
+### Existing records each recommendation builds on
+
+Added on 2026-11-21. The existing records below are context: this proposal neither supersedes nor amends them. Where a
+recommendation overlaps a record, the record keeps what it decided, and this proposal claims only the last column.
+
+| Section | Already decided or implemented | What this proposal adds |
+|---|---|---|
+| 1.1 AI DLP | The effective classification is computed from the whole context ([ADR-0034](0034-compute-effective-classification-from-the-complete-context.md)) and can only be raised ([ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md)). Restricted internal context stays on local inference ([ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)). The guardrails run in the ai-gateway as NeMo rails, in `observe` or `block` mode per classification level ([ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md), [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md)). The MCP tools carry signed classification markers ([ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md)). | Detection of content (personal data, secrets, identifiers) as one shared capability, masking before an eligible external call, a detector qualified for its own reliability, and the fail-closed rule. |
+| 1.2 Data governance | Document ACLs are the source's groups, applied fail closed at query time by the UnifAI RAG ([ADR-0110](0110-automate-document-acl-synchronization.md), [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)). Knowledge access is a policy intersection over knowledge domains ([ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)). | A catalog, lineage, licences and purposes, retention, deletion propagation, data quality and dataset versioning. No record covers them today. |
+| 1.3 Policy as code | Tool authorization is a policy intersection, enforced in the MCP gateway ([ADR-0011](0011-define-tool-authorization-as-policy-intersection.md), [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)). Tasks and policies are declarative and reviewed in Git ([ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)). The corp policies live in the agents repository and ship in a signed release ([ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)). The ai-gateway is the policy router ([ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md)). | Only an assessment: a shared decision engine (OPA or Cedar) compared with the native implementation, plus policy simulation and decision explanations. Policy as code itself is already the rule. |
+| 1.4 Sovereign services | Day-0 services run in internal or external mode ([ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md), partially implemented). Buckets follow one per-cluster convention ([ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)). The internal Quay stores its blobs in an AWS S3 bucket ([ADR-0612](0612-serve-every-zuno-image-from-an-internal-red-hat-quay-backed-by-an-s3-bucket.md)). Vault holds the application secrets ([ADR-0024](0024-use-vault-for-application-secrets.md)). The wildcard certificate comes from an ACME issuer through Route 53 ([ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md)). Backup and recovery are defined and drilled ([ADR-0112](0112-implement-production-grade-backup-and-recovery.md)). | Object storage, Vault unseal and certificate issuance that need no AWS service, an independent failure domain for the backups, and the offline artifact path. |
+| 1.5 European models | Local and external providers coexist under classification routing ([ADR-0020](0020-support-both-local-and-external-llm-providers.md), [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)). Mistral models are consumed as a service: Codestral ([ADR-0417](0417-consume-codestral-via-mistral-api.md)) and `mistral-large-latest` as a MaaS ExternalModel ([ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md)). Local models get hardware profiles ([ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md)). | European-origin weights served locally, a qualification matrix, and model bills of materials. |
+| 1.6 Substitutability | The Git-forge MCP server already speaks GitHub and GitLab ([ADR-0120](0120-implement-a-multi-provider-git-forge-mcp-server-for-github-and-gitlab.md)). RHTAS is the in-cluster trust service ([ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md)). Pre-GA dependencies are tracked in a known-good file ([ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md)). | A full dependency inventory, the licence assessment and the documented exit paths. |
+| 2 Profiles | Day-0 modes ([ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md)), per-cluster values in Ansible ([ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)) and classification routing ([ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)). | Named profiles, their enforcement and the live profile check. |
+| 3 Modularity | An experience is admitted with a definition of done and a limit per band ([ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)). Every demo runs through one lifecycle ([ADR-0616](0616-prepare-and-play-every-catalogue-demo-through-one-make-demo-lifecycle.md)). | The three layers, their overlays and the promotion criteria between them. |
+| 4 Roadmap | The trust-boundary hardening and its remaining windows ([ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md), [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md), [ADR-0613](0613-close-the-three-remaining-live-hardening-items-of-adr-0603-in-mid-december.md)). Immutable, verifiable artifacts: [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) is `Deferred`, the in-cluster release ledger of [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) and the image verification of [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) are implemented. HA ([ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md)), backup ([ADR-0112](0112-implement-production-grade-backup-and-recovery.md)) and the stress campaign ([ADR-0624](0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)). | Work packages that extend these records. None reopens them. |
+
+One gap this comparison shows: OKF artifacts and the UnifAI images are signed keyless with a GitHub OIDC identity
+([ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md)), and verified offline against a committed trusted root. The European, Sovereign and
+Air-Gapped profiles ask for an internal signing and trust chain (section 2), so the build-time signer is part of the
+dependency inventory (1.6).
 
 ## Decision
 
@@ -441,7 +467,23 @@ tests and live evidence. Proposed acceptance evidence:
 
 ## Work packages
 
-None yet. Work packages are created after the review accepts some or all of the proposal. The first candidates are:
-- the capability inventory and dependency graph (section 3);
-- the live profile check (2.1);
-- the per-cluster inventory layout already planned for after the 2026-11-24 demo (F8).
+Proposed on 2026-11-21, one per workstream of section 4, all `Not started`. They exist so the roadmap shows the size of
+the proposal. None is approved: the review accepts, changes or drops each one.
+
+- WP-319: the gateway and trust-boundary review, with its security acceptance tests (Day 0-30).
+- WP-320: the capability inventory, the Core / Enterprise / Labs overlays and a minimal Core deployment (Day 0-30).
+- WP-321: the AI DLP proof of concept (Day 30-60).
+- WP-322: the fully local profile and the live profile check (2.1) (Day 30-60).
+- WP-323: the verifiable supply chain for models, datasets and deployable artifacts (Day 30-60).
+- WP-324: the data governance pilot (Day 60-90).
+- WP-325: the deployment without AWS services (Day 60-90).
+- WP-326: the air-gapped qualification (Day 90-180).
+- WP-327: the enterprise operational qualification (Day 90-180).
+- WP-328: the European model portfolio (across the horizons).
+- WP-329: the dependency and licence inventory, with exit paths (across the horizons).
+
+Section 1.3 (unified policy as code) has no work package: section 4 gives it no workstream, and it stays an open
+question of section 5.
+
+The per-cluster inventory layout (F8) is separate work, already planned for after the 2026-11-24 demo. WP-320 and WP-322
+build on it.
