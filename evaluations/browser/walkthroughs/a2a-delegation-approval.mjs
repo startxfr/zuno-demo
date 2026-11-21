@@ -43,9 +43,32 @@ const TOOL = "aap.cluster.audit";
 const CARD = "Approval Required";                               // the page's row 1:30
 const APPROVE = ["button:text-is('Approve')"];                  // guess
 const REJECT = ["button:text-is('Reject')"];                    // guess
+const REASON = "textarea[placeholder^='Reason for rejection']"; // the field the first Reject opens (unifai-main, 2026-11-21)
 const JOB = /jobs\/playbook\/(\d+)|\bjob(?:\s+id)?\s*[:#]?\s*(\d{2,})/i;
 const CARD_TIMEOUT_MS = 180000;      // the page: about 10 s through the API
 const ANSWER_TIMEOUT_MS = 300000;    // the approval expires after 300 s
+
+// Reject takes two clicks (ApprovalCard.tsx, read by unifai-main on 2026-11-21): the first only opens a "Reason for
+// rejection..." field with Cancel and a second Reject, and only that second one posts the decision. A single click sent
+// nothing 99 times on 2026-11-21 08:29Z, and the card expired after 300 s. True once the second Reject is clicked;
+// false when the card has no Reject, or was redrawn before the second click (the caller tries again).
+async function rejectCard(page, log) {
+  const reject = await firstVisible(page, REJECT);
+  if (!reject) throw new Error("an approval card is waiting and its Reject button was not found: nothing more is approved");
+  await click(reject, { changes });
+  const reason = page.locator(REASON).first();
+  if (!(await reason.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false))) {
+    log("the reason field did not open after Reject (the card may have been redrawn): trying again");
+    return false;
+  }
+  const confirm = reason.locator("xpath=ancestor::*[.//button[normalize-space()='Cancel']][1]").locator("button:text-is('Reject')").first();
+  if (!(await confirm.isVisible().catch(() => false))) {
+    log("the reason field closed before the second Reject (the card was redrawn): trying again");
+    return false;
+  }
+  await click(confirm, { changes });
+  return true;
+}
 
 export async function enter(ctx) {
   await warm(ctx.page, ctx.base);
@@ -119,11 +142,10 @@ export async function run({ page, mark, log, state }) {
   // The answer; a second card, if the model asks twice, is rejected (the page's row 3:30): one audit is enough.
   const answer = await waitUntil(page, { what: "Arkos's answer after the approval", timeoutMs: ANSWER_TIMEOUT_MS, everyMs: 1000, done: async () => {
     if (await pending(page)) {
-      const reject = await firstVisible(page, REJECT);
-      if (!reject) throw new Error("a second approval card came and its Reject button was not found: nothing more is approved");
-      await click(reject, { changes });
+      const sent = await rejectCard(page, log);
+      if (!sent) return undefined;
       state.notes.rejections += 1;
-      log("a second approval card came: rejected");
+      log("a second approval card came: rejected (Reject, then Reject next to Cancel)");
       await page.waitForTimeout(1500);
       return undefined;
     }
@@ -181,8 +203,7 @@ export async function scout({ page, step, state }) {
 // approval is left open; the AAP job an approval launched stays in AAP.
 export async function cleanup({ page, log, state }) {
   if (state.sessionId && (await pending(page).catch(() => false))) {
-    const reject = await firstVisible(page, REJECT);
-    if (reject) { await click(reject, { changes }).catch(() => {}); log("an approval card was still waiting at the end: rejected"); await page.waitForTimeout(1000); }
+    if (await rejectCard(page, log).catch(() => false)) { log("an approval card was still waiting at the end: rejected"); await page.waitForTimeout(1000); }
   }
   const gone = await unifaiDeleteSession(page, state, persona);
   if (gone && state.teamId && (await teamSessions(page, state.teamId)).includes(state.sessionId)) {

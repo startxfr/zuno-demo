@@ -79,9 +79,9 @@ Nothing is prepared by the file. What only a person does:
 - [ ] A browser profile for **consultant-02** (password in Vault, `keycloak/demo-personas`). Open
   `https://unifai-ui-zuno-unifai.apps.demo333.startx.fr` and sign in through Keycloak (realm `zuno`). Check the name at
   the top right.
-- [ ] Rehearse the 5-minute version once the same day as consultant-02 and click **Reject**: nothing runs. Arkos
-  answers without delegating on some turns (one in four in the earlier runs), so rehearsal tells you whether the prompt
-  delegates today.
+- [ ] Rehearse the 5-minute version once the same day as consultant-02 and reject the card (**Reject**, then
+  **Reject** again next to **Cancel**): nothing runs. Arkos answers without delegating on some turns (one in four in
+  the earlier runs), so rehearsal tells you whether the prompt delegates today.
 - [ ] The AAP launch limit is 2 per caller in 15 minutes. If you rehearse with **Approve**, do it at least 15 minutes
   before the session.
 - [ ] Budget: a delegating turn costs tens of thousands of tokens on consultant-02's quota (about 65,000 measured on
@@ -116,7 +116,7 @@ Profile **consultant-02**.
 | 0:45 | Ask: `Call the Tekos delegation tool right now and ask it to launch a fresh cluster audit with its audit tool (aap.cluster.audit), then tell me the job link it returns. Do not answer from memory.` | "I ask Arkos, and Arkos asks Tekos. The call carries my identity. Tekos gets my rights, not more, and the platform checks that I may use both agents." | The **Live workflow** panel runs. |
 | 1:30 | Wait for the approval card | "Tekos wants to launch a job: that is a write. The platform stops the turn and asks the person who started the chain. Not Arkos, not an automatic rule." | A card **Approval Required** for `aap.cluster.audit`, with **Approve** and **Reject**. Through the API it arrived about 10 s after the question (WP-174). |
 | 2:30 | Click **Approve** | "I approve. If I had said nothing, the request would expire after five minutes and nothing would run." | AAP starts job `zuno-day0-check` seconds after the click. Arkos's answer gives the job link (`https://aap.apps.demo333.startx.fr/#/jobs/playbook/<id>/output`) or the job id. Let the job run; it takes about six minutes. |
-| 3:30 | If a second card appears, click **Reject** | "The model sometimes asks twice. One audit is enough, so I decline the second one." | The card shows **Rejected**. Without an answer the session would wait for the 300 s expiry. |
+| 3:30 | If a second card appears, click **Reject**, then **Reject** again next to **Cancel** | "The model sometimes asks twice. One audit is enough, so I decline the second one." | The first **Reject** only opens a **Reason for rejection...** field; the second one sends the refusal. The card then shows **Rejected**. After the first click alone nothing is sent, and the session waits for the 300 s expiry (seen on 2026-11-21). |
 | 4:15 | Close | "An agent can ask another agent for help, but never with more rights than the person who asked. And before anything is executed, that person decides." | |
 
 ## 15-minute version
@@ -140,7 +140,7 @@ Run the 5-minute version, then:
 | Symptom | Fallback | Say |
 |---|---|---|
 | No approval card after about a minute; Arkos answers alone ("I will reach out to the technical consultant") | Start a new session with **+** and ask again. If it still does not delegate, show the probe result of the morning. | "The model decides whether to call another agent. The platform decides what happens when it does." |
-| A second card appears after you answered the first | Click **Reject** on it. | "Each request is answered on its own. Without an answer it would wait five minutes, then count as a refusal." |
+| A second card appears after you answered the first | Click **Reject** on it, then **Reject** again next to **Cancel** (the first click only opens the reason field). If the reason field closes by itself, start a new session with **+**. | "Each request is answered on its own. Without an answer it would wait five minutes, then count as a refusal." |
 | Tekos's answer says `cluster_audit is rate limited: 2 launch(es) per 900s per caller (ADR-0603 M15)` | Carry on without the job. The approval already worked. | "The platform also caps how often one person can launch this audit: twice in fifteen minutes." |
 | Tekos reports AAP 400 `'env' value missing` | Carry on without the job. A required Survey question was added by hand to `zuno-day0-check` once before (2026-09-29 to 2026-11-06). | "The approval worked; the job template was changed outside Git. That is what the drift checks are for." |
 | A card **Rate limit reached - quota_exceeded** | Stop the scenario. Show the probe result. | "My token budget is spent, across every experience. The delegation draws on the same budget as my own questions." |

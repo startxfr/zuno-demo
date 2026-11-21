@@ -147,7 +147,16 @@ async function show() {
       const card = document.createElement("div"); card.id = "approval"; card.style.cssText = "border:2px solid #c60;padding:8px;margin:8px 0";
       card.innerHTML = "<h4>Approval Required</h4><p>Tekos wants to call " + chat.pending_approval.tool + "</p><button>Approve</button><button>Reject</button>";
       const decide = (approved) => fetch("/api2/sessions/session.approval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sid, approved }) });
-      card.querySelectorAll("button")[0].onclick = () => decide(true); card.querySelectorAll("button")[1].onclick = () => decide(false);
+      // As UnifAI's ApprovalCard (unifai-main, 2026-11-21): Approve posts at once; Reject only opens a "Reason for
+      // rejection..." field with Cancel and a second Reject, and only that one posts the refusal.
+      card.querySelectorAll("button")[0].onclick = () => decide(true);
+      card.querySelectorAll("button")[1].onclick = () => {
+        card.querySelectorAll("button")[0].remove(); card.querySelectorAll("button")[0].remove();
+        const why = document.createElement("div");
+        why.innerHTML = "<textarea placeholder='Reason for rejection...'></textarea><button>Cancel</button><button>Reject</button>";
+        why.querySelectorAll("button")[1].onclick = () => decide(false);
+        card.appendChild(why);
+      };
       $("live").after(card);
     }
   }
