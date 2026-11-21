@@ -3,7 +3,7 @@
 - **State:** Repo work in review (2026-11-19, committed in the `wp306-coder` worktree on branch `wp311-coder`, based on origin/devel 78b1bafc, not pushed); every live step is the owner's go
 - **ADRs:** [ADR-0624](../../adr/0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md)
 - **Depends on:** [WP-305](wp-305-build-the-stress-runner-core-and-profiles.md), [WP-307](wp-307-launch-the-stress-campaign-as-an-indexed-job.md), [WP-312](wp-312-report-the-campaigns-and-read-the-limitador-counters.md)
-- **Related:** WP-308, WP-309
+- **Related:** WP-308, WP-309; [WP-316](wp-316-run-chaos-pipelines-and-the-two-chaos-demos.md) and [ADR-0626](../../adr/0626-chaos-engineering-with-krkn-and-tekton-pipelines.md) (2026-11-21: krkn pipelines are to replace these disruptions; this brief is marked superseded only after a live krkn run)
 - **Target:** v0.17
 - **Estimated files touched:** ~16: the catalogue, the validator, two Ansible task files, the plan/launch/collect wiring, the runner timeline, the report, the aggressive profile, the Makefile, an optional aap-config grant, the tests
 

@@ -407,6 +407,12 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0624](0624-drive-the-day3-stresstest-from-scenario-drivers-and-named-profiles.md) | Accepted | Drive the Day 3 stresstest from scenario drivers and named profiles |
 | [ADR-0625](0625-evolve-zuno-toward-a-modular-sovereign-enterprise-ai-platform.md) | Proposed | Evolve Zuno toward a modular, sovereign enterprise AI platform |
 
+## v0.18
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0626](0626-chaos-engineering-with-krkn-and-tekton-pipelines.md) | Proposed | Chaos engineering with krkn and Tekton pipelines |
+
 ## OKF v0.1
 
 | ADR | Status | Decision |

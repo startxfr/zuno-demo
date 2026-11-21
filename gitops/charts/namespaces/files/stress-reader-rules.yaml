@@ -67,6 +67,7 @@ rules:
   - ai-gateway
   - assistant
   - assistant-proxy
+  - cerberus
   - cert-manager-istio-csr
   - confluence-mcp
   - diagram-render
@@ -147,6 +148,7 @@ rules:
   - zuno-ai-gateway-d1
   - zuno-cert-manager-d0
   - zuno-cert-manager-d1
+  - zuno-chaos-d1
   - zuno-connectivity-link-d1
   - zuno-dify-d1
   - zuno-dify-knowledge-d1
@@ -621,6 +623,16 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - tekton.dev
+  resources:
+  - pipelines
+  resourceNames:
+  - chaos-application
+  - chaos-infra
+  - zuno-chaos-provider-cut
+  verbs:
+  - get
+- apiGroups:
   - tempo.grafana.com
   resources:
   - tempomonolithics
@@ -651,6 +663,8 @@ rules:
   - workflowtemplates
   resourceNames:
   - zuno-day1-check-workflow
+  - zuno-day3-chaos-infra-workflow
+  - zuno-day3-chaos-platform-workflow
   verbs:
   - get
 - apiGroups:

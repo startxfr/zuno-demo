@@ -1,0 +1,29 @@
+---
+# chaos-infrastructure start: launches the AAP workflow `zuno-day3-chaos-infra-workflow` with the tier `pods`, through
+# the Controller API (ansible/playbooks/aap_launch.yml), and returns at once (`aap_launch_wait: false`): the workflow
+# runs its pre-check, then waits at its approval node for a person. Nothing breaks before the approval. Declared
+# changing in demo.yml. The page section `## Presenter lifecycle` > `### Start` says what the presenter does after it.
+- name: "chaos-infrastructure start | launch the chaos workflow, tier pods, without waiting for its end"
+  ansible.builtin.command:
+    argv:
+      - ansible-playbook
+      - -i
+      - "{{ zuno_repo_root }}/ansible/inventories/{{ zuno_cluster_name | default('demo333') }}/hosts.yml"
+      - "{{ zuno_repo_root }}/ansible/playbooks/aap_launch.yml"
+      - -e
+      - '{"aap_launch_type": "workflow", "aap_launch_template": "zuno-day3-chaos-infra-workflow", "aap_launch_wait": false, "aap_launch_extra_vars": {"chaos_tier": "pods"}}'
+    chdir: "{{ zuno_repo_root }}"
+  register: _chaos_launch
+  changed_when: true
+  failed_when: false
+  timeout: 300
+- name: "chaos-infrastructure start | record the launch"
+  ansible.builtin.set_fact:
+    demo_unit_commands: >-
+      {{ demo_unit_commands + [{'cmd': 'ansible-playbook ansible/playbooks/aap_launch.yml -e aap_launch_template=zuno-day3-chaos-infra-workflow aap_launch_wait=false chaos_tier=pods',
+                                'rc': _chaos_launch.rc, 'output': (_chaos_launch.stdout_lines | default([]) + _chaos_launch.stderr_lines | default([]))[-12:] | join(_chaos_nl),
+                                'truncated': false}] }}
+  vars:
+    _chaos_nl: "\n"
+- name: "chaos-infrastructure start | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"

@@ -33,10 +33,10 @@ class Repository(unittest.TestCase):
     def test_no_problem(self):
         self.assertEqual(consistency.problems(ROOT), [])
 
-    def test_39_directories(self):
+    def test_41_directories(self):
         ids = {e.id for e in catalogue.discover(ROOT)}
         dirs = {d.name for d in (ROOT / "ansible/demos").iterdir() if d.is_dir() and d.name != "_lib"}
-        self.assertEqual(len(ids), 39)
+        self.assertEqual(len(ids), 41)   # chaos-infrastructure and chaos-platform (WP-316, 2026-11-21)
         self.assertEqual(dirs, ids)
 
     def test_scaffolder_has_nothing_left_to_create(self):

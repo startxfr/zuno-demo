@@ -72,17 +72,17 @@ class RealPages(unittest.TestCase):
         cls.entries = c.discover(ROOT)
         cls.pages = {e.id: c.load(e) for e in cls.entries}
 
-    def test_39_demos_33_scenarios_6_workshops(self):
+    def test_41_demos_35_scenarios_6_workshops(self):
         kinds = [e.kind for e in self.entries]
-        self.assertEqual(len(self.entries), 39)
-        self.assertEqual(kinds.count("scenario"), 33)
+        self.assertEqual(len(self.entries), 41)   # the two chaos scenarios (WP-316, 2026-11-21)
+        self.assertEqual(kinds.count("scenario"), 35)
         self.assertEqual(kinds.count("workshop"), 6)
 
     def test_step_counts(self):
         k5 = sum(len(p.steps("5")) for p in self.pages.values())
         k15_own = sum(len(p.steps15_own) for p in self.pages.values())
-        self.assertEqual(k5, 179)   # claude-code-sovereign: 8 rows after its rehearsal (2026-11-19), was 6
-        self.assertEqual(k15_own, 304)
+        self.assertEqual(k5, 193)   # claude-code-sovereign: 8 rows after its rehearsal (2026-11-19), was 6; +14 the chaos pages
+        self.assertEqual(k15_own, 325)   # +21 the chaos pages (2026-11-21)
 
     def test_fifteen_minute_version_is_cumulative(self):
         for page in self.pages.values():

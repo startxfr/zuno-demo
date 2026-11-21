@@ -1,0 +1,18 @@
+---
+# chaos-infrastructure status: fast reads only: Applications, workloads, Routes; no model call (ADR-0616 clause 9).
+# The page section `## Presenter lifecycle` > `### Status` says what the presenter does after it.
+# Written from the design of the chaos component (WP-316) before its first install. The Application name follows the
+# repository's pattern (gitops/apps/<component>/application-d1.yaml names zuno-<component>-d1, as praxis does): align
+# it with gitops/apps/chaos/ once that is merged.
+- name: "chaos-infrastructure status | Argo CD Application of the chaos component"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/argo_apps.yml"
+  vars:
+    argo_apps:
+      - "zuno-chaos-d1"
+- name: "chaos-infrastructure status | the health signal"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/workloads.yml"
+  vars:
+    workloads:
+      - {"name": "cerberus", "namespace": "zuno-chaos"}
+- name: "chaos-infrastructure status | report"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/render.yml"
