@@ -39,7 +39,8 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
-| v0.17 | 15 | 12 | 52 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313 |
+| v0.17 | 15 | 12 | 54 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313, WP-317, WP-318 |
+| v0.18 | 1 | 1 | 3 | WP-316, WP-317, WP-318 |
 | OKF v0.1 | 8 | — | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1235,6 +1236,20 @@ Blender and world-model.
 | WP-313 | [wp-313](work-packages/wp-313-give-the-stresstest-the-observability-it-needs-to-judge-load.md) | 0624 | none | Repo work in review | dashboards and Authorino done 2026-11-19; Limitador counter reader and zero-initialised counters (with the WP-306 roll) remain |
 | WP-314 | [wp-314](work-packages/wp-314-fit-the-maas-gateway-wasm-config-under-1-4-mb.md) | 0624 | none | Done (2026-11-20) | applied 12:27 UTC (generation 4, 674,956 bytes, 20 limits counted); V4 (sale-01 live) and V6 (`make d2 check agents`, v1.1.7) passed; the re-check after the KServe window of the same day is to be recorded |
 | WP-315 | [wp-315](work-packages/wp-315-harden-maas-usage-tiers-single-listener-alert-limitador-redis.md) | 0624 | WP-314 | Done (2026-11-20) | tiers live and measured at 15:33Z (549,033 bytes, 15 limits counted, 12 subscriptions); alert and Limitador on disk live at 16:30Z (counter kept across a restart); image-proof guard live at 16:36Z; the single-listener change is deferred after the demo |
+
+### Phase 59 — Chaos engineering, and the limits of the 2026-11-21 stress campaign (added 2026-11-21)
+
+ADR-0626: krkn scenarios run as Tekton pipelines in `zuno-chaos`, from the startx charts `chaos-cerberus` and
+`chaos-pipeline` pinned in a wrapper chart, on a closed list of targets, launched only by an AAP workflow that a person
+approves. Two demos of the catalogue's resilience layer show it. The same day's stress campaign reached no capacity
+limit, but limits of its tool (WP-317) and of the platform's quotas, memory, batch queue and metrics (WP-318). Nothing of
+this phase had run on a cluster on 2026-11-21; the first live validation is planned for 2026-11-22.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-316 | [wp-316](work-packages/wp-316-run-chaos-pipelines-and-the-two-chaos-demos.md) | 0626 | WP-291 | Repo work in review | owner's go at each step of the 2026-11-22 validation: install, chart test, tiers, targets, stress and chaos together |
+| WP-317 | [wp-317](work-packages/wp-317-improve-the-stress-tool-after-the-2026-11-21-campaign.md) | 0624, 0626 | WP-305, WP-307, WP-312 | Repo work in review | owner's go: a live campaign with the changed tool; the Keycloak personas `stress-load-09` and `-10` |
+| WP-318 | [wp-318](work-packages/wp-318-lift-the-limits-found-by-the-2026-11-21-stress-campaign.md) | 0624, 0626 | none | Not started | owner's go: the memory of the crash-looping pods before 2026-11-24; the quotas (a zuno-demo-agents release) after |
 
 ### OKF stream phases
 

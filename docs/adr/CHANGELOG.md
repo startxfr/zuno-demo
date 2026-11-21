@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition and new band (2026-11-21) - ADR-0626, v0.18 created
+
+The stress campaign of 2026-11-21 and the startx chaos charts 21.3.391 released the same day led to ADR-0626 (chaos
+engineering with krkn and Tekton pipelines, launched by an approved AAP workflow, on a closed list of targets). It opens
+the band v0.18 with its work packages WP-316 (the chaos component and the two chaos demos), WP-317 (the stress tool)
+and WP-318 (the limits found by the campaign). ADR-0626 replaces clause 6 of ADR-0624 only once krkn has run live; until
+then ADR-0624 and WP-311 are unchanged. `check_docs.py` verifies the band v0.18.
+
 ## Renumbering and addition (2026-11-07) - the world-model ADR becomes ADR-0604, in v0.16
 
 The interactive generative world-model record was committed as a second `0602` file (a380cc77) while ADR-0602 already
