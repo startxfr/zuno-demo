@@ -1,9 +1,9 @@
 dependencies:
 - name: chaos-cerberus
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.392
+  version: 21.3.398
 - name: chaos-pipeline
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.392
-digest: sha256:cac6def33050809c90ba3bf95a1ed6c34fb0628d840219cb91ee3f3f264048fb
-generated: "2026-11-21T15:23:28.442750206+01:00"
+  version: 21.3.398
+digest: sha256:d9793a62759ffc40f671fd0cfef7bdf2c6ff72d016e02f26d149627b1b7cce66
+generated: "2026-11-21T21:58:44.882559435+01:00"

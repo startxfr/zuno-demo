@@ -9,15 +9,16 @@ description: >-
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-# 21.3.392 carries the run parameters this component needs (scenarios, recovery-time, node-selector, workload-namespace,
-# per-scenario recoveryTime). It is not on the stable index yet (2026-11-21: 21.3.391 is the newest there), so there is
-# no Chart.lock: run `helm dependency update gitops/charts/chaos` and commit the Chart.lock once it is published (README).
+# 21.3.398 (startx stable index, 2026-11-21 ~21:05Z): the run parameters this component needs (scenarios,
+# recovery-time, node-selector, workload-namespace, per-scenario recoveryTime; first in 21.3.392), an empty `scenarios`
+# default (a run that names no scenario runs none) and an optional ClusterOperator final check (off here). Chart.lock is
+# committed; `helm dependency build gitops/charts/chaos` fetches the packages.
 dependencies:
   - name: chaos-cerberus
     alias: cerberus
-    version: "21.3.392"
+    version: "21.3.398"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
   - name: chaos-pipeline
     alias: pipeline
-    version: "21.3.392"
+    version: "21.3.398"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"

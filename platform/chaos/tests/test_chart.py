@@ -2,7 +2,7 @@
 
 The values half needs only PyYAML: the generated application scenarios in sync with the catalogue, the infra tiers present
 and enabled, the node-level scenarios on the labelled node with the infra toleration, the provider-cut allow-list equal to
-the catalogue's. The render half needs helm and the two startx dependencies under gitops/charts/chaos/charts/ (21.3.392 is
+the catalogue's. The render half needs helm and the two startx dependencies under gitops/charts/chaos/charts/ (21.3.398 is
 not on the stable index yet, see the chart README): it skips without them. It renders the chart, checks what a run relies
 on, and runs the zuno-provider-cut script with a stub `oc` to compare its AdminNetworkPolicy with the WP-311 shape
 (platform/testing/stress_chaos.py anp_manifest).
@@ -116,7 +116,7 @@ class Values(unittest.TestCase):
     def test_dependencies_are_the_two_startx_charts_at_one_pinned_version(self):
         chart = yaml.safe_load((CHART / "Chart.yaml").read_text())
         deps = {d["alias"]: (d["name"], d["version"]) for d in chart["dependencies"]}
-        self.assertEqual(deps, {"cerberus": ("chaos-cerberus", "21.3.392"), "pipeline": ("chaos-pipeline", "21.3.392")})
+        self.assertEqual(deps, {"cerberus": ("chaos-cerberus", "21.3.398"), "pipeline": ("chaos-pipeline", "21.3.398")})
 
 
 def _render_ready():
@@ -133,7 +133,17 @@ def render(extra=()):
     return [d for d in yaml.safe_load_all(out) if d]
 
 
-@unittest.skipUnless(_render_ready(), "needs helm and the 21.3.392 dependencies under gitops/charts/chaos/charts/")
+
+def _scenario_tasks(pipeline):
+    """The scenario names a pipeline can run: each scenario task is skipped unless its name is in params.scenarios."""
+    names = []
+    for task in pipeline["spec"].get("tasks", []):
+        for cond in task.get("when", []) or []:
+            if cond.get("values") == ["$(params.scenarios[*])"]:
+                names.append(cond.get("input"))
+    return names
+
+@unittest.skipUnless(_render_ready(), "needs helm and the 21.3.398 dependencies under gitops/charts/chaos/charts/")
 class Render(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -163,13 +173,17 @@ class Render(unittest.TestCase):
 
     def test_application_pipeline_offers_exactly_the_pod_targets(self):
         pipeline = self.get("Pipeline", "chaos-application")
+        # Since 21.3.398 a run without `scenarios` runs nothing (the default is empty); the scenario tasks are the
+        # pipeline's tasks between the cerberus gate and the final checks, one per catalogue pod target.
         default = next(p for p in pipeline["spec"]["params"] if p["name"] == "scenarios")["default"]
-        self.assertEqual(default, sorted(t["id"] for t in self.cat["targets"] if t["kind"] == "pod-delete"))
+        self.assertEqual(default, [])
+        self.assertEqual(sorted(_scenario_tasks(pipeline)), sorted(t["id"] for t in self.cat["targets"] if t["kind"] == "pod-delete"))
 
     def test_infra_pipeline_offers_every_tier_scenario(self):
         pipeline = self.get("Pipeline", "chaos-infra")
         default = next(p for p in pipeline["spec"]["params"] if p["name"] == "scenarios")["default"]
-        self.assertEqual(sorted(default), sorted(s for names in self.cat["infra_tiers"].values() for s in names))
+        self.assertEqual(default, [])
+        self.assertEqual(sorted(_scenario_tasks(pipeline)), sorted(s for names in self.cat["infra_tiers"].values() for s in names))
         params = {p["name"]: p.get("default") for p in pipeline["spec"]["params"]}
         self.assertEqual(params["node-selector"], "zuno.io/chaos-target=true")
         self.assertEqual(params["workload-namespace"], "zuno-chaos")
