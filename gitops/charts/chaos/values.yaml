@@ -1,0 +1,325 @@
+# Day 2 component chaos (ansible/roles/chaos). Three parts, each off by default so `helm template` with no overrides renders
+# nothing (gitops/apps/chaos/application-d1.yaml turns them on):
+#   - zuno.enabled: the Zuno Tasks (zuno-provider-cut, zuno-steady-state), the zuno-chaos-provider-cut Pipeline and their
+#     RBAC (templates/);
+#   - cerberus.cerberus.enabled: the startx chaos-cerberus watchdog, the go/no-go signal every run is gated on;
+#   - pipeline.pipeline.enabled: the startx chaos-pipeline Tasks and Pipelines (chaos-infra, chaos-application).
+# Everything lives in ONE namespace, zuno-chaos, created by gitops/charts/namespaces (not Kueue-managed: the krkn steps and
+# helper pods are short and must never queue behind a GPU workload). The startx `project` subcharts stay off for that reason.
+# No PipelineRun is rendered: a run is created by ansible/roles/chaos/tasks/run.yml.
+
+zuno:
+  enabled: false
+  namespace: zuno-chaos
+  # Read by the Zuno Tasks and by the pre/post checks of the role (the same URL as pipeline.pipeline.cerberus.url).
+  cerberusUrl: http://cerberus.zuno-chaos.svc.cluster.local:8080
+  images:
+    # oc, curl and getent in one image, pinned by digest: the one ansible/roles/rhtas_config already pulls on this cluster
+    # (a digest of registry.redhat.io, reachable with the cluster pull secret).
+    tools:
+      repository: registry.redhat.io/openshift4/ose-tools-rhel9
+      digest: sha256:a3bdc6574db914ec8c4385b6ff8b2c315930f8de9a27a3a9e0204163c85cd6be
+  # The Zuno task steps only call the API server and sleep.
+  resources:
+    requests: {cpu: 10m, memory: 64Mi}
+    limits: {memory: 256Mi}
+  # The provider cut (target kind provider-cut of platform/chaos/targets.yaml). The Task refuses any host or subject not
+  # listed here, whatever the PipelineRun asks: a PipelineRun is created by whoever may create one in zuno-chaos, so the
+  # allow-list is repeated where the policy is applied, not only in the catalogue (platform/chaos/tests/test_chart.py keeps
+  # both lists equal).
+  providerCut:
+    enabled: true
+    # The value platform/testing/stress_chaos.py anp_manifest uses (WP-311): the same policy shape.
+    anpPriority: 90
+    maxDuration: 300
+    allowedHosts:
+      - api.mistral.ai
+      - api.anthropic.com
+      - api.openai.com
+      - generativelanguage.googleapis.com
+    # namespace|label selector of the pods whose egress may be denied.
+    allowedSubjects:
+      - "zuno-ai-run|app.kubernetes.io/name=ai-gateway"
+  # The AAP credentials of the chaos workflows (gitops/charts/aap-config): the installer creates the PipelineRun (run
+  # node), both read the cerberus signal through the API server's service proxy and the PipelineRuns (pre and post
+  # checks, `make d2|d3 check chaos`). Namespaced Roles in zuno-chaos only: neither credential gains a cluster-wide right.
+  aap:
+    enabled: true
+    namespace: zuno-aap
+    runnerServiceAccounts: [aap-installer]
+    readerServiceAccounts: [aap-day0-check, aap-installer]
+
+# ---------------------------------------------------------------------------------------------------------------- cerberus
+# startx chaos-cerberus (https://helm-repository.readthedocs.io/en/latest/charts/chaos-cerberus): a Deployment and the
+# Service cerberus:8080, which answers True or False. A run starts only on True and the pipelines check it again at the end.
+cerberus:
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: chaos
+    app: cerberus
+  project:
+    enabled: false
+    project:
+      name: zuno-chaos
+  cerberus:
+    enabled: false
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 512Mi}
+    # Only the pods of zuno-chaos (the pipeline tasks) call the Service; the pre/post checks come through the API server's
+    # service proxy, admitted by the namespace baseline (gitops/charts/namespaces, allowApiServerWebhooks).
+    allowedNamespaces: []
+    # The masters are not schedulable on demo333 (ADR-0614): a schedulable master is a finding, as for check_recovery.py.
+    watch_master_schedulable: true
+    # The chart's OpenShift list, plus the namespaces of the Zuno targets. A namespace with a crash-looping pod keeps the
+    # signal False: fix the pod, or exclude it with watch_namespaces_ignore_pattern and say so on the demo page.
+    watch_namespaces:
+      - openshift-etcd
+      - openshift-apiserver
+      - openshift-kube-apiserver
+      - openshift-monitoring
+      - openshift-kube-controller-manager
+      - openshift-machine-api
+      - openshift-kube-scheduler
+      - openshift-ingress
+      - openshift-ovn-kubernetes
+      - zuno-ai-run
+      - zuno-ai-gateways
+      - zuno-auth
+      - zuno-unifai
+      - zuno-openwebui
+      - redhat-ods-applications
+    watch_namespaces_ignore_pattern:
+      - "^installer.*"
+    # Unauthenticated health URLs only, one list per URL (cerberus format: [["https://..."]]). Empty here: the role fills
+    # it from the cluster's apps domain (chaos_watch_url_paths in ansible/roles/chaos/defaults/main.yml): the Keycloak
+    # well-known document, Open WebUI /health and the UnifAI UI.
+    watch_url_routes: []
+
+# ---------------------------------------------------------------------------------------------------------------- pipeline
+# startx chaos-pipeline (https://helm-repository.readthedocs.io/en/latest/charts/chaos-pipeline): the Tasks cerberus-check,
+# krkn-run and krkn-hub-scenario, the Pipelines chaos-infra and chaos-application, the ConfigMap chaos-pipeline-scenarios and
+# the ServiceAccount chaos-pipeline every PipelineRun uses. A run picks its scenarios with the `scenarios` parameter.
+pipeline:
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: chaos
+    app: pipeline
+  project:
+    enabled: false
+    project:
+      name: zuno-chaos
+  pipeline:
+    enabled: false
+    # Node-level scenarios target the nodes with this label, and only them: one node, labelled by hand with the owner's
+    # go (`oc label node <node> zuno.io/chaos-target=true`), never by this chart. On demo333 it is the infra node
+    # ip-10-18-82-70 (2026-11-21 decision); no label, no target, the hog and latency scenarios fail and touch nothing.
+    nodeSelector: "zuno.io/chaos-target=true"
+    # krkn's privileged helper pods start here, not in `default`.
+    workloadNamespace: zuno-chaos
+    privilegedNamespaces: [zuno-chaos]
+    # Needs a token of openshift-monitoring's prometheus-k8s, which this component does not grant (owner's decision).
+    checkCriticalAlerts: false
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    checkResources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 64Mi}
+    cerberus:
+      enabled: true
+      url: http://cerberus.zuno-chaos.svc.cluster.local:8080
+      timeout: 300
+    infra:
+      enabled: true
+      scenarios:
+        # Tier `pods` (platform/chaos/targets.yaml infra_tiers): one pod each of monitoring, router, openshift-apiserver.
+        10-pods-monitoring:
+          enabled: true
+        11-pods-ingress:
+          enabled: true
+        12-pods-apiserver:
+          enabled: true
+        # Tiers `hog` and `latency`: one minute of pressure on the labelled node. It is an infra node, tainted
+        # node-role.kubernetes.io/infra:NoSchedule, so the helper pods carry that toleration (krkn's `taints` list,
+        # key:Effect). Enabled here so the `scenarios` parameter can pick them; a run names its tier explicitly.
+        20-hog-cpu-worker:
+          enabled: true
+          type: hog_scenarios
+          content:
+            duration: 60
+            workers: ''
+            hog-type: cpu
+            image: quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog
+            namespace: ${WORKLOAD_NAMESPACE}
+            cpu-load-percentage: 80
+            cpu-method: all
+            node-selector: "${NODE_SELECTOR}"
+            number-of-nodes: 1
+            taints: ["node-role.kubernetes.io/infra:NoSchedule"]
+        21-hog-memory-worker:
+          enabled: true
+          type: hog_scenarios
+          content:
+            duration: 60
+            workers: ''
+            hog-type: memory
+            image: quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog
+            namespace: ${WORKLOAD_NAMESPACE}
+            # Half the node's memory, not the chart's 80 %: the infra node also carries the router and monitoring.
+            memory-vm-bytes: 50%
+            node-selector: "${NODE_SELECTOR}"
+            number-of-nodes: 1
+            taints: ["node-role.kubernetes.io/infra:NoSchedule"]
+        22-network-latency-worker:
+          enabled: true
+          type: network_chaos_ng_scenarios
+          content:
+            - id: node_network_chaos
+              image: quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-network-chaos
+              wait_duration: 1
+              test_duration: 60
+              label_selector: "${NODE_SELECTOR}"
+              service_account: ""
+              taints: ["node-role.kubernetes.io/infra:NoSchedule"]
+              namespace: ${WORKLOAD_NAMESPACE}
+              instance_count: 1
+              target: ""
+              execution: serial
+              interfaces: []
+              ingress: true
+              egress: true
+              latency: 50ms
+              loss: 2
+              bandwidth: 1gbit
+              force: false
+        # Tier 3, after 2026-11-24: needs the AWS IAM user and pipeline.cloud.existingSecret.
+        30-node-reboot-worker:
+          enabled: false
+    application:
+      enabled: true
+      scenarios:
+        # The chart's generic scenarios work on the target-namespace/label-selector parameters of a run; the Zuno ones
+        # below name their own target, so a run only names scenarios. Off, so no run can fall back to a whole namespace.
+        10-pods:
+          enabled: false
+        20-container:
+          enabled: false
+        30-service-disruption:
+          enabled: false
+        # BEGIN generated by platform/chaos/targets.py render-values --write (do not edit by hand)
+        # P1 The a2a-gateway pod deleted (a single replica by design, ADR-0101): the delegation path is down until it is back.
+        pod-a2a-gateway:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-ai-run$
+              label_selector: app.kubernetes.io/name=a2a-gateway
+              kill: 1
+              krkn_pod_recovery_time: 240
+        # P1 One ai-gateway pod deleted (two replicas since WP-260): the other keeps answering and the Deployment replaces it.
+        pod-ai-gateway:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-ai-run$
+              label_selector: app.kubernetes.io/name=ai-gateway
+              kill: 1
+              krkn_pod_recovery_time: 240
+        # P2 The Keycloak pod deleted: new sign-ins and token refreshes fail until it is back; issued tokens stay valid.
+        pod-keycloak:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-auth$
+              label_selector: app.kubernetes.io/instance=zuno,app.kubernetes.io/managed-by=keycloak-operator
+              kill: 1
+              krkn_pod_recovery_time: 300
+        # P2 The KServe controller pod deleted: serving goes on, no model change is reconciled until it is back.
+        pod-kserve-controller:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^redhat-ods-applications$
+              label_selector: control-plane=kserve-controller-manager
+              kill: 1
+              krkn_pod_recovery_time: 300
+        # P1 One mcp-gateway pod deleted (two replicas): the tools keep answering from the other one.
+        pod-mcp-gateway:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-ai-run$
+              label_selector: app.kubernetes.io/name=mcp-gateway
+              kill: 1
+              krkn_pod_recovery_time: 240
+        # P3 The gpt-oss-20b serving pod deleted: the gateway answers from another local model until gpt-oss is Ready again.
+        pod-model-gpt-oss:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-ai-run$
+              label_selector: app.kubernetes.io/name=gpt-oss-20b,kserve.io/component=workload
+              kill: 1
+              krkn_pod_recovery_time: 900
+        # P1 The Open WebUI pod deleted: the chat page is down until the pod is back, then the session goes on.
+        pod-open-webui:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-openwebui$
+              label_selector: app.kubernetes.io/name=open-webui
+              kill: 1
+              krkn_pod_recovery_time: 300
+        # P1 The Praxis pod deleted (the alternative gateway, ADR-0619): its clients get errors until it is back.
+        pod-praxis:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-ai-gateways$
+              label_selector: app.kubernetes.io/name=praxis
+              kill: 1
+              krkn_pod_recovery_time: 240
+        # P2 One RHOAI operator pod deleted: the DataScienceCluster is not reconciled until it is back; serving goes on.
+        pod-rhoai-operator:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^redhat-ods-operator$
+              label_selector: name=rhods-operator
+              kill: 1
+              krkn_pod_recovery_time: 300
+        # P1 The UnifAI multiagent backend pod deleted: chat streams are cut and resume, runs go on in the temporal worker.
+        pod-unifai:
+          enabled: true
+          type: pod_disruption_scenarios
+          content:
+          - id: kill-pods
+            config:
+              namespace_pattern: ^zuno-unifai$
+              name_pattern: ^unifai-multiagent-be-.*
+              kill: 1
+              krkn_pod_recovery_time: 300
+        # END generated by platform/chaos/targets.py

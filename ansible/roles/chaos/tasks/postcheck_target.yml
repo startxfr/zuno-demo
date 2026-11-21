@@ -1,0 +1,42 @@
+---
+# One target of the post-check (included per target by postcheck.yml with _t): its workload fully ready, waited for at
+# most the target's recover_within, and the time it took. A provider cut checks its subject, the ai-gateway.
+- name: "chaos | {{ _t.id }}: the workload"
+  ansible.builtin.set_fact:
+    _chaos_w: "{{ _t.workload | default(_t.subject.workload) }}"
+    _chaos_w_ns: "{{ _t.namespace | default(_t.subject.namespace) }}"
+    _chaos_w_start: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+
+- name: "chaos | {{ _t.id }}: wait for {{ _chaos_w.kind }}/{{ _chaos_w.name }} fully ready (at most {{ _t.recover_within }} s)"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: "{{ _chaos_w.kind }}"
+    namespace: "{{ _chaos_w_ns }}"
+    name: "{{ _chaos_w.name }}"
+  register: _chaos_w_state
+  until: >-
+    (_chaos_w_state.resources | default([]) | length) == 1 and
+    (_chaos_w_state.resources[0].status.readyReplicas | default(0)) >= (_chaos_w_state.resources[0].spec.replicas | default(1)) and
+    (_chaos_w_state.resources[0].spec.replicas | default(1)) >= 1
+  retries: "{{ [(_t.recover_within | int) // 5, 1] | max }}"
+  delay: 5
+  # ignore_errors: the wait is bounded by `retries`; when it runs out the row says what did not come back, and the
+  #   post-check decides once at the end instead of stopping at the first target.
+  ignore_errors: true
+
+- name: "chaos | {{ _t.id }}: the row"
+  ansible.builtin.set_fact:
+    _chaos_rows: >-
+      {{ _chaos_rows + [{'target': _t.id, 'workload': _chaos_w.kind ~ '/' ~ _chaos_w.name, 'namespace': _chaos_w_ns,
+                         'ready': _ready, 'desired': _desired, 'catalogue_replicas': _t.replicas | default(none),
+                         'waited_s': (lookup('ansible.builtin.pipe', 'date +%s') | int) - (_chaos_w_start | int),
+                         'recover_within': _t.recover_within, 'whole': _whole, 'probe': _t.probe}] }}
+    _chaos_failures: >-
+      {{ _chaos_failures + ([] if _whole else
+         [_t.id ~ ': ' ~ _chaos_w.kind ~ '/' ~ _chaos_w.name ~ ' ' ~ _ready ~ '/' ~ _desired ~ ' ready after '
+          ~ _t.recover_within ~ ' s']) }}
+  vars:
+    _res: "{{ _chaos_w_state.resources | default([]) }}"
+    _desired: "{{ (_res[0].spec.replicas | default(1)) if _res else 0 }}"
+    _ready: "{{ (_res[0].status.readyReplicas | default(0)) if _res else 0 }}"
+    _whole: "{{ not (_chaos_w_state.failed | default(false)) }}"

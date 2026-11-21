@@ -1,0 +1,30 @@
+---
+# The cerberus signal (True or False), read through the API server's service proxy: the same call from a workstation and
+# from an AAP execution environment, no pod to start and no route to expose. Sets _chaos_signal: True, False,
+# `unreachable: <why>`, or `no-oc` when the machine running this has no oc (an execution environment without the custom
+# image). Retries while it is not True when _chaos_signal_retries > 1 (the post-check gives the cluster time to settle).
+- name: "chaos | look for oc"
+  ansible.builtin.shell: "command -v oc >/dev/null"
+  register: _chaos_oc
+  changed_when: false
+  failed_when: false
+
+- name: "chaos | read the cerberus signal"
+  ansible.builtin.command:
+    argv: ["oc", "get", "--raw", "{{ chaos_cerberus_proxy_path }}"]
+  register: _chaos_signal_read
+  changed_when: false
+  # ignore_errors, not failed_when: false - when the retries run out Ansible marks the task failed whatever failed_when
+  #   says; the signal is judged by the caller from the last answer, below.
+  ignore_errors: true
+  until: (_chaos_signal_read.stdout | default('') | trim) == 'True'
+  retries: "{{ (_chaos_signal_retries | default(1) | int) - 1 }}"
+  delay: "{{ _chaos_signal_delay | default(15) }}"
+  when: _chaos_oc.rc == 0
+
+- name: "chaos | the signal"
+  ansible.builtin.set_fact:
+    _chaos_signal: >-
+      {{ 'no-oc' if _chaos_oc.rc != 0
+         else ((_chaos_signal_read.stdout | trim) if (_chaos_signal_read.rc | default(1)) == 0
+               else 'unreachable: ' ~ (_chaos_signal_read.stderr | default('') | trim | truncate(160))) }}

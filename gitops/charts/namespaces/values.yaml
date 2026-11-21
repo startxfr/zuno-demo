@@ -781,6 +781,18 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
 
+  # Day 2 component chaos (gitops/charts/chaos): the cerberus watchdog, the krkn Tekton pipelines and krkn's privileged
+  # helper pods. Not meshed, no Kueue label (a chaos step must never queue behind a GPU workload), no quota: the pods
+  # live for minutes and carry their own requests. NOT zuno.io/managed on purpose: that label gives ocp-ai-dev `edit`
+  # (gitops/charts/openshift-rbac-groups), and an `edit` user here could start a pod as chaos-pipeline, which holds the
+  # privileged SCC and the cluster chaos rights. Nobody calls in from another namespace; the API server does, for the
+  # cerberus signal read through its service proxy by the pre/post checks (allowApiServerWebhooks admits host-network).
+  - name: zuno-chaos
+    displayName: Zuno Chaos
+    description: Chaos engineering of the infrastructure and of the Zuno platform (krkn, cerberus, Tekton).
+    allowedFromNamespaces: []
+    allowApiServerWebhooks: true
+
   # ADR-0535/WP-110: rhtas-operator's CSV supports AllNamespaces only (no
   # OwnNamespace/SingleNamespace/MultiNamespace - confirmed live against
   # this cluster's PackageManifest), so unlike openshift-lightspeed below

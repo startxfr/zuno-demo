@@ -1,0 +1,80 @@
+---
+# `make d2 check chaos` and `make d3 check chaos`: state detection first (never fails), then, when installed, what a run
+# needs: the Tasks and Pipelines, cerberus answering True, and the node the hog and latency tiers would use. Reads only.
+- name: "chaos | load the switch"
+  ansible.builtin.include_tasks: load_vars.yml
+
+- name: "chaos | check the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "{{ chaos_app_name }}"
+
+- name: "chaos | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "chaos | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+  when: state_report_file is defined
+
+- name: "chaos | report the component against the switch"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_chaos_enabled={{ zuno_chaos_enabled | bool }}; installed={{ _state_is_installed | bool }}.
+      {{ 'Matches the switch.' if (zuno_chaos_enabled | bool) == (_state_is_installed | bool)
+         else 'MISMATCH: run make d2 install chaos to converge.' }}
+
+- name: "chaos | probe the component"
+  when: _state_is_installed | bool
+  block:
+    - name: "chaos | the Tasks"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: Task
+        namespace: "{{ chaos_namespace }}"
+      register: _chaos_tasks
+
+    - name: "chaos | the Pipelines"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: Pipeline
+        namespace: "{{ chaos_namespace }}"
+      register: _chaos_pipelines
+
+    - name: "chaos | every Task and Pipeline a run uses is there"
+      ansible.builtin.assert:
+        that:
+          - _missing_tasks | length == 0
+          - _missing_pipelines | length == 0
+        fail_msg: "missing in {{ chaos_namespace }}: Tasks {{ _missing_tasks }}, Pipelines {{ _missing_pipelines }}"
+        success_msg: "Tasks and Pipelines present."
+      vars:
+        _missing_tasks: >-
+          {{ ['cerberus-check', 'krkn-run', 'zuno-provider-cut', 'zuno-steady-state']
+             | difference(_chaos_tasks.resources | map(attribute='metadata.name') | list) }}
+        _missing_pipelines: >-
+          {{ ['chaos-infra', 'chaos-application', 'zuno-chaos-provider-cut']
+             | difference(_chaos_pipelines.resources | map(attribute='metadata.name') | list) }}
+
+    - name: "chaos | read the cerberus signal"
+      ansible.builtin.include_tasks: cerberus_signal.yml
+
+    - name: "chaos | cerberus says the cluster is healthy"
+      ansible.builtin.assert:
+        that: _chaos_signal in ['True', 'no-oc']
+        fail_msg: >-
+          cerberus says {{ _chaos_signal }}: a run would refuse to start. `oc logs -n {{ chaos_namespace }} deploy/cerberus`
+          names what it found (a Degraded ClusterOperator, a pod not Running in a watched namespace, a URL not answering).
+        success_msg: "cerberus: {{ _chaos_signal }}{{ ' (skipped: no oc here; run it from a workstation)' if _chaos_signal == 'no-oc' else '' }}"
+
+    - name: "chaos | the node of the hog and latency tiers"
+      kubernetes.core.k8s_info:
+        kind: Node
+        label_selectors: ["{{ chaos_node_label }}"]
+      register: _chaos_nodes
+
+    - name: "chaos | report the node"
+      ansible.builtin.debug:
+        msg: >-
+          {{ (_chaos_nodes.resources | length) }} node(s) labelled {{ chaos_node_label }}:
+          {{ _chaos_nodes.resources | map(attribute='metadata.name') | list }} (the hog and latency tiers need exactly one).

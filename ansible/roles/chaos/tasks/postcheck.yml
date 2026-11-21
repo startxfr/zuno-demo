@@ -1,0 +1,254 @@
+---
+# After a chaos run (ansible/playbooks/day3_chaos_postcheck.yml: the last node of the AAP chaos workflows; locally the last
+# step of `make d3 chaos ...`). Reads only. Is the platform whole again?
+#   - the run: chaos_run_name (handed by the run node through set_stats, or -e), else the newest chaos run of chaos_kind;
+#     what it targeted is read from its own annotations, not from this machine's variables;
+#   - each target: its workload fully ready within the target's recover_within; a provider cut: no chaos policy left;
+#   - infra: every node Ready, the labelled node without pressure, no krkn helper pod left;
+#   - cerberus True again, and platform/recovery/check_recovery.py finds every layer back;
+#   - the golden-path probe of each target (evaluations/golden_path_probe.py --only), from a workstation.
+# Every check runs, then the post-check fails once with the list of what is not back (report everything, decide once).
+- name: "chaos | load the switch"
+  ansible.builtin.include_tasks: load_vars.yml
+
+- name: "chaos | the kind of run"
+  ansible.builtin.assert:
+    that: chaos_kind in ['infra', 'platform']
+    fail_msg: "chaos_kind must be infra or platform (got '{{ chaos_kind }}')"
+
+- name: "chaos | the chaos runs of this kind"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: PipelineRun
+    namespace: "{{ chaos_namespace }}"
+    label_selectors: ["zuno.io/chaos-kind={{ chaos_kind }}"]
+  register: _chaos_prs
+
+- name: "chaos | the run to check"
+  ansible.builtin.set_fact:
+    _chaos_pr: >-
+      {{ (_chaos_prs.resources | selectattr('metadata.name', 'equalto', chaos_run_name) | list | first | default({}))
+         if (chaos_run_name | default('') | length > 0)
+         else (_chaos_prs.resources | sort(attribute='metadata.creationTimestamp') | last | default({})) }}
+
+- name: "chaos | there is a finished run"
+  ansible.builtin.assert:
+    that:
+      - _chaos_pr.metadata is defined
+      - (_chaos_pr.status.completionTime | default('')) | length > 0
+    fail_msg: >-
+      No finished {{ chaos_kind }} chaos run {{ chaos_run_name | default('') }} in {{ chaos_namespace }}
+      ({{ 'still running: ' ~ _chaos_pr.metadata.name if _chaos_pr.metadata is defined else 'none found' }}).
+
+- name: "chaos | what the run targeted"
+  ansible.builtin.set_fact:
+    _chaos_run_targets: "{{ (_chaos_pr.metadata.annotations['zuno.io/chaos-targets'] | default('')).split(',') | select | list }}"
+    _chaos_run_tier: "{{ _chaos_pr.metadata.annotations['zuno.io/chaos-tier'] | default('') }}"
+    _chaos_run_node: "{{ _chaos_pr.metadata.annotations['zuno.io/chaos-node'] | default('') }}"
+    _chaos_failures: []
+    _chaos_rows: []
+
+- name: "chaos | the targets, from the catalogue"
+  ansible.builtin.include_tasks: plan.yml
+  vars:
+    _chaos_plan_tier: "{{ _chaos_run_tier }}"
+    _chaos_plan_targets: "{{ _chaos_run_targets | join(',') }}"
+
+# ---------------------------------------------------------------- each target whole within its bound
+- name: "chaos | each workload back within its bound"
+  ansible.builtin.include_tasks: postcheck_target.yml
+  loop: "{{ _chaos_plan.targets }}"
+  loop_control:
+    loop_var: _t
+    label: "{{ _t.id }}"
+
+- name: "chaos | the provider cut left no policy"
+  when: _chaos_plan.pipeline == 'zuno-chaos-provider-cut'
+  block:
+    - name: "chaos | chaos AdminNetworkPolicies"
+      kubernetes.core.k8s_info:
+        api_version: policy.networking.k8s.io/v1alpha1
+        kind: AdminNetworkPolicy
+        label_selectors: ["zuno.io/chaos=true"]
+      register: _chaos_anps
+      # failed_when: false - a reader identity may not list them: the row then says "unknown", it does not pass.
+      failed_when: false
+
+    # The AAP reader credential may not list AdminNetworkPolicies: the run's own `reap` task (finally) then answers,
+    # it deleted every policy labelled zuno.io/chaos=true and checked none was left.
+    - name: "chaos | the run's reap task"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: TaskRun
+        namespace: "{{ chaos_namespace }}"
+        label_selectors:
+          - "tekton.dev/pipelineRun={{ _chaos_pr.metadata.name }}"
+          - "tekton.dev/pipelineTask=reap"
+      register: _chaos_reap
+      when: _chaos_anps.resources is not defined
+
+    - name: "chaos | record the policies"
+      ansible.builtin.set_fact:
+        _chaos_failures: >-
+          {{ _chaos_failures + ([] if _clean else
+             ['a chaos AdminNetworkPolicy is left, or neither listable nor reaped by the run: '
+              ~ (_chaos_anps.resources | default([]) | map(attribute='metadata.name') | list | string)]) }}
+        _chaos_rows: "{{ _chaos_rows + [{'check': 'adminnetworkpolicies', 'whole': _clean, 'listed': _chaos_anps.resources is defined}] }}"
+      vars:
+        _listed_clean: "{{ _chaos_anps.resources is defined and _chaos_anps.resources | length == 0 }}"
+        _reaped: >-
+          {{ (_chaos_reap.resources | default([]) | map(attribute='status.conditions') | flatten
+              | selectattr('type', 'equalto', 'Succeeded') | map(attribute='status') | list) == ['True'] }}
+        _clean: "{{ (_listed_clean | bool) or (_chaos_anps.resources is not defined and (_reaped | bool)) }}"
+
+# ---------------------------------------------------------------- infra: nodes and helper pods
+- name: "chaos | the nodes"
+  when: chaos_kind == 'infra'
+  block:
+    - name: "chaos | every node"
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: _chaos_all_nodes
+
+    - name: "chaos | record nodes not Ready, or under pressure"
+      ansible.builtin.set_fact:
+        _chaos_failures: "{{ _chaos_failures + (['node ' ~ _n.metadata.name ~ ': ' ~ (_issues | join(', '))] if _issues | length > 0 else []) }}"
+      loop: "{{ _chaos_all_nodes.resources }}"
+      loop_control:
+        loop_var: _n
+        label: "{{ _n.metadata.name }}"
+      vars:
+        _conditions: "{{ _n.status.conditions | default([]) }}"
+        _issues: >-
+          {{ (_conditions | selectattr('type', 'equalto', 'Ready') | rejectattr('status', 'equalto', 'True')
+              | map(attribute='type') | map('regex_replace', '$', ' not True') | list)
+             + (_conditions | selectattr('type', 'in', ['MemoryPressure', 'DiskPressure', 'PIDPressure'])
+                | selectattr('status', 'equalto', 'True') | map(attribute='type') | list) }}
+
+    - name: "chaos | the nodes row"
+      ansible.builtin.set_fact:
+        _chaos_rows: >-
+          {{ _chaos_rows + [{'check': 'nodes', 'total': _chaos_all_nodes.resources | length, 'node': _chaos_run_node,
+                             'whole': (_chaos_failures | select('match', '^node ') | list | length) == 0}] }}
+
+    - name: "chaos | krkn helper pods left in {{ chaos_namespace }}"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ chaos_namespace }}"
+        label_selectors: ["!tekton.dev/taskRun", "app!=cerberus"]
+      register: _chaos_helpers
+
+    - name: "chaos | record helper pods left"
+      ansible.builtin.set_fact:
+        _chaos_failures: >-
+          {{ _chaos_failures + ([] if _chaos_helpers.resources | length == 0 else
+             ['krkn helper pods left in ' ~ chaos_namespace ~ ': ' ~ (_chaos_helpers.resources | map(attribute='metadata.name') | list | string)]) }}
+
+# ---------------------------------------------------------------- the cluster as a whole
+- name: "chaos | cerberus True again"
+  ansible.builtin.include_tasks: cerberus_signal.yml
+  vars:
+    _chaos_signal_retries: "{{ chaos_cerberus_wait_retries }}"
+    _chaos_signal_delay: "{{ chaos_cerberus_wait_delay }}"
+
+- name: "chaos | record the signal"
+  ansible.builtin.set_fact:
+    _chaos_failures: "{{ _chaos_failures + ([] if _chaos_signal == 'True' else ['cerberus says ' ~ _chaos_signal]) }}"
+
+- name: "chaos | every layer of the cluster is back (check_recovery.py)"
+  block:
+    - name: "chaos | check_recovery"
+      ansible.builtin.include_role:
+        name: recovery
+        tasks_from: precheck
+  rescue:
+    - name: "chaos | record the recovery check"
+      ansible.builtin.set_fact:
+        _chaos_failures: "{{ _chaos_failures + ['check_recovery.py: a layer is not back (its report above names the next step)'] }}"
+
+# ---------------------------------------------------------------- the user path
+- name: "chaos | the golden-path moments of the targets"
+  ansible.builtin.set_fact:
+    _chaos_probes: "{{ _chaos_plan.targets | map(attribute='probe') | reject('equalto', 'none') | unique | list }}"
+    _chaos_probe_here: >-
+      {{ (chaos_golden_probe | string | lower) in ['true', 'yes']
+         or ((chaos_golden_probe | string | lower) == 'auto'
+             and (lookup('ansible.builtin.env', 'K8S_AUTH_HOST') | default('', true)) | length == 0) }}
+
+- name: "chaos | run the golden-path probe (about a minute per moment)"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/evaluations/golden_path_probe.py", "--only", "{{ _chaos_probes | join(',') }}"]
+    chdir: "{{ zuno_repo_root }}"
+  register: _chaos_golden
+  changed_when: false
+  failed_when: false
+  timeout: 1800
+  when: _chaos_probes | length > 0 and _chaos_probe_here | bool
+
+- name: "chaos | the probe's report"
+  ansible.builtin.debug:
+    msg: "{{ _chaos_golden.stdout_lines | default([]) }}"
+  when: _chaos_golden is not skipped and _chaos_golden.stdout_lines is defined
+
+- name: "chaos | record the probe"
+  ansible.builtin.set_fact:
+    _chaos_failures: >-
+      {{ _chaos_failures + (['golden path ' ~ (_chaos_probes | join(',')) ~ ' failed (rc ' ~ _chaos_golden.rc ~ ')']
+         if (_chaos_golden is not skipped and _chaos_golden.rc is defined and _chaos_golden.rc != 0) else []) }}
+
+- name: "chaos | the probe runs from a workstation"
+  ansible.builtin.debug:
+    msg: >-
+      The golden-path probe of {{ _chaos_probes | join(',') }} needs the demo credentials and oc of a workstation: run
+      ONLY={{ _chaos_probes | join(',') }} make demo golden-path
+  when: _chaos_probes | length > 0 and not (_chaos_probe_here | bool)
+
+# ---------------------------------------------------------------- the row, then one decision
+- name: "chaos | the post-check row"
+  ansible.builtin.set_fact:
+    chaos_postcheck:
+      run: "{{ _chaos_pr.metadata.name }}"
+      kind: "{{ chaos_kind }}"
+      checked_at: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+      run_status: "{{ (_chaos_pr.status.conditions | default([]) | selectattr('type', 'equalto', 'Succeeded') | map(attribute='reason') | first) | default('Unknown') }}"
+      rows: "{{ _chaos_rows }}"
+      cerberus: "{{ _chaos_signal }}"
+      probes: "{{ _chaos_probes }}"
+      probe_rc: "{{ _chaos_golden.rc | default('not run here') }}"
+      whole: "{{ _chaos_failures | length == 0 }}"
+      failures: "{{ _chaos_failures }}"
+
+- name: "chaos | print the post-check row"
+  ansible.builtin.debug:
+    msg: "CHAOS_POSTCHECK {{ chaos_postcheck | to_json }}"
+
+- name: "chaos | add it to the run's file on a workstation"
+  when: (lookup('ansible.builtin.env', 'K8S_AUTH_HOST') | default('', true)) | length == 0
+  block:
+    - name: "chaos | the report directory"
+      ansible.builtin.file:
+        path: "{{ chaos_report_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: "chaos | read the run's file"
+      ansible.builtin.slurp:
+        src: "{{ chaos_report_dir }}/{{ chaos_postcheck.run }}.json"
+      register: _chaos_report
+      failed_when: false
+
+    - name: "chaos | {{ chaos_report_dir }}/{{ chaos_postcheck.run }}.json"
+      ansible.builtin.copy:
+        content: >-
+          {{ ((_chaos_report.content | b64decode | from_json) if _chaos_report.content is defined else {})
+             | combine({'postcheck': chaos_postcheck}) | to_nice_json }}
+        dest: "{{ chaos_report_dir }}/{{ chaos_postcheck.run }}.json"
+        mode: "0600"
+
+- name: "chaos | the platform is whole again"
+  ansible.builtin.assert:
+    that: _chaos_failures | length == 0
+    fail_msg: >-
+      Not whole after {{ chaos_postcheck.run }}: {{ _chaos_failures | join('; ') }}. `make d3 check recovery` gives the
+      next step for the first layer that is not back.
+    success_msg: "{{ chaos_postcheck.run }}: every target back within its bound, cerberus True, every layer back."

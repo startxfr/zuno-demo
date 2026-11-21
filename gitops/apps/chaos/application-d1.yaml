@@ -1,0 +1,44 @@
+# Day 2 component chaos (gitops/charts/chaos): cerberus, the krkn Tekton pipelines and the Zuno chaos Tasks, all in
+# zuno-chaos (the namespace and its baseline come from gitops/charts/namespaces). One Application, no -d0: there is no
+# operator of its own (OpenShift Pipelines is the Day 1 component openshift-pipelines), same shape as open-webui and
+# perses. zuno-platform: the chart renders ClusterRoles and ClusterRoleBindings (cerberus' read-only role, the krkn chaos
+# role, the AdminNetworkPolicy role of the provider cut).
+# Applied and deleted ONLY by ansible/roles/chaos, which follows zuno_chaos_enabled and passes the cerberus URL routes of
+# the cluster: a dict passed that way REPLACES spec.source.helm.values, so every key below is also written by the role.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-chaos-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-55"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/chaos
+    helm:
+      releaseName: zuno-chaos-d1
+      values: |
+        zuno:
+          enabled: true
+        cerberus:
+          cerberus:
+            enabled: true
+            watch_url_routes:
+              - ["https://keycloak.apps.mycluster.example.com/realms/zuno/.well-known/openid-configuration"]
+              - ["https://open-webui.apps.mycluster.example.com/health"]
+              - ["https://unifai-ui-zuno-unifai.apps.mycluster.example.com/"]
+        pipeline:
+          pipeline:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-chaos
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

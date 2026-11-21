@@ -1,0 +1,174 @@
+# The chaos targets of the Zuno platform (Day 2 component `chaos`, `make d3 chaos platform TARGETS=<ids>`), and the tiers of
+# the infrastructure chaos (`make d3 chaos infra TIER=<tier>`).
+#
+# Same closed-list philosophy as WP-311 (evaluations/stress/chaos.yaml, platform/testing/stress_chaos.py, kept until they are
+# removed after 2026-11-24), checked by platform/chaos/targets.py `validate` and by its tests:
+#   - two kinds only: delete ONE pod of a named workload (krkn pod_disruption_scenarios, kill 1, in the chaos-application
+#     pipeline), or deny ONE external provider's addresses to the ai-gateway pods for a bounded time (the Zuno Tekton task
+#     zuno-provider-cut: an AdminNetworkPolicy applied, then removed whatever happens);
+#   - every target is a workload on the allow-list of targets.py (namespace, kind, name): never a node, never a namespace,
+#     never a control-plane or etcd pod, never a Deployment scale;
+#   - `recover_within` is the time the platform has to be whole again (the pod back Ready, the provider allowed again);
+#     the post-check measures it and says whether it held;
+#   - `probe` is the golden-path moment (evaluations/golden_path_probe.py) that proves the user path is back, or `none`.
+#
+# `selector_verified: false` marks a selector written from the operator's conventions and not yet seen on a live pod:
+# krkn then deletes nothing and the scenario fails, it never guesses another pod. Check it live before the first run:
+#   oc get pods -n <namespace> -l <selector> -o name
+# A pod target names its pods by labels (`selector`) or, when the repository cannot prove a label, by the name prefix its
+# workload gives them (`name_pattern`, anchored on the workload name).
+#
+# The application scenarios of gitops/charts/chaos/values.yaml are GENERATED from this file:
+#   python3 platform/chaos/targets.py render-values --write
+# and platform/chaos/tests/test_targets.py fails when the two disagree.
+version: 1
+
+# Infrastructure tiers: which scenarios of the chaos-infra pipeline (gitops/charts/chaos/values.yaml,
+# pipeline.pipeline.infra.scenarios) one `make d3 chaos infra TIER=<tier>` runs. 30-node-reboot-worker is in no tier: it is
+# disabled in the chart until the AWS credentials exist (after 2026-11-24).
+infra_tiers:
+  # Tier 1: one platform pod of each (monitoring, router, openshift-apiserver).
+  pods: [10-pods-monitoring, 11-pods-ingress, 12-pods-apiserver]
+  # Tier 2: pressure on the ONE node labelled zuno.io/chaos-target=true (an infra node, by the owner's go).
+  hog: [20-hog-cpu-worker, 21-hog-memory-worker]
+  latency: [22-network-latency-worker]
+
+targets:
+  # ---------------------------------------------------------------- P1: the gateways and the experiences
+  - id: pod-ai-gateway
+    kind: pod-delete
+    tier: P1
+    description: "One ai-gateway pod deleted (two replicas since WP-260): the other keeps answering and the Deployment replaces it."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: ai-gateway}
+    selector_verified: true
+    workload: {kind: Deployment, name: ai-gateway}
+    replicas: 2
+    recover_within: 240
+    probe: sovereignty
+  - id: pod-mcp-gateway
+    kind: pod-delete
+    tier: P1
+    description: "One mcp-gateway pod deleted (two replicas): the tools keep answering from the other one."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: mcp-gateway}
+    selector_verified: true
+    workload: {kind: Deployment, name: mcp-gateway}
+    replicas: 2
+    recover_within: 240
+    probe: tools
+  - id: pod-a2a-gateway
+    kind: pod-delete
+    tier: P1
+    description: "The a2a-gateway pod deleted (a single replica by design, ADR-0101): the delegation path is down until it is back."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: a2a-gateway}
+    selector_verified: true
+    workload: {kind: Deployment, name: a2a-gateway}
+    replicas: 1
+    recover_within: 240
+    probe: delegation-approval
+  - id: pod-praxis
+    kind: pod-delete
+    tier: P1
+    description: "The Praxis pod deleted (the alternative gateway, ADR-0619): its clients get errors until it is back."
+    namespace: zuno-ai-gateways
+    selector: {app.kubernetes.io/name: praxis}
+    selector_verified: true
+    workload: {kind: Deployment, name: praxis}
+    replicas: 1
+    recover_within: 240
+    probe: none
+  - id: pod-open-webui
+    kind: pod-delete
+    tier: P1
+    description: "The Open WebUI pod deleted: the chat page is down until the pod is back, then the session goes on."
+    namespace: zuno-openwebui
+    selector: {app.kubernetes.io/name: open-webui}
+    selector_verified: true
+    workload: {kind: Deployment, name: open-webui}
+    replicas: 1
+    recover_within: 300
+    probe: open-webui
+  # The multiagent backend, not the temporal worker (never a target): live chat streams are cut and the UI reconnects, the
+  # run goes on in the temporal worker, an approval clicked during the restart must be clicked again, and the API answers
+  # 5xx until the pod is back (expected effect given by the UnifAI owner, 2026-11-21). No pod label of the UnifAI operator
+  # is proven in this repository: the pods are named by their Deployment.
+  - id: pod-unifai
+    kind: pod-delete
+    tier: P1
+    description: "The UnifAI multiagent backend pod deleted: chat streams are cut and resume, runs go on in the temporal worker."
+    namespace: zuno-unifai
+    name_pattern: "^unifai-multiagent-be-.*"
+    selector_verified: false
+    workload: {kind: Deployment, name: unifai-multiagent-be}
+    replicas: 1
+    recover_within: 300
+    probe: unifai-tekos
+
+  # ---------------------------------------------------------------- P2: identity, RHOAI controllers, a SaaS provider
+  # Labels confirmed live 2026-08-14 (gitops/charts/keycloak/templates/poddisruptionbudget.yaml). krkn deletes the pod, it
+  # does not evict it: the PodDisruptionBudget does not hold it back. Sign-ins fail until the pod is back.
+  - id: pod-keycloak
+    kind: pod-delete
+    tier: P2
+    description: "The Keycloak pod deleted: new sign-ins and token refreshes fail until it is back; issued tokens stay valid."
+    namespace: zuno-auth
+    selector: {app.kubernetes.io/managed-by: keycloak-operator, app.kubernetes.io/instance: zuno}
+    selector_verified: true
+    workload: {kind: StatefulSet, name: zuno}
+    replicas: 1
+    recover_within: 300
+    probe: none
+  # Upstream KServe's label; not seen live in this repository. The models keep serving: the controller only reconciles.
+  - id: pod-kserve-controller
+    kind: pod-delete
+    tier: P2
+    description: "The KServe controller pod deleted: serving goes on, no model change is reconciled until it is back."
+    namespace: redhat-ods-applications
+    selector: {control-plane: kserve-controller-manager}
+    selector_verified: false
+    workload: {kind: Deployment, name: kserve-controller-manager}
+    replicas: 1
+    recover_within: 300
+    probe: sovereignty
+  # The RHOAI operator's own Deployment (CSV rhods-operator); the label is the CSV's convention, not seen live here, and the
+  # replica count is read live by the post-check (the CSV may run more than one, with leader election).
+  - id: pod-rhoai-operator
+    kind: pod-delete
+    tier: P2
+    description: "One RHOAI operator pod deleted: the DataScienceCluster is not reconciled until it is back; serving goes on."
+    namespace: redhat-ods-operator
+    selector: {name: rhods-operator}
+    selector_verified: false
+    workload: {kind: Deployment, name: rhods-operator}
+    replicas: 1
+    recover_within: 300
+    probe: sovereignty
+  - id: provider-cut-mistral
+    kind: provider-cut
+    tier: P2
+    description: "The addresses of api.mistral.ai denied to the ai-gateway pods for two minutes: zuno-code must fall back to another provider."
+    host: api.mistral.ai
+    subject:
+      namespace: zuno-ai-run
+      selector: {app.kubernetes.io/name: ai-gateway}
+      workload: {kind: Deployment, name: ai-gateway}
+    duration: 120
+    recover_within: 60
+    probe: zuno-code
+
+  # ---------------------------------------------------------------- P3: a GPU model pod (15 minutes of gpt-oss)
+  # The LLMInferenceService workload pod: the same labels its NetworkPolicy selects (gitops/charts/models/templates/
+  # networkpolicy-gptoss.yaml), proven live by the MaaS data path. The gateway answers from another local model meanwhile.
+  - id: pod-model-gpt-oss
+    kind: pod-delete
+    tier: P3
+    description: "The gpt-oss-20b serving pod deleted: the gateway answers from another local model until gpt-oss is Ready again."
+    namespace: zuno-ai-run
+    selector: {app.kubernetes.io/name: gpt-oss-20b, kserve.io/component: workload}
+    selector_verified: true
+    workload: {kind: Deployment, name: gpt-oss-20b-kserve}
+    replicas: 1
+    recover_within: 900
+    probe: sovereignty

@@ -1,0 +1,45 @@
+---
+# chaos_kind, chaos_tier and chaos_targets through platform/chaos/targets.py: the catalogue's allow-list decides what a
+# run may do, and the plan says which pipeline and scenarios it uses. Sets _chaos_plan.
+# The post-check plans the run it reads (its annotations) through _chaos_plan_tier and _chaos_plan_targets: an include
+# variable of another name, because extra vars (-e chaos_tier=...) would win over an include variable of the same name.
+- name: "chaos | the kind of run"
+  ansible.builtin.assert:
+    that:
+      - chaos_kind in ['infra', 'platform']
+      - chaos_kind != 'infra' or _tier | length > 0
+      - chaos_kind != 'platform' or _targets | length > 0
+    fail_msg: >-
+      chaos_kind must be infra (with chaos_tier: pods, hog or latency) or platform (with chaos_targets: ids of
+      platform/chaos/targets.yaml); got kind={{ chaos_kind }} tier={{ _tier }} targets={{ _targets }}.
+  vars:
+    _tier: "{{ _chaos_plan_tier | default(chaos_tier) }}"
+    _targets: "{{ _chaos_plan_targets | default(chaos_targets) }}"
+
+- name: "chaos | plan the run"
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ zuno_repo_root }}/platform/chaos/targets.py"
+      - plan
+      - --kind
+      - "{{ chaos_kind }}"
+      - --tier
+      - "{{ _tier }}"
+      - --targets
+      - "{{ _targets | replace(' ', '') }}"
+  register: _chaos_plan_out
+  changed_when: false
+  failed_when: false
+  vars:
+    _tier: "{{ _chaos_plan_tier | default(chaos_tier) }}"
+    _targets: "{{ _chaos_plan_targets | default(chaos_targets) }}"
+
+- name: "chaos | the catalogue accepts it"
+  ansible.builtin.assert:
+    that: _chaos_plan_out.rc == 0
+    fail_msg: "{{ _chaos_plan_out.stderr | default('') | trim }}"
+
+- name: "chaos | keep the plan"
+  ansible.builtin.set_fact:
+    _chaos_plan: "{{ _chaos_plan_out.stdout | from_json }}"

@@ -1,0 +1,102 @@
+{{- if .Values.zuno.enabled }}
+{{- $z := .Values.zuno }}
+# Is the target whole again? Reads the cerberus signal and the ready replicas of the target's workload, until both are good
+# or the bound runs out. No model call, no user path: the golden-path probe of the target is the post-check's job
+# (ansible/roles/chaos/tasks/postcheck.yml), from the workstation that holds the demo credentials.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: zuno-steady-state
+  namespace: {{ $z.namespace }}
+  labels:
+    app.kubernetes.io/name: zuno-steady-state-task
+    {{- include "zuno-chaos.labels" . | nindent 4 }}
+  annotations:
+    tekton.dev/displayName: "Zuno steady state"
+    tekton.dev/tags: "chaos, zuno"
+spec:
+  description: >-
+    Wait until the cerberus signal is True and the target workload has all its replicas ready, within a bound; fail
+    otherwise. Reads only.
+  params:
+    - name: cerberus-url
+      type: string
+      description: URL of the cerberus signal (empty to skip it)
+      default: {{ $z.cerberusUrl | quote }}
+    - name: target-namespace
+      type: string
+      description: Namespace of the target workload
+    - name: target-kind
+      type: string
+      description: Deployment or StatefulSet
+      default: Deployment
+    - name: target-name
+      type: string
+      description: Name of the target workload
+    - name: label-selector
+      type: string
+      description: Label selector of its pods, printed for the record (optional)
+      default: ""
+    - name: timeout
+      type: string
+      description: Bound in seconds (the target's recover_within)
+      default: "300"
+  results:
+    - name: status
+      description: whole or not-whole
+    - name: seconds
+      description: Seconds it took to be whole
+  steps:
+    - name: steady-state
+      image: {{ include "zuno-chaos.image" $z.images.tools | quote }}
+      imagePullPolicy: IfNotPresent
+      computeResources:
+        {{- toYaml $z.resources | nindent 8 }}
+      securityContext:
+        {{- include "zuno-chaos.securityContext" . | nindent 8 }}
+      env:
+        - name: CERBERUS_URL
+          value: "$(params.cerberus-url)"
+        - name: TARGET_NAMESPACE
+          value: "$(params.target-namespace)"
+        - name: TARGET_KIND
+          value: "$(params.target-kind)"
+        - name: TARGET_NAME
+          value: "$(params.target-name)"
+        - name: LABEL_SELECTOR
+          value: "$(params.label-selector)"
+        - name: TIMEOUT
+          value: "$(params.timeout)"
+        - name: RESULT_STATUS
+          value: "$(results.status.path)"
+        - name: RESULT_SECONDS
+          value: "$(results.seconds.path)"
+      script: |
+        #!/bin/bash
+        set -u
+        printf 'not-whole' > "${RESULT_STATUS}"
+        case "${TARGET_KIND}" in Deployment|StatefulSet) ;; *) echo "target-kind must be Deployment or StatefulSet" >&2; exit 1 ;; esac
+        [[ "${TIMEOUT}" =~ ^[0-9]+$ ]] || { echo "timeout must be a number of seconds" >&2; exit 1; }
+        start=$(date +%s)
+        while true; do
+          elapsed=$(( $(date +%s) - start ))
+          read -r desired ready <<< "$(oc get "${TARGET_KIND}" "${TARGET_NAME}" -n "${TARGET_NAMESPACE}" \
+            -o jsonpath='{.spec.replicas} {.status.readyReplicas}' 2>/dev/null)"
+          desired=${desired:-0}; ready=${ready:-0}
+          signal="skipped"
+          if [ -n "${CERBERUS_URL}" ]; then signal=$(curl -s -m 10 "${CERBERUS_URL}" || true); fi
+          if [ "${desired}" -ge 1 ] && [ "${ready}" -ge "${desired}" ] && { [ "${signal}" = "True" ] || [ "${signal}" = "skipped" ]; }; then
+            echo "${TARGET_KIND}/${TARGET_NAME} ${ready}/${desired} ready, cerberus ${signal}, after ${elapsed}s (${LABEL_SELECTOR})"
+            printf 'whole' > "${RESULT_STATUS}"
+            printf '%s' "${elapsed}" > "${RESULT_SECONDS}"
+            exit 0
+          fi
+          if [ "${elapsed}" -ge "${TIMEOUT}" ]; then
+            echo "${TARGET_KIND}/${TARGET_NAME} ${ready}/${desired} ready, cerberus '${signal:-unreachable}' after ${elapsed}s (bound ${TIMEOUT}s)" >&2
+            printf '%s' "${elapsed}" > "${RESULT_SECONDS}"
+            exit 1
+          fi
+          echo "${TARGET_KIND}/${TARGET_NAME} ${ready}/${desired} ready, cerberus '${signal:-unreachable}' (${elapsed}/${TIMEOUT}s)"
+          sleep 5
+        done
+{{- end }}

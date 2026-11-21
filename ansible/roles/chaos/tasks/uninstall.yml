@@ -1,0 +1,28 @@
+---
+# Removes the Application, and with it cerberus, the Tasks, the Pipelines and the RBAC (the privileged SCC binding of the
+# helper pods included). A chaos AdminNetworkPolicy left over is removed too (the provider cut's own trap and its
+# Pipeline's `finally` should have done it). The PipelineRuns stay in zuno-chaos as the record of the runs (inert); the
+# namespace stays (gitops/charts/namespaces); the node label zuno.io/chaos-target is the owner's, removed by hand.
+- name: "chaos | delete the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "{{ chaos_app_name }}"
+
+- name: "chaos | remove a chaos AdminNetworkPolicy left over"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: policy.networking.k8s.io/v1alpha1
+    kind: AdminNetworkPolicy
+    label_selectors: ["zuno.io/chaos=true"]
+  register: _chaos_anp_reap
+  # failed_when: false - the AdminNetworkPolicy API may be absent (no OVN-Kubernetes) or the identity may lack the right
+  #   (the AAP installer does): the message below says so, the uninstall of the component itself is done.
+  failed_when: false
+
+- name: "chaos | say when the reaping could not run"
+  ansible.builtin.debug:
+    msg: >-
+      Could not reap chaos AdminNetworkPolicies ({{ _chaos_anp_reap.msg | default('') | truncate(160) }}):
+      check with `oc get adminnetworkpolicy -l zuno.io/chaos=true` and delete what is listed.
+  # A successful delete returns no msg; a refused or failed one does.
+  when: (_chaos_anp_reap.msg | default('')) | length > 0

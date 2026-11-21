@@ -1,0 +1,20 @@
+---
+# `make d3 chaos infra|platform` (first half) and the first node of the AAP workflows zuno-day3-chaos-infra-workflow and
+# zuno-day3-chaos-platform-workflow: is the request in the catalogue, is the cluster whole, is no other chaos run going?
+# Reads only (ansible/roles/chaos/tasks/precheck.yml). An approval follows it: in AAP the workflow approval node, locally
+# the Makefile's TTY pause.
+#
+# Extra vars: chaos_kind (infra | platform), chaos_tier (infra: pods | hog | latency), chaos_targets (platform: ids of
+# platform/chaos/targets.yaml, comma separated).
+- name: "Day 3: chaos run - pre-check (reads only)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: "chaos | precheck"
+      ansible.builtin.include_role:
+        name: chaos
+        tasks_from: precheck

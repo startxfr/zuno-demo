@@ -62,7 +62,9 @@ spec:
   name: {{ .name }}
   organization: {{ $.Values.organization }}
   inventory: {{ $.Values.inventory.name }}
-  ask_variables_on_launch: false
+  # Day 2 component chaos: a workflow that takes launch variables (chaos_tier, chaos_targets) passes them to every
+  # node; the others take none.
+  ask_variables_on_launch: {{ .askVariablesOnLaunch | default false }}
   workflow_nodes:
     {{- $defaultJobTemplate := .jobTemplate }}
     {{- range .nodes }}
@@ -101,17 +103,31 @@ spec:
       # querying workflow_nodes/ directly against the live Controller API.
       extra_data:
         target_component: {{ .id }}
+      {{- else if .extraData }}
+      # A node with its own Job Template may still carry fixed variables (the chaos workflows: chaos_kind). Its Job
+      # Template must ask for variables on launch, or Controller refuses the node (see the comment above).
+      extra_data:
+        {{- toYaml .extraData | nindent 8 }}
       {{- end }}
       {{- end }}
       {{- if .allParentsMustConverge }}
       all_parents_must_converge: true
       {{- end }}
-      {{- if .successNodes }}
+      {{- if or .successNodes .alwaysNodes }}
       related:
+        {{- if .successNodes }}
         success_nodes:
           {{- range .successNodes }}
           - identifier: {{ . }}
           {{- end }}
+        {{- end }}
+        {{- if .alwaysNodes }}
+        # Day 2 component chaos: the post-check runs whatever the run's outcome.
+        always_nodes:
+          {{- range .alwaysNodes }}
+          - identifier: {{ . }}
+          {{- end }}
+        {{- end }}
       {{- end }}
     {{- end }}
 {{- end }}

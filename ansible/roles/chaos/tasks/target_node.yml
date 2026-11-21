@@ -1,0 +1,28 @@
+---
+# The node-level tiers (hog, latency) act on the nodes labelled chaos_node_label: exactly ONE, Ready, never a control-plane
+# node (etcd lives there) and never a GPU node (a model would lose its node). The label is put by hand with the owner's go.
+- name: "chaos | the node labelled {{ chaos_node_label }}"
+  kubernetes.core.k8s_info:
+    kind: Node
+    label_selectors: ["{{ chaos_node_label }}"]
+  register: _chaos_nodes
+
+- name: "chaos | exactly one node, Ready, no control plane, no GPU"
+  ansible.builtin.assert:
+    that:
+      - _chaos_nodes.resources | length == 1
+      - "'node-role.kubernetes.io/master' not in _n.metadata.labels"
+      - "'node-role.kubernetes.io/control-plane' not in _n.metadata.labels"
+      - (_n.metadata.labels['nvidia.com/gpu.present'] | default('false')) != 'true'
+      - (_n.status.capacity['nvidia.com/gpu'] | default('0') | int) == 0
+      - (_n.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) == 'True'
+    fail_msg: >-
+      The tier {{ chaos_tier }} needs exactly one Ready node labelled {{ chaos_node_label }} that is neither a control-plane
+      nor a GPU node; found {{ _chaos_nodes.resources | map(attribute='metadata.name') | list }}. The label is put by hand
+      with the owner's go: oc label node <node> {{ chaos_node_label }}
+  vars:
+    _n: "{{ _chaos_nodes.resources[0] | default({'metadata': {'labels': {}}, 'status': {'capacity': {}, 'conditions': [{'type': 'Ready', 'status': 'Unknown'}]}}) }}"
+
+- name: "chaos | keep the node"
+  ansible.builtin.set_fact:
+    _chaos_node_name: "{{ _chaos_nodes.resources[0].metadata.name }}"

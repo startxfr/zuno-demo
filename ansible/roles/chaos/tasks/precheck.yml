@@ -1,0 +1,127 @@
+---
+# Before a chaos run (ansible/playbooks/day3_chaos_precheck.yml: the first node of the AAP chaos workflows, then the
+# approval; locally, `make d3 chaos ...` pauses after it). Reads only, and refuses to go on when the run should not start:
+#   - the request is in the catalogue (platform/chaos/targets.py plan) and the component is installed;
+#   - no other chaos PipelineRun is running (the lock);
+#   - cerberus says True, and platform/recovery/check_recovery.py finds every layer back (the WP-248 checks);
+#   - hog and latency: exactly one labelled node, not control plane, not GPU;
+#   - platform: every target is whole NOW (a chaos run on a degraded target proves nothing) and its selector matches a pod
+#     (a selector never seen live, selector_verified: false, is proven here before krkn uses it).
+# Not a role state check: `make d2|d3 check chaos` runs tasks/check.yml.
+- name: "chaos | load the switch"
+  ansible.builtin.include_tasks: load_vars.yml
+
+- name: "chaos | plan"
+  ansible.builtin.include_tasks: plan.yml
+
+- name: "chaos | the pipeline of the plan is installed"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: Pipeline
+    namespace: "{{ chaos_namespace }}"
+    name: "{{ _chaos_plan.pipeline }}"
+  register: _chaos_pipeline
+  failed_when: (_chaos_pipeline.resources | default([]) | length) == 0
+
+- name: "chaos | the lock"
+  ansible.builtin.include_tasks: lock.yml
+
+- name: "chaos | no other chaos run"
+  ansible.builtin.assert:
+    that: _chaos_running | length == 0
+    fail_msg: >-
+      A chaos PipelineRun is still running in {{ chaos_namespace }}: {{ _chaos_running }}. Wait for it
+      (tkn pipelinerun logs -f -n {{ chaos_namespace }} {{ _chaos_running | first | default('') }}) or cancel it first.
+
+- name: "chaos | read the cerberus signal"
+  ansible.builtin.include_tasks: cerberus_signal.yml
+
+- name: "chaos | cerberus says the cluster is healthy"
+  ansible.builtin.assert:
+    that: _chaos_signal == 'True'
+    fail_msg: >-
+      cerberus says {{ _chaos_signal }}: no chaos on a cluster that is not whole. {{ 'This machine has no oc: run the
+      pre-check from a workstation or an execution environment that has it.' if _chaos_signal == 'no-oc' else
+      '`oc logs -n ' ~ chaos_namespace ~ ' deploy/cerberus` names what it found.' }}
+
+- name: "chaos | every layer of the cluster is back (check_recovery.py)"
+  ansible.builtin.include_role:
+    name: recovery
+    tasks_from: precheck
+
+- name: "chaos | the node of the hog and latency tiers"
+  ansible.builtin.include_tasks: target_node.yml
+  when: chaos_kind == 'infra' and chaos_tier in chaos_node_tiers
+
+- name: "chaos | the targets"
+  when: chaos_kind == 'platform'
+  block:
+    - name: "chaos | the workload of each target"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: "{{ _t.workload.kind | default(_t.subject.workload.kind | default('')) }}"
+        namespace: "{{ _t.namespace | default(_t.subject.namespace | default('')) }}"
+        name: "{{ _t.workload.name | default(_t.subject.workload.name | default('')) }}"
+      loop: "{{ _chaos_plan.targets }}"
+      loop_control:
+        loop_var: _t
+        label: "{{ _t.id }}"
+      register: _chaos_workloads
+
+    - name: "chaos | each target is whole before the run"
+      ansible.builtin.assert:
+        that:
+          - _w.resources | length == 1
+          - (_w.resources[0].spec.replicas | default(1)) >= 1
+          - (_w.resources[0].status.readyReplicas | default(0)) >= (_w.resources[0].spec.replicas | default(1))
+        fail_msg: >-
+          {{ _w._t.id }}: {{ _w._t.workload | default(_w._t.subject.workload) }} in
+          {{ _w._t.namespace | default(_w._t.subject.namespace) }} is missing or not fully ready
+          ({{ (_w.resources[0].status.readyReplicas | default(0)) if _w.resources else 0 }}/{{ (_w.resources[0].spec.replicas | default(1)) if _w.resources else '?' }}):
+          a chaos run on a target that is already degraded proves nothing.
+        success_msg: >-
+          {{ _w._t.id }}: {{ _w.resources[0].status.readyReplicas | default(0) }}/{{ _w.resources[0].spec.replicas | default(1) }}
+          ready (catalogue says {{ _w._t.replicas | default('-') }}).
+      loop: "{{ _chaos_workloads.results }}"
+      loop_control:
+        loop_var: _w
+        label: "{{ _w._t.id }}"
+
+    - name: "chaos | the pods each pod target names"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ _t.namespace }}"
+        label_selectors: "{{ [_t.selector.items() | map('join', '=') | join(',')] if _t.selector is defined else [] }}"
+      loop: "{{ _chaos_plan.targets | selectattr('kind', 'equalto', 'pod-delete') | list }}"
+      loop_control:
+        loop_var: _t
+        label: "{{ _t.id }}"
+      register: _chaos_pods
+
+    - name: "chaos | each selector matches at least one running pod"
+      ansible.builtin.assert:
+        that: _matched | length > 0
+        fail_msg: >-
+          {{ _p._t.id }}: {{ _p._t.selector | default(_p._t.name_pattern) }} matches no running pod in {{ _p._t.namespace }}
+          (selector_verified: {{ _p._t.selector_verified }}). krkn would delete nothing and fail: correct the selector in
+          platform/chaos/targets.yaml (then render-values --write) before running it.
+        success_msg: >-
+          {{ _p._t.id }}: {{ _matched | length }} running pod(s) match
+          {{ _p._t.selector | default(_p._t.name_pattern) }}{{ '' if _p._t.selector_verified else ' (selector seen live now: set selector_verified: true in the catalogue)' }}.
+      loop: "{{ _chaos_pods.results }}"
+      loop_control:
+        loop_var: _p
+        label: "{{ _p._t.id }}"
+      vars:
+        _running: "{{ _p.resources | selectattr('status.phase', 'equalto', 'Running') | list }}"
+        _matched: >-
+          {{ _running if _p._t.selector is defined
+             else (_running | selectattr('metadata.name', 'match', _p._t.name_pattern) | list) }}
+
+- name: "chaos | ready to run"
+  ansible.builtin.debug:
+    msg: >-
+      Pre-check passed. The run will start {{ _chaos_plan.pipeline }} in {{ chaos_namespace }} with the scenarios
+      {{ _chaos_plan.scenarios }}{{ (' on node ' ~ _chaos_node_name) if _chaos_node_name is defined else '' }}.
+      {% for t in _chaos_plan.targets %}{{ t.id }} ({{ t.tier }}): {{ t.description }} Recovery bound {{ t.recover_within }} s.
+      {% endfor %}

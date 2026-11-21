@@ -1,0 +1,128 @@
+{{- if and .Values.zuno.enabled .Values.zuno.providerCut.enabled .Values.pipeline.pipeline.enabled }}
+{{- $z := .Values.zuno }}
+{{- $c := .Values.pipeline.pipeline.cerberus }}
+# The provider cut as a Pipeline, on the model of the startx chaos pipelines: the cerberus gate (the chart's own
+# cerberus-check Task), the cut, the subject whole again within its bound, and in `finally` the reaping of any chaos
+# AdminNetworkPolicy left over and the last cerberus check. ansible/roles/chaos/tasks/run.yml fills every parameter from
+# platform/chaos/targets.yaml (targets.py plan); the defaults are the cerberus ones only.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: zuno-chaos-provider-cut
+  namespace: {{ $z.namespace }}
+  labels:
+    app.kubernetes.io/name: zuno-chaos-provider-cut-pipeline
+    {{- include "zuno-chaos.labels" . | nindent 4 }}
+  annotations:
+    tekton.dev/displayName: "Zuno provider cut"
+spec:
+  description: >-
+    Deny one external provider to the ai-gateway pods for a bounded time, gated by the cerberus signal; the policy is
+    removed whatever happens. Start it with ansible/roles/chaos (make d3 chaos platform TARGETS=provider-cut-...).
+    Do not run two chaos PipelineRuns at the same time.
+  params:
+    - name: target-id
+      type: string
+    - name: host
+      type: string
+    - name: subject-namespace
+      type: string
+    - name: subject-selector
+      type: string
+    - name: subject-kind
+      type: string
+      default: Deployment
+    - name: subject-name
+      type: string
+    - name: duration
+      type: string
+    - name: recover-within
+      type: string
+      default: "60"
+    - name: cerberus-enabled
+      type: string
+      default: {{ ternary "true" "false" (default false $c.enabled) | quote }}
+    - name: cerberus-url
+      type: string
+      default: {{ $c.url | quote }}
+    - name: cerberus-timeout
+      type: string
+      default: {{ $c.timeout | default 300 | quote }}
+  tasks:
+    - name: cerberus-gate
+      when:
+        - input: "$(params.cerberus-enabled)"
+          operator: in
+          values: ["true"]
+      taskRef:
+        kind: Task
+        name: cerberus-check
+      params:
+        - name: cerberus-url
+          value: "$(params.cerberus-url)"
+        - name: timeout
+          value: "$(params.cerberus-timeout)"
+    - name: provider-cut
+      runAfter: [cerberus-gate]
+      # The cut is at most zuno.providerCut.maxDuration seconds; the margin covers the image pull and the apply.
+      timeout: "15m0s"
+      taskRef:
+        kind: Task
+        name: zuno-provider-cut
+      params:
+        - name: action
+          value: cut
+        - name: run-id
+          value: "$(context.pipelineRun.name)"
+        - name: target-id
+          value: "$(params.target-id)"
+        - name: host
+          value: "$(params.host)"
+        - name: subject-namespace
+          value: "$(params.subject-namespace)"
+        - name: subject-selector
+          value: "$(params.subject-selector)"
+        - name: duration
+          value: "$(params.duration)"
+    - name: steady-state
+      runAfter: [provider-cut]
+      taskRef:
+        kind: Task
+        name: zuno-steady-state
+      params:
+        - name: cerberus-url
+          value: "$(params.cerberus-url)"
+        - name: target-namespace
+          value: "$(params.subject-namespace)"
+        - name: target-kind
+          value: "$(params.subject-kind)"
+        - name: target-name
+          value: "$(params.subject-name)"
+        - name: label-selector
+          value: "$(params.subject-selector)"
+        - name: timeout
+          value: "$(params.recover-within)"
+  finally:
+    - name: reap
+      taskRef:
+        kind: Task
+        name: zuno-provider-cut
+      params:
+        - name: action
+          value: reap
+        - name: run-id
+          value: "$(context.pipelineRun.name)"
+    - name: cerberus-final-check
+      when:
+        - input: "$(params.cerberus-enabled)"
+          operator: in
+          values: ["true"]
+      taskRef:
+        kind: Task
+        name: cerberus-check
+      params:
+        - name: cerberus-url
+          value: "$(params.cerberus-url)"
+        - name: timeout
+          value: "$(params.cerberus-timeout)"
+{{- end }}

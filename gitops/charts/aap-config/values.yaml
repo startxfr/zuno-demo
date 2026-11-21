@@ -120,7 +120,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, supply-chain]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -131,7 +131,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -166,7 +166,7 @@ jobTemplates:
     playbook: ansible/playbooks/day3_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql, unifai, lightspeed, lightspeed-config, agents, platform]
+    surveyComponents: [postgresql, unifai, lightspeed, lightspeed-config, agents, platform, chaos]
   # WP-103: gated (launch-RBAC)
   # WP-126: triggers a real GPU burst-node scale-up and training compute,
   # same tier as backup/restore/sign. WP-103: gated (launch-RBAC)
@@ -205,6 +205,25 @@ jobTemplates:
     playbook: ansible/playbooks/day3_scenario_failover_node_restore.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: false
+
+  # Day 2 component chaos: the three nodes of the chaos workflows below, on the failover drill's model (one Job Template
+  # per node). The pre- and post-check read only, so they run with the reader credential (plus the chart's Role
+  # zuno-chaos-signal-reader for the cerberus service proxy and the PipelineRuns); the run creates the PipelineRun with the
+  # installer credential (plus the chart's Role zuno-chaos-runner), and is gated. All three take chaos_kind, chaos_tier,
+  # chaos_targets (and chaos_run_name, handed from the run to the post-check by set_stats) as launch variables.
+  - name: zuno-day3-chaos-precheck
+    playbook: ansible/playbooks/day3_chaos_precheck.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-chaos-run
+    playbook: ansible/playbooks/day3_chaos_run.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+  - name: zuno-day3-chaos-postcheck
+    playbook: ansible/playbooks/day3_chaos_postcheck.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
 
 # ADR-0418 clause 6/WP-095: one Workflow Template per Day 1/Day 2 verb
 # that has more than one component (no Day 3 - its verbs have no
@@ -378,7 +397,7 @@ workflowTemplates:
       # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
       # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos]
       # ADR-0587 (WP-179): the experience clients, independent branches
       # so one track's failure never blocks the other (Dify and kagent: WP-202).
       - id: open-webui
@@ -394,6 +413,9 @@ workflowTemplates:
         successNodes: []
       # ADR-0619 (WP-292): a no-op while zuno_praxis_enabled is false. After models (and redis, Day 1).
       - id: praxis
+        successNodes: []
+      # Chaos engineering: a no-op while zuno_chaos_enabled is false; an independent leaf (nothing depends on it).
+      - id: chaos
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -424,7 +446,7 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, supply-chain]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos, supply-chain]
       # ADR-0587 (WP-179): experience clients, independent leaves.
       - id: open-webui
         successNodes: []
@@ -437,6 +459,8 @@ workflowTemplates:
       - id: world-model
         successNodes: []
       - id: praxis
+        successNodes: []
+      - id: chaos
         successNodes: []
       - id: supply-chain
         successNodes: []
@@ -480,6 +504,58 @@ workflowTemplates:
         successNodes: [restore]
       - id: restore
         jobTemplate: zuno-day3-scenario-failover-node-restore
+
+  # Day 2 component chaos (ansible/roles/chaos): pre-check -> approval -> run -> post-check, on the failover drill's
+  # model. `make d3 chaos infra|platform` launches one with chaos_tier or chaos_targets (askVariablesOnLaunch: the
+  # workflow passes them to every node); each node also carries chaos_kind (extraData). The post-check is an
+  # `alwaysNodes` successor of the run: a failed run is exactly when the platform's recovery must be checked. The
+  # approval expires after an hour: a run approved long after its pre-check would start on a state nobody checked.
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-chaos-infra-workflow
+    askVariablesOnLaunch: true
+    nodes:
+      - id: precheck
+        jobTemplate: zuno-day3-chaos-precheck
+        extraData: {chaos_kind: infra}
+        successNodes: [approve-run]
+      - id: approve-run
+        type: approval
+        approvalName: "Read the chaos pre-check, then approve to start the run"
+        approvalDescription: >-
+          Pre-check passed: cerberus True, check_recovery green, no other chaos run, the targets whole. Its Job output
+          names the pipeline, the scenarios and each target's recovery bound. Approving creates the PipelineRun at once.
+        approvalTimeoutSeconds: 3600
+        successNodes: [run]
+      - id: run
+        jobTemplate: zuno-day3-chaos-run
+        extraData: {chaos_kind: infra}
+        alwaysNodes: [postcheck]
+      - id: postcheck
+        jobTemplate: zuno-day3-chaos-postcheck
+        extraData: {chaos_kind: infra}
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-chaos-platform-workflow
+    askVariablesOnLaunch: true
+    nodes:
+      - id: precheck
+        jobTemplate: zuno-day3-chaos-precheck
+        extraData: {chaos_kind: platform}
+        successNodes: [approve-run]
+      - id: approve-run
+        type: approval
+        approvalName: "Read the chaos pre-check, then approve to start the run"
+        approvalDescription: >-
+          Pre-check passed: cerberus True, check_recovery green, no other chaos run, each target whole and its pods found.
+          Its Job output names the targets and their recovery bounds. Approving creates the PipelineRun at once.
+        approvalTimeoutSeconds: 3600
+        successNodes: [run]
+      - id: run
+        jobTemplate: zuno-day3-chaos-run
+        extraData: {chaos_kind: platform}
+        alwaysNodes: [postcheck]
+      - id: postcheck
+        jobTemplate: zuno-day3-chaos-postcheck
+        extraData: {chaos_kind: platform}
 
 # Secret holding the Gateway API access token every CR's
 # connection_secret references. Minted once by ansible/roles/aap_config

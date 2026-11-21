@@ -187,7 +187,7 @@ def _parse_makefile_lists() -> dict:
                  "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_CHECK_ONLY_COMPONENTS",
                  "DAY2_BUILD_COMPONENTS",
                  "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS",
-                 "DAY3_CHECK_ONLY_COMPONENTS"):
+                 "DAY3_CHECK_ONLY_COMPONENTS", "DAY3_CHAOS_KINDS"):
         match = re.search(rf"^{name}\s*:=\s*(.*)$", text, re.MULTILINE)
         lists[name] = match.group(1).split() if match else []
     return lists
@@ -219,6 +219,9 @@ def _components_for(day: str, verb: str, lists: dict) -> List[str]:
             components = components + lists.get(
                 f"DAY{day[1]}_CHECK_ONLY_COMPONENTS", [])
         return components
+    if verb == "chaos":
+        # `make d3 chaos infra|platform`: the word after the verb is the kind of run, not a component.
+        return lists.get("DAY3_CHAOS_KINDS", [])
     components = lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
     if verb == "check":
         # `make d3 check <x>` also accepts the check-only components
