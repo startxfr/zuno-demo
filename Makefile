@@ -130,7 +130,9 @@ DAY3_BACKUP_COMPONENTS := postgresql unifai quay-registry
 # updated (platform/olm/audit_operator_updates.py, ansible/roles/operators).
 # "recovery" (2026-11-12): read-only, is the cluster back after a node drain or a reboot
 # (platform/recovery/check_recovery.py, ansible/roles/recovery).
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift recovery
+# "chaos" (Day 2 component): `make d3 check chaos` is the same read-only check as `make d2 check chaos` (the
+# Application, the Tasks and Pipelines, the cerberus signal), next to `recovery`, before and after a chaos run.
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift recovery chaos
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
 # already-installed platform - the same tier as backup/restore, never
@@ -147,8 +149,13 @@ DAY3_RELEASE_COMPONENTS := supply-chain
 # platform/okf/agents.lock. Needs cosign and oras, no cluster. It replaced
 # `make d3 sign agents` and the OKF Vault Transit chain (ADR-0578, WP-165).
 DAY3_ADMIT_COMPONENTS := agents
+# Day 2 component chaos: `make d3 chaos infra TIER=<tier>` or `make d3 chaos platform TARGETS=<ids>` injects failures
+# into the live cluster (krkn through Tekton, ansible/roles/chaos) - the kind is the word after the verb, confirmed by
+# CHAOS_CONFIRM=<kind>. Routed to the AAP workflow zuno-day3-chaos-<kind>-workflow (its approval node is the pause), or
+# run locally as pre-check, TTY pause, run, post-check.
+DAY3_CHAOS_KINDS := infra platform
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
-DAY3_VERBS := test stresstest stresstest-collect backup restore check admit run release scenario-failover-node
+DAY3_VERBS := test stresstest stresstest-collect backup restore check admit run release scenario-failover-node chaos
 
 # ADR-0616/WP-270: the presenter lifecycle of every catalogue demo, as
 # `make demo <verb> [arguments]`. The verbs run locally, never through AAP:
@@ -244,7 +251,7 @@ endef
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components $(DEMO_VERBS) $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components $(DEMO_VERBS) $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_CHAOS_KINDS)
 
 help:
 	@printf '%s\n' \
@@ -286,6 +293,7 @@ help:
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
 	  '  make day3|d3 admit [component]       Verify and validate the zuno-demo-agents release in platform/okf/agents.lock (ADR-0580)' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
+	  '  make day3|d3 chaos infra|platform    Inject failures with krkn: TIER=pods|hog|latency (infra) or TARGETS=<ids> (platform), CHAOS_CONFIRM=<kind>' \
 	  '' \
 	  '  make demo list                       The catalogue demos, their step counts (5/15), show-ready, last rehearsal (ADR-0616)' \
 	  '  make demo use <id> 5|15              Select a demo and its version (a workshop takes no version)' \
@@ -387,6 +395,7 @@ _complete-components:
 	       admit) echo "$(DAY3_ADMIT_COMPONENTS) all" ;; \
 	       run) echo "$(DAY3_RUN_COMPONENTS) all" ;; \
 	       release) echo "$(DAY3_RELEASE_COMPONENTS) all" ;; \
+	       chaos) echo "$(DAY3_CHAOS_KINDS)" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
 	     esac ;; \
 	  demo) python3 platform/demo/presenter.py --complete "$(VERB)" $(ARG) ;; \
@@ -687,6 +696,10 @@ if [[ -z "$$verb" ]]; then \
     '               confirmation, then uncordon+reschedule and verify the return to normal. Requires a TTY' \
     '               (refuses to run non-interactively) and mutates live shared GPU infra - coordinate with' \
     '               any other session on this cluster first.' \
+    '  chaos        Inject failures into the live cluster with krkn (Day 2 component chaos): pre-check, approval,' \
+    '               ONE PipelineRun in zuno-chaos, post-check. The kind is the word after the verb, typed again in' \
+    '               CHAOS_CONFIRM: infra TIER=pods|hog|latency, or platform TARGETS=<ids of platform/chaos/targets.yaml>.' \
+    '               Routed to the AAP workflow zuno-day3-chaos-<kind>-workflow (approve there); locally, needs a TTY.' \
     '' \
     'Components (test/stresstest/check; optional, default: all):' \
     '  $(DAY3_TEST_COMPONENTS)' \
@@ -731,7 +744,10 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
     'Example: make d3 release TAG=v0.2.0 RENDER_DIGESTS=1   # also writes the ledgered digests into the chart values (ADR-0603 M16; a deployment pin, needs the go)' \
-    'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
+    'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore' \
+    'Example: make d3 chaos infra TIER=pods CHAOS_CONFIRM=infra   # one monitoring, router and apiserver pod each' \
+    'Example: make d3 chaos platform TARGETS=pod-ai-gateway,pod-mcp-gateway CHAOS_CONFIRM=platform' \
+    'Example: make d3 chaos platform TARGETS=provider-cut-mistral CHAOS_CONFIRM=platform   # a provider cut runs alone'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -856,6 +872,30 @@ case "$$verb" in \
     else \
       exit $$rc; \
     fi ;; \
+  chaos) \
+    case " $(DAY3_CHAOS_KINDS) " in *" $$component "*) ;; *) echo "Usage: make d3 chaos infra TIER=pods|hog|latency CHAOS_CONFIRM=infra, or make d3 chaos platform TARGETS=<id,id> CHAOS_CONFIRM=platform" >&2; exit 2;; esac; \
+    kind="$$component"; tier="$${TIER:-}"; targets="$${TARGETS:-}"; \
+    if [[ "$$kind" == "infra" ]]; then \
+      if ! [[ "$$tier" =~ ^(pods|hog|latency)$$ ]]; then echo "make d3 chaos infra needs TIER=pods|hog|latency" >&2; exit 2; fi; \
+      if [[ -n "$$targets" ]]; then echo "TARGETS is for make d3 chaos platform" >&2; exit 2; fi; \
+    else \
+      if ! [[ "$$targets" =~ ^[a-z0-9][a-z0-9,-]*$$ ]]; then echo "make d3 chaos platform needs TARGETS=<id,id> (ids of platform/chaos/targets.yaml)" >&2; exit 2; fi; \
+      if [[ -n "$$tier" ]]; then echo "TIER is for make d3 chaos infra" >&2; exit 2; fi; \
+    fi; \
+    if [[ "$${CHAOS_CONFIRM:-}" != "$$kind" ]]; then echo "make d3 chaos $$kind injects failures into the live cluster: type the kind again, CHAOS_CONFIRM=$$kind" >&2; exit 2; fi; \
+    python3 platform/chaos/targets.py plan --kind "$$kind" --tier "$$tier" --targets "$$targets" >/dev/null || exit 2; \
+    chaos_args=(-e "chaos_kind=$$kind" -e "chaos_tier=$$tier" -e "chaos_targets=$$targets"); \
+    aap_route workflow "zuno-day3-chaos-$$kind-workflow" "{\"chaos_kind\": \"$$kind\", \"chaos_tier\": \"$$tier\", \"chaos_targets\": \"$$targets\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then \
+      if [[ ! -t 0 ]]; then echo "make d3 chaos runs locally only from an interactive terminal: it pauses for a person between the pre-check and the run" >&2; exit 2; fi; \
+      $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_chaos_precheck.yml "$${chaos_args[@]}" $(EXTRA_VARS) || exit $$?; \
+      read -r -p "Pre-check passed (see above). Press Enter to start the chaos run, or Ctrl-C to stop here with nothing started: " _chaos_confirm; \
+      run_rc=0; $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_chaos_run.yml "$${chaos_args[@]}" $(EXTRA_VARS) || run_rc=$$?; \
+      post_rc=0; $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_chaos_postcheck.yml "$${chaos_args[@]}" $(EXTRA_VARS) || post_rc=$$?; \
+      if [[ $$run_rc -ne 0 ]]; then exit $$run_rc; fi; exit $$post_rc; \
+    else \
+      exit $$rc; \
+    fi ;; \
 esac
 endef
 
@@ -870,7 +910,7 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` or `make demo step next`
 # needs "check"/"postgresql"/"next" to resolve to *something* as Make
 # goals without erroring as unknown targets.
-NOOP_WORDS := $(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS))
+NOOP_WORDS := $(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_CHAOS_KINDS) $(DEMO_VERBS))
 $(NOOP_WORDS):
 	@:
 

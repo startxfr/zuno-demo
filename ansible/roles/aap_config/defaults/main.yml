@@ -106,7 +106,7 @@ aap_config_job_templates:
     survey_components: [postgresql]
   - name: zuno-day3-check
     credential: zuno-cluster-reader
-    survey_components: [postgresql, lightspeed, lightspeed-config, agents, platform]
+    survey_components: [postgresql, lightspeed, lightspeed-config, agents, platform, chaos]
   - name: zuno-day3-run
     credential: zuno-aap-installer
     gated: true

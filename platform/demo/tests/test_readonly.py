@@ -58,6 +58,10 @@ ALLOWED = [
     "make d3 check agents",
     "make d3 admit agents",
     "make d3 admit agents RELEASE=v1.0.1",
+    "make d2 check chaos",
+    "make d3 check chaos",
+    "oc get --raw /api/v1/namespaces/zuno-chaos/services/http:cerberus:8080/proxy/",
+    "oc get pipelineruns -n zuno-chaos -l zuno.io/chaos=true",
     "oc get externalsecrets -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c",
     "oc get pods -o json | jq '.items[] | select(.status.restartCount > 1 and .x < 3) | `x`'",
     "curl -s -o /dev/null -w '%{http_code}\\n' https://example.invalid/v1/models",
@@ -138,6 +142,9 @@ DENIED = {
     "make demo install": "allowlist",
     "make demo reset": "allowlist",
     "make d3 admit agents UPDATE_LOCK=1": "UPDATE_LOCK",
+    "make d3 chaos infra TIER=pods CHAOS_CONFIRM=infra": "allowlist",
+    "make d3 chaos platform TARGETS=pod-ai-gateway CHAOS_CONFIRM=platform": "allowlist",
+    "make d3 chaos platform": "allowlist",
     "UPDATE_LOCK=1 make d3 admit agents": "UPDATE_LOCK",
     "FOO=1 make demo golden-path": "ONLY",
     "make demo golden-path | grep x": "piped",
@@ -307,6 +314,15 @@ class MakeVerbsRunLocally(unittest.TestCase):
     def test_day_check_defaults_to_all_and_day3_report_format(self):
         self.assertIn("target_component=all", r.plan("make d0 check", ROOT).pipeline[0])
         self.assertIn("report_format=text", r.plan("make d3 check agents", ROOT).pipeline[0])
+
+    def test_chaos_check_is_the_day3_check_and_a_chaos_run_is_not_a_read(self):
+        argv = r.plan("make d3 check chaos", ROOT).pipeline[0]
+        self.assertTrue(argv[3].endswith("ansible/playbooks/day3_check.yml"), argv)
+        self.assertIn("target_component=chaos", argv)
+        for command in ("make d3 chaos infra TIER=hog CHAOS_CONFIRM=infra", "make d3 chaos check",
+                        "TIER=pods make d3 chaos infra"):
+            with self.assertRaises(r.Denied, msg=command):
+                r.plan(command, ROOT)
 
     def test_admit_runs_the_admitter_without_update_lock(self):
         argv = r.plan("make d3 admit agents RELEASE=v1.0.1", ROOT).pipeline[0]

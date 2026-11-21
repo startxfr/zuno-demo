@@ -42,6 +42,9 @@
       # WP-248 incident: nodes, pools, operators, stuck pods, Quay, the Kuadrant wasm Service and a MaaS route
       # (platform/recovery/check_recovery.py); fails with the next step for the first layer that is not back.
       - recovery
+      # Day 2 component chaos: the Application, the Tasks and Pipelines, the cerberus signal (its tasks/check.yml; the
+      # role's precheck.yml is the pre-check of a chaos run, not a state check).
+      - chaos
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -84,6 +87,8 @@
 
     - name: Run Day 3 component prechecks
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component_precheck.yml"
+      vars:
+        _precheck_tasks_from: "{{ 'check' if _precheck_component == 'chaos' else 'precheck' }}"
       loop: "{{ selected_precheck_components }}"
       loop_control:
         loop_var: _precheck_component
