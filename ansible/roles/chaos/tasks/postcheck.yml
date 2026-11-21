@@ -51,8 +51,8 @@
 - name: "chaos | the targets, from the catalogue"
   ansible.builtin.include_tasks: plan.yml
   vars:
-    chaos_tier: "{{ _chaos_run_tier }}"
-    chaos_targets: "{{ _chaos_run_targets | join(',') }}"
+    _chaos_plan_tier: "{{ _chaos_run_tier }}"
+    _chaos_plan_targets: "{{ _chaos_run_targets | join(',') }}"
 
 # ---------------------------------------------------------------- each target whole within its bound
 - name: "chaos | each workload back within its bound"

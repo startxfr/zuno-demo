@@ -14,7 +14,9 @@
     argv: ["oc", "get", "--raw", "{{ chaos_cerberus_proxy_path }}"]
   register: _chaos_signal_read
   changed_when: false
-  failed_when: false
+  # ignore_errors, not failed_when: false - when the retries run out Ansible marks the task failed whatever failed_when
+  #   says; the signal is judged by the caller from the last answer, below.
+  ignore_errors: true
   until: (_chaos_signal_read.stdout | default('') | trim) == 'True'
   retries: "{{ (_chaos_signal_retries | default(1) | int) - 1 }}"
   delay: "{{ _chaos_signal_delay | default(15) }}"
@@ -24,5 +26,5 @@
   ansible.builtin.set_fact:
     _chaos_signal: >-
       {{ 'no-oc' if _chaos_oc.rc != 0
-         else ((_chaos_signal_read.stdout | trim) if _chaos_signal_read.rc == 0
+         else ((_chaos_signal_read.stdout | trim) if (_chaos_signal_read.rc | default(1)) == 0
                else 'unreachable: ' ~ (_chaos_signal_read.stderr | default('') | trim | truncate(160))) }}

@@ -78,19 +78,22 @@
       Follow it: tkn pipelinerun logs -f -n {{ chaos_namespace }} {{ _chaos_run.result.metadata.name }}, or the console's
       Pipelines page of {{ chaos_namespace }}.
 
-- name: "chaos | wait for the run, then clean up whatever happens"
+- name: "chaos | wait for {{ _chaos_run.result.metadata.name }}"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: PipelineRun
+    namespace: "{{ chaos_namespace }}"
+    name: "{{ _chaos_run.result.metadata.name }}"
+  register: _chaos_run_state
+  until: (_chaos_run_state.resources[0].status.completionTime | default('')) | length > 0
+  retries: "{{ chaos_run_wait_retries }}"
+  delay: "{{ chaos_run_wait_delay }}"
+  # ignore_errors: a run still going after the wait is reported by the row and the last assert ("not finished"), with
+  #   the cleanup and the row written first, instead of stopping here.
+  ignore_errors: true
+
+- name: "chaos | read the outcome, then clean up once the run is over"
   block:
-    - name: "chaos | wait for {{ _chaos_run.result.metadata.name }}"
-      kubernetes.core.k8s_info:
-        api_version: tekton.dev/v1
-        kind: PipelineRun
-        namespace: "{{ chaos_namespace }}"
-        name: "{{ _chaos_run.result.metadata.name }}"
-      register: _chaos_run_state
-      until: (_chaos_run_state.resources[0].status.completionTime | default('')) | length > 0
-      retries: "{{ chaos_run_wait_retries }}"
-      delay: "{{ chaos_run_wait_delay }}"
-  always:
     - name: "chaos | read the PipelineRun once more"
       kubernetes.core.k8s_info:
         api_version: tekton.dev/v1
