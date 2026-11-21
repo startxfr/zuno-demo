@@ -162,7 +162,8 @@ queueResources:
   #   day2-stresstest-* (x4)         200m / 256Mi   <- python:3.12-slim
   #
   # 750m/1536Mi therefore blocks the two combinations that matter: two garak
-  # Jobs together (1000m) and garak alongside the three prefetch Jobs (800m),
+  # Jobs together (1000m, 2Gi) and garak alongside the three prefetch Jobs
+  # (800m, 1792Mi) - both on cpu AND on memory,
   # i.e. no two big-image pulls are ever admitted concurrently. Small
   # workloads still flow - garak+ragas fits exactly, three prefetch Jobs fit,
   # three of the four stresstest Jobs fit.
@@ -170,7 +171,18 @@ queueResources:
   # Raising this re-permits concurrent multi-GiB pulls. If you need to, raise
   # it and say so in the commit message rather than treating it as a tuning
   # detail.
-  cpuQuota: 750m
+  #
+  # 2026-11-21: raised 750m -> 1500m, the image-pull throttle loosened on
+  # purpose. One 2-shard stress campaign (400m/512Mi, python:3.12-slim) held
+  # the queue while a second one waited 747 s ("insufficient unused quota for
+  # cpu ... 50m more needed"), so a stress campaign and a scheduled Job could
+  # not overlap. The big-image guard now rests on memoryQuota, unchanged at
+  # 1536Mi: two garak Jobs (2Gi) and garak with the three prefetch Jobs
+  # (1792Mi) are still refused, so no NEW multi-GiB pull combination is
+  # admitted. What the raise admits is more small-image pods: up to six
+  # 200m/256Mi stress shards, or garak plus one 2-shard campaign. Do not raise
+  # memoryQuota without re-reading the DiskPressure history above.
+  cpuQuota: 1500m
   memoryQuota: 1536Mi
   # GPU quota, against the real MIG topology (ADR-0351). Read live from
   # both `machine.startx.io/group=gpu` nodes 2026-09-03: each allocates
