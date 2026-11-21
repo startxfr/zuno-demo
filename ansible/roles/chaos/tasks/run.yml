@@ -1,0 +1,232 @@
+---
+# One chaos run (ansible/playbooks/day3_chaos_run.yml: the node after the approval in the AAP chaos workflows; locally,
+# `make d3 chaos ...` after its pause). Creates ONE PipelineRun in zuno-chaos, as the chaos-pipeline ServiceAccount, waits
+# for it, reads the outcome of each task and writes the result row. Model: ansible/roles/praxis_build/tasks/build.yml.
+#   infra:    chaos-infra, the scenarios of the tier (platform/chaos/targets.yaml infra_tiers);
+#   platform: chaos-application with the pod targets as scenarios, or zuno-chaos-provider-cut for one provider cut.
+# The cerberus gate runs inside the pipeline (before the first scenario, after each one, at the end).
+# The guards are repeated here and not left to the pre-check: this playbook can be launched on its own.
+- name: "chaos | load the switch"
+  ansible.builtin.include_tasks: load_vars.yml
+
+- name: "chaos | plan"
+  ansible.builtin.include_tasks: plan.yml
+
+- name: "chaos | the pipeline of the plan is installed (make d2 install chaos)"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: Pipeline
+    namespace: "{{ chaos_namespace }}"
+    name: "{{ _chaos_plan.pipeline }}"
+  register: _chaos_pipeline
+  failed_when: (_chaos_pipeline.resources | default([]) | length) == 0
+
+- name: "chaos | the lock"
+  ansible.builtin.include_tasks: lock.yml
+
+- name: "chaos | refuse a second chaos run"
+  ansible.builtin.assert:
+    that: _chaos_running | length == 0
+    fail_msg: "A chaos PipelineRun is still running in {{ chaos_namespace }}: {{ _chaos_running }}. Nothing was started."
+
+- name: "chaos | the node of the hog and latency tiers"
+  ansible.builtin.include_tasks: target_node.yml
+  when: chaos_kind == 'infra' and chaos_tier in chaos_node_tiers
+
+- name: "chaos | the parameters of the run"
+  ansible.builtin.set_fact:
+    # Every Tekton parameter is a string except `scenarios` (an array). The cerberus URL and timeout are the pipelines'
+    # own defaults (gitops/charts/chaos values).
+    _chaos_params: >-
+      {{ ([{'name': 'scenarios', 'value': _chaos_plan.scenarios}] if _chaos_plan.pipeline != 'zuno-chaos-provider-cut' else [])
+         + ((_chaos_plan.params | default({})) | dict2items(key_name='name', value_name='value'))
+         + [{'name': 'cerberus-enabled', 'value': 'true'}] }}
+    _chaos_start: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+
+- name: "chaos | create the PipelineRun"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: "chaos-{{ chaos_kind }}-"
+        namespace: "{{ chaos_namespace }}"
+        labels:
+          zuno.io/managed-by: zuno-ansible
+          zuno.io/chaos: "true"
+          zuno.io/chaos-kind: "{{ chaos_kind }}"
+        annotations:
+          # The post-check reads what this run was from here, whichever machine runs it.
+          zuno.io/chaos-tier: "{{ chaos_tier }}"
+          zuno.io/chaos-targets: "{{ _chaos_plan.targets | map(attribute='id') | join(',') }}"
+          zuno.io/chaos-scenarios: "{{ _chaos_plan.scenarios | join(',') }}"
+          zuno.io/chaos-node: "{{ _chaos_node_name | default('') }}"
+      spec:
+        pipelineRef:
+          name: "{{ _chaos_plan.pipeline }}"
+        params: "{{ _chaos_params }}"
+        taskRunTemplate:
+          serviceAccountName: "{{ chaos_service_account }}"
+        timeouts: "{{ chaos_run_timeouts }}"
+  register: _chaos_run
+
+- name: "chaos | started"
+  ansible.builtin.debug:
+    msg: >-
+      PipelineRun {{ _chaos_run.result.metadata.name }} ({{ _chaos_plan.pipeline }}, scenarios {{ _chaos_plan.scenarios }}).
+      Follow it: tkn pipelinerun logs -f -n {{ chaos_namespace }} {{ _chaos_run.result.metadata.name }}, or the console's
+      Pipelines page of {{ chaos_namespace }}.
+
+- name: "chaos | wait for the run, then clean up whatever happens"
+  block:
+    - name: "chaos | wait for {{ _chaos_run.result.metadata.name }}"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: "{{ chaos_namespace }}"
+        name: "{{ _chaos_run.result.metadata.name }}"
+      register: _chaos_run_state
+      until: (_chaos_run_state.resources[0].status.completionTime | default('')) | length > 0
+      retries: "{{ chaos_run_wait_retries }}"
+      delay: "{{ chaos_run_wait_delay }}"
+  always:
+    - name: "chaos | read the PipelineRun once more"
+      kubernetes.core.k8s_info:
+        api_version: tekton.dev/v1
+        kind: PipelineRun
+        namespace: "{{ chaos_namespace }}"
+        name: "{{ _chaos_run.result.metadata.name }}"
+      register: _chaos_run_final
+
+    - name: "chaos | did it finish"
+      ansible.builtin.set_fact:
+        _chaos_finished: "{{ (_chaos_run_final.resources[0].status.completionTime | default('')) | length > 0 }}"
+
+    # krkn deletes its helper pods and the provider cut its policy, and the provider cut's `finally` reaps again; this is
+    # the last net, run only once the PipelineRun is over (a running one still owns its pods). The AdminNetworkPolicy
+    # reaping needs the right the AAP installer does not have (aap-config chaosRbac): the pipeline's own reaping is the
+    # guarantee, this one is best effort and says when it could not run.
+    - name: "chaos | reap a chaos AdminNetworkPolicy left over"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: policy.networking.k8s.io/v1alpha1
+        kind: AdminNetworkPolicy
+        label_selectors: ["zuno.io/chaos=true"]
+      register: _chaos_anp_reap
+      failed_when: false
+      when: _chaos_finished | bool and _chaos_plan.pipeline == 'zuno-chaos-provider-cut'
+
+    # Everything in zuno-chaos that is neither a Tekton task pod nor cerberus is a krkn helper pod.
+    - name: "chaos | the krkn helper pods of {{ chaos_namespace }}"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ chaos_namespace }}"
+        label_selectors: ["!tekton.dev/taskRun", "app!=cerberus"]
+      register: _chaos_ns_pods
+      when: _chaos_finished | bool
+
+    - name: "chaos | reap krkn helper pods left over"
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        namespace: "{{ chaos_namespace }}"
+        name: "{{ _pod.metadata.name }}"
+      loop: "{{ _chaos_ns_pods.resources | default([]) }}"
+      loop_control:
+        loop_var: _pod
+        label: "{{ _pod.metadata.name }}"
+      failed_when: false
+      when: _chaos_finished | bool
+
+- name: "chaos | the TaskRuns of the run"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: TaskRun
+    namespace: "{{ chaos_namespace }}"
+    label_selectors: ["tekton.dev/pipelineRun={{ _chaos_run.result.metadata.name }}"]
+  register: _chaos_taskruns
+
+# One entry per task of the pipeline: a scenario, the cerberus gates, the provider cut and its reaping. `seconds` is the
+# task's own duration; a scenario's recovery is checked by krkn (krkn_pod_recovery_time) and again by the post-check.
+- name: "chaos | one row per task"
+  ansible.builtin.set_fact:
+    _chaos_task_rows: >-
+      {{ (_chaos_task_rows | default([])) + [{
+           'task': _tr.metadata.labels['tekton.dev/pipelineTask'] | default(_tr.metadata.name),
+           'status': (_tr.status.conditions | default([]) | selectattr('type', 'equalto', 'Succeeded')
+                      | map(attribute='reason') | first) | default('Unknown'),
+           'seconds': ((((_tr.status.completionTime | to_datetime('%Y-%m-%dT%H:%M:%SZ'))
+                        - (_tr.status.startTime | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).total_seconds()) | int)
+                      if (_tr.status.completionTime is defined and _tr.status.startTime is defined) else -1,
+           'results': dict((_tr.status.results | default([])) | map(attribute='name')
+                           | zip((_tr.status.results | default([])) | map(attribute='value')))}] }}
+  loop: "{{ _chaos_taskruns.resources | default([]) | sort(attribute='metadata.creationTimestamp') }}"
+  loop_control:
+    loop_var: _tr
+    label: "{{ _tr.metadata.name }}"
+
+- name: "chaos | the result row"
+  ansible.builtin.set_fact:
+    _chaos_condition: "{{ _pr.status.conditions | default([]) | selectattr('type', 'equalto', 'Succeeded') | first | default({}) }}"
+    chaos_result:
+      run: "{{ _pr.metadata.name }}"
+      namespace: "{{ chaos_namespace }}"
+      pipeline: "{{ _chaos_plan.pipeline }}"
+      kind: "{{ chaos_kind }}"
+      tier: "{{ chaos_tier }}"
+      targets: "{{ _chaos_plan.targets | map(attribute='id') | list }}"
+      scenarios: "{{ _chaos_plan.scenarios }}"
+      node: "{{ _chaos_node_name | default('') }}"
+      start: "{{ _pr.status.startTime | default(_chaos_start) }}"
+      end: "{{ _pr.status.completionTime | default('') }}"
+      status: "{{ (_pr.status.conditions | default([]) | selectattr('type', 'equalto', 'Succeeded') | map(attribute='reason') | first) | default('Unknown') }}"
+      succeeded: "{{ (_pr.status.conditions | default([]) | selectattr('type', 'equalto', 'Succeeded') | map(attribute='status') | first | default('Unknown')) == 'True' }}"
+      tasks: "{{ _chaos_task_rows | default([]) }}"
+  vars:
+    _pr: "{{ _chaos_run_final.resources[0] }}"
+
+- name: "chaos | print the result row (an AAP job keeps it in its output)"
+  ansible.builtin.debug:
+    msg: "CHAOS_RESULT {{ chaos_result | to_json }}"
+
+# The workflow's post-check node runs in another job: set_stats hands it the run (AAP passes these as extra vars).
+- name: "chaos | hand the run to the post-check node"
+  ansible.builtin.set_stats:
+    data:
+      chaos_run_name: "{{ chaos_result.run }}"
+    per_host: false
+
+- name: "chaos | write the result row on a workstation"
+  when: (lookup('ansible.builtin.env', 'K8S_AUTH_HOST') | default('', true)) | length == 0
+  block:
+    - name: "chaos | the report directory"
+      ansible.builtin.file:
+        path: "{{ chaos_report_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: "chaos | {{ chaos_report_dir }}/{{ chaos_result.run }}.json"
+      ansible.builtin.copy:
+        content: "{{ {'run': chaos_result} | to_nice_json }}\n"
+        dest: "{{ chaos_report_dir }}/{{ chaos_result.run }}.json"
+        mode: "0600"
+
+- name: "chaos | say when the AdminNetworkPolicy reaping could not run"
+  ansible.builtin.debug:
+    msg: >-
+      The provider cut's policy reaping from here was refused ({{ _chaos_anp_reap.msg | truncate(160) }}); the
+      pipeline's own `finally` reaps it. Check: oc get adminnetworkpolicy -l zuno.io/chaos=true
+  when: (_chaos_anp_reap.msg | default('')) | length > 0
+
+- name: "chaos | the run succeeded"
+  ansible.builtin.assert:
+    that:
+      - _chaos_finished | bool
+      - chaos_result.succeeded | bool
+    fail_msg: >-
+      {{ chaos_result.run }}: {{ chaos_result.status }} - {{ _chaos_condition.message | default('not finished') }}.
+      Failed tasks: {{ chaos_result.tasks | rejectattr('status', 'in', ['Succeeded', 'Unknown']) | map(attribute='task') | list }}.
+      Logs: tkn pipelinerun logs -n {{ chaos_namespace }} {{ chaos_result.run }}. Then `make d3 check recovery`
+      gives the next step for the first layer that is not back.
+    success_msg: "{{ chaos_result.run }} succeeded: {{ chaos_result.tasks | map(attribute='task') | list }}"

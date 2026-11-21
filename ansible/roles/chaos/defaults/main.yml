@@ -1,0 +1,52 @@
+---
+# Day 2 component chaos (gitops/charts/chaos). ONE switch, as for praxis: the component holds a privileged SCC and cluster
+# chaos rights, so a full `make d2 install` does not put it on a cluster that did not ask for it. Set it in
+# ansible/inventories/<cluster>/cluster.yml (committed: AAP reads the SCM); ansible/confidential.yml may override it.
+zuno_chaos_enabled: false
+
+chaos_namespace: zuno-chaos
+chaos_app_name: zuno-chaos-d1
+chaos_service_account: chaos-pipeline
+chaos_cerberus_service: cerberus
+chaos_cerberus_port: 8080
+# The cerberus signal read through the API server's service proxy: no pod to start, the same call from a workstation and
+# from an AAP execution environment (Role zuno-chaos-signal-reader of the chart grants it to both AAP credentials).
+chaos_cerberus_proxy_path: "/api/v1/namespaces/{{ chaos_namespace }}/services/http:{{ chaos_cerberus_service }}:{{ chaos_cerberus_port }}/proxy/"
+# Unauthenticated health URLs cerberus watches (its watch_url_routes), built from the cluster's apps domain at install.
+# A cluster without one of these experiences overrides the list in its cluster.yml, or cerberus stays False.
+chaos_watch_urls:
+  - "https://keycloak.{{ cluster_base_domain }}/realms/zuno/.well-known/openid-configuration"
+  - "https://open-webui.{{ cluster_base_domain }}/health"
+  - "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}/"
+
+# Install: cerberus pulls its image and answers its first signal.
+chaos_wait_retries: 40
+chaos_wait_delay: 15
+
+# One run (`make d3 chaos ...`, the AAP chaos workflows). chaos_kind: infra | platform. chaos_tier (infra): pods | hog |
+# latency. chaos_targets (platform): a comma list of ids of platform/chaos/targets.yaml. platform/chaos/targets.py checks
+# all three and turns them into a plan.
+chaos_kind: ""
+chaos_tier: ""
+chaos_targets: ""
+# The node-level tiers act on the ONE node with this label (gitops/charts/chaos values pipeline.nodeSelector), put by hand
+# with the owner's go; the pre-check refuses zero, two, a control-plane or a GPU node.
+chaos_node_label: zuno.io/chaos-target=true
+chaos_node_tiers: [hog, latency]
+# A PipelineRun runs its scenarios one after the other: the gpt-oss pod alone may take 15 minutes. `finally` (the last
+# cerberus check, the provider cut's reaping) only runs when the tasks time out before the pipeline does, so it keeps its
+# own 15 minutes (tasks + finally = pipeline).
+chaos_run_timeouts:
+  pipeline: "2h0m0s"
+  tasks: "1h45m0s"
+  finally: "15m0s"
+chaos_run_wait_retries: 480
+chaos_run_wait_delay: 15
+# How long the post-check waits for cerberus to turn True again.
+chaos_cerberus_wait_retries: 20
+chaos_cerberus_wait_delay: 15
+# Where a workstation run writes its result row (one JSON file per PipelineRun); an AAP run prints it in the job output.
+chaos_report_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.local/share/zuno/chaos"
+# The golden-path probe of each target (evaluations/golden_path_probe.py) needs the demo credentials and `oc` of the
+# workstation: auto = run it locally, print the command in AAP. true = always run it, false = never.
+chaos_golden_probe: auto

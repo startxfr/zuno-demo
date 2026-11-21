@@ -86,7 +86,10 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model praxis
+# "chaos" (gitops/charts/chaos: cerberus and the krkn Tekton pipelines)
+# follows zuno_chaos_enabled like praxis, and installs nothing that runs:
+# a run is the Day 3 verb `make d3 chaos infra|platform`.
+DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model praxis chaos
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model praxis
 DAY2_VERBS := check install build uninstall reconcile all reinstall

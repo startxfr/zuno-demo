@@ -1,0 +1,19 @@
+---
+# `make d3 chaos infra|platform` (last step) and the last node of the AAP chaos workflows: is the platform whole again,
+# within the bound of each target? Reads only (ansible/roles/chaos/tasks/postcheck.yml). Fails with the list of what is
+# not back; `make d3 check recovery` then gives the next step.
+#
+# Extra vars: chaos_kind (infra | platform), chaos_tier (infra: pods | hog | latency), chaos_targets (platform: ids of
+# platform/chaos/targets.yaml, comma separated).
+- name: "Day 3: chaos run - post-check (reads only)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: "chaos | postcheck"
+      ansible.builtin.include_role:
+        name: chaos
+        tasks_from: postcheck

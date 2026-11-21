@@ -46,6 +46,9 @@
       - world_model
       # ADR-0619 (WP-292): Praxis AI; reports the switch against what is installed, probes the gateway when it is.
       - praxis
+      # Chaos engineering: the Application, the Tasks and Pipelines, the cerberus signal (tasks/check.yml; its
+      # precheck.yml is the pre-check of a chaos run, not a state check).
+      - chaos
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials
@@ -68,7 +71,7 @@
     - name: Run Day 2 component state checks
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component_precheck.yml"
       vars:
-        _precheck_tasks_from: "{{ 'check' if _precheck_component in ['agents', 'supply_chain', 'unifai', 'openclaw'] else ('precheck_d1' if _precheck_component == 'namespaces' else 'precheck') }}"
+        _precheck_tasks_from: "{{ 'check' if _precheck_component in ['agents', 'supply_chain', 'unifai', 'openclaw', 'chaos'] else ('precheck_d1' if _precheck_component == 'namespaces' else 'precheck') }}"
       loop: "{{ selected_components }}"
       loop_control:
         loop_var: _precheck_component

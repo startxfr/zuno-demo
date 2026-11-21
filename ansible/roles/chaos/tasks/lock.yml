@@ -1,0 +1,17 @@
+---
+# The lock: two chaos runs at the same time would each read the failures the other injects (the startx pipelines say so),
+# and the provider cut's reaping assumes it is alone. Any PipelineRun of zuno-chaos that has not finished holds it.
+# Sets _chaos_running (names). A check, not a mutex: two runs started in the same second could both pass it.
+- name: "chaos | list the PipelineRuns of {{ chaos_namespace }}"
+  kubernetes.core.k8s_info:
+    api_version: tekton.dev/v1
+    kind: PipelineRun
+    namespace: "{{ chaos_namespace }}"
+  register: _chaos_prs
+
+- name: "chaos | the ones still running"
+  ansible.builtin.set_fact:
+    _chaos_running: >-
+      {{ _chaos_prs.resources | default([])
+         | rejectattr('status.completionTime', 'defined')
+         | map(attribute='metadata.name') | list }}
