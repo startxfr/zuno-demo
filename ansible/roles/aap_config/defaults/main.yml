@@ -53,6 +53,10 @@ aap_config_ee_job_templates:
   # criterion as the other entries above.
   - zuno-day3-scenario-failover-node-inject
   - zuno-day3-scenario-failover-node-restore
+  # Day 2 component chaos: the pre- and post-check run `oc get --raw` (the cerberus signal) and check_recovery.py (oc).
+  # The run node uses Kubernetes modules only.
+  - zuno-day3-chaos-precheck
+  - zuno-day3-chaos-postcheck
 
 aap_config_job_templates:
   - name: zuno-day0-check
@@ -121,6 +125,18 @@ aap_config_job_templates:
     credential: zuno-aap-installer
     gated: true
     survey_components: []
+  # Day 2 component chaos: no Survey, the variables (chaos_kind, chaos_tier, chaos_targets) come from the workflow
+  # launch and its nodes; platform/chaos/targets.py refuses anything outside the catalogue.
+  - name: zuno-day3-chaos-precheck
+    credential: zuno-cluster-reader
+    survey_components: []
+  - name: zuno-day3-chaos-run
+    credential: zuno-aap-installer
+    gated: true
+    survey_components: []
+  - name: zuno-day3-chaos-postcheck
+    credential: zuno-cluster-reader
+    survey_components: []
 
 # "-workflow" suffix (WP-097 fix): a Workflow Template and its underlying
 # Job Template would otherwise share the exact same name (e.g.
@@ -140,4 +156,8 @@ aap_config_workflow_templates:
   - name: zuno-day2-check-workflow
   - name: zuno-day2-build-workflow
   - name: zuno-day3-scenario-failover-node-workflow
+    gated: true
+  - name: zuno-day3-chaos-infra-workflow
+    gated: true
+  - name: zuno-day3-chaos-platform-workflow
     gated: true
