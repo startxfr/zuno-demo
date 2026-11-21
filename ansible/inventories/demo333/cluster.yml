@@ -508,6 +508,9 @@ zuno_stress_image_proof_guard_enabled: true
 # aggressive profile's provider-cut runs through AAP too. A real grant: an ANP outranks every NetworkPolicy, and RBAC
 # cannot limit a create to one name.
 zuno_stress_chaos_rbac_enabled: true
+# ADR-0626 / WP-316 (owner's plan approved 2026-11-21, validation day 2026-11-22): the chaos component (cerberus and the
+# krkn Tekton pipelines in zuno-chaos). Installing it starts nothing: each run is an AAP workflow with an approval node.
+zuno_chaos_enabled: true
 # 2026-11-19: the maas-default-gateway wasm config (EnvoyFilter openshift-ingress/kuadrant-maas-default-gateway) cannot be
 # written since 2026-11-05: the desired object is over etcd's 1.5 MiB request limit (3.9 MB with 28 subscriptions, still
 # 2.9 MB without the persona-group and /sales ones, because every route rule is emitted once per gateway listener).
