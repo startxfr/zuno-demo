@@ -108,5 +108,24 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(out["maas"], [])
 
 
+class FinishedTaskRunPods(unittest.TestCase):
+    """A failed Tekton TaskRun pod is finished, not stuck (AAP pre-check 1541, 2026-11-22); any other Error pod still is."""
+
+    def _failed(self, labels):
+        p = pod("zuno-chaos", "chaos-platform-x-pod-a2a-gateway-pod")
+        p["metadata"]["labels"] = labels
+        p["status"] = {"phase": "Failed", "containerStatuses": [
+            {"state": {"terminated": {"exitCode": 1, "reason": "Error"}}}]}
+        return p
+
+    def test_failed_taskrun_pod_is_ignored(self):
+        oc = lambda args: {"items": [self._failed({"tekton.dev/taskRun": "chaos-platform-x-pod-a2a-gateway"})]}
+        self.assertEqual(r.pods(oc), [])
+
+    def test_failed_pod_without_taskrun_label_is_still_stuck(self):
+        oc = lambda args: {"items": [self._failed({"app": "something"})]}
+        self.assertEqual(r.pods(oc), ["zuno-chaos/chaos-platform-x-pod-a2a-gateway-pod: Error"])
+
+
 if __name__ == "__main__":
     unittest.main()

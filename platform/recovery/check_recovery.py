@@ -108,6 +108,11 @@ def pods(oc: Oc) -> List[str]:
             continue
         if p["status"].get("phase") in ("Succeeded",):
             continue
+        # A failed Tekton TaskRun pod has finished and never restarts: its logs stay for `tkn pipelinerun logs` (the chaos
+        # role keeps them on purpose), so it is not stuck. Without this, one failed chaos task blocked the next pre-check
+        # (AAP job 1541, 2026-11-22).
+        if p["status"].get("phase") == "Failed" and "tekton.dev/taskRun" in (p["metadata"].get("labels") or {}):
+            continue
         state = pod_state(p)
         if state in STUCK:
             out.append(f"{ns}/{name}: {state}")
