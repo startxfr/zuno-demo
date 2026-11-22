@@ -9,9 +9,10 @@ description: >-
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-# 21.3.398 (startx stable index, 2026-11-21 ~21:05Z): the run parameters this component needs (scenarios,
-# recovery-time, node-selector, workload-namespace, per-scenario recoveryTime; first in 21.3.392), an empty `scenarios`
-# default (a run that names no scenario runs none) and an optional ClusterOperator final check (off here). Chart.lock is
+# chaos-cerberus 21.3.398 and chaos-pipeline 21.3.400 (startx stable index). 21.3.392 brought the run parameters this
+# component needs (scenarios, recovery-time, node-selector, workload-namespace, per-scenario recoveryTime); 21.3.398 an
+# empty `scenarios` default and an optional ClusterOperator final check (off here); chaos-pipeline 21.3.400
+# (2026-11-22 15:24Z) krkn's exit_on_failure False, so the cerberus gates can run (chaos-cerberus was not re-released). Chart.lock is
 # committed; `helm dependency build gitops/charts/chaos` fetches the packages.
 dependencies:
   - name: chaos-cerberus
@@ -20,5 +21,5 @@ dependencies:
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"
   - name: chaos-pipeline
     alias: pipeline
-    version: "21.3.398"
+    version: "21.3.400"
     repository: "https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable"

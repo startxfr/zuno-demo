@@ -131,14 +131,12 @@ pipeline:
     checkResources:
       requests: {cpu: 10m, memory: 32Mi}
       limits: {memory: 64Mi}
-    # Off on 2026-11-22: with it on, krkn 4.22.20 reads the cerberus signal after each scenario and, even when the signal
-    # is True, logs "Cerberus reports cluster is healthy, but exit_on_failure is set - exiting kraken run" and exits 1
-    # (exit_on_failure is fixed to True in the chart's krkn config): the first scenario fails and the next ones are
-    # skipped (PipelineRun chaos-platform-dgd8b). It also turns off the chart's cerberus-gate and cerberus-final-check
-    # tasks; the Zuno role still requires cerberus True before the run (pre-check) and waits for it after (post-check),
-    # and krkn still waits for each target's recovery before the next one. Reported to helm-hachley.
+    # The cerberus gates of the pipelines (cerberus-gate, cerberus-final-check, and krkn's own read after each scenario).
+    # Off for an afternoon on 2026-11-22 (c91bfb34): chaos-pipeline 21.3.398 fixed krkn's exit_on_failure to True, and
+    # krkn 4.22.20 then exits 1 after the first scenario even on a True signal (PipelineRun chaos-platform-dgd8b).
+    # chaos-pipeline 21.3.400 sets it False: a healthy signal lets the run go on, an unhealthy one still fails it.
     cerberus:
-      enabled: false
+      enabled: true
       url: http://cerberus.zuno-chaos.svc.cluster.local:8080
       timeout: 300
     infra:

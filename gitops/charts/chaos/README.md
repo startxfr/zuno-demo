@@ -33,7 +33,7 @@ Nothing runs at install: the chart renders no PipelineRun. A run is created by `
 
 ## Dependencies
 
-`chaos-cerberus` and `chaos-pipeline` **21.3.398** from the startx stable index (2026-11-21 ~21:05Z: `scenarios` now defaults to an empty list, and an optional ClusterOperator final check, off here). 21.3.392 (14:19Z) was the first
+`chaos-cerberus` **21.3.398** and `chaos-pipeline` **21.3.400** from the startx stable index. 21.3.398 (2026-11-21 ~21:05Z): `scenarios` defaults to an empty list, and an optional ClusterOperator final check, off here. chaos-pipeline 21.3.400 (2026-11-22): krkn's `exit_on_failure` is False, so the cerberus gates of the pipelines are on again. 21.3.392 (14:19Z) was the first
 release with the `scenarios`, `recovery-time`, `node-selector` and `workload-namespace` pipeline parameters. `Chart.lock`
 is committed; `helm dependency build gitops/charts/chaos` fetches the two packages into the gitignored `charts/`, as for
 every chart here.

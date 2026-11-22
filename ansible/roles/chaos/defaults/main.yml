@@ -43,10 +43,9 @@ chaos_run_timeouts:
 chaos_run_wait_retries: 480
 chaos_run_wait_delay: 15
 # The cerberus gates inside the PipelineRun (the chart's cerberus-gate and cerberus-final-check, and krkn's own read of
-# the signal). Off since 2026-11-22: krkn 4.22.20 exits 1 after reading a True signal ("exit_on_failure is set"), so the
-# first scenario failed and the next ones were skipped (chaos-platform-dgd8b). The pre-check and post-check of this role
-# still require cerberus True before and after the run.
-chaos_pipeline_cerberus_gate: false
+# the signal), on top of this role's pre-check and post-check. Back on with chaos-pipeline 21.3.400 (krkn's
+# exit_on_failure False); it was off for an afternoon on 2026-11-22 because 21.3.398 made krkn exit 1 on a True signal.
+chaos_pipeline_cerberus_gate: true
 # How long the post-check waits for cerberus to turn True again.
 chaos_cerberus_wait_retries: 20
 chaos_cerberus_wait_delay: 15

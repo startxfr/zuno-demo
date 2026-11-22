@@ -2,8 +2,8 @@
 
 The values half needs only PyYAML: the generated application scenarios in sync with the catalogue, the infra tiers present
 and enabled, the node-level scenarios on the labelled node with the infra toleration, the provider-cut allow-list equal to
-the catalogue's. The render half needs helm and the two startx dependencies under gitops/charts/chaos/charts/ (21.3.398 is
-not on the stable index yet, see the chart README): it skips without them. It renders the chart, checks what a run relies
+the catalogue's. The render half needs helm and the two startx dependencies under gitops/charts/chaos/charts/ (cerberus 21.3.398,
+pipeline 21.3.400, see the chart README): it skips without them. It renders the chart, checks what a run relies
 on, and runs the zuno-provider-cut script with a stub `oc` to compare its AdminNetworkPolicy with the WP-311 shape
 (platform/testing/stress_chaos.py anp_manifest).
 
@@ -116,7 +116,7 @@ class Values(unittest.TestCase):
     def test_dependencies_are_the_two_startx_charts_at_one_pinned_version(self):
         chart = yaml.safe_load((CHART / "Chart.yaml").read_text())
         deps = {d["alias"]: (d["name"], d["version"]) for d in chart["dependencies"]}
-        self.assertEqual(deps, {"cerberus": ("chaos-cerberus", "21.3.398"), "pipeline": ("chaos-pipeline", "21.3.398")})
+        self.assertEqual(deps, {"cerberus": ("chaos-cerberus", "21.3.398"), "pipeline": ("chaos-pipeline", "21.3.400")})
 
 
 def _render_ready():
@@ -143,7 +143,7 @@ def _scenario_tasks(pipeline):
                 names.append(cond.get("input"))
     return names
 
-@unittest.skipUnless(_render_ready(), "needs helm and the 21.3.398 dependencies under gitops/charts/chaos/charts/")
+@unittest.skipUnless(_render_ready(), "needs helm and the startx dependencies under gitops/charts/chaos/charts/")
 class Render(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -178,6 +178,17 @@ class Render(unittest.TestCase):
         default = next(p for p in pipeline["spec"]["params"] if p["name"] == "scenarios")["default"]
         self.assertEqual(default, [])
         self.assertEqual(sorted(_scenario_tasks(pipeline)), sorted(t["id"] for t in self.cat["targets"] if t["kind"] == "pod-delete"))
+
+    def test_cerberus_gates_are_on_and_krkn_does_not_exit_on_a_healthy_signal(self):
+        # 2026-11-22: 21.3.398 fixed exit_on_failure to True and krkn exited 1 after the first scenario on a True signal
+        # (PipelineRun chaos-platform-dgd8b). chaos-pipeline 21.3.400 sets it False; the gates are back on.
+        for name in ("chaos-application", "chaos-infra"):
+            params = {p["name"]: p.get("default") for p in self.get("Pipeline", name)["spec"]["params"]}
+            self.assertEqual(params["cerberus-enabled"], "true", name)
+        script = self.get("Task", "krkn-run")["spec"]["steps"][0]["script"]
+        kraken = script.split("\nkraken:\n", 1)[1].split("\nresiliency:", 1)[0]
+        self.assertIn("exit_on_failure: False", kraken)
+        self.assertNotIn("exit_on_failure: True", kraken)
 
     def test_infra_pipeline_offers_every_tier_scenario(self):
         pipeline = self.get("Pipeline", "chaos-infra")

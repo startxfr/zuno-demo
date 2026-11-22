@@ -42,7 +42,7 @@ run starts only through an AAP workflow that a person approves.**
 
 1. **Charts consumed pinned.** The Day 2 component `chaos` (`make d2 install chaos`, `make d2 check chaos`) is a local
    wrapper chart, `gitops/charts/chaos`, with `chaos-cerberus` and `chaos-pipeline` as dependencies at an exact version
-   of the startx stable index, vendored as tgz files. A fixed chart is taken by changing that pin (21.3.392 on 2026-11-21, then 21.3.398 the same evening: empty `scenarios` default, optional ClusterOperator final check).
+   of the startx stable index, vendored as tgz files. A fixed chart is taken by changing that pin (21.3.392 on 2026-11-21, then 21.3.398 the same evening: empty `scenarios` default, optional ClusterOperator final check; chaos-pipeline 21.3.400 on 2026-11-22: krkn's `exit_on_failure` False, so the pipelines' cerberus gates run again).
    `chaos-kraken` is not part of the component: the pipeline replaces its Job. It is proven once, as a chart test.
 2. **One namespace.** Cerberus, the Pipelines, their ServiceAccount `chaos-pipeline` and the privileged helper pods of
    the node scenarios run in `zuno-chaos`, and nowhere else. The namespace is not Kueue-managed.

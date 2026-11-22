@@ -4,6 +4,6 @@ dependencies:
   version: 21.3.398
 - name: chaos-pipeline
   repository: https://sx-helm-repository-prod.s3.eu-west-3.amazonaws.com/stable
-  version: 21.3.398
-digest: sha256:d9793a62759ffc40f671fd0cfef7bdf2c6ff72d016e02f26d149627b1b7cce66
-generated: "2026-11-21T21:58:44.882559435+01:00"
+  version: 21.3.400
+digest: sha256:c96f1de105cd576a1f7b64dbb40e06b3bd6cabcbb92ba39b872cde798ac931bd
+generated: "2026-11-22T18:16:50.724530507+01:00"
