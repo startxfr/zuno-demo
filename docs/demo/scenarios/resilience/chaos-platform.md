@@ -168,7 +168,9 @@ Run the 5-minute version, then:
 - **The UnifAI approval click is lost during the restart** and must be sent again; in 0.1.74 the reason typed with it
   is lost too.
 - **The health signal is coarse.** cerberus answers `False` when a ClusterOperator is Degraded or a pod of a watched
-  namespace is not Running, wherever it is.
+  namespace is not Running, wherever it is. One pod is left out on purpose: since 2026-11-22 the RHOAI operator
+  re-rolls `lsd-genai-playground` (zuno-ai-run) without end, so one of its pods is always starting. cerberus ignores
+  `lsd-genai-playground-*` until that operator loop is fixed; the genai-playground scenario still passes.
 - **No recorded walkthrough and no GIF yet.**
 
 ## Appendix A - HLD
