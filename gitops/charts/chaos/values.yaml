@@ -94,10 +94,6 @@ cerberus:
       - redhat-ods-applications
     watch_namespaces_ignore_pattern:
       - "^installer.*"
-      # Known limit (2026-11-22): the RHOAI OGXServer operator re-rolls lsd-genai-playground without end (Deployment
-      # generation above 36,000), so one of its pods is always starting. The genai-playground demo still passes; the pod
-      # is left out of the signal until the operator loop is fixed (post-demo). Said on the chaos-platform page.
-      - "^lsd-genai-playground-.*"
     # Unauthenticated health URLs only, one list per URL (cerberus format: [["https://..."]]). Empty here: the role fills
     # it from the cluster's apps domain (chaos_watch_url_paths in ansible/roles/chaos/defaults/main.yml): the Keycloak
     # well-known document, Open WebUI /health and the UnifAI UI.

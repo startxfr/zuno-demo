@@ -700,6 +700,9 @@ genAiMcpServers:
 
 # WP-220 (2026-11-06): ready-made playground for the MaaS consumer portal in zuno-playground
 # (templates/playground.yaml explains the three differences from the portal's own version).
+# Never press "Create playground" in the portal: the copy it made in zuno-ai-run on 2026-11-13 restarted without end
+# (OGX operator 0.15.0 rewrites its merged CA bundle on every reconcile and the pod template hashes the ConfigMap's
+# version: generation above 37,000). It was deleted on 2026-11-22; this GitOps copy has no such annotation.
 playground:
   enabled: true
   namespace: zuno-playground
