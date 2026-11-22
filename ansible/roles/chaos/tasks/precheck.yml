@@ -38,7 +38,7 @@
 
 - name: "chaos | cerberus says the cluster is healthy"
   ansible.builtin.assert:
-    that: _chaos_signal == 'True'
+    that: (_chaos_signal | string) == 'True'
     fail_msg: >-
       cerberus says {{ _chaos_signal }}: no chaos on a cluster that is not whole. {{ 'This machine has no oc: run the
       pre-check from a workstation or an execution environment that has it.' if _chaos_signal == 'no-oc' else

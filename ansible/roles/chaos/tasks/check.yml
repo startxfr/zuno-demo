@@ -61,7 +61,7 @@
 
     - name: "chaos | cerberus says the cluster is healthy"
       ansible.builtin.assert:
-        that: _chaos_signal in ['True', 'no-oc']
+        that: (_chaos_signal | string) in ['True', 'no-oc']
         fail_msg: >-
           cerberus says {{ _chaos_signal }}: a run would refuse to start. `oc logs -n {{ chaos_namespace }} deploy/cerberus`
           names what it found (a Degraded ClusterOperator, a pod not Running in a watched namespace, a URL not answering).

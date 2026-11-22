@@ -22,6 +22,8 @@
   delay: "{{ _chaos_signal_delay | default(15) }}"
   when: _chaos_oc.rc == 0
 
+# Compare it as a string everywhere ((_chaos_signal | string) == 'True'): with Jinja2 native types (the AAP execution
+# environment), the set_fact below turns the text True into the boolean True (precheck job 1528, 2026-11-22).
 - name: "chaos | the signal"
   ansible.builtin.set_fact:
     _chaos_signal: >-

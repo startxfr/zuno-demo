@@ -153,7 +153,7 @@
 
 - name: "chaos | record the signal"
   ansible.builtin.set_fact:
-    _chaos_failures: "{{ _chaos_failures + ([] if _chaos_signal == 'True' else ['cerberus says ' ~ _chaos_signal]) }}"
+    _chaos_failures: "{{ _chaos_failures + ([] if (_chaos_signal | string) == 'True' else ['cerberus says ' ~ _chaos_signal]) }}"
 
 - name: "chaos | every layer of the cluster is back (check_recovery.py)"
   block:
