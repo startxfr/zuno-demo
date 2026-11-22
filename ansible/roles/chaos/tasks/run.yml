@@ -40,7 +40,7 @@
     _chaos_params: >-
       {{ ([{'name': 'scenarios', 'value': _chaos_plan.scenarios}] if _chaos_plan.pipeline != 'zuno-chaos-provider-cut' else [])
          + ((_chaos_plan.params | default({})) | dict2items(key_name='name', value_name='value'))
-         + [{'name': 'cerberus-enabled', 'value': 'true'}] }}
+         + [{'name': 'cerberus-enabled', 'value': ('true' if chaos_pipeline_cerberus_gate | bool else 'false')}] }}
     _chaos_start: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
 
 - name: "chaos | create the PipelineRun"
