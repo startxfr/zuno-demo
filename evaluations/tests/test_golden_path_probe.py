@@ -317,7 +317,7 @@ class Aggregate(unittest.TestCase):
         self.assertIn("FAIL (dify)", g.render(results))
 
     def test_every_moment_has_a_probe(self):
-        self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "zuno-wesh", "dify", "kagent",
+        self.assertEqual(set(g.PROBES) - g.ON_DEMAND, {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "zuno-wesh", "dify", "kagent",
                                          "openclaw", "lightspeed", "tools", "guardrails", "trace", "delegation-approval",
                                          "world-model", "blender"})
         self.assertLess(list(g.PROBES).index("unifai-tekos"), list(g.PROBES).index("trace"))
@@ -412,6 +412,23 @@ class Blender(unittest.TestCase):
             self.assertTrue(g.run_one("blender", None).required)
         finally:
             g.PROBES["blender"] = saved
+
+
+class CodeFallback(unittest.TestCase):
+    """zuno-code-fallback: during a provider cut, zuno-code must answer from a local model (2026-11-22 chaos test)."""
+
+    def test_local_model_passes(self):
+        self.assertEqual(g.judge_code_fallback("zuno-code", 200, "gpt-oss-20b", "def add(a, b): return a + b").status, g.PASS)
+
+    def test_codestral_fails(self):
+        self.assertEqual(g.judge_code_fallback("zuno-code", 200, "codestral-latest", "x").status, g.FAIL)
+
+    def test_no_answer_fails(self):
+        self.assertEqual(g.judge_code_fallback("zuno-code", 502, "", "").status, g.FAIL)
+
+    def test_not_in_the_default_list(self):
+        self.assertIn("zuno-code-fallback", g.PROBES)
+        self.assertIn("zuno-code-fallback", g.ON_DEMAND)
 
 
 if __name__ == "__main__":

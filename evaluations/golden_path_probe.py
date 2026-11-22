@@ -303,7 +303,19 @@ def pick_model(ids: List[str], want: str) -> Optional[str]:
                 next((i for i in ids if "zuno-code" not in i and "zuno-wesh" not in i), None))
 
 
-def _open_webui_answer(ctx: Context, moment: str, want: str) -> Result:
+def judge_code_fallback(model: str, status: int, served: str, content: str) -> Result:
+    """zuno-code during a provider cut of api.mistral.ai (chaos target provider-cut-mistral): it must still answer, and
+    from a model that is not Codestral, i.e. the ai-gateway fell back to a local model. Outside a cut this moment FAILS
+    by design (Codestral answers), which is why it is not in the default list (ON_DEMAND)."""
+    moment = "zuno-code-fallback"
+    if status != 200 or not content.strip():
+        return Result(moment, FAIL, f"model {model}: HTTP {status}, no answer during the cut")
+    if not served or "codestral" in served.lower() or "mistral" in served.lower():
+        return Result(moment, FAIL, f"model {model} answered from {served or '?'}: no fallback to a local model")
+    return Result(moment, PASS, f"model {model} answered from {served} (local fallback, {len(content)} chars)")
+
+
+def _open_webui_answer(ctx: Context, moment: str, want: str, fallback: bool = False) -> Result:
     c, auth = _open_webui_session(ctx)
     try:
         models = c.get(f"{ctx.open_webui}/api/models", headers=auth)
@@ -325,6 +337,8 @@ def _open_webui_answer(ctx: Context, moment: str, want: str) -> Result:
                 first_error = f"{type(exc).__name__} on the first attempt, passed on retry; "
         body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         content = ((body.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        if fallback:
+            return judge_code_fallback(model, r.status_code, str(body.get("model") or ""), content)
         if r.status_code == 200 and content.strip():
             return Result(moment, PASS, f"{first_error}model {model} answered ({len(content)} chars, served by "
                                         f"{body.get('model', '?')})")
@@ -339,6 +353,10 @@ def probe_open_webui(ctx: Context) -> Result:
 
 def probe_zuno_code(ctx: Context) -> Result:
     return _open_webui_answer(ctx, "zuno-code", "code")
+
+
+def probe_zuno_code_fallback(ctx: Context) -> Result:
+    return _open_webui_answer(ctx, "zuno-code-fallback", "code", fallback=True)
 
 
 def probe_zuno_wesh(ctx: Context) -> Result:
@@ -845,7 +863,10 @@ PROBES: Dict[str, Callable[[Context], Result]] = {
     "delegation-approval": probe_delegation_approval,
     "world-model": probe_world_model,
     "blender": probe_blender,
+    "zuno-code-fallback": probe_zuno_code_fallback,
 }
+# Run only when named with --only: zuno-code-fallback passes only during a cut of api.mistral.ai (chaos run).
+ON_DEMAND = {"zuno-code-fallback"}
 # Required once they have a verdict: a roadmap or skipped row (feature off, lookup not confirmable, persona not created
 # yet) never fails the run, a PASS or FAIL of an installed feature does. Blender is in the 2026-11-09 demonstration.
 OPTIONAL = {"world-model", "blender"}
@@ -881,7 +902,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--only", default="", help="comma list of moments (default: all)")
     ap.add_argument("--json", action="store_true", help="one JSON object per moment, then a summary")
     args = ap.parse_args(argv)
-    names = [n for n in (args.only.split(",") if args.only else PROBES) if n]
+    names = [n for n in (args.only.split(",") if args.only else [p for p in PROBES if p not in ON_DEMAND]) if n]
     unknown = [n for n in names if n not in PROBES]
     if unknown:
         ap.error(f"unknown moment(s): {unknown}; known: {list(PROBES)}")

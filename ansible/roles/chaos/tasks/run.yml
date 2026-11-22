@@ -78,6 +78,28 @@
       Follow it: tkn pipelinerun logs -f -n {{ chaos_namespace }} {{ _chaos_run.result.metadata.name }}, or the console's
       Pipelines page of {{ chaos_namespace }}.
 
+# A provider cut must show the fallback while it lasts: zuno-code answers from a local model, not Codestral (2026-11-22
+# chaos test, where nothing proved it). The golden-path probe needs the workstation's personas and the routes, so it
+# runs only where the post-check's probe runs (chaos_golden_probe, not from an AAP execution environment); started in
+# the background before the wait, it asks once, chaos_fallback_probe_delay seconds into the cut.
+- name: "chaos | ask zuno-code during the cut (background)"
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -c
+      - >-
+        sleep {{ chaos_fallback_probe_delay | int }} &&
+        python3 {{ zuno_repo_root }}/evaluations/golden_path_probe.py --only zuno-code-fallback
+    chdir: "{{ zuno_repo_root }}"
+  async: "{{ chaos_fallback_probe_delay | int + 600 }}"
+  poll: 0
+  register: _chaos_fallback_job
+  changed_when: false
+  when:
+    - _chaos_plan.pipeline == 'zuno-chaos-provider-cut'
+    - (chaos_golden_probe | string | lower) in ['true', 'yes'] or ((chaos_golden_probe | string | lower) == 'auto'
+       and (lookup('ansible.builtin.env', 'K8S_AUTH_HOST') | default('', true)) | length == 0)
+
 - name: "chaos | wait for {{ _chaos_run.result.metadata.name }}"
   kubernetes.core.k8s_info:
     api_version: tekton.dev/v1
@@ -221,6 +243,31 @@
       The provider cut's policy reaping from here was refused ({{ _chaos_anp_reap.msg | truncate(160) }}); the
       pipeline's own `finally` reaps it. Check: oc get adminnetworkpolicy -l zuno.io/chaos=true
   when: (_chaos_anp_reap.msg | default('')) | length > 0
+
+- name: "chaos | the answer of zuno-code during the cut"
+  ansible.builtin.async_status:
+    jid: "{{ _chaos_fallback_job.ansible_job_id }}"
+  register: _chaos_fallback
+  until: _chaos_fallback.finished | default(false)
+  retries: 60
+  delay: 10
+  failed_when: false
+  when: _chaos_fallback_job.ansible_job_id is defined
+
+- name: "chaos | the fallback seen during the cut"
+  ansible.builtin.debug:
+    msg: "{{ _chaos_fallback.stdout_lines | default(['the probe did not answer']) }}"
+  when: _chaos_fallback_job.ansible_job_id is defined
+
+- name: "chaos | zuno-code fell back to a local model during the cut"
+  ansible.builtin.assert:
+    that: (_chaos_fallback.rc | default(1)) == 0
+    fail_msg: >-
+      During the cut, zuno-code did not answer from a local model: {{ _chaos_fallback.stdout_lines | default([]) | join(' / ') }}.
+      The ai-gateway's fallback from Codestral did not happen (or the probe ran outside the cut: raise or lower
+      chaos_fallback_probe_delay, now {{ chaos_fallback_probe_delay }} s).
+    success_msg: "zuno-code answered from a local model during the cut"
+  when: _chaos_fallback_job.ansible_job_id is defined
 
 - name: "chaos | the run succeeded"
   ansible.builtin.assert:

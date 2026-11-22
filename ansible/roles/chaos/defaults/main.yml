@@ -54,3 +54,6 @@ chaos_report_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.local/share/zuno
 # The golden-path probe of each target (evaluations/golden_path_probe.py) needs the demo credentials and `oc` of the
 # workstation: auto = run it locally, print the command in AAP. true = always run it, false = never.
 chaos_golden_probe: auto
+# Seconds into a provider cut (120 s for provider-cut-mistral) when the run asks zuno-code once, to see the local
+# fallback (workstation runs only, as the golden-path probe above). The PipelineRun starts its cut within ~20-40 s.
+chaos_fallback_probe_delay: 70
