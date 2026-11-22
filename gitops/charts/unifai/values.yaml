@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.76, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.77, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:949d732d167a33cec844d33ddc254b0988c93b929d8147b88626b73e1ed6e3e5
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:a308101456f3f03e4153e0adb5a73028beeba52a06615539897b671b798a4297
   catalogSourceName: unifai-operator-catalog
   channel: alpha
   package: unifai-operator
@@ -29,6 +29,9 @@ operator:
 stack:
   enabled: false
   profile: dev
+  # Replicas per component (unifai-operator >= 0.1.77, R-570): only `multiagent` (1-10); empty keeps the operator's 1.
+  # Two multiagent pods need the RWX shared storage (sharedStorageClass). Set per cluster in zuno_unifai_values.
+  replicas: {}
   # Namespaces (and optional pod labels) allowed to reach the RAG search of the stack, with the user's own token
   # (unifai-operator >= 0.1.28): ragClients: [{namespace: zuno-ai-run, podLabels: {app: mcp-gateway}}].
   ragClients: []

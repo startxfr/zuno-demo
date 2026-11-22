@@ -22,6 +22,11 @@ spec:
   resources:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $s.replicas }}
+  {{- /* R-570 (unifai-operator >= 0.1.77): replicas per component; only multiagent so far (1-10). */}}
+  replicas:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   storage:
     className: {{ $s.storageClass }}
     sharedClassName: {{ $s.sharedStorageClass }}
