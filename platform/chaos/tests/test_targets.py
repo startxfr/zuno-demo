@@ -106,7 +106,8 @@ class Catalogue(unittest.TestCase):
     def test_unverified_selectors_are_the_ones_to_check_live(self):
         unverified = {t["id"] for t in self.cat["targets"]
                       if t["kind"] == "pod-delete" and not t["selector_verified"]}
-        self.assertEqual(unverified, {"pod-unifai", "pod-kserve-controller", "pod-rhoai-operator"})
+        # All checked live on demo333 on 2026-11-22.
+        self.assertEqual(unverified, set())
 
     def test_provider_cut_host_outside_the_list_is_refused(self):
         bad = copy.deepcopy(self.cat)

@@ -92,15 +92,15 @@ targets:
     probe: open-webui
   # The multiagent backend, not the temporal worker (never a target): live chat streams are cut and the UI reconnects, the
   # run goes on in the temporal worker, an approval clicked during the restart must be clicked again, and the API answers
-  # 5xx until the pod is back (expected effect given by the UnifAI owner, 2026-11-21). No pod label of the UnifAI operator
-  # is proven in this repository: the pods are named by their Deployment.
+  # 5xx until the pod is back (expected effect given by the UnifAI owner, 2026-11-21). The pods are named by their
+  # Deployment; the pattern matched exactly the one multiagent-be pod on demo333 (checked live 2026-11-22).
   - id: pod-unifai
     kind: pod-delete
     tier: P1
     description: "The UnifAI multiagent backend pod deleted: chat streams are cut and resume, runs go on in the temporal worker."
     namespace: zuno-unifai
     name_pattern: "^unifai-multiagent-be-.*"
-    selector_verified: false
+    selector_verified: true
     workload: {kind: Deployment, name: unifai-multiagent-be}
     replicas: 1
     recover_within: 300
@@ -120,29 +120,31 @@ targets:
     replicas: 1
     recover_within: 300
     probe: none
-  # Upstream KServe's label; not seen live in this repository. The models keep serving: the controller only reconciles.
+  # Upstream KServe's label, matching exactly the one controller pod on demo333 (checked live 2026-11-22). The models keep
+  # serving: the controller only reconciles.
   - id: pod-kserve-controller
     kind: pod-delete
     tier: P2
     description: "The KServe controller pod deleted: serving goes on, no model change is reconciled until it is back."
     namespace: redhat-ods-applications
     selector: {control-plane: kserve-controller-manager}
-    selector_verified: false
+    selector_verified: true
     workload: {kind: Deployment, name: kserve-controller-manager}
     replicas: 1
     recover_within: 300
     probe: sovereignty
-  # The RHOAI operator's own Deployment (CSV rhods-operator); the label is the CSV's convention, not seen live here, and the
-  # replica count is read live by the post-check (the CSV may run more than one, with leader election).
+  # The RHOAI operator's own Deployment (CSV rhods-operator): 3 replicas with leader election on demo333 (the label matched
+  # exactly those 3 pods, checked live 2026-11-22). One pod is deleted; it may be a follower, then nothing is disrupted.
+  # The whole-workload checks read the live spec.replicas.
   - id: pod-rhoai-operator
     kind: pod-delete
     tier: P2
     description: "One RHOAI operator pod deleted: the DataScienceCluster is not reconciled until it is back; serving goes on."
     namespace: redhat-ods-operator
     selector: {name: rhods-operator}
-    selector_verified: false
+    selector_verified: true
     workload: {kind: Deployment, name: rhods-operator}
-    replicas: 1
+    replicas: 3
     recover_within: 300
     probe: sovereignty
   - id: provider-cut-mistral
