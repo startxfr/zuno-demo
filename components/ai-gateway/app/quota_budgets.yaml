@@ -68,10 +68,10 @@ classes:
     fail_mode: closed
     tokens:
       user:
-        budget: 250000
+        budget: 500000
         window: 1h
       group:
-        budget: 1000000
+        budget: 5000000
         window: 1h
       project:
         budget: 500000
