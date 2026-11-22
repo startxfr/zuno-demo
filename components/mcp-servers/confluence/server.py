@@ -408,15 +408,20 @@ async def search_pages(
                 raise ToolPermissionError("no Confluence space is allowed to the caller's groups (ADR-0603 M12)")
             spaces = ",".join(f'"{key}"' for key in literal)
             cql = f"space in ({spaces}) and {cql}"
+    # 2026-11-22 stress: about 1 call in 4 came back with 0 pages. Confluence applies `limit` to its fuzzy text~ ranking
+    # BEFORE the title and space filters below, and that ranking is not stable between calls: when the top `limit` hits
+    # held no relevant title, the answer was empty. Fetch more, filter, then cut to `limit`.
+    fetch = min(max(limit * 3, 30), _MAX_SEARCH_LIMIT)
     async with _client() as client:
         resp = await client.get(
             "/content/search",
-            params={"cql": cql, "limit": limit, "expand": "space,version"},
+            params={"cql": cql, "limit": fetch, "expand": "space,version"},
         )
         resp.raise_for_status()
         payload = resp.json()
 
     results = [_summarize(item) for item in payload.get("results", [])]
+    raw = len(results)
     # ADR-0034/live-caught 2026-09-05: drop hits CQL's own fuzzy ranking
     # returned but that don't actually look like the query - see
     # _is_relevant_result's own docstring for why this matters beyond
@@ -424,6 +429,9 @@ async def search_pages(
     results = [r for r in results if _is_relevant_result(query, r.get("title") or "")]
     if policy is not None:
         results = [r for r in results if _allowed(r.get("space") or "", *policy)]
+    # Counts only (no query text, no content): tells an empty Confluence answer from an over-strict filter.
+    logger.info("search_pages fetched=%d kept=%d returned=%d", raw, len(results), min(len(results), limit))
+    results = results[:limit]
     return {"query": query, "results": results, "count": len(results)}
 
 

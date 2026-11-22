@@ -488,6 +488,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+          # WP-222 (ADR-0603): CQL escaping; 2026-11-22: search fetches more than `limit`, filters, then cuts.
+          python3 tests/test_wp222_cql.py
           # WP-225 lot B (ADR-0603 M12): the space allowlist from the signed caller context.
           python3 tests/test_wp225_space_allowlist.py
           # WP-225 lot C (ADR-0602 clause 10): the gateway's per-call assertion, verified here.

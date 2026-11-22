@@ -71,6 +71,30 @@ def test_page_id_must_be_numeric() -> None:
         raise AssertionError("update_page accepted a path")
 
 
+def test_fetches_more_than_limit_and_cuts_after_the_filter() -> None:
+    """2026-11-22: the title filter ran on Confluence's top `limit` hits only, so a fuzzy ranking with no relevant title
+    in that window gave 0 pages. Now 30 are fetched for limit=10, filtered, then cut to 10."""
+    seen = {}
+    hits = [{"id": str(i), "title": f"Unrelated {i}", "space": {"key": "ARCHI"}} for i in range(20)]
+    hits += [{"id": str(100 + i), "title": f"Onboarding guide {i}", "space": {"key": "ARCHI"}} for i in range(12)]
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def json(self): return {"results": hits}
+
+    class _Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, url, params=None):
+            seen.update(params); return _Resp()
+
+    with mock.patch.object(server, "_client", lambda: _Client()):
+        out = asyncio.run(server.search_pages("onboarding", space="ARCHI", limit=10))
+    assert seen["limit"] == 30
+    assert out["count"] == 10
+    assert all("Onboarding" in r["title"] for r in out["results"])
+
+
 if __name__ == "__main__":
     for n, f in sorted(globals().items()):
         if n.startswith("test_") and callable(f):

@@ -18,13 +18,19 @@ image:
 
 replicas: 1
 
+# 2026-11-22 stress (10 users, 45 min): the istio-proxy sidecar was OOMKilled at its 256Mi default and the app sat near
+# 256Mi too. Both get room; the sidecar is sized through Istio's pod annotations.
 resources:
   requests:
     cpu: 100m
     memory: 128Mi
   limits:
     cpu: 500m
-    memory: 256Mi
+    memory: 512Mi
+
+podAnnotations:
+  sidecar.istio.io/proxyMemory: 128Mi
+  sidecar.istio.io/proxyMemoryLimit: 512Mi
 
 # ADR-0208 service-identity: one shared Confluence technical identity for
 # every caller (the gateway's own ADR-0011 intersection authorizes the
