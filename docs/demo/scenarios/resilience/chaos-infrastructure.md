@@ -308,7 +308,8 @@ Evidence:
 > since 2026-11-22, but no run of the `chaos-infra` pipeline is recorded: the infrastructure tiers were left out of the
 > validation of that day. Every "You should see" cell describes what the design should show. Read on 2026-11-23: no
 > node carries the label `zuno.io/chaos-target=true`, so the pre-check refuses the tiers `hog` and `latency` until the
-> platform owner labels the infra node again; that node runs no router.
+> platform owner labels the infra node again; that node runs no router. The owner withdrew this demo from the
+> demonstration of 2026-11-24 on 2026-11-23.
 > The timings of the rows are estimates, not measures.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > No. No golden-path probe covers this page, and it has never run. Rehearse it before showing it to an audience. A
