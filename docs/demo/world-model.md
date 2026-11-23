@@ -348,7 +348,12 @@ The decisions this page rests on:
 > installed. History: shown live on 2026-11-09 (moment 5 of the [demonstration](demo-day-2026-11-09.md)), where it was
 > the one part that did not go as planned. The presenter's feedback (the picture blurred and lost the scene while
 > walking) led to the re-anchor of [ADR-0604](../adr/0604-introduce-an-interactive-generative-world-model-experience.md)
-> D9, deployed the same day.
+> D9, deployed the same day. On 2026-11-23 the owner switched the demo on for the demonstration of 2026-11-24 (45108ca4):
+> a g7e.8xlarge node in eu-central-1b was ready at 17:21 UTC after a 45-minute capacity search, the runtime image was
+> rebuilt at 18:06 UTC (the internal registry no longer held the one of 2026-11-09), the install was green at 18:08 UTC
+> and the golden-path probe `world-model` passed (a world created, 460 frames, `waypoint-1.5-1b`, `nvenc`, an edit
+> applied in 1.2 s). No rehearsal through `make demo rehearse` is recorded since. The switch goes back to `false` and
+> the node is uninstalled after the demonstration; it bills until then.
 > **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > not show-ready: the GPU node is off.
 > **Personas:** see [Personas](#personas).
