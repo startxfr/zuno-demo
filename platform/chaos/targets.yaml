@@ -90,10 +90,11 @@ targets:
     replicas: 1
     recover_within: 300
     probe: open-webui
-  # The multiagent backend, not the temporal worker (never a target): live chat streams are cut and the UI reconnects, the
-  # run goes on in the temporal worker, an approval clicked during the restart must be clicked again, and the API answers
-  # 5xx until the pod is back (expected effect given by the UnifAI owner, 2026-11-21). The pods are named by their
-  # Deployment; the pattern matched exactly the one multiagent-be pod on demo333 (checked live 2026-11-22).
+  # The multiagent backend, not the temporal worker (never a target). UnifAI runs two multiagent-be pods on two nodes
+  # since 0.1.77 (stack.replicas.multiagent: 2 in ansible/inventories/demo333/cluster.yml); the pattern matches both and
+  # one is deleted. With one pod (2026-11-22 afternoon) the API answered 5xx for 90.6 s until it was back. With two, the
+  # other pod serves: 0 s seen in the proof run of 2026-11-22 (AAP 1589, UnifAI 0.1.77), and on 0.1.78 (2026-11-23) a pod
+  # deleted during an open approval card cut nothing (the card's six checks passed, 240 of 240 health probes 200).
   - id: pod-unifai
     kind: pod-delete
     tier: P1
@@ -102,7 +103,7 @@ targets:
     name_pattern: "^unifai-multiagent-be-.*"
     selector_verified: true
     workload: {kind: Deployment, name: unifai-multiagent-be}
-    replicas: 1
+    replicas: 2
     recover_within: 300
     probe: unifai-tekos
 
