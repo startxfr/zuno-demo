@@ -40,7 +40,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.15 | 2 | — | 4 | — |
 | v0.16 | 13 | 4 | 49 | WP-224, WP-227, WP-237 |
 | v0.17 | 14 | 11 | 54 | WP-212, WP-213, WP-215, WP-218, WP-248, WP-252, WP-253, WP-254, WP-268, WP-283, WP-293, WP-294, WP-295, WP-302, WP-303, WP-305, WP-306, WP-307, WP-308, WP-309, WP-310, WP-311, WP-312, WP-313, WP-317, WP-318 |
-| v0.18 | 5 | 5 | 7 | WP-316, WP-317, WP-318, WP-331, WP-332 |
+| v0.18 | 5 | 5 | 7 | WP-316, WP-317, WP-318, WP-331 |
 | v0.19 | 1 | 1 | 11 | WP-319, WP-320, WP-321, WP-322, WP-323, WP-324, WP-325, WP-326, WP-327, WP-328, WP-329 |
 | OKF v0.1 | 8 | — | 7 | — |
 
@@ -1253,7 +1253,7 @@ this phase had run on a cluster on 2026-11-21; the first live validation is plan
 | WP-318 | [wp-318](work-packages/wp-318-lift-the-limits-found-by-the-2026-11-21-stress-campaign.md) | 0624, 0626 | none | Not started | owner's go: the memory of the crash-looping pods before 2026-11-24; the quotas (a zuno-demo-agents release) after |
 | WP-330 | [wp-330](work-packages/wp-330-serve-the-demo-guide-page.md) | 0627 | none | Done | installed on demo333 on 2026-11-23, https://demo-guide.apps.demo333.startx.fr/ |
 | WP-331 | [wp-331](work-packages/wp-331-show-vault-through-its-web-ui-in-the-vault-pki-demo.md) | 0628 | WP-223 | Repo work in review | owner's go: `make d0 install vault` on demo333 (Route and role), deletion of the hand-made Route `vault`, then the GIF ("go vault-pki") |
-| WP-332 | [wp-332](work-packages/wp-332-platform-personas-tools-and-agent-data-ceilings.md) | 0629 | none | Repo work in review | owner's go: promote zuno-demo-agents v1.2.5, roll (`make d0 install keycloak` applies the AAP memberships) |
+| WP-332 | [wp-332](work-packages/wp-332-platform-personas-tools-and-agent-data-ceilings.md) | 0629 | none | Done | released as v1.2.5 and rolled on demo333 on 2026-11-23 |
 | WP-333 | [wp-333](work-packages/wp-333-name-the-test-accounts-test-type-and-give-each-type-its-marker-group.md) | 0630 | none | Done | applied to demo333 on 2026-11-23, smoke stress 13/13 |
 
 ### Phase 60 — sovereignty profiles, data governance and modularity, proposed by ADR-0625 (added 2026-11-21)

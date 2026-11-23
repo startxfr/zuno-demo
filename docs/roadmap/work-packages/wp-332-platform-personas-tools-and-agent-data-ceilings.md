@@ -1,6 +1,6 @@
 # WP-332: Platform personas, tools and agent data ceilings
 
-- **State:** Repo work in review (2026-11-23: the bundle changes are committed in zuno-demo-agents on a local branch, the realm and role changes here; nothing released, promoted or applied to a cluster)
+- **State:** Done (released as zuno-demo-agents v1.2.5, rolled on demo333 on 2026-11-23)
 - **ADRs:** [ADR-0629](../../adr/0629-give-every-platform-persona-the-cluster-and-aap-tools-and-set-the-agent-data-ceilings.md)
 - **Depends on:** none
 - **Target:** v0.18
@@ -26,4 +26,8 @@ ceilings are Arkos C2, Finage C3, Tekos C2, Soursage C2, Naveo C1, Comage and Ad
 
 ## Review evidence
 
-None yet: nothing is rolled.
+2026-11-23, demo333: zuno-demo-agents v1.2.5 released (PR #94), promoted here (PR #74), mirrored and rolled (mcp, a2a, unifai, the
+Keycloak memberships, ai-gateway image 64adab9f). `ai-dev-01` holds `aap_reader` and `ai-ops-01` holds `aap_ops`, read back from
+Keycloak. The gateway floors give Arkos C2, Finage C3 and Tekos C2. `make d2 check agents`: 18/19 scenarios (scenario 11, the
+Red Hat documentation citation, fails as before), 14/14 security checks, 5/5 gate checks. Not exercised: a token of each of the
+four platform personas calling the cluster and AAP tools through Tekos.
