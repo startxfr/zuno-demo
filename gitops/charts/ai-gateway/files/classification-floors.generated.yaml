@@ -14,12 +14,12 @@ agents:
       identify-new-business-with-po: C2
       monthly-sales-report: C2
   arkos:
-    floor: C3
+    floor: C2
     tasks:
-      draft-architecture-testimonial: C3
-      structure-demo: C3
-      workshop-presentation: C3
-      write-code: C3
+      draft-architecture-testimonial: C2
+      structure-demo: C2
+      workshop-presentation: C2
+      write-code: C2
   cognos:
     floor: C3
     tasks:
@@ -31,12 +31,12 @@ agents:
       check-my-drive-and-mail: C2
       update-opportunity-status: C2
   finage:
-    floor: C2
+    floor: C3
     tasks:
-      answer-finance-question: C2
-      check-my-drive-and-mail: C2
-      identify-business-ready-to-invoice: C2
-      monthly-invoice-report: C2
+      answer-finance-question: C3
+      check-my-drive-and-mail: C3
+      identify-business-ready-to-invoice: C3
+      monthly-invoice-report: C3
   naveo:
     floor: C1
     tasks:
@@ -46,9 +46,9 @@ agents:
     tasks:
       coming-soon: C2
   tekos:
-    floor: C1
+    floor: C2
     tasks:
-      answer-technical-question: C1
-      check-my-drive-docs: C1
-      find-relevant-docs: C1
-      write-code: C1
+      answer-technical-question: C2
+      check-my-drive-docs: C2
+      find-relevant-docs: C2
+      write-code: C2
