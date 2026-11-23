@@ -33,7 +33,7 @@ IF_WRONG_SECTION = "If something goes wrong"
 # is a parse error.
 EXCLUDED_BLOCKS = (
     {"page": "ai-gateway-routing", "version": "15", "kind": "subsection",
-     "match": "The coding pair: C1 and C3",
+     "match": "The coding pair: Codestral and local only",
      "why": "optional untimed Do | Say | You should see table, played on request"},
     {"page": "blender-3d", "version": "5", "kind": "table",
      "match": ["Order", "Prompt", "Measured", "What the audience sees"],

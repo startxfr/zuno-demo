@@ -81,7 +81,7 @@ Nothing is prepared by the file. What only a person does:
   in as **ai-ops-01**, and the Zuno Code live-proof evidence (listed under References) open at section T5.
 - Known on screen, not a failure: Open WebUI generates the chat title with the model you picked, so one **Zuno
   Code** question makes two Codestral calls.
-- The optional block [The coding pair: C1 and C3](#the-coding-pair-c1-and-c3) is not a step. It is an owner action:
+- The optional block [The coding pair: Codestral and local only](#the-coding-pair-codestral-and-local-only) is not a step. It is an owner action:
   the lifecycle prints it and never runs it. If you play it, you sign in to UnifAI as **consultant-01** yourself.
 
 ### Stop
@@ -118,11 +118,10 @@ Run the 5-minute version, then:
 | 13:00 | Show the WP-194 evidence, table T5 | "We broke Codestral on purpose on 2026-11-05. The user got a normal answer from the local model, in the same trace, about one second after the failure. The routing decision of such a call names `local-maas`, with `fallback_used: true` and `fallback_from: mistral-codestral`. UnifAI reads it from `GET /v1/routing-decisions/{request_id}`." | Two traces: `mistral-codestral` error `Invalid model` in under a second, then `local-maas` ok in 40 to 66 s. |
 | 14:15 | Close | Repeat the message. | |
 
-### The coding pair: C1 and C3
+### The coding pair: Codestral and local only
 
 Optional, 3 minutes, since agents v1.0.1 (promoted on demo333 on 2026-11-14). The same code request goes to two
-agents. The level belongs to the task, and the level decides the model: Tekos works on C1 data, Arkos on C3 customer
-architecture.
+agents. The task decides which models may serve it: Tekos works at C2 (since agents v1.2.5) and lists Mistral Codestral first, Arkos works at C2 too but its code task keeps local models only.
 
 Dry-run on 2026-11-14:
 - **API and Tempo, not the UI.** Tekos answered in 1.8 s and Arkos in 23 s. The Tempo search below returned exactly the
@@ -132,9 +131,9 @@ Dry-run on 2026-11-14:
 
 | Do | Say | You should see |
 |---|---|---|
-| UnifAI as **consultant-01**, workspace `agent-tekos`, workflow `tekos-write-code`, ask: `Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.` | "Tekos works on public and internal data, C1. A code request goes to the best code model, Mistral Codestral." | A NetworkPolicy manifest in a few seconds. |
-| Workspace `agent-arkos`, workflow `arkos-write-code`, same request | "Arkos works on our customers' architecture, C3. The same request never leaves our GPUs: gpt-oss-20b answers." | The same kind of manifest, a little slower (plan, draft and write stages). |
-| Tempo search UI: service `ai-gateway`, operation `model_call`, tag `zuno.task=write-code`, last 15 minutes | "Same request, two levels, two models. Nobody chose the model: the level of the task did." | Tekos: `zuno.provider=mistral-codestral`, `zuno.model=codestral-latest`, `zuno.model_kind=saas`, `zuno.classification=C1`. Arkos: `zuno.provider=local-gpt-oss-maas`, `zuno.model=gpt-oss-20b`, `zuno.model_kind=local`, `zuno.classification=C3`. |
+| UnifAI as **consultant-01**, workspace `agent-tekos`, workflow `tekos-write-code`, ask: `Write a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace.` | "Tekos works on public and internal data, C2. A code request goes to the best code model, Mistral Codestral." | A NetworkPolicy manifest in a few seconds. |
+| Workspace `agent-arkos`, workflow `arkos-write-code`, same request | "Arkos works on our customers' architecture. Its code task is local only: the same request never leaves our GPUs and gpt-oss-20b answers." | The same kind of manifest, a little slower (plan, draft and write stages). |
+| Tempo search UI: service `ai-gateway`, operation `model_call`, tag `zuno.task=write-code`, last 15 minutes | "Same request, two agents, two models. Nobody chose the model: the policy of the task did." | Tekos: `zuno.provider=mistral-codestral`, `zuno.model=codestral-latest`, `zuno.model_kind=saas`, `zuno.classification=C2`. Arkos: `zuno.provider=local-gpt-oss-maas`, `zuno.model=gpt-oss-20b`, `zuno.model_kind=local`, `zuno.classification=C2`. |
 
 ## If something goes wrong
 
@@ -161,10 +160,9 @@ Dry-run on 2026-11-14:
   model compiles its kernels on the first requests).
 - **The routing decision lives 120 seconds** in Redis and names the serving provider and the first candidate. It does
   not list the skipped candidates: those are only on the counter `zuno_model_candidates_skipped`.
-- **Arkos writes code on local models.** Arkos is floored at C3, where Codestral is not eligible. Since agents v1.0.1
-  its `write-code` task runs on the local models only, gpt-oss-20b first. Codestral serves Tekos and "Zuno Code". The
-  level belongs to the task, not to the question: the same Arkos task cannot run at C2 for one request and C3 for
-  another.
+- **Arkos writes code on local models.** Its `write-code` task carries `local_only_for` at every level (Arkos was
+  floored at C3 until agents v1.2.5, and is C2 now), so Codestral is not a candidate for it. It runs on the local models
+  only, gpt-oss-20b first. Codestral serves Tekos and "Zuno Code".
 - **The skip of a down model is told, not shown.** Showing it live needs a model taken down. It was proven on demo333
   on 2026-11-03 (WP-188): models skipped while not ready, served again without a gateway restart.
 

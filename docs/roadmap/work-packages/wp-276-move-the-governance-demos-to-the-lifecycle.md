@@ -34,7 +34,7 @@ For each demo below, in the order given:
 ## The demos
 
 - `a2a-delegation-approval`: Check = probe `delegation-approval` (it proves the request and a refusal, as `eval-consultant-01`); the approval clicked by consultant-02 and the AAP job stay human steps; respect the AAP launch limit of 2 per 900 s between rehearsals.
-- `ai-gateway-routing`: the `### The coding pair: C1 and C3` block is excluded from the steps (ADR-0616 clause 2); Check = probe `zuno-code`.
+- `ai-gateway-routing`: the `### The coding pair: Codestral and local only` block is excluded from the steps (ADR-0616 clause 2); Check = probe `zuno-code`.
 - `ai-gateway-sovereignty`: the 1:00 row runs `ONLY=sovereignty make demo golden-path` (allowed read); Check = probes `sovereignty`, `trace` with `unifai-tekos`.
 - `identity-personas`: no probe; Start = the OpenShift sign-in of each persona whose group is missing (human: a first sign-in creates the OpenShift user and group); Check = reads of the Keycloak CR, the realm import, the OAuth provider, the RoleBindings.
 - `mcp-tools-by-group`: the 5:00 row runs the `tools` probe; Check = probes `tools`, `open-webui`.
