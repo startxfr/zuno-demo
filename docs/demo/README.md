@@ -99,7 +99,7 @@ shows what it will change and asks you to type the demo id.
 
 | Scenario | Shows | Personas | Golden-path probe | Page | Rehearsed on 2026-11-15 |
 |---|---|---|---|---|---|
-| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (wave 0) | 5: PASS, 15: PASS |
+| [Sovereignty by data classification](scenarios/governance/ai-gateway-sovereignty.md) | C1/C2/C3, the C3 floor keeps Finage on local models, fail closed, the trace | paas-ops-01, ai-ops-01 | `sovereignty`, `trace` | written (wave 0) | 5: PASS, 15: PASS |
 | [Model routing and fallback](scenarios/governance/ai-gateway-routing.md) | "Zuno Code" to Codestral first, preferred and fallback lists per task, `local_only_for`, unready models skipped with an immediate 503, the routing decision API | sale-01, ai-ops-01, paas-ops-01 | `zuno-code` | written (wave 2) | 5: PASS, 15: PASS |
 | [Guardrails](scenarios/governance/guardrails.md) | A prompt injection detected in observe mode through Dify, the TrustyAI dashboard, the mode per classification level, what blocking would do | consultant-02, ai-ops-01, paas-ops-01 | `guardrails` | written (wave 2) | 5: PASS, 15: PASS |
 | [One budget per persona](scenarios/governance/quotas.md) | One token budget per persona across the experiences, the 2026-11-03 evidence, MaaS budgets versus persona budgets, fail-closed classes, the per-turn ceiling | sale-01, ai-ops-01, paas-ops-01 | none (rehearse first) | written (wave 2) | 5: PASS, 15: PASS |

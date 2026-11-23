@@ -57,7 +57,7 @@ Nothing to do. The file reads the Applications `zuno-a2a-gateway-d0`/`-d1`, `zun
 `LLMInferenceService` models in `zuno-ai-run` (and how many are Ready), the pod `tempo-tempo-0` and the Deployment
 `grafana-deployment`. If one is missing or not
 Healthy, stop and tell the platform owner: this demo installs nothing. At least one local model must be `Ready=True`:
-Arkos is floored at C3, so it answers on local models only.
+the routing policy of the agents release keeps every Arkos task on local models (its floor is C2 since agents v1.2.5).
 
 ### Check
 
@@ -144,7 +144,7 @@ Run the 5-minute version, then:
 | Tekos's answer says `cluster_audit is rate limited: 2 launch(es) per 900s per caller (ADR-0603 M15)` | Carry on without the job. The approval already worked. | "The platform also caps how often one person can launch this audit: twice in fifteen minutes." |
 | Tekos reports AAP 400 `'env' value missing` | Carry on without the job. A required Survey question was added by hand to `zuno-day0-check` once before (2026-09-29 to 2026-11-06). | "The approval worked; the job template was changed outside Git. That is what the drift checks are for." |
 | A card **Rate limit reached - quota_exceeded** | Stop the scenario. Show the probe result. | "My token budget is spent, across every experience. The delegation draws on the same budget as my own questions." |
-| 503 "no eligible provider is available", or a very long wait | The local models are down or restarting (`oc get llminferenceservice -n zuno-ai-run`). Arkos is C3, local only. Show the 15-minute terminal steps instead. | "No local model is ready, so the gateway refuses rather than sending architecture data to the cloud." |
+| 503 "no eligible provider is available", or a very long wait | The local models are down or restarting (`oc get llminferenceservice -n zuno-ai-run`). Arkos is local only. Show the 15-minute terminal steps instead. | "No local model is ready, so the gateway refuses rather than sending architecture data to the cloud." |
 | Tekos reports `No approval is pending for this task (it expired after 300 seconds, was answered, or the gateway restarted)` | Start a new session. A pending request lives in the gateway's memory and is lost with its pod. | "A lost request fails closed: nothing ran." |
 | The job link opens the AAP home page, not the job | Find `zuno-day0-check` in the AAP job list. | |
 | No span in the Tempo search | Widen to the last hour. The export takes about a minute. | |
@@ -266,7 +266,7 @@ sequenceDiagram
   participant AAP as aap-mcp, then AAP<br/>job template zuno-day0-check
   U->>UI: prompt (user.session.submit)
   UI->>W: run Arkos as the user (token bound to the session)
-  W->>AIGW: Arkos model calls, X-Zuno-Agent arkos, C3, local only
+  W->>AIGW: Arkos model calls, X-Zuno-Agent arkos, C2, local only
   W->>A2A: message/send, user's token, X-Zuno-Task answer-technical-question<br/>X-Zuno-Delegated-By arkos:draft-architecture-testimonial<br/>X-Zuno-Delegation-Depth 1, X-Zuno-Run-Id session id
   Note over A2A: token of realm zuno, audience zuno-admin-api<br/>caller in agent_tekos, else 404 like an unknown agent<br/>verify_chain: declared target, active, entitled,<br/>depth within min(max_depth 1, ceiling 2), no cycle<br/>classification raised to Tekos's floor, never lowered
   A2A->>MCPGW: tools/list, user's token + signed X-Zuno-Agent-Chain (Vault Transit, 60 s)

@@ -704,7 +704,7 @@
      "id": "ai-gateway-sovereignty",
      "title": "ai-gateway - data classification keeps sovereign data on local models",
      "kind": "scenario",
-     "shows": "C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace",
+     "shows": "C1/C2/C3, the C3 floor keeps Finage on local models, fail closed, the trace",
      "message": "Sensitive data stays in the cluster even if the caller says otherwise. When no local model can answer, Zuno refuses rather than leaking.",
      "personas": [
       {
