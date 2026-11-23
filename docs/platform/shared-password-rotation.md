@@ -127,7 +127,7 @@ database Secrets can hold the same string and must follow their own procedure.
   oauth2-proxy cookies (OpenClaw, world model) survive too. Log users out and delete their OAuth tokens.
 - **Keycloak restart.** If the operator restarts `zuno-0` when `keycloak-admin` changes, SSO is down for 30 to 65 s (one
   replica behind a minAvailable PDB, ADR-0101). Announce it.
-- **The golden path uses real personas** (`eval-consultant-01`, `consultant-01`): run it only after Phase 3.
+- **The golden path uses real personas** (`test-eval-consultant-01`, `consultant-01`): run it only after Phase 3.
 - **Keycloak's file-vault SPI file is unused.** Do not rely on it to change a password.
 - **`ocp-ai-dev` and `ocp-ai-ops` can read the personas value** through an ExternalSecret they create in `zuno-ai-run`.
   After a departure, rotate again.

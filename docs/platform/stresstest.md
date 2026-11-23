@@ -45,7 +45,7 @@ Defined in `evaluations/stress/profile_<name>.yaml` (first values, to be tuned a
 | `smoke` | tools, models, unifai, guardrails | each driver once, concurrency 1, 1 shard | 2 failures in a row, 2 x 429, 1,500 tokens | 15 min, waits |
 | `standard` | tools, models, unifai, guardrails, experiences, state, saturation, counters (`agents` is opt-in, see below) | 3 iterations at concurrency 2; the experience drivers 1 iteration at concurrency 1; `unifai-agents` and `observability-trace` 2 iterations; state once | 3 in a row, 5 x 429, 20,000 tokens | 45 min, waits, with the dashboard coverage |
 | `aggressive` | the standard families plus `load` (also without `agents`) | the load pool of 10 personas, 60 iterations at concurrency 8 with a 60 s ramp, 2 shards; `load-ai-gateway` and `load-mcp-gateway` 400 iterations, `load-unifai-scenarios` 40 at concurrency 4; the three load drivers run together (`parallel_families: [load]`) | 5 in a row, 20 x 429, 100,000 tokens | 60 min, waits, with the coverage |
-| `mutating` | mutating only: `delegation-approval`, `unifai-live-rag`, `image-signing-refusal` | each once, concurrency 1, as the persona `stress-mutate-01` only (the one profile that sets `allow_mutating`) | 2 failures in a row, 2 x 429, 6,000 tokens | 40 min, waits |
+| `mutating` | mutating only: `delegation-approval`, `unifai-live-rag`, `image-signing-refusal` | each once, concurrency 1, as the persona `test-stress-mutate-01` only (the one profile that sets `allow_mutating`) | 2 failures in a row, 2 x 429, 6,000 tokens | 40 min, waits |
 | `soak` | tools, models, saturation, counters | about 2 requests a minute per driver for 4 hours (`rate` 0.033, `duration` 14400), the three drivers together (`parallel_families: [tools, models]`) | 5 in a row, 30 x 429, 300,000 tokens | 4 h 20 min, asynchronous: it prints a run id |
 
 The `agents` family (the per-agent Jobs of ADR-0555) is **not in `standard` or `aggressive`**: those Jobs drained the shared ai-gateway ServiceAccount's MaaS budget on 2026-11-19, so they are opt-in with `FAMILIES=agents`. A per-agent Job that no longer exists (deleted by hand or by its TTL) is terminal: the wait stops and reports `job-missing` instead of waiting its whole budget.
@@ -125,7 +125,7 @@ These are in `ansible/inventories/demo333/cluster.yml` (each is the owner's deci
 | Switch | Effect |
 |---|---|
 | `zuno_ai_gateway_stress_credentials: true` | The ai-gateway chooses its MaaS credential by quota class. The classes `stresstest` and `loadtest` reach MaaS with the ServiceAccount `zuno-ai-run/ai-gateway-stress` and the `<model>-service` tier of the MaaS subscriptions (200,000 tokens an hour, shared with Lightspeed; models chart), formerly `<model>-load`, never with the ai-gateway's own ServiceAccount, whose budget Open WebUI, Dify, kagent, OpenClaw and the acceptance gate share. Needs the ai-gateway image built from 01079893 or later |
-| `zuno_ai_gateway_quota_loadtest_group: zuno-loadtest` | Members of the Keycloak group `/zuno-loadtest` run in the quota class `loadtest`. Inert until an admitted agents release defines the class in `policies/quotas/quota-policy.yaml` |
+| `zuno_ai_gateway_quota_loadtest_group: test-stress` | Members of the Keycloak group `/test-stress` run in the quota class `loadtest`. Inert until an admitted agents release defines the class in `policies/quotas/quota-policy.yaml` |
 | `zuno_stress_clients_enabled: true` | The Dify and kagent token proxies admit the stress Job's pods, so the Job can replay those clients' path |
 | `zuno_stress_reader_enabled: true` | The Job runs as the ServiceAccount `zuno-stress-reader` (namespaces chart, `stressReader`): get-only on the objects the demos' state checks name, generated from the demos' own lists, no Secret, no write. Without it the Job runs as `acceptance-gate` and every state row fails with `status=403` and says what to enable |
 | `zuno_stress_reader_monitoring_view: true` | Adds the built-in `cluster-monitoring-view` to that ServiceAccount, for the `saturation` and `counters` samplers |
@@ -133,12 +133,12 @@ These are in `ansible/inventories/demo333/cluster.yml` (each is the owner's deci
 
 ## Identities and budgets
 
-- **`stress-consultant-01`**: the default persona of the runner (`STRESS_PERSONAS`), a copy of consultant-01 in
-  `/zuno-evaluation`, signed in through the confidential client `zuno-stresstest`. Quota class `stresstest`
+- **`test-stress-consultant-01`**: the default persona of the runner (`STRESS_PERSONAS`), a copy of consultant-01 in
+  `/test-stress`, signed in through the confidential client `zuno-stresstest`. Quota class `stresstest`
   (a cap, not a load: it proves a limit).
-- **`stress-mutate-01`**: the dedicated persona of the `mutating` profile, a copy of consultant-01 in `/zuno-evaluation`, without `/zuno-loadtest`. The mutating drivers never use another persona.
-- **`stress-load-01` to `stress-load-10`**: the load pool (ten since 2026-11-21, for `CONCURRENCY=10`), in
-  `/zuno-evaluation` and in `/zuno-loadtest`. A budget is keyed by persona (WP-190), so a concurrency of N wants N
+- **`test-stress-mutate-01`**: the dedicated persona of the `mutating` profile, a copy of consultant-01 in `/test-stress` (the `loadtest` class since ADR-0630; it was on `evaluation` before). The mutating drivers never use another persona.
+- **`test-stress-load-01` to `test-stress-load-10`**: the load pool (ten since 2026-11-21, for `CONCURRENCY=10`), in
+  `/test-stress`. A budget is keyed by persona (WP-190), so a concurrency of N wants N
   personas. They exist after the Keycloak personas Job has run; without it each worker fails to sign in. Quota class
   `loadtest`, by their group and by the class the load drivers ask for.
 - **`ai-gateway-stress`** and the `<model>-service` subscriptions (named `<model>-load` until 2026-11-20, WP-315): the MaaS side of both classes, with its own limit
@@ -223,7 +223,7 @@ fails and says so, it never guesses another one.
 - Until the Mistral Codestral key is renewed, the C1 code path falls back to a local model; the report counts it as a
   known state ([key rotation](saas-provider-key-rotation.md)).
 - The profile values are first values, tuned after the first runs.
-- The five stress twin personas (`stress-consultant-01`, `stress-sale-01`, `stress-adv-01`, `stress-finance-01` and `stress-board-01`) are in
-  `/zuno-loadtest` on demo333 since 2026-11-19 (commit 6fe9ffb7; Keycloak synced, the eval-personas Job reported 188 memberships against 183 before).
+- The five stress twin personas (`test-stress-consultant-01`, `test-stress-sale-01`, `test-stress-adv-01`, `test-stress-finance-01` and `test-stress-board-01`) are in
+  `/test-stress` on demo333 since 2026-11-19 (commit 6fe9ffb7; Keycloak synced, the eval-personas Job reported 188 memberships against 183 before).
   What is not proven yet is the `agents` family riding the `ai-gateway-stress` identity: that is the full demo check planned for 2026-11-22, and
   until then `agents` stays opt-in (`FAMILIES=agents`).

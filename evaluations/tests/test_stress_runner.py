@@ -334,12 +334,12 @@ class Samplers(unittest.TestCase):
         with mock.patch.object(sr, "run_all", fake_run_all):
             sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
             # ten since 2026-11-21: one persona per worker at CONCURRENCY=10
-            self.assertEqual(seen["personas"], [f"stress-load-{n:02d}" for n in range(1, 11)])
+            self.assertEqual(seen["personas"], [f"test-stress-load-{n:02d}" for n in range(1, 11)])
             with mock.patch.dict("os.environ", {"STRESS_OVERRIDES": '{"personas": ["p9"]}'}):
                 sr.main(["--dir", str(STRESS_DIR), "--profile", "aggressive"])
             self.assertEqual(seen["personas"], ["p9"])
             sr.main(["--dir", str(STRESS_DIR), "--profile", "smoke"])
-            self.assertEqual(seen["personas"], ["stress-consultant-01"])
+            self.assertEqual(seen["personas"], ["test-stress-consultant-01"])
 
     def test_every_persona_of_the_aggressive_pool_is_declared_in_the_loadtest_group(self):
         values = yaml.safe_load((REPO / "gitops/charts/keycloak/values.yaml").read_text())
@@ -347,7 +347,7 @@ class Samplers(unittest.TestCase):
         for persona in sr.load_profile("aggressive", STRESS_DIR)["personas"]:
             self.assertIn(persona, declared)
             self.assertEqual(declared[persona]["copyOf"], "consultant-01", persona)
-            self.assertIn("/zuno-loadtest", declared[persona].get("extraGroups") or [], persona)
+            self.assertIn("/test-stress", declared[persona].get("extraGroups") or [], persona)
 
 
 class ParallelFamilies(unittest.TestCase):
@@ -453,7 +453,7 @@ class ParallelFamilies(unittest.TestCase):
 
         async def go():
             ctx = sr.Ctx(env={"KEYCLOAK_URL": "https://kc"}, client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
-            return await asyncio.gather(*(ctx.token("stress-load-01") for _ in range(5)))
+            return await asyncio.gather(*(ctx.token("test-stress-load-01") for _ in range(5)))
 
         self.assertEqual(asyncio.run(go()), ["tok"] * 5)
         self.assertEqual(len(calls), 1)
@@ -577,12 +577,12 @@ class ContextTagging(unittest.TestCase):
                           "DEMO_PERSONA_PASSWORD": "pw"}, client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
 
         async def go():
-            return await ctx.token("stress-consultant-01"), await ctx.token("stress-consultant-01")
+            return await ctx.token("test-stress-consultant-01"), await ctx.token("test-stress-consultant-01")
 
         self.assertEqual(asyncio.run(go()), ("tok", "tok"))
         self.assertEqual(len(calls), 1)
         self.assertIn("client_id=zuno-stresstest", calls[0])
-        self.assertIn("username=stress-consultant-01", calls[0])
+        self.assertIn("username=test-stress-consultant-01", calls[0])
 
     def test_token_refusal_names_the_status(self):
         ctx = sr.Ctx(env={"KEYCLOAK_URL": "https://kc"}, client=httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(401))))
@@ -664,7 +664,7 @@ class Drivers(unittest.TestCase):
         self.assertEqual(sr.row_status(rows[0]), 429)
         self.assertFalse(one("ai-gateway-routing", gateway(self.chat(content="  ")))[0].passed)
 
-    def test_sovereignty_driver_passes_when_arkos_stays_local_at_c3(self):
+    def test_sovereignty_driver_passes_when_finage_stays_local_at_c3(self):
         ctx = gateway(self.chat())
         rows = one("ai-gateway-sovereignty", ctx)
         self.assertTrue(rows[0].passed, rows[0].detail)

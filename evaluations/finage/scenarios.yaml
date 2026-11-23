@@ -9,7 +9,7 @@
 # inside Finage, per agent.okf.md's own body prose) and the `agent_finage`
 # entitlement group (ADR-0040) - see security_checks.py for the negative
 # tests covering entitlement without business role and vice versa
-# (`finage-entitlement-only-user-01`/`finance-role-only-user-01`, mirroring
+# (`test-func-finage-entitlement-only-user-01`/`test-func-finance-role-only-user-01`, mirroring
 # the prior slices' own ADR-0040 negative-test pattern). `type` selects
 # which handler in evaluations/tekos/run_scenarios.py executes the
 # scenario - each type's exact behavior is documented there, not

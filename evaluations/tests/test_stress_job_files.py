@@ -74,7 +74,7 @@ class JobFileSet(unittest.TestCase):
 
 class ResilientLoading(unittest.TestCase):
     def setUp(self):
-        self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="stress-load-"))
+        self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="test-stress-load-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
         sr.LOAD_FAILURES.clear()
         self.addCleanup(sr.LOAD_FAILURES.clear)

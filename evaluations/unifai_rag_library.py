@@ -15,7 +15,7 @@ own prefix:
     DELETE /api1/data_sources/data.source.delete   {"pipeline_ids": [<source_id>]}   200, 207 partial, 500 failure
 
 A library is per user (`upload_by`), with no team or scope parameter. The persona signs in as itself:
-`EVAL_PERSONAS=0` is forced, because the eval twin (`eval-consultant-01`) has its own, empty library.
+`EVAL_PERSONAS=0` is forced, because the eval twin (`test-eval-consultant-01`) has its own, empty library.
 
     python3 evaluations/unifai_rag_library.py --persona consultant-01 list
     python3 evaluations/unifai_rag_library.py --persona consultant-01 delete a.md b.md

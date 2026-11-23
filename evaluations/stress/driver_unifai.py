@@ -12,7 +12,7 @@
 In-cluster HTTP only: the UnifAI UI route (allowed by the zuno-ai-run egress firewall), the ai-gateway Service and Tempo
 (zuno-monitoring admits zuno-ai-run). unifai_target.py is mounted flat next to this file; locally it is read from
 evaluations/common. The UnifAI sign-in is the stress persona's own Keycloak username, so a load pool persona
-(stress-load-NN) spends the pool's budget, not a demo persona's.
+(test-stress-load-NN) spends the pool's budget, not a demo persona's.
 """
 from __future__ import annotations
 

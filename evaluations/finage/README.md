@@ -85,9 +85,9 @@ session is refused (ADR-0033), `X-Zuno-Local-Only: true` actually forces `compon
 the local provider even for a C2 request that would otherwise be
 SaaS-eligible, the two-dimension group model is enforced server-side in
 both directions using two new fixture personas mirroring the prior
-slices' own (`finage-entitlement-only-user-01`: `agent_finage`
+slices' own (`test-func-finage-entitlement-only-user-01`: `agent_finage`
 entitlement but no business role, denied `read_gmail` by the MCP
-Gateway with 403; `finance-role-only-user-01`: `finance` business role
+Gateway with 403; `test-func-finance-role-only-user-01`: `finance` business role
 but no `agent_finage` entitlement, which neither sees the agent's
 workflow nor gets past the MCP gateway's agent declaration), and a direct
 call to

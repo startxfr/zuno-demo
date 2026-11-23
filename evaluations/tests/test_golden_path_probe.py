@@ -326,7 +326,7 @@ class Aggregate(unittest.TestCase):
 class Blender(unittest.TestCase):
     """ADR-0610 clause 9 (WP-245): the Blender workstation moment."""
 
-    OK = {"persona": "eval-ai-dev-01", "no_token": 401, "unrouted": 404, "login": "ok", "models": 200,
+    OK = {"persona": "test-eval-ai-dev-01", "no_token": 401, "unrouted": 404, "login": "ok", "models": 200,
           "generation": 200, "generation_seconds": 8.2, "lines": 50, "problems": [], "floor_logged": True,
           "gpt_oss_called": True, "revoked": True}
 
@@ -354,7 +354,7 @@ class Blender(unittest.TestCase):
     def test_a_persona_not_created_yet_is_named_and_never_fails(self):
         r = self.judge(login="persona")
         self.assertEqual(r.status, g.SKIPPED)
-        self.assertIn("eval-ai-dev-01", r.detail)
+        self.assertIn("test-eval-ai-dev-01", r.detail)
         saved = g.PROBES["blender"]
         g.PROBES["blender"] = lambda ctx: r
         try:

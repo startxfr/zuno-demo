@@ -38,7 +38,7 @@ blender --background --factory-startup --python evaluations/blender/test_in_blen
 ```
 
 The golden-path moment `blender` (`evaluations/golden_path_probe.py`, `make demo golden-path ONLY=blender`) checks
-the live chain end to end with the persona `eval-ai-dev-01`.
+the live chain end to end with the persona `test-eval-ai-dev-01`.
 
 ## Measure the prompt set
 

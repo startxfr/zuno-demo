@@ -37,13 +37,13 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | UnifAI team workspaces `agent-comage` and `sales`. In Open WebUI, the assistant lists three tools when asked, no Confluence. `view` on the Zuno namespaces once it has signed in to OpenShift. | Profile 2, in the 5-minute version: the same screens with other groups. |
 | **ai-dev-01**, **ai-ops-01**, **paas-dev-01** | AI developer, AI platform operator, platform developer, back office. Groups `ocp-ai-dev`, `ocp-ai-ops`, `ocp-paas-dev`, each with `agent_tekos`. | `edit` (ai-dev-01) and `admin` (ai-ops-01) on the Zuno namespaces, `cluster-reader` (paas-dev-01). | Named in the 15-minute version: the cluster-access dimension. |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Reads groups, bindings and ConfigMaps. | The presenter's `oc` terminal in the 15-minute version. |
-| `tekos-entitlement-only-user-01`, `consultant-role-only-user-01` | Negative fixtures of the rule that separates agent entitlement from business role: `agent_tekos` only, `consultant` only. Similar fixtures exist for Arkos, Comage, Advantage, Finage and Naveo. | Each must be refused: the first gets no Confluence, the second no Tekos. | Named in the 15-minute version. Never signed in on stage. |
+| `test-func-tekos-entitlement-only-user-01`, `test-func-consultant-role-only-user-01` | Negative fixtures of the rule that separates agent entitlement from business role: `agent_tekos` only, `consultant` only. Similar fixtures exist for Arkos, Comage, Advantage, Finage and Naveo. | Each must be refused: the first gets no Confluence, the second no Tekos. | Named in the 15-minute version. Never signed in on stage. |
 
 Other identities:
 - the Keycloak service accounts that carry the groups of one persona, for experiences that cannot pass a user token:
   `service-account-dify` and `service-account-openclaw-consultant-02` act as **consultant-02**,
   `service-account-openclaw-sale-01` as **sale-01**, `service-account-kagent` as **ai-ops-01**;
-- `eval-consultant-01` and the other `eval-*` accounts, created by the Job `zuno-keycloak-eval-personas` for the probes
+- `test-eval-consultant-01` and the other `eval-*` accounts, created by the Job `zuno-keycloak-eval-personas` for the probes
   and the evaluations;
 - the HTPasswd provider `startx-htpasswd_auth`, kept as the break-glass sign-in to OpenShift. It is not a persona.
 
@@ -256,7 +256,7 @@ flowchart LR
     KC["Keycloak CR zuno<br/>realm zuno"]
     IMP["KeycloakRealmImport zuno-realm<br/>realm-zuno.json, create-only"]
     REC["Job client-reconcile<br/>clients + realm settings:<br/>brute force 30 failures,<br/>60 s up to 900 s, never permanent"]
-    EVP["Job eval-personas<br/>eval-* accounts"]
+    EVP["Job test-accounts<br/>test-* accounts"]
   end
   OPR --> KC
   IMP -->|"first import only"| KC

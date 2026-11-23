@@ -7,10 +7,10 @@ description: load ramp to saturation, stopped by the budget guard; the disruptio
 # The `agents` family (the per-agent Jobs, which sign in as the stress-<persona> twins) is NOT in this profile: those Jobs
 # ride the shared ai-gateway ServiceAccount's MaaS budget (1,000,000 tokens an hour per route, shared with Open WebUI, Dify,
 # kagent and OpenClaw) and drained it on 2026-11-19, which broke `make d2 check agents`. Opt in with FAMILIES=agents until the
-# twins are in the /zuno-loadtest group live (keycloak chart, evalPersonas extraGroups) so they run under the `loadtest` class
+# twins are in the /test-stress group live (keycloak chart, evalPersonas extraGroups) so they run under the `loadtest` class
 # on the ai-gateway-stress identity; then add `agents` back here.
 # Caveat of the twins' move: the `loadtest` class is fail_mode closed and served only through MaaS, so a scenario that needs a SaaS
-# model (for instance tekos #21, Codestral) fails BY DESIGN once the twins are in /zuno-loadtest; the report lists those rows as
+# model (for instance tekos #21, Codestral) fails BY DESIGN once the twins are in /test-stress; the report lists those rows as
 # "skipped: SaaS under loadtest", not as failures.
 families: [tools, models, unifai, guardrails, experiences, state, load, saturation, counters]
 # 2026-11-21: the drivers of these families run TOGETHER (each with its own guard and summary row); the others run one
@@ -20,10 +20,10 @@ families: [tools, models, unifai, guardrails, experiences, state, load, saturati
 # token cap (budget.max_tokens is one count for the whole run).
 parallel_families: [load]
 # The load pool of WP-306: one persona per concurrent worker (a budget is keyed by persona), in the `loadtest` class (the
-# load drivers ask for it, STRESS_LOAD_QUOTA_CLASS, and the pool is in /zuno-loadtest). Ten since 2026-11-21, for
+# load drivers ask for it, STRESS_LOAD_QUOTA_CLASS, and the pool is in /test-stress). Ten since 2026-11-21, for
 # CONCURRENCY=10. Needs the Keycloak personas Job to have run; without it the sign-in of each worker fails.
-personas: [stress-load-01, stress-load-02, stress-load-03, stress-load-04, stress-load-05, stress-load-06, stress-load-07, stress-load-08,
-           stress-load-09, stress-load-10]
+personas: [test-stress-load-01, test-stress-load-02, test-stress-load-03, test-stress-load-04, test-stress-load-05, test-stress-load-06, test-stress-load-07, test-stress-load-08,
+           test-stress-load-09, test-stress-load-10]
 defaults:
   iterations: 60
   concurrency: 8

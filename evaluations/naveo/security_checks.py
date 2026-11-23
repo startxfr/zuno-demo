@@ -88,7 +88,7 @@ unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
-    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="consultant-role-only-user-01",
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="test-func-consultant-role-only-user-01",
     mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
 )
 # ADR-0040, entitlement without any business role: the legacy check only proved a chat turn

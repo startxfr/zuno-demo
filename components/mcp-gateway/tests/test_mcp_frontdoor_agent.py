@@ -47,7 +47,7 @@ _CONSULTANT = CallerIdentity(
     sub="consultant-01", groups=["consultant", "agent_tekos"], raw_claims={"iss": "zuno"}, token="caller-jwt"
 )
 _ENTITLED_ONLY = CallerIdentity(
-    sub="tekos-entitlement-only-user-01", groups=["agent_tekos"], raw_claims={"iss": "zuno"}, token="caller-jwt"
+    sub="test-func-tekos-entitlement-only-user-01", groups=["agent_tekos"], raw_claims={"iss": "zuno"}, token="caller-jwt"
 )
 _FINANCE = CallerIdentity(sub="finance-01", groups=["finance"], raw_claims={"iss": "zuno"}, token="caller-jwt")
 _OPENSHIFT = CallerIdentity(

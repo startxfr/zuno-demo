@@ -86,9 +86,9 @@ true` actually forces `components/ai-gateway` to pick the local provider
 even for a C2 request that would otherwise be SaaS-eligible, the
 two-dimension group model is enforced server-side in both directions
 using two new fixture personas mirroring Tekos/Arkos's own
-(`comage-entitlement-only-user-01`: `agent_comage` entitlement but no
+(`test-func-comage-entitlement-only-user-01`: `agent_comage` entitlement but no
 business role, denied `salesforce.opportunity.read` by the MCP Gateway
-with 403; `sales-role-only-user-01`: `sales` business role but no
+with 403; `test-func-sales-role-only-user-01`: `sales` business role but no
 `agent_comage` entitlement, which neither sees the agent's workflow nor
 gets past the MCP gateway's agent declaration), a direct call to
 `salesforce-mcp` - Comage's own new server, unlike Arkos's re-proof

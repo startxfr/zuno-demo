@@ -81,7 +81,7 @@ def run(check, gateway):
 def surface(root, **kw):
     return dc.delegation_surface(
         CheckResult, root=root, mcp_gateway_url="http://gw", auth_headers=lambda p: {"Authorization": f"Bearer {p}"},
-        persona="eval-consultant-01", delegator="arkos", delegator_task="draft-architecture-testimonial",
+        persona="test-eval-consultant-01", delegator="arkos", delegator_task="draft-architecture-testimonial",
         target="tekos", target_task="answer-technical-question", **kw)
 
 

@@ -9,7 +9,7 @@
 # inside Comage, per agent.okf.md's own body prose) and the `agent_comage`
 # entitlement group (ADR-0040) - see security_checks.py for the negative
 # tests covering entitlement without business role and vice versa
-# (`comage-entitlement-only-user-01`/`sales-role-only-user-01`, mirroring
+# (`test-func-comage-entitlement-only-user-01`/`test-func-sales-role-only-user-01`, mirroring
 # Tekos/Arkos's own ADR-0040 negative-test pattern). `type` selects which
 # handler in evaluations/tekos/run_scenarios.py executes the scenario -
 # each type's exact behavior is documented there, not duplicated here.

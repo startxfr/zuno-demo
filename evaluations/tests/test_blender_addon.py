@@ -139,7 +139,7 @@ class DeviceLogin(unittest.TestCase):
 
     def test_errors_never_carry_secrets(self):
         self.assertTrue(issubclass(d.PersonaRefused, d.DeviceLoginError))
-        self.assertNotIn("password", str(d.PersonaRefused("Keycloak refused the sign-in of eval-ai-dev-01")))
+        self.assertNotIn("password", str(d.PersonaRefused("Keycloak refused the sign-in of test-eval-ai-dev-01")))
 
 
 if __name__ == "__main__":

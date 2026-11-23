@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Security-negative checks for Arkos, mirroring evaluations/tekos/
 security_checks.py's structure with ADR-0040's entitlement/business-role
-fixtures substituted for Arkos's own (`arkos-entitlement-only-user-01`/
-`consultant-role-only-user-01` - ADR-0349 moved Arkos's audience from
+fixtures substituted for Arkos's own (`test-func-arkos-entitlement-only-user-01`/
+`test-func-consultant-role-only-user-01` - ADR-0349 moved Arkos's audience from
 board to the consultant architect tier, so the shared consultant
 role-only fixture now carries the converse case; the old
-`board-role-only-user-01` fixture stays in the realm, forward-reserved
+`test-func-board-role-only-user-01` fixture stays in the realm, forward-reserved
 for Cognos) and the Confluence policy check retargeted at
 the canonical `confluence.page.*` capability IDs Arkos's task declares
 (rather than Tekos's legacy `search_confluence` tool name - both resolve
@@ -189,7 +189,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
 
 def entitlement_without_business_role_denied_confluence() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
-    arkos-entitlement-only-user-01 holds agent_arkos (can sign in / reach
+    test-func-arkos-entitlement-only-user-01 holds agent_arkos (can sign in / reach
     Arkos) but no business role at all - not board, not consultant. The MCP
     Gateway's user_group_rights factor (policies/tools/tool-policy.yaml:
     confluence.page.search.allowed_groups: [consultant, board]) must still
@@ -197,7 +197,7 @@ def entitlement_without_business_role_denied_confluence() -> CheckResult:
     substitutes for the business-role check.
     """
     resp = _invoke_tool(
-        "arkos-entitlement-only-user-01",
+        "test-func-arkos-entitlement-only-user-01",
         "confluence.page.search",
         {"query": "OpenShift AI GPU sizing"},
         classification="C2",
@@ -376,7 +376,7 @@ unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
-    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="consultant-role-only-user-01",
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="test-func-consultant-role-only-user-01",
     mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
 )
 # ADR-0415/ADR-0516: Arkos's tasks declare `diagram.generation.create` but never

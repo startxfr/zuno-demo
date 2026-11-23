@@ -1,4 +1,4 @@
-"""The three mutating stress drivers (WP-310 batch 2, ADR-0624), run only with `allow_mutating` and only as `stress-mutate-01`.
+"""The three mutating stress drivers (WP-310 batch 2, ADR-0624), run only with `allow_mutating` and only as `test-stress-mutate-01`.
 
   delegation-approval   Arkos is asked to have Tekos launch a cluster audit (a delegated WRITE). The pending approval is
                         read from the session's stream and REJECTED (never approved: an approval starts a real AAP job),
@@ -12,7 +12,7 @@
                         pods, granted only when `stressImageProof.enabled` (namespaces chart, default off).
 
 The persona is a constant, never `ctx.persona`: a dedicated Keycloak user (keycloak chart `evalPersonas`, a copy of consultant-01
-in `/zuno-evaluation`), so what these drivers create or spend is attributable and no demo or load persona is ever used.
+in `/test-eval`), so what these drivers create or spend is attributable and no demo or load persona is ever used.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ import unifai_rag_library as lib  # noqa: E402
 import unifai_target as ut  # noqa: E402
 from stress_runner import register, row  # noqa: E402
 
-MUTATE_PERSONA = "stress-mutate-01"
+MUTATE_PERSONA = "test-stress-mutate-01"
 APPROVAL_PROMPT = ("Call the Tekos delegation tool right now and ask it to launch a fresh cluster audit with its audit tool "
                    "(aap.cluster.audit), then tell me the job link it returns. Do not answer from memory.")
 WAIT_REQUEST_SECONDS = 240

@@ -32,9 +32,9 @@ Runs from a workstation where `oc` is logged in to the cluster (not from a contr
     python3 evaluations/dashboard_coverage.py --check-only --window 3h
 
 Environment, all optional: OC_CONTEXT, COVERAGE_QUOTA_PERSONA (the persona whose `stresstest` budget is burnt, default
-stress-board-01: a stress twin on its own per-user budget, never a real persona and never ai-dev-01; note that
-eval-consultant-01 and consultant-01 share one Keycloak subject, hence one budget), COVERAGE_PRAXIS_PERSONA (the
-persona of the Praxis call, default stress-consultant-01), COVERAGE_SETTLE_SECONDS (wait before the check so the scrapes land, default 75), and the variables
+test-stress-board-01: a stress twin on its own per-user budget, never a real persona and never ai-dev-01; note that
+test-eval-consultant-01 and consultant-01 share one Keycloak subject, hence one budget), COVERAGE_PRAXIS_PERSONA (the
+persona of the Praxis call, default test-stress-consultant-01), COVERAGE_SETTLE_SECONDS (wait before the check so the scrapes land, default 75), and the variables
 read by evaluations/golden_path_probe.py.
 """
 from __future__ import annotations
@@ -347,7 +347,7 @@ def stage_guardrails(ctx: "gpp.Context") -> List[Row]:
 
 
 def stage_quota(ctx: "gpp.Context") -> List[Row]:
-    persona = os.getenv("COVERAGE_QUOTA_PERSONA", "stress-board-01")
+    persona = os.getenv("COVERAGE_QUOTA_PERSONA", "test-stress-board-01")
     try:
         secret = gpp.secret_value("zuno-auth", "zuno-stresstest-client-secret", "client_secret")
     except RuntimeError as exc:
@@ -385,7 +385,7 @@ def stage_models(ctx: "gpp.Context") -> List[Row]:
         # labelled zuno.io/experience-client=true, the unifai multiagent pods and the zuno-agent-gateway pods, not
         # zuno-ai-run. So the call leaves the Dify token proxy's pod (an experience client), with a stress persona's
         # token on stdin (never a real persona, never ai-dev-01); Praxis verifies the Keycloak bearer itself.
-        persona = os.getenv("COVERAGE_PRAXIS_PERSONA", "stress-consultant-01")
+        persona = os.getenv("COVERAGE_PRAXIS_PERSONA", "test-stress-consultant-01")
         try:
             token = ctx.persona_token(persona)
         except RuntimeError as exc:

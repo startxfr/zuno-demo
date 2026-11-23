@@ -37,7 +37,7 @@ Environment (all optional except where a driver needs a call):
   STRESS_FLUSH_SECONDS  a checkpoint array of the rows so far is printed this often (default 300), so a soak that hits
                         the Job deadline still leaves its rows behind
   KEYCLOAK_URL, EVAL_CLIENT_ID, EVAL_CLIENT_SECRET, DEMO_PERSONA_PASSWORD   the zuno-stresstest sign-in
-  STRESS_PERSONAS       comma list of personas (default stress-consultant-01); WP-190 keys a budget by persona, so
+  STRESS_PERSONAS       comma list of personas (default test-stress-consultant-01); WP-190 keys a budget by persona, so
                         concurrency N wants N personas
   AI_GATEWAY_URL, MCP_GATEWAY_URL   in-cluster service URLs
   STRESS_LOAD_QUOTA_CLASS   the X-Zuno-Quota-Class of the `load` family (default `loadtest`); empty = no header
@@ -424,7 +424,7 @@ class Ctx:
         self.ai_gateway = self.env.get("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.mcp_gateway = self.env.get("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080").rstrip("/")
         self.keycloak = self.env.get("KEYCLOAK_URL", "").rstrip("/")
-        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["stress-consultant-01"]  # a profile's pool is passed in
+        self.personas = personas or _as_list(self.env.get("STRESS_PERSONAS")) or ["test-stress-consultant-01"]  # a profile's pool is passed in
         self._client = client
         self._tokens: Dict[str, Tuple[str, float]] = {}
         self._token_locks: Dict[str, asyncio.Lock] = {}

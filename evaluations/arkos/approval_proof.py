@@ -43,7 +43,7 @@ from run_scenarios import _unifai  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent / "common"))
 
-PERSONA = os.getenv("APPROVAL_PROOF_PERSONA", "eval-consultant-01")
+PERSONA = os.getenv("APPROVAL_PROOF_PERSONA", "test-eval-consultant-01")
 PROMPT = ("Call the Tekos delegation tool right now and ask it to launch a fresh cluster audit with its audit tool "
           "(aap.cluster.audit), then tell me the job link it returns. Do not answer from memory.")
 MULTI_PROMPT = ("Call the Tekos delegation tool four separate times in a row, one call per message, each asking it to launch a "

@@ -414,6 +414,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0627](0627-serve-the-demo-guide-as-a-generated-page-from-a-configmap.md) | Proposed | Serve the demo guide as a generated page from a ConfigMap |
 | [ADR-0628](0628-publish-the-vault-ui-on-a-route-entered-with-a-read-only-demo-token.md) | Proposed | Publish the Vault UI on a Route, entered with a read-only demo token |
 | [ADR-0629](0629-give-every-platform-persona-the-cluster-and-aap-tools-and-set-the-agent-data-ceilings.md) | Proposed | Give every platform persona the cluster and AAP tools, and set the agent data ceilings |
+| [ADR-0630](0630-name-every-test-account-test-type-and-give-each-type-its-marker-group.md) | Proposed | Name every test account `test-<type>-<name>` and give each type its marker group |
 
 ## v0.19
 

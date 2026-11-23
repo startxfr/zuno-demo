@@ -254,7 +254,7 @@
                   - name: LIMITADOR_URL
                     value: "{{ stress_limitador_url | default('http://limitador-limitador.kuadrant-system.svc:8080') }}"
                   - name: STRESS_PERSONAS
-                    value: "{{ stress_personas | default('stress-consultant-01') }}"
+                    value: "{{ stress_personas | default('test-stress-consultant-01') }}"
                 volumeMounts:
                   - name: stress
                     mountPath: /stress

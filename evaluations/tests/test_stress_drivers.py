@@ -46,7 +46,7 @@ def ctx_with(handler, env=None):
         return handler(request)
 
     merged = dict(ENV, **(env or {}))
-    return sr.Ctx(env=merged, run_id="t", client=httpx.AsyncClient(transport=httpx.MockTransport(route)), personas=["stress-load-01"])
+    return sr.Ctx(env=merged, run_id="t", client=httpx.AsyncClient(transport=httpx.MockTransport(route)), personas=["test-stress-load-01"])
 
 
 def one(driver_id, ctx, i=0):
@@ -122,12 +122,12 @@ class DemoDrivers(unittest.TestCase):
     def test_the_identity_row_judges_the_token_the_persona_got(self):
         import time as _t
         now = _t.time()
-        good = {"preferred_username": "stress-load-01", "azp": "zuno-stresstest", "iss": "https://kc/realms/zuno", "exp": now + 100,
+        good = {"preferred_username": "test-stress-load-01", "azp": "zuno-stresstest", "iss": "https://kc/realms/zuno", "exp": now + 100,
                 "groups": ["/a", "/b"]}
-        self.assertTrue(demos.judge_identity(good, "stress-load-01", "zuno-stresstest", now)[0])
-        self.assertIn("groups=2", demos.judge_identity(good, "stress-load-01", "zuno-stresstest", now)[1])
+        self.assertTrue(demos.judge_identity(good, "test-stress-load-01", "zuno-stresstest", now)[0])
+        self.assertIn("groups=2", demos.judge_identity(good, "test-stress-load-01", "zuno-stresstest", now)[1])
         for field, value in (("preferred_username", "someone-else"), ("azp", "other"), ("iss", "https://kc/realms/master"), ("exp", now - 1)):
-            self.assertFalse(demos.judge_identity(dict(good, **{field: value}), "stress-load-01", "zuno-stresstest", now)[0], field)
+            self.assertFalse(demos.judge_identity(dict(good, **{field: value}), "test-stress-load-01", "zuno-stresstest", now)[0], field)
         self.assertFalse(demos.judge_identity({}, "p", "c", now)[0])
         self.assertEqual(demos.token_claims("not-a-jwt"), {})
         self.assertEqual(demos.token_claims(self.jwt({"a": 1})), {"a": 1})
@@ -159,7 +159,7 @@ class UnifaiDrivers(unittest.TestCase):
             rows = one("unifai-agents", ctx_with(lambda r: httpx.Response(500)))
         self.assertTrue(rows[0].passed, rows[0].detail)
         self.assertIn("via local-maas/qwen3.6", rows[0].detail)
-        self.assertEqual(turn.call_args[0][1], "stress-load-01")  # the worker's own persona signs in
+        self.assertEqual(turn.call_args[0][1], "test-stress-load-01")  # the worker's own persona signs in
 
     def test_unifai_agents_fails_without_a_reply_or_on_an_error_status(self):
         for run in (run_of(reply="  "), run_of(status=599, reply="")):
@@ -258,7 +258,7 @@ class ExperienceDrivers(unittest.TestCase):
 
         def login(base, username, password):
             calls["login"] += 1
-            assert base == "https://open-webui.apps.test" and username == "stress-load-01" and password == "pw"
+            assert base == "https://open-webui.apps.test" and username == "test-stress-load-01" and password == "pw"
             return "owui-token"
 
         ctx = ctx_with(lambda r: httpx.Response(500))
@@ -288,7 +288,7 @@ class ExperienceDrivers(unittest.TestCase):
             rows = one("open-webui", ctx)
         self.assertFalse(rows[0].passed)
         self.assertEqual(sr.row_status(rows[0]), 401)
-        self.assertNotIn("stress-load-01", exp._TOKENS)
+        self.assertNotIn("test-stress-load-01", exp._TOKENS)
 
     def test_judge_owui(self):
         self.assertTrue(exp.judge_owui("open-webui", "chat", 200, "auto", "ok", "q", [])[0])
@@ -359,7 +359,7 @@ class LoadDrivers(unittest.TestCase):
         with mock.patch.object(load, "_agent_turn", side_effect=turn):
             rows = one("load-unifai-scenarios", ctx_with(lambda r: httpx.Response(500)))
         self.assertTrue(rows[0].passed, rows[0].detail)
-        self.assertEqual(seen["persona"], "stress-load-01")
+        self.assertEqual(seen["persona"], "test-stress-load-01")
         self.assertIn(seen["agent"], {"tekos", "arkos", "comage"})
         self.assertIn(f"agent={seen['agent']}", rows[0].detail)
         with mock.patch.object(load, "_agent_turn", return_value=run_of(status=599, reply="")):
@@ -552,7 +552,7 @@ class NetworkDrivers(unittest.TestCase):
         with mock.patch.object(net, "device_access_token", return_value="dev-token") as device:
             rows = one("blender-3d", ctx)
         self.assertTrue(rows[0].passed, rows[0].detail)
-        self.assertEqual(device.call_args[0], ("https://kc/realms/zuno", "stress-load-01", "pw", "blender"))
+        self.assertEqual(device.call_args[0], ("https://kc/realms/zuno", "test-stress-load-01", "pw", "blender"))
         self.assertEqual(seen, [("GET", "https://ai-gateway.apps.test/v1/models"), ("POST", "https://ai-gateway.apps.test/v1/chat/completions")])
         self.assertEqual(ctx.tokens_used, 11)
 

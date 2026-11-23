@@ -682,7 +682,7 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     tempo = os.getenv("TEMPO_URL", "").strip()
     if not tempo:
         return _skip(s, "no trace backend (TEMPO_URL unset), the delegation cannot be observed")
-    persona = s.get("persona", "eval-consultant-01")
+    persona = s.get("persona", "test-eval-consultant-01")
     try:
         run_ = _unifai().collect(persona, s["message"], deadline_seconds=int(s.get("timeout_seconds", 190)))
     except Exception as exc:  # noqa: BLE001

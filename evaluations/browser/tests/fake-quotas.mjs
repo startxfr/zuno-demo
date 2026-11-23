@@ -65,7 +65,7 @@ ${process.env.FAKE_GITHUB_BANNER === "1" ? `<div style="position:fixed;top:0;lef
 <p>The classes come from the signed agents release (<a href="#">policies/quotas/quota-policy.yaml</a>):</p>
 <table><thead><tr><th>Class</th><th>Who runs under it</th><th>Per user (persona)</th><th>Per group</th><th><code>fail_mode</code></th></tr></thead><tbody>
 <tr><td><code>standard</code></td><td>everyone, by default</td><td>10,000,000 tokens per 24 h</td><td>100,000,000 per 24 h</td><td>open</td></tr>
-<tr><td><code>evaluation</code></td><td>members of <code>zuno-evaluation</code></td><td>20,000,000 per 24 h</td><td>200,000,000 per 24 h</td><td>open</td></tr>
+<tr><td><code>evaluation</code></td><td>members of <code>test-eval</code></td><td>20,000,000 per 24 h</td><td>200,000,000 per 24 h</td><td>open</td></tr>
 <tr><td><code>intensive</code></td><td>no task opts in today</td><td>500,000 per 24 h</td><td>5,000,000 per 24 h</td><td>closed</td></tr>
 <tr><td><code>stresstest</code></td><td>the group named by <code>QUOTA_STRESSTEST_GROUP</code> (off)</td><td>2,000 per 5 min</td><td>8,000 per 5 min</td><td>closed</td></tr>
 </tbody></table>${filler(30)}

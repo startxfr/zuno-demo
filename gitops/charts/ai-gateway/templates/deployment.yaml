@@ -309,6 +309,10 @@ spec:
             - name: QUOTA_LOADTEST_GROUP
               value: {{ .Values.quotaLoadtestGroup | quote }}
             {{- end }}
+            {{- if .Values.evaluationGroup }}
+            - name: EVALUATION_GROUP
+              value: {{ .Values.evaluationGroup | quote }}
+            {{- end }}
             {{- if .Values.maasAdapter.classCredentials.enabled }}
             {{- /* WP-306: class -> token file, read per call by app/maas_adapter.py (no fallback to the shared identity). */}}
             {{- $paths := dict }}

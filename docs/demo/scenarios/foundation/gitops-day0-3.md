@@ -47,7 +47,7 @@ Other identities:
 - When `zuno_make_aap_mode` is `auto` or `remote`, Day 1 to Day 3 verbs run in AAP as the ServiceAccount
   `aap-day0-check` (checks and tests) or `aap-installer` (writes). On the operator workstation of demo333 the mode was
   `local` on 2026-11-13, so `make` runs Ansible from the terminal.
-- The golden-path probes sign in as `eval-consultant-01`. Some spend the budget of consultant-02, ai-ops-01 or sale-01
+- The golden-path probes sign in as `test-eval-consultant-01`. Some spend the budget of consultant-02, ai-ops-01 or sale-01
   ([golden-path.md](../../golden-path.md)).
 
 ## Presenter lifecycle

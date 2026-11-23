@@ -35,7 +35,7 @@ IDS = ("delegation-approval", "unifai-live-rag", "image-signing-refusal")
 
 def ctx_of(handler=None, env=None):
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler or (lambda r: httpx.Response(404))))
-    return sr.Ctx(env=dict(ENV, **(env or {})), run_id="mut-20261119", client=client, personas=["stress-load-01"])
+    return sr.Ctx(env=dict(ENV, **(env or {})), run_id="mut-20261119", client=client, personas=["test-stress-load-01"])
 
 
 class Registration(unittest.TestCase):
@@ -67,13 +67,13 @@ class Registration(unittest.TestCase):
         self.assertTrue(all(p.concurrency == 1 and p.iterations == 1 for p in plans))
 
     def test_the_persona_is_a_constant_never_the_workers(self):
-        self.assertEqual(mut.MUTATE_PERSONA, "stress-mutate-01")
+        self.assertEqual(mut.MUTATE_PERSONA, "test-stress-mutate-01")
         source = (STRESS_DIR / "driver_mutating.py").read_text()
         self.assertNotIn("ctx.persona", source.replace("never `ctx.persona`", ""))
         values = yaml.safe_load((REPO / "gitops/charts/keycloak/values.yaml").read_text())
-        entry = next(p for p in values["evalPersonas"] if p["username"] == "stress-mutate-01")
+        entry = next(p for p in values["evalPersonas"] if p["username"] == "test-stress-mutate-01")
         self.assertEqual(entry["copyOf"], "consultant-01")
-        self.assertNotIn("/zuno-loadtest", entry.get("extraGroups") or [])
+        self.assertEqual(entry.get("extraGroups"), ["/test-stress"])  # ADR-0630: the marker group of its type, so the loadtest class
 
 
 class FakeStream:
@@ -171,7 +171,7 @@ class Approval(unittest.TestCase):
         self.assertEqual({d for r, d in decisions if r == "req-1"} - {"reject"}, {"approve"})  # only the stale probe says approve
         self.assertIn("session.cancel", [p for _, p, _ in target.log])
         self.assertEqual(target.cleaned, 1)
-        self.assertEqual(set(target.personas), {"stress-mutate-01"})
+        self.assertEqual(set(target.personas), {"test-stress-mutate-01"})
 
     def test_no_request_still_cancels_and_deletes_the_session(self):
         with fake_unifai({"stream": []}) as made:
@@ -226,7 +226,7 @@ class Rag(unittest.TestCase):
         self.assertEqual([k for k, _ in order], ["upload", "wait", "delete"])
         self.assertEqual(len({n for _, n in order}), 1)
         self.assertTrue(all(r["ok"] for r in results))
-        self.assertEqual(set(made[0].personas), {"stress-mutate-01"})
+        self.assertEqual(set(made[0].personas), {"test-stress-mutate-01"})
 
 
 class Admission(unittest.TestCase):

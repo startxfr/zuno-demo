@@ -78,9 +78,9 @@ session is refused (ADR-0033), `X-Zuno-Local-Only: true` actually forces `compon
 the local provider even for a C2 request that would otherwise be
 SaaS-eligible, the two-dimension group model is enforced server-side in
 both directions using two new fixture personas mirroring the prior
-slices' own (`advantage-entitlement-only-user-01`: `agent_advantage`
+slices' own (`test-func-advantage-entitlement-only-user-01`: `agent_advantage`
 entitlement but no business role, denied `list_drive_files` by the MCP
-Gateway with 403; `adv-role-only-user-01`: `adv` business role but no
+Gateway with 403; `test-func-adv-role-only-user-01`: `adv` business role but no
 `agent_advantage` entitlement, which neither sees the agent's workflow
 nor gets past the MCP gateway's agent declaration), and a direct call to
 `confluence-mcp` that bypasses the MCP Gateway entirely is denied by the

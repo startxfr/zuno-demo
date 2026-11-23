@@ -39,7 +39,7 @@ class Recorder:
             return httpx.Response(200, text=f'<form id="kc-form-login" action="{KC}/login?x=1&amp;y=2">')
         if request.url.host == "kc.test":
             body = request.content.decode()
-            assert "username=eval-consultant-01" in body and "password=pw" in body
+            assert "username=test-eval-consultant-01" in body and "password=pw" in body
             return httpx.Response(302, headers={"location": f"{UI}/", "set-cookie": "session=abc; Path=/"})
         if path == "/":
             return httpx.Response(200, text="ui")
@@ -378,9 +378,9 @@ def test_login_name_uses_the_evaluation_twin_for_business_personas(monkeypatch):
 
     monkeypatch.delenv("EVAL_PERSONAS", raising=False)
     for p in ("consultant-01", "sale-01", "adv-01", "finance-01", "board-01"):
-        assert login_name(p) == f"eval-{p}"
+        assert login_name(p) == f"test-eval-{p}"
     # negative personas and other users keep their own account
-    assert login_name("consultant-role-only-user-01") == "consultant-role-only-user-01"
+    assert login_name("test-func-consultant-role-only-user-01") == "test-func-consultant-role-only-user-01"
     assert login_name("consultant-02") == "consultant-02"
 
 
@@ -400,7 +400,7 @@ def test_tekos_reexport_exposes_login_name():
     spec = importlib.util.spec_from_file_location("tekos_unifai_target_shim", shim)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    assert mod.login_name("sale-01") == "eval-sale-01"
+    assert mod.login_name("sale-01") == "test-eval-sale-01"
 
 
 # --- comage scenario 11 (WP-155): the retrieval proven by the run's trace -----------------------------

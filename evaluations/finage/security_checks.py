@@ -2,7 +2,7 @@
 """Security-negative checks for Finage, mirroring evaluations/advantage/
 security_checks.py's structure with ADR-0040's entitlement/business-role
 fixtures substituted for Finage's own
-(`finage-entitlement-only-user-01`/`finance-role-only-user-01`) and the
+(`test-func-finage-entitlement-only-user-01`/`test-func-finance-role-only-user-01`) and the
 same static config check pattern - Finage's own OKF task bundle must
 never declare the sales or ADV knowledge domains, or any live-Salesforce
 capability, the config-level half of ADR-0326's least-privilege proof for
@@ -196,7 +196,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
 
 def entitlement_without_business_role_denied() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
-    finage-entitlement-only-user-01 holds agent_finage (can sign in /
+    test-func-finage-entitlement-only-user-01 holds agent_finage (can sign in /
     reach Finage) but no business role at all - not finance, not board.
     The MCP Gateway's user_group_rights factor
     (policies/tools/tool-policy.yaml: gmail.message.read.allowed_groups:
@@ -210,7 +210,7 @@ def entitlement_without_business_role_denied() -> CheckResult:
     before ADR-0219 removed the sxa.customer.read it originally used.
     """
     resp = _invoke_tool(
-        "finage-entitlement-only-user-01",
+        "test-func-finage-entitlement-only-user-01",
         "read_gmail",
         {"query": "invoice"},
         classification="C1",
@@ -276,7 +276,7 @@ unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
-    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="finance-role-only-user-01",
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="test-func-finance-role-only-user-01",
     mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
 )
 

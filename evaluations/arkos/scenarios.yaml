@@ -11,9 +11,9 @@
 # the `agent_arkos` entitlement group (ADR-0040) - see security_checks.py
 # for the negative tests covering entitlement without business role and
 # vice versa (new
-# `arkos-entitlement-only-user-01`/`board-role-only-user-01` fixtures,
-# mirroring Tekos's own `tekos-entitlement-only-user-01`/
-# `consultant-role-only-user-01`). `type` selects which handler in
+# `test-func-arkos-entitlement-only-user-01`/`test-func-board-role-only-user-01` fixtures,
+# mirroring Tekos's own `test-func-tekos-entitlement-only-user-01`/
+# `test-func-consultant-role-only-user-01`). `type` selects which handler in
 # evaluations/tekos/run_scenarios.py executes the scenario - each type's
 # exact behavior is documented there, not duplicated here.
 
@@ -193,7 +193,7 @@ scenarios:
     # ADR-0401/0403 (WP-174): skipped, never passed, until the admitted release declares
     # arkos -> tekos/answer-technical-question and TEMPO_URL is set. The proof is the answer plus an
     # A2A delegation span in the run's trace; refusals and chain headers are in security_checks.py.
-    persona: eval-consultant-01
+    persona: test-eval-consultant-01
     delegator: arkos
     target: tekos
     target_task: answer-technical-question

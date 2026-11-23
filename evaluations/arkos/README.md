@@ -77,9 +77,9 @@ correctly classified C2 with `external_model_policy.allow_context: false`
 actually forces `components/ai-gateway` to pick the local provider even
 for a C2 request that would otherwise be SaaS-eligible, the two-dimension
 group model is enforced server-side in both directions using two new
-fixture personas mirroring Tekos's own (`arkos-entitlement-only-user-01`:
+fixture personas mirroring Tekos's own (`test-func-arkos-entitlement-only-user-01`:
 `agent_arkos` entitlement but no business role, denied `confluence.page.search`
-by the MCP Gateway with 403; `consultant-role-only-user-01`: `consultant`
+by the MCP Gateway with 403; `test-func-consultant-role-only-user-01`: `consultant`
 business role but no `agent_arkos` entitlement, which neither sees the
 agent's workflow nor gets past the MCP gateway's agent declaration - ADR-0349
 moved Arkos's audience from board to the consultant tier, so the shared
@@ -92,8 +92,8 @@ ADR-0401/0403/0406 (WP-174): the first agent delegation, Arkos to Tekos
 (`answer-technical-question`; the direction was reversed on 2026-11-01 because Tekos's
 skills serve Arkos's users), through the MCP gateway
 (`evaluations/common/delegation_checks.py`, wired into `security_checks.py`): as
-`eval-consultant-01` the delegated surface lists only read tools while the direct one lists a
-write tool; refused when the user lacks `agent_tekos` (persona `arkos-entitlement-only-user-01`),
+`test-eval-consultant-01` the delegated surface lists only read tools while the direct one lists a
+write tool; refused when the user lacks `agent_tekos` (persona `test-func-arkos-entitlement-only-user-01`),
 for a target Arkos does not declare, beyond the depth limit, on a cycle, with a depth header that
 disagrees and with half a chain. **They are reported as skipped, never as passes, while the
 admitted release does not declare Arkos -> Tekos** and while the corp flag

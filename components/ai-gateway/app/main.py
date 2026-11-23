@@ -879,7 +879,7 @@ EVALUATION_QUOTA_CLASS = "evaluation"
 
 def _default_quota_class(identity: CallerIdentity) -> str:
     """`evaluation` for a member of EVALUATION_GROUP (default
-    zuno-evaluation, the group the Keycloak evaluation-personas Job gives the
+    test-eval, the group the Keycloak evaluation-personas Job gives the
     eval-* and stress-* personas), provided the budgets define the class -
     an image older than the policy that adds it keeps them on `standard`
     rather than denying them as an unknown class."""
@@ -901,7 +901,7 @@ def _default_quota_class(identity: CallerIdentity) -> str:
         and "stresstest" in (getattr(quota.ledger, "_classes", None) or {})
     ):
         return "stresstest"
-    group = os.getenv("EVALUATION_GROUP", "zuno-evaluation").strip().lstrip("/")
+    group = os.getenv("EVALUATION_GROUP", "test-eval").strip().lstrip("/")
     if not group or group not in (identity.groups or []):
         return "standard"
     if EVALUATION_QUOTA_CLASS not in (getattr(quota.ledger, "_classes", None) or {}):

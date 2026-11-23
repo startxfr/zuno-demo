@@ -18,7 +18,7 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 
 | Moment | What passes |
 |---|---|
-| `unifai-tekos` | A Tekos answer in the `agent-tekos` team workspace, signed in as `eval-consultant-01`; the session is deleted |
+| `unifai-tekos` | A Tekos answer in the `agent-tekos` team workspace, signed in as `test-eval-consultant-01`; the session is deleted |
 | `sovereignty` | Finage (floor C3 since agents v1.2.5; it was Arkos before) called with a `C1` header is routed to a local model and recorded at `C3`; a Tekos control call (floor C2) answers |
 | `delegation-approval` | Arkos delegates to Tekos, the approval request appears and is rejected (nothing runs); the gateway logs show the delegated call |
 | `open-webui` | One answer from the Zuno model through Open WebUI's API, signed in through Keycloak |
@@ -30,13 +30,13 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 | `tools` | `search_confluence` through the mcp-gateway REST path (consultant-01, Tekos's task, C2) is answered by the `confluence` MCP server with at least one page |
 | `guardrails` | The DAN prompt through Dify's token proxy is answered (observe mode) and the ai-gateway logs `guardrails DETECTED` for client `dify` |
 | `trace` | The trace of the `unifai-tekos` run is found in Tempo by its run id (temporary port-forward to `tempo-tempo`), with its gateway spans |
-| `blender` | Required (Blender is in the 2026-11-09 demonstration): the workstation edge answers 401 and 404 as it should, eval-ai-dev-01 signs in by the device flow, the mug prompt returns a `bpy` script in seconds that passes the add-on's check, and the ai-gateway logs the C3 floor and a `gpt-oss-20b` call (WP-245) |
+| `blender` | Required (Blender is in the 2026-11-09 demonstration): the workstation edge answers 401 and 404 as it should, test-eval-ai-dev-01 signs in by the device flow, the mug prompt returns a `bpy` script in seconds that passes the add-on's check, and the ai-gateway logs the C3 floor and a `gpt-oss-20b` call (WP-245) |
 | `world-model` | `roadmap` while `zuno_world_model_enabled` is false; once the demo is installed, a real world is created as `GOLDEN_WORLD_PERSONA` (ai-ops-01), video arrives, one edit is screened and applied, the session is released (run in the web pod); then it is required (ADR-0604, WP-235) |
 
 `RESULT: PASS` means every required moment passed. A `FAIL` on the morning of the demonstration switches that moment
 to its fallback in the runbook; it does not open a fix.
 
-Personas and limits: the probes that sign in do so as `eval-consultant-01` (`GOLDEN_PERSONA`), so the demonstration
+Personas and limits: the probes that sign in do so as `test-eval-consultant-01` (`GOLDEN_PERSONA`), so the demonstration
 personas' histories and quotas are untouched by them. Some probes do spend a demonstration persona's budget, because
 they call as that persona:
 - `dify`, `kagent` and `guardrails` go through the experience's token proxy, so they count as **consultant-02** (Dify)

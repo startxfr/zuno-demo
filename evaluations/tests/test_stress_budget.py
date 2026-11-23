@@ -2,7 +2,7 @@
 
 The standard run of 2026-11-19 left the shared ai-gateway ServiceAccount's MaaS counter at 1,002,556 / 1,000,000 and broke
 `make d2 check agents`: the per-agent Jobs and the experience drivers ride that counter. What is guarded here:
-  - the `agents` family is opt-in, the five stress twins are in /zuno-loadtest (the root fix, live after a keycloak roll);
+  - the `agents` family is opt-in, the five stress twins are in /test-stress (the root fix, live after a keycloak roll);
   - the experience drivers are capped at one iteration and a guard skips a driver when the shared counter is above max_used;
   - the isolation row warns when the shared ServiceAccount moved more than 10% of its window budget;
   - the wait loop of the per-agent Jobs treats a deleted Job as terminal.
@@ -61,10 +61,10 @@ class Profiles(unittest.TestCase):
 
     def test_the_stress_twins_are_in_the_loadtest_group(self):
         values = yaml.safe_load((REPO / "gitops/charts/keycloak/values.yaml").read_text())
-        twins = {p["username"]: p for p in values["evalPersonas"] if p["username"].startswith("stress-") and p["username"] != "stress-mutate-01"}
-        for name in ("stress-consultant-01", "stress-sale-01", "stress-adv-01", "stress-finance-01", "stress-board-01"):
-            self.assertIn("/zuno-loadtest", twins[name].get("extraGroups") or [], name)
-        self.assertIn("/zuno-loadtest", values["evalPersonasExtraGroups"])
+        twins = {p["username"]: p for p in values["evalPersonas"] if p["username"].startswith("test-stress-") and p["username"] != "test-stress-mutate-01" and "load" not in p["username"]}
+        for name in ("test-stress-consultant-01", "test-stress-sale-01", "test-stress-adv-01", "test-stress-finance-01", "test-stress-board-01"):
+            self.assertIn("/test-stress", twins[name].get("extraGroups") or [], name)
+        self.assertIn("/test-stress", values["evalPersonasExtraGroups"])
 
 
 class Guard(unittest.TestCase):

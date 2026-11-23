@@ -2,7 +2,7 @@
 """Security-negative checks for Comage, mirroring evaluations/arkos/
 security_checks.py's structure with ADR-0040's entitlement/business-role
 fixtures substituted for Comage's own
-(`comage-entitlement-only-user-01`/`sales-role-only-user-01`) and the
+(`test-func-comage-entitlement-only-user-01`/`test-func-sales-role-only-user-01`) and the
 Confluence policy check replaced with Salesforce's own (Comage's live-read
 capability, `salesforce.opportunity.*`, not Confluence).
 
@@ -179,7 +179,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
 
 def entitlement_without_business_role_denied_salesforce() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
-    comage-entitlement-only-user-01 holds agent_comage (can sign in / reach
+    test-func-comage-entitlement-only-user-01 holds agent_comage (can sign in / reach
     Comage) but no business role at all - not sales, not board. The MCP
     Gateway's user_group_rights factor (policies/tools/tool-policy.yaml:
     salesforce.opportunity.read.allowed_groups: [sales, board]) must still
@@ -187,7 +187,7 @@ def entitlement_without_business_role_denied_salesforce() -> CheckResult:
     substitutes for the business-role check.
     """
     resp = _invoke_tool(
-        "comage-entitlement-only-user-01",
+        "test-func-comage-entitlement-only-user-01",
         "salesforce.opportunity.read",
         {"query": "Acme Renewal"},
         classification="C2",
@@ -257,7 +257,7 @@ unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
-    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="sales-role-only-user-01",
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="test-func-sales-role-only-user-01",
     mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
 )
 # Policy update (post-ADR-0516): Comage is the only agent still declaring

@@ -212,7 +212,7 @@ def delegation_checks(
 
 def arkos_to_tekos_checks(
     CheckResult: Any, *, root: Roots, mcp_gateway_url: str, auth_headers: Headers,
-    allowed_persona: str = "eval-consultant-01", unentitled_persona: str = "arkos-entitlement-only-user-01",
+    allowed_persona: str = "test-eval-consultant-01", unentitled_persona: str = "test-func-arkos-entitlement-only-user-01",
 ) -> List[Callable[[], Any]]:
     """The first declared delegation: Arkos asks Tekos for a technical answer (the direction was
     reversed on 2026-11-01: Tekos's skills serve Arkos's users). The unentitled persona holds

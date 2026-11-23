@@ -2,7 +2,7 @@
 
   ai-gateway-routing      one `zuno-code` call (the declared code model, Codestral first, ADR-0596) with the routing
                           decision read back: the golden-path moment `zuno-code` of ansible/demos/ai-gateway-routing
-  ai-gateway-sovereignty  Arkos (floor C3) must be routed to a local model at C3 and a Tekos control call must answer
+  ai-gateway-sovereignty  Finage (floor C3) must be routed to a local model at C3 and a Tekos control call must answer
                           (the golden-path moment `sovereignty`, ansible/demos/ai-gateway-sovereignty)
 
 Every call carries `X-Zuno-Quota-Class: stresstest` (stress_runner.quota_headers, STRESS_QUOTA_CLASS; only the zuno-stresstest
@@ -78,12 +78,12 @@ async def ai_gateway_routing(ctx, i):
 
 
 @register("ai-gateway-sovereignty", family="models",
-          description="Arkos kept local at C3 and a Tekos control call answered (golden-path moment `sovereignty`)",
+          description="Finage kept local at C3 and a Tekos control call answered (golden-path moment `sovereignty`)",
           needs=("ai-gateway", "a local model"))
 async def ai_gateway_sovereignty(ctx, i):
     token = await ctx.token()
     calls, spent = [], 0.0
-    for agent, task in (("arkos", "draft-architecture-testimonial"), ("tekos", "answer-technical-question")):
+    for agent, task in (("finage", "answer-finance-question"), ("tekos", "answer-technical-question")):
         r, rid, ms = await _chat(ctx, "ai-gateway-sovereignty", i, agent, token, "auto", SAY_OK, agent, task, max_tokens=16)
         spent += ms
         _tokens(ctx, r)

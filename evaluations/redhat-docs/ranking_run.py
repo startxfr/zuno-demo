@@ -7,7 +7,7 @@ Same method as the README's "Ranking set" section: each entry is queried with it
 
     oc -n zuno-unifai port-forward svc/unifai-rag-server 13456:13456 &
     KEYCLOAK_URL=https://keycloak.apps.<domain> EVAL_CLIENT_SECRET=... DEMO_PERSONA_PASSWORD=... \
-    python3 ranking_run.py --persona eval-consultant-01 --top-k 10 --out results/ranking-<name>-<date>.json
+    python3 ranking_run.py --persona test-eval-consultant-01 --top-k 10 --out results/ranking-<name>-<date>.json
 
 Read only: it sends search queries and writes the result file; the credentials come from the environment.
 """
@@ -54,7 +54,7 @@ def figures(rows: list[dict]) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--persona", default="eval-consultant-01")
+    ap.add_argument("--persona", default="test-eval-consultant-01")
     ap.add_argument("--top-k", type=int, default=10)
     ap.add_argument("--set", default=str(HERE / "ranking.yaml"))
     ap.add_argument("--label", default="")

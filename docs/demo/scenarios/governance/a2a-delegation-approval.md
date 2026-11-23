@@ -36,7 +36,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **sale-01** | Salesperson, front office. Groups `sales`, `agent_comage`, `agent_finage`. | Neither `agent_arkos` nor `agent_tekos`: no Arkos workspace. A delegation in its name would be refused by the a2a-gateway. | Named only, as the counter-example. |
 
 Other identities:
-- `eval-consultant-01`, an evaluation copy of consultant-01, used only by the `delegation-approval` probe, which
+- `test-eval-consultant-01`, an evaluation copy of consultant-01, used only by the `delegation-approval` probe, which
   rejects the request (nothing runs). Never on stage.
 - `zuno-mcp`, the least-privilege AAP account of the `aap-mcp` server. AAP shows the job as launched by it, not by
   consultant-02 (see [Limits](#limits)).
@@ -62,7 +62,7 @@ the routing policy of the agents release keeps every Arkos task on local models 
 ### Check
 
 Nothing to do when it passes. It runs the golden-path probe `delegation-approval` (see
-[golden-path.md](../../golden-path.md)), as eval-consultant-01. The probe proves the request and a refusal: nothing
+[golden-path.md](../../golden-path.md)), as test-eval-consultant-01. The probe proves the request and a refusal: nothing
 runs. It usually takes 25 to 70 s, and about 326 s when Arkos asks a second time and nobody answers. The approval
 clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day. If it fails, see
 [If something goes wrong](#if-something-goes-wrong).
@@ -343,7 +343,7 @@ Evidence:
 > golden-path run of 2026-11-12 at 17:07 UTC
 > ([WP-249 evidence](../../../roadmap/evidence/wp-249-unifai-rollback-2026-11-12.md)).
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> yes, golden-path probe `delegation-approval`. The probe proves the request and a refusal, as `eval-consultant-01`.
+> yes, golden-path probe `delegation-approval`. The probe proves the request and a refusal, as `test-eval-consultant-01`.
 > The approval clicked by consultant-02, the AAP job and the trace steps have no probe: rehearse them the same day.
 > **Personas:** see [Personas](#personas).
 > **Used in workshops:** [Agentic AI](../../workshops/agentic-ai.md).

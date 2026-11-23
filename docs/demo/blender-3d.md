@@ -30,7 +30,7 @@ kept in Vault at `keycloak/demo-personas`. The [catalogue](README.md#personas) l
 | **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on the Zuno namespaces, `zuno-monitoring` included). | Opens Grafana. Refused at the Blender entry (403): not in `ocp-ai-dev`. | Shows the `client="blender"` series in Grafana in the 15-minute version, from a separate browser profile. |
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the entry objects in `openshift-ingress` and `zuno-ai-run`, and the ai-gateway log. | The presenter's `oc` terminal in the 15-minute version. |
 
-Other identities: `eval-ai-dev-01`, an evaluation copy with the groups `/ocp-ai-dev` and `/zuno-evaluation` only. The
+Other identities: `test-eval-ai-dev-01`, an evaluation copy with the groups `/ocp-ai-dev` and `/test-eval` only. The
 golden-path probe `blender` signs it in by the device flow with no human
 ([`evaluations/blender/device_login.py`](../../evaluations/blender/device_login.py)). It never signs in on stage.
 
@@ -70,7 +70,7 @@ The ai-gateway's per-persona token budgets apply on top of the entry's request r
 ### Check
 
 Nothing to do when it passes. It runs the golden-path probe `blender`
-(`ONLY=blender make demo golden-path`, see [golden-path.md](golden-path.md)). The probe signs in as eval-ai-dev-01 by
+(`ONLY=blender make demo golden-path`, see [golden-path.md](golden-path.md)). The probe signs in as test-eval-ai-dev-01 by
 the device flow with no human, so it never uses the stage account. It proves the entry, the token, the C3 floor and a
 local answer, not the add-on on the laptop. Run it within the hour before the session. If it fails, see
 [If something goes wrong](#if-something-goes-wrong) and tell the platform owner.

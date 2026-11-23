@@ -27,7 +27,7 @@ One probe per demonstration moment, each a real call that must get a real answer
                        released; run inside the web pod. Roadmap while zuno_world_model_enabled is false
   blender              ADR-0610: while the workstation entry exists, from this workstation like the Blender add-on:
                        401 without a token and 404 off the two routed paths at ai-gateway.<domain>, then a device
-                       sign-in of the public client `blender` as eval-ai-dev-01 (no human), /v1/models, one streamed
+                       sign-in of the public client `blender` as test-eval-ai-dev-01 (no human), /v1/models, one streamed
                        bpy generation that passes the add-on's static check, and the ai-gateway's log shows the C3
                        floor for client blender and a gpt-oss-20b call; the device session is revoked afterwards
 
@@ -45,10 +45,10 @@ probes through the environment or stdin, never printed:
 Exit code 0 when every required moment passes, 1 otherwise. `manual` and `roadmap` rows never fail the run.
 
 Environment, all optional: OC_CONTEXT (an explicit `oc --context`), GOLDEN_PERSONA (UnifAI and Open WebUI persona,
-default eval-consultant-01), GOLDEN_GATEWAY_PERSONA (the persona of the ai-gateway token, default consultant-01),
+default test-eval-consultant-01), GOLDEN_GATEWAY_PERSONA (the persona of the ai-gateway token, default consultant-01),
 GOLDEN_VERIFY_TLS=1 (verify the routes' certificates), GOLDEN_SKIP (comma list of moments to skip),
 GOLDEN_WORLD_PERSONA (the presenter of the world-model moment, default ai-ops-01, group ocp-ai-ops),
-GOLDEN_BLENDER_PERSONA (the persona of the blender moment, default eval-ai-dev-01, group ocp-ai-dev).
+GOLDEN_BLENDER_PERSONA (the persona of the blender moment, default test-eval-ai-dev-01, group ocp-ai-dev).
 """
 from __future__ import annotations
 
@@ -132,7 +132,7 @@ def last_json_line(text: str) -> Dict:
 class Context:
     def __init__(self) -> None:
         self.domain = cluster_domain()
-        self.persona = os.getenv("GOLDEN_PERSONA", "eval-consultant-01")
+        self.persona = os.getenv("GOLDEN_PERSONA", "test-eval-consultant-01")
         self.gateway_persona = os.getenv("GOLDEN_GATEWAY_PERSONA", "consultant-01")
         self.password = secret_value("zuno-ai-run", "acceptance-gate-credentials", "demo-persona-password")
         self._eval_secret = secret_value("zuno-ai-run", "acceptance-gate-credentials", "eval-client-secret")
@@ -803,7 +803,7 @@ def probe_blender(ctx: Context) -> Result:
     addon = load_addon()
     gateway, issuer = addon.endpoints(
         ctx.domain, issuer_override=f"{ctx.keycloak}/realms/zuno" if os.getenv("GOLDEN_KEYCLOAK_URL") else "")
-    persona = os.getenv("GOLDEN_BLENDER_PERSONA", "eval-ai-dev-01")
+    persona = os.getenv("GOLDEN_BLENDER_PERSONA", "test-eval-ai-dev-01")
     s: Dict = {"persona": persona}
     s["no_token"] = httpx.post(f"{gateway}/v1/chat/completions", json={}, timeout=30, verify=VERIFY_TLS).status_code
     s["unrouted"] = httpx.get(f"{gateway}/health", timeout=30, verify=VERIFY_TLS).status_code

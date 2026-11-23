@@ -33,9 +33,9 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Reads the EvalHub, Kueue, Job and DSC objects. | The presenter's `oc` terminal in the 15-minute version. |
 
 Other identities:
-- The acceptance gate signs in as the `eval-*` copies of the personas named in each `scenarios.yaml`. Tokens come
+- The acceptance gate signs in as the `test-eval-*` copies of the personas named in each `scenarios.yaml`. Tokens come
   from the Keycloak client `zuno-evaluations` (Vault `zuno/keycloak/zuno-evaluations`).
-- `ragas-eval` asks UnifAI's RAG as **eval-consultant-01**.
+- `ragas-eval` asks UnifAI's RAG as **test-eval-consultant-01**.
 - EvalHub's evaluation pods run as the instance's job ServiceAccount, not as the user who launched them.
 
 ## Presenter lifecycle
@@ -257,10 +257,10 @@ flowchart TB
     MODELS["Model workload Services<br/>model-kserve-workload-svc:8000<br/>KServe DestinationRule, TLS SIMPLE"]
   end
   UNIFAI["UnifAI agents and RAG<br/>zuno-unifai"]
-  KC["Keycloak client zuno-evaluations<br/>eval-* personas"]
+  KC["Keycloak client zuno-evaluations<br/>test-eval-* accounts"]
   GATE --> UNIFAI
   GATE -. "tokens" .-> KC
-  RAGAS -->|"retrievals on knowledge.tech,<br/>as eval-consultant-01"| UNIFAI
+  RAGAS -->|"retrievals on knowledge.tech,<br/>as test-eval-consultant-01"| UNIFAI
   RAGAS -->|"judge qwen3.6-27b-instruct"| MODELS
   GARAK -->|"plain http,<br/>sidecar originates TLS"| MODELS
   LMEJ -->|"plain http"| MODELS

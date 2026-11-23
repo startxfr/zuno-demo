@@ -30,7 +30,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 
 Other identities:
 - the presenter's `oc` session (**paas-ops-01**, cluster-admin) for the 15-minute terminal steps;
-- `eval-consultant-01`, an evaluation copy of consultant-01, used by the `unifai-tekos` probe only, never on stage;
+- `test-eval-consultant-01`, an evaluation copy of consultant-01, used by the `unifai-tekos` probe only, never on stage;
 - the unifai-operator writes the platform's objects (built-ins, teams, templates, team examples) as **ai-ops-01**, the
   first entry of `stack.rag.sharedPublishers`. The personal starters are owned by each persona.
 

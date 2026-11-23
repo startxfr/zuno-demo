@@ -178,7 +178,7 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
     )
     # One point per Keycloak group of the caller, for the group panels only. The three counters above and the
     # duration histogram take ONE point per call: summing a per-group series over a user counts a call once per
-    # group (13 times for eval-consultant-01, WP-174).
+    # group (13 times for test-eval-consultant-01, WP-174).
     _model_call_by_group_counter = meter.create_counter(
         "zuno.model_calls_by_group",
         description="Model calls, one point per Keycloak group of the caller; sum it by group only",
@@ -558,7 +558,7 @@ def model_call_span(
     per group (a user with zero groups gets one point with `group=""`), to
     be summed by group only. Until 2026-11-03 the main counters took one
     point per group, which multiplied every per-user sum by the caller's
-    group count (13x for eval-consultant-01, WP-174), the same defect
+    group count (13x for test-eval-consultant-01, WP-174), the same defect
     agent-bff had (3f74e4b0).
     Since WP-225 lot B (ADR-0603 M15) the counters carry no `user` label
     at all: the "by user" view is the span (zuno.user_sub, zuno.persona)

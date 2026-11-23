@@ -713,7 +713,7 @@
        "role": "The presenter's oc terminal in both versions: runs the probe and the oc get steps."
       },
       {
-       "name": "eval-consultant-01",
+       "name": "test-eval-consultant-01",
        "profile": "Evaluation copy of consultant-01: group consultant, entitled to Arkos (agent_arkos) and Tekos. Used by the probes only.",
        "role": "Never on stage."
       },
@@ -795,7 +795,7 @@
        "role": "The presenter's oc terminal in the 15-minute version."
       },
       {
-       "name": "tekos-entitlement-only-user-01, consultant-role-only-user-01",
+       "name": "test-func-tekos-entitlement-only-user-01, test-func-consultant-role-only-user-01",
        "profile": "Negative fixtures of the rule that separates agent entitlement from business role: agent_tekos only, consultant only. Similar fixtures exist for Arkos, Comage…",
        "role": "Named in the 15-minute version. Never signed in on stage."
       }
@@ -910,8 +910,8 @@
        "role": "The presenter's oc terminal in the 15-minute version."
       },
       {
-       "name": "eval-consultant-01 and the other eval-* accounts",
-       "profile": "Evaluation copies of the personas, in the group zuno-evaluation. Never signed in on stage.",
+       "name": "test-eval-consultant-01 and the other eval-* accounts",
+       "profile": "Evaluation copies of the personas, in the group test-eval. Never signed in on stage.",
        "role": "Named only, in the limits."
       }
      ],
@@ -1271,7 +1271,7 @@
        "role": "The presenter's oc terminal and OpenShift console in the 15-minute version. Must have signed in to OpenShift once: on 2026-11-13 the group ocp-paas-ops did not exist on demo333."
       },
       {
-       "name": "eval-consultant-01",
+       "name": "test-eval-consultant-01",
        "profile": "Evaluation copy of consultant-01. Never signed in on stage.",
        "role": "Named only: the identity behind the probe result."
       }

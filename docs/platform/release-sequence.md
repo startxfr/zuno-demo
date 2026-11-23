@@ -38,7 +38,7 @@ needs the go of the person who owns it; a peer session's relayed "go" is not one
 
 ## E. Proofs and records
 
-9. Acceptance scenarios of the changed agents as `eval-consultant-01`, the delegation scenario, the gateway refusal checks, the cost of a delegating turn
+9. Acceptance scenarios of the changed agents as `test-eval-consultant-01`, the delegation scenario, the gateway refusal checks, the cost of a delegating turn
    (the ai-gateway counters `zuno_model_tokens_total` and `zuno_model_calls_total`, labelled by `user`), then the evidence files.
 10. Set the work packages to Done and the ADRs to Implemented, after the live proof only.
 

@@ -18,7 +18,7 @@ or a policy change), 2 when the probe could not run.
 Environment: AI_GATEWAY_URL, KEYCLOAK_URL, DEMO_PERSONA_PASSWORD,
 EVAL_CLIENT_SECRET, LIMITADOR_URL (e.g. a port-forward to the Limitador pod's
 8080), PROBE_SCOPE (default zuno-ai-run/qwen36-27b-instruct-kserve-route),
-PROBE_PERSONA (default eval-consultant-01), PROBE_MODEL (default local-maas).
+PROBE_PERSONA (default test-eval-consultant-01), PROBE_MODEL (default local-maas).
 """
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def main(argv: List[str] | None = None) -> int:
             scope = env.get("PROBE_SCOPE", "zuno-ai-run/qwen36-27b-instruct-kserve-route")
             before = read_counters(client, env["LIMITADOR_URL"], scope)
             token = persona_token(client, env["KEYCLOAK_URL"], env["EVAL_CLIENT_SECRET"],
-                                  env.get("PROBE_PERSONA", "eval-consultant-01"), env["DEMO_PERSONA_PASSWORD"])
+                                  env.get("PROBE_PERSONA", "test-eval-consultant-01"), env["DEMO_PERSONA_PASSWORD"])
             chat = client.post(
                 f"{env['AI_GATEWAY_URL'].rstrip('/')}/v1/chat/completions",
                 headers={"Authorization": f"Bearer {token}"},

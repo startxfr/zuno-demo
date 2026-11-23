@@ -148,7 +148,7 @@ class PraxisCall(unittest.TestCase):
         self.assertIn("zuno-dify", praxis[0]["args"])
         self.assertNotIn("-c", praxis[0]["args"][: praxis[0]["args"].index("--")])  # no container flag: python's own -c follows
         self.assertEqual(praxis[0]["stdin"], "persona-token\n")
-        self.assertTrue(ctx.persona.startswith("stress-"), ctx.persona)
+        self.assertTrue(ctx.persona.startswith("test-stress-"), ctx.persona)
         self.assertEqual([r.status for r in rows if "praxis" in r.check], [d.OK])
 
     def test_no_secret_is_on_a_command_line_and_the_ai_gateway_pod_never_calls_praxis(self):

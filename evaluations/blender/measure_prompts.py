@@ -94,7 +94,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--prompts", default=str(HERE / "prompts.json"))
     ap.add_argument("--repeats", type=int, default=2)
-    ap.add_argument("--persona", default=os.getenv("BLENDER_EVAL_PERSONA", "eval-ai-dev-01"))
+    ap.add_argument("--persona", default=os.getenv("BLENDER_EVAL_PERSONA", "test-eval-ai-dev-01"))
     ap.add_argument("--blender", default=os.getenv("BLENDER_BIN", "blender"))
     ap.add_argument("--work-dir", default=str(pathlib.Path.home() / "blender-measure"))
     ap.add_argument("--render", action="store_true", help="render each successful script to PNG in --work-dir")

@@ -72,7 +72,7 @@ def test_untrusted_unknown_class_is_not_denied() -> None:
 
 def _member(azp=None):
     claims = {"azp": azp} if azp else {}
-    return CallerIdentity(sub="eval", groups=["sales", "zuno-evaluation"], raw_claims=claims, token="t")
+    return CallerIdentity(sub="eval", groups=["sales", "test-eval"], raw_claims=claims, token="t")
 
 
 def _with_evaluation_class():

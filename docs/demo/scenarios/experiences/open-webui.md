@@ -28,7 +28,7 @@ The personas are fictional role accounts of the Keycloak realm `zuno`. They shar
 
 Other identities:
 - the presenter's `oc` session (**paas-ops-01**, cluster-admin) for the optional `oc get` step;
-- `eval-consultant-01`, an evaluation copy of consultant-01, used only by the golden-path probes, never on stage.
+- `test-eval-consultant-01`, an evaluation copy of consultant-01, used only by the golden-path probes, never on stage.
 
 ## Presenter lifecycle
 

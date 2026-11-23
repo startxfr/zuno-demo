@@ -161,7 +161,7 @@
                   # The stresstest twins (stress-*), on their own per-user budget
                   # (gitops/charts/keycloak values evalPersonas).
                   - name: EVAL_TWIN_PREFIX
-                    value: "stress-"
+                    value: "test-stress-"
                   - name: KEYCLOAK_URL
                     value: "{{ zuno_keycloak_url }}"
                   # WP-156: run_scenarios.py/security_checks.py/day2_bulk.py

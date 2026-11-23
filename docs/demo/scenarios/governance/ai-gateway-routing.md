@@ -33,7 +33,7 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | **paas-ops-01** | Platform operator, back office. Group `ocp-paas-ops` (cluster-admin). | Runs the golden-path probe and reads the routing ConfigMaps and the model status. | The presenter's `oc` terminal in the 15-minute version. |
 
 Other identities:
-- `eval-consultant-01`, an evaluation copy of consultant-01: the probe `zuno-code` signs in to Open WebUI with it,
+- `test-eval-consultant-01`, an evaluation copy of consultant-01: the probe `zuno-code` signs in to Open WebUI with it,
   never on stage;
 - consultant-01 and consultant-02 are named only: they ran the recorded Codestral fallback drill of 2026-11-05.
 
@@ -58,7 +58,7 @@ local models were `READY True` on 2026-11-13.
 
 Nothing to do when it passes. It runs the golden-path probe `zuno-code` (see [golden-path.md](../../golden-path.md)).
 It asks "Write a one-line Python function that adds two numbers." with the `zuno-code` model through Open WebUI, as
-eval-consultant-01. If it fails, see [If something goes wrong](#if-something-goes-wrong).
+test-eval-consultant-01. If it fails, see [If something goes wrong](#if-something-goes-wrong).
 
 ### Install
 

@@ -1,9 +1,9 @@
-# Mutating: the three drivers that change state, once each, as the dedicated persona stress-mutate-01 (WP-310 batch 2, ADR-0624).
+# Mutating: the three drivers that change state, once each, as the dedicated persona test-stress-mutate-01 (WP-310 batch 2, ADR-0624).
 # The only profile that sets allow_mutating, and in no other profile's families: `make d3 stresstest PROFILE=mutating` is the
 # one deliberate way to run them. Each cleans up what it creates (the approval is rejected and the session cancelled, the
 # uploaded document is deleted and checked gone, the unsigned pod is a dry run). Run it outside a demo window.
 name: mutating
-description: delegation-approval, unifai-live-rag and image-signing-refusal x1, concurrency 1, as stress-mutate-01 only
+description: delegation-approval, unifai-live-rag and image-signing-refusal x1, concurrency 1, as test-stress-mutate-01 only
 allow_mutating: true
 families: [mutating]
 defaults:

@@ -264,10 +264,14 @@ trustedPlatformClients: []
 quotaStresstestGroup: ""
 
 # ADR-0624 clause 5 / WP-306: Keycloak group whose members run under the `loadtest` quota class, the budget of the stress
-# personas that carry real load (stress-load-NN). Empty = off. Checked before quotaStresstestGroup. The class itself comes
+# personas that carry real load (test-stress-*, ADR-0630). Empty = off. Checked before quotaStresstestGroup. The class itself comes
 # with the quota policy (zuno-demo-agents policies/quotas/quota-policy.yaml); until a release defines it, the gateway
 # ignores the group and the members stay on the next rule.
 quotaLoadtestGroup: ""
+
+# ADR-0630: Keycloak group whose members run under the `evaluation` quota class (the test-eval-* accounts). Empty = the
+# gateway's own default, test-eval (the group the accounts of before ADR-0630 joined).
+evaluationGroup: "test-eval"
 
 # ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
 # zuno_guardrails_* (the token's `azp`, the user experience the call came

@@ -126,7 +126,7 @@ def test_a_broken_mapping_is_an_error_not_a_guess() -> None:
 
 def test_the_metered_path_sends_the_class_credential_and_the_attested_class() -> None:
     stress = _token_file("stress-sa-token")
-    identity = CallerIdentity(sub="u", groups=["zuno-loadtest"], raw_claims={}, token="caller-token")
+    identity = CallerIdentity(sub="u", groups=["test-stress"], raw_claims={}, token="caller-token")
     try:
         with _env(MAAS_CLASS_TOKEN_PATHS='{"loadtest": "%s"}' % stress, MAAS_GATEWAY_IDENTITY="true", MAAS_SA_TOKEN_PATH="/nonexistent"):
             headers = app_main._metered_upstream_headers({"via_maas": True}, identity, "rid-1", "loadtest", None, {})
@@ -147,32 +147,32 @@ def _classes(*names):
 
 
 def _who(*groups):
-    return CallerIdentity(sub="stress-load-01", groups=list(groups), raw_claims={"azp": "zuno-stresstest"}, token="t")
+    return CallerIdentity(sub="test-stress-load-01", groups=list(groups), raw_claims={"azp": "zuno-stresstest"}, token="t")
 
 
 def test_a_loadtest_group_member_runs_under_loadtest_when_the_class_exists() -> None:
-    with _classes("loadtest", "stresstest", "evaluation"), mock.patch.dict(os.environ, {"QUOTA_LOADTEST_GROUP": "zuno-loadtest"}):
-        assert app_main._default_quota_class(_who("sales", "zuno-evaluation", "zuno-loadtest")) == "loadtest"
-        assert app_main._default_quota_class(_who("sales", "zuno-evaluation")) == "evaluation"
+    with _classes("loadtest", "stresstest", "evaluation"), mock.patch.dict(os.environ, {"QUOTA_LOADTEST_GROUP": "test-stress"}):
+        assert app_main._default_quota_class(_who("sales", "test-eval", "test-stress")) == "loadtest"
+        assert app_main._default_quota_class(_who("sales", "test-eval")) == "evaluation"
 
 
 def test_the_loadtest_group_wins_over_the_stresstest_group() -> None:
-    env = {"QUOTA_LOADTEST_GROUP": "zuno-loadtest", "QUOTA_STRESSTEST_GROUP": "zuno-quota-stresstest"}
+    env = {"QUOTA_LOADTEST_GROUP": "test-stress", "QUOTA_STRESSTEST_GROUP": "zuno-quota-stresstest"}
     with _classes("loadtest", "stresstest"), mock.patch.dict(os.environ, env):
-        assert app_main._default_quota_class(_who("zuno-quota-stresstest", "zuno-loadtest")) == "loadtest"
+        assert app_main._default_quota_class(_who("zuno-quota-stresstest", "test-stress")) == "loadtest"
         assert app_main._default_quota_class(_who("zuno-quota-stresstest")) == "stresstest"
 
 
 def test_without_the_class_in_the_budgets_the_group_changes_nothing() -> None:
     """An image older than the policy that adds `loadtest` keeps the member on the next rule instead of denying it."""
     classes = {"standard": {"fail_mode": "open", "tokens": {}}, "evaluation": {"fail_mode": "open", "tokens": {}}}
-    with mock.patch.object(app_main.quota.ledger, "_classes", classes), mock.patch.dict(os.environ, {"QUOTA_LOADTEST_GROUP": "zuno-loadtest"}):
-        assert app_main._default_quota_class(_who("zuno-evaluation", "zuno-loadtest")) == "evaluation"
+    with mock.patch.object(app_main.quota.ledger, "_classes", classes), mock.patch.dict(os.environ, {"QUOTA_LOADTEST_GROUP": "test-stress"}):
+        assert app_main._default_quota_class(_who("test-eval", "test-stress")) == "evaluation"
 
 
 def test_the_group_is_off_by_default() -> None:
     with _classes("loadtest"), _env():
-        assert app_main._default_quota_class(_who("zuno-loadtest")) == "standard"
+        assert app_main._default_quota_class(_who("test-stress")) == "standard"
 
 
 # -- the traffic tag ---------------------------------------------------------------------------------------------

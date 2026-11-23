@@ -2,7 +2,7 @@
 """Security-negative checks for Advantage, mirroring evaluations/comage/
 security_checks.py's structure with ADR-0040's entitlement/business-role
 fixtures substituted for Advantage's own
-(`advantage-entitlement-only-user-01`/`adv-role-only-user-01`) and a new
+(`test-func-advantage-entitlement-only-user-01`/`test-func-adv-role-only-user-01`) and a new
 static config check replacing the per-agent capability-classification
 check every prior slice has: Advantage's own OKF task bundle must never
 declare the sales knowledge domain, the config-level half of ADR-0326's
@@ -194,7 +194,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
 
 def entitlement_without_business_role_denied_drive() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
-    advantage-entitlement-only-user-01 holds agent_advantage (can sign in
+    test-func-advantage-entitlement-only-user-01 holds agent_advantage (can sign in
     / reach Advantage) but no business role at all - not adv, not board.
     The MCP Gateway's user_group_rights factor
     (policies/tools/tool-policy.yaml: list_drive_files.allowed_groups:
@@ -203,7 +203,7 @@ def entitlement_without_business_role_denied_drive() -> CheckResult:
     business-role check.
     """
     resp = _invoke_tool(
-        "advantage-entitlement-only-user-01",
+        "test-func-advantage-entitlement-only-user-01",
         "list_drive_files",
         {},
         classification="C1",
@@ -271,7 +271,7 @@ unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
-    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="adv-role-only-user-01",
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="test-func-adv-role-only-user-01",
     mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
 )
 

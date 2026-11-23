@@ -63,7 +63,7 @@ def parse_rows(text: str) -> List[Dict[str, Any]]:
 
 
 # The ai-gateway skips every candidate that is not reached through MaaS for a `closed` quota class (loadtest, stresstest): a
-# scenario that needs a SaaS model (tekos #21, Codestral) then fails BY DESIGN once the stress twins are in /zuno-loadtest. Those
+# scenario that needs a SaaS model (tekos #21, Codestral) then fails BY DESIGN once the stress twins are in /test-stress. Those
 # rows are listed apart, as skipped, and do not count as failures.
 BY_DESIGN_RE = re.compile(r"skipped for closed quota class|not reached through MaaS", re.I)
 

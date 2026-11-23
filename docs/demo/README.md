@@ -175,7 +175,7 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | openclaw | `openclaw-state` | state only; not replayed: its path is the operator's egress proxy inside each persona's pod |
 | open-webui | `open-webui`, `open-webui-zuno-code`, `open-webui-zuno-wesh`, `open-webui-state` | replayed (Open WebUI's API as a stress persona) |
 | unifai-agents | `unifai-agents`, `unifai-agents-state`, `load-unifai-scenarios` | replayed; the load driver replays the active agents' scenarios as concurrent turns |
-| unifai-live-rag | `unifai-live-rag`, `unifai-live-rag-state` | state check in the profiles; the `unifai-live-rag` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it uploads one small, uniquely named document to the persona's Personal library, waits until it is indexed, then deletes it and checks it is gone |
+| unifai-live-rag | `unifai-live-rag`, `unifai-live-rag-state` | state check in the profiles; the `unifai-live-rag` driver is mutating and opt-in (profile `mutating`, as `test-stress-mutate-01`): it uploads one small, uniquely named document to the persona's Personal library, waits until it is indexed, then deletes it and checks it is gone |
 | blender-3d | `blender-3d`, `blender-3d-state` | replayed (device sign-in, then the workstation entry); skipped when the entry is off |
 | world-model | `world-model-state` | state only (one assertion); not deployed on demand, no replay driver |
 | aap-audited-operations | `aap-audited-operations-state` | state only |
@@ -187,7 +187,7 @@ The [Day 3 stresstest](../platform/stresstest.md) (ADR-0624) replays the scenari
 | okf-signed-agent-release | `okf-signed-agent-release-state` | state only |
 | service-mesh-kiali | `service-mesh-kiali-state` | state only |
 | vault-pki | `vault-pki-state` | state only |
-| a2a-delegation-approval | `delegation-approval`, `a2a-delegation-approval-state` | state check in the profiles; the `delegation-approval` driver is mutating and opt-in (profile `mutating`, as `stress-mutate-01`): it asks Arkos for a delegated write, rejects the pending approval (never approves it), checks that a stale request id answers 409, and cancels and deletes its session |
+| a2a-delegation-approval | `delegation-approval`, `a2a-delegation-approval-state` | state check in the profiles; the `delegation-approval` driver is mutating and opt-in (profile `mutating`, as `test-stress-mutate-01`): it asks Arkos for a delegated write, rejects the pending approval (never approves it), checks that a stale request id answers 409, and cancels and deletes its session |
 | agents-alt-gateway | `agents-alt-gateway-state` | state only; the kagent agent on Praxis is judged for real (live and Ready on demo333, 2026-11-19) |
 | ai-gateway-routing | `ai-gateway-routing`, `ai-gateway-routing-state` | replayed (one `zuno-code` call, routing decision read back) |
 | ai-gateway-sovereignty | `ai-gateway-sovereignty`, `ai-gateway-sovereignty-state` | replayed (Arkos kept local at C3, Tekos control call) |
@@ -218,7 +218,7 @@ and what it may see on the cluster. Source of truth: `gitops/charts/keycloak/fil
 |---|---|---|---|
 | **sale-01** | Salesperson, front office | `sales`, `agent_comage`, `agent_finage` | Open WebUI (three tools, named when asked), OpenClaw (its own assistant, no Confluence), the shared budget, RAG isolation |
 | **sale-02** | Salesperson, front office | `sales`, `agent_comage`, `agent_soursage` | not used yet |
-| **consultant-01** | Consultant and architect, front office | `consultant` with six Confluence subgroups, `agent_comage`, `agent_tekos`, `agent_arkos`, `agent_naveo`, `aap_admin` | UnifAI live RAG; copied by the probe identity `eval-consultant-01` |
+| **consultant-01** | Consultant and architect, front office | `consultant` with six Confluence subgroups, `agent_comage`, `agent_tekos`, `agent_arkos`, `agent_naveo`, `aap_admin` | UnifAI live RAG; copied by the probe identity `test-eval-consultant-01` |
 | **consultant-02** | Consultant and architect, front office | `consultant` with Confluence build OpenShift and OpenShift AI and the four architecture spaces, `agent_tekos`, `agent_arkos`, `aap_ops` | UnifAI, Dify, OpenClaw (with Confluence), the Open WebUI contrast, delegation with approval |
 | **consultant-03** | Consultant (run), front office | `consultant` with Confluence run OpenShift and Keycloak, `agent_tekos`, `aap_reader` | not used yet |
 | **finance-01**, **finance-02** | Finance, middle office | `finance`, `agent_finage` | the tools contrast (Drive and Gmail only) |
@@ -235,7 +235,7 @@ signed in to OpenShift on demo333: sign each persona in once before a session th
 (Lightspeed, the MaaS portal, the presenter's terminal).
 
 Other identities, never signed in on stage:
-- `eval-consultant-01` and the other `eval-*` accounts are copies used by the golden-path probes and the evaluations.
+- `test-eval-consultant-01` and the other `eval-*` accounts are copies used by the golden-path probes and the evaluations.
 - The `*-entitlement-only-user-01` and `*-role-only-user-01` accounts are negative fixtures for access-denied tests.
 - `dify-admin@zuno.local` is Dify's local administrator (Vault `zuno/dify/admin`).
 - Some experiences call the platform as a service account that carries exactly the groups of one persona:

@@ -16,6 +16,7 @@ Run from the repository root:
 """
 from __future__ import annotations
 
+import re
 import json
 import shutil
 import subprocess
@@ -446,15 +447,25 @@ def test_each_eval_persona_copies_its_source_users_groups() -> None:
     }
     assert values["evalPersonas"], "no evaluation persona declared"
     for p in values["evalPersonas"]:
-        assert p["username"].startswith(("eval-", "stress-")), (
-            f"{p['username']}: evaluation personas carry the eval- or stress- prefix, "
+        assert re.match(r"test-(stress|eval|func|demo)-[a-z0-9-]+$", p["username"]), (
+            f"{p['username']}: test accounts are named test-<type>-<name> (ADR-0630), "
             "so they never collide with a demo persona"
         )
+        kind = p["username"].split("-")[1]
+        marker = "/test-" + kind
+        if kind == "func":
+            # the fixtures hold exactly one group, by design (ADR-0040): a marker group would break the refusal proof
+            assert len(p.get("groups") or []) == 1 and not p.get("extraGroups"), p["username"]
+        else:
+            assert marker in (p.get("extraGroups") or []), f"{p['username']} lacks its marker group {marker}"
+            assert not {"/test-eval", "/test-stress", "/test-func", "/test-demo"} - {marker} & set(p.get("extraGroups") or []), (
+                f"{p['username']} carries the marker group of another test type"
+            )
         assert p["username"] not in users, (
             f"{p['username']} is also a realm-file user: the Job owns eval personas"
         )
         # the Job adds evalPersonasGroup (when set) to every group of the source persona, or to the explicit
-        # `groups` list of a probe persona (ADR-0610/WP-245: eval-ai-dev-01 holds /ocp-ai-dev only)
+        # `groups` list of a probe persona (ADR-0610/WP-245: test-eval-ai-dev-01 holds /ocp-ai-dev only)
         base = p["groups"] if p.get("groups") else users[p["copyOf"]]["groups"]
         expected = list(base) + (
             [values["evalPersonasGroup"]] if values.get("evalPersonasGroup") else []
@@ -463,7 +474,7 @@ def test_each_eval_persona_copies_its_source_users_groups() -> None:
 
 
 def test_every_extra_group_of_a_persona_is_created_by_the_job() -> None:
-    """ADR-0624 clause 5 / WP-306: the load pool joins /zuno-loadtest, a group the Job must create when missing (the realm
+    """ADR-0624 clause 5 / WP-306: the load pool joins /test-stress, a group the Job must create when missing (the realm
     import is create-only). A persona naming a group that evalPersonasExtraGroups does not list would be created without
     that membership, silently."""
     import yaml
@@ -473,12 +484,13 @@ def test_every_extra_group_of_a_persona_is_created_by_the_job() -> None:
     used = {g for p in values["evalPersonas"] for g in (p.get("extraGroups") or [])}
     assert used, "no persona uses an extra group: the load pool is gone"
     assert used <= listed, f"extraGroups not created by the Job: {sorted(used - listed)}"
-    pool = [p["username"] for p in values["evalPersonas"] if "/zuno-loadtest" in (p.get("extraGroups") or [])]
-    load = [u for u in pool if u.startswith("stress-load-")]
+    pool = [p["username"] for p in values["evalPersonas"] if "/test-stress" in (p.get("extraGroups") or [])]
+    load = [u for u in pool if u.startswith("test-stress-load-")]
     assert len(load) >= 4, pool
-    # 2026-11-19 (6fe9ffb7): the five stress twins run the per-agent Jobs under `loadtest` too. No other persona joins:
-    # not stress-mutate-01, and never a demo or eval persona.
-    twins = {f"stress-{role}-01" for role in ("consultant", "sale", "adv", "finance", "board")}
+    # 2026-11-19 (6fe9ffb7): the five stress twins run the per-agent Jobs under `loadtest` too, and since ADR-0630 so does the
+    # mutating persona (the marker group of its type). No demo or eval persona joins: /test-stress is for test-stress-* only.
+    assert all(u.startswith("test-stress-") for u in pool), sorted(u for u in pool if not u.startswith("test-stress-"))
+    twins = {f"test-stress-{role}-01" for role in ("consultant", "sale", "adv", "finance", "board")} | {"test-stress-mutate-01"}
     assert set(pool) - set(load) <= twins, sorted(set(pool) - set(load) - twins)
 
 

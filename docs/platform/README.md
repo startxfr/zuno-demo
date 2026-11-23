@@ -22,6 +22,7 @@ the [ADRs](../adr/README.md); this directory says how to install, change and run
 | [agents-release-integration.md](agents-release-integration.md) | How the signed agents release is promoted, admitted, mirrored and rolled. |
 | [saas-provider-key-rotation.md](saas-provider-key-rotation.md) | Rotating a SaaS provider key; symptoms of a failing SaaS model. |
 | [shared-password-rotation.md](shared-password-rotation.md) | Rotating the shared demo password. |
+| [test-accounts.md](test-accounts.md) | The `test-<type>-<name>` accounts, their marker groups and quota classes. |
 | [vault-kms-raft-migration.md](vault-kms-raft-migration.md) | Vault with KMS auto-unseal, Raft storage and TLS. |
 | [pre-ga-upgrade.md](pre-ga-upgrade.md) | Upgrading a pre-GA dependency. |
 | [canary-rehearsal.md](canary-rehearsal.md) | Rehearsing a change in a canary namespace. |

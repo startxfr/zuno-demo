@@ -56,6 +56,6 @@ python3 evaluations/dashboard_coverage.py --only tools,rag   # some stages (expe
 ```
 
 Informational (ADR-0058): the exit code is 0 whatever the table says and it is in no mandatory gate. The quota stage burns
-the `stresstest` token budget of `COVERAGE_QUOTA_PERSONA` (default `stress-board-01`, a stress twin on its own per-user budget); never point it at a real persona or at
-`ai-dev-01`, and remember that `eval-consultant-01` and `consultant-01` share one Keycloak subject, hence one budget. World model and
+the `stresstest` token budget of `COVERAGE_QUOTA_PERSONA` (default `test-stress-board-01`, a stress twin on its own per-user budget); never point it at a real persona or at
+`ai-dev-01`, and remember that `test-eval-consultant-01` and `consultant-01` share one Keycloak subject, hence one budget. World model and
 MariaDB panels are out of scope (not deployed, no exporter).

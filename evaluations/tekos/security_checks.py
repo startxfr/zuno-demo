@@ -173,7 +173,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
 
 def entitlement_without_business_role_denied_confluence() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
-    tekos-entitlement-only-user-01 holds agent_tekos (can sign in / reach
+    test-func-tekos-entitlement-only-user-01 holds agent_tekos (can sign in / reach
     Tekos) but no business role at all - not consultant, not board. The MCP
     Gateway's user_group_rights factor (policies/tools/tool-policy.yaml:
     search_confluence.allowed_groups: [consultant, board]) must still deny
@@ -181,7 +181,7 @@ def entitlement_without_business_role_denied_confluence() -> CheckResult:
     for the business-role check.
     """
     resp = _invoke_tool(
-        "tekos-entitlement-only-user-01",
+        "test-func-tekos-entitlement-only-user-01",
         "search_confluence",
         {"query": "RHOAI 3.5 EA2 rollout"},
         classification="C2",
@@ -282,7 +282,7 @@ def mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group() -> CheckResult
     cluster automation, so an unauthorized caller must be stopped by the
     platform's own policy layer - not merely by AAP-side RBAC further down.
 
-    tekos-entitlement-only-user-01 holds agent_tekos (so it can reach the
+    test-func-tekos-entitlement-only-user-01 holds agent_tekos (so it can reach the
     agent) but no business role at all, while Tekos's
     answer-technical-question task DOES declare this capability - so the
     agent_declaration factor passes and a 403 here can only come from the
@@ -292,7 +292,7 @@ def mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group() -> CheckResult
     reaches AAP at all.
     """
     resp = _invoke_tool(
-        "tekos-entitlement-only-user-01",
+        "test-func-tekos-entitlement-only-user-01",
         "aap.cluster.audit",
         {},
         classification="C2",
@@ -312,7 +312,7 @@ def mcp_gateway_denies_aap_platform_audit_for_unauthorized_group() -> CheckResul
     an asymmetry here would mean one of the two entries drifted.
     """
     resp = _invoke_tool(
-        "tekos-entitlement-only-user-01",
+        "test-func-tekos-entitlement-only-user-01",
         "aap.platform.audit",
         {},
         classification="C2",
@@ -411,10 +411,10 @@ def unifai_ignores_a_client_supplied_identity_header() -> CheckResult:
 
 
 def business_role_without_entitlement_denied_by_unifai() -> CheckResult:
-    """ADR-0040 converse case on UnifAI: consultant-role-only-user-01 has the
+    """ADR-0040 converse case on UnifAI: test-func-consultant-role-only-user-01 has the
     business role but no `agent_tekos`. The agent must not appear for it AND the
     MCP gateway must refuse the agent declaration (`zuno.access.groups`)."""
-    persona = "consultant-role-only-user-01"
+    persona = "test-func-consultant-role-only-user-01"
     visible = "tekos" in _unifai().visible_workflows(persona)
     resp = httpx.post(
         f"{MCP_GATEWAY_URL}/mcp",
