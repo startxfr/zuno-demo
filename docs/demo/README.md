@@ -235,8 +235,7 @@ signed in to OpenShift on demo333: sign each persona in once before a session th
 (Lightspeed, the MaaS portal, the presenter's terminal).
 
 Other identities, never signed in on stage:
-- `test-eval-consultant-01` and the other `eval-*` accounts are copies used by the golden-path probes and the evaluations.
-- The `*-entitlement-only-user-01` and `*-role-only-user-01` accounts are negative fixtures for access-denied tests.
+- The `test-*` accounts ([convention](../platform/test-accounts.md)): `test-eval-*` are copies used by the golden-path probes and the evaluations, `test-stress-*` by the stress runs, and the `test-func-*-entitlement-only-user-01` and `test-func-*-role-only-user-01` accounts are negative fixtures for access-denied tests.
 - `dify-admin@zuno.local` is Dify's local administrator (Vault `zuno/dify/admin`).
 - Some experiences call the platform as a service account that carries exactly the groups of one persona:
   - `service-account-dify` and `service-account-openclaw-consultant-02` act as **consultant-02**;

@@ -219,7 +219,7 @@ if __name__ == "__main__":
 
 
 def render_security_checks_py(spec: AgentSpec) -> str:
-    role_only_persona = f"{spec.business_role}-role-only-user-01"
+    role_only_persona = f"test-func-{spec.business_role}-role-only-user-01"
     # spec.name is a URL/Kubernetes-style slug (hyphens allowed, e.g.
     # "sixth-agent") - not a valid Python identifier as-is, so the
     # generated check FUNCTION name uses an underscored variant while

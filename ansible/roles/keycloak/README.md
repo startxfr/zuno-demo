@@ -273,8 +273,8 @@ each with a plus-addressed real mailbox (`dev+zuno-<user>@startx.fr`, so
 SMTP/password-reset flows are demonstrable while staying non-nominative,
 ADR-0041 intact) and a `FrontOffice`/`MiddleOffice`/`BackOffice`
 organizational tier in `lastName`. Plus 11 entitlement/business-role
-negative-test fixtures (`<agent>-entitlement-only-user-01` /
-`<role>-role-only-user-01`, unchanged `@zuno-demo.internal` emails) -
+negative-test fixtures (`test-func-<agent>-entitlement-only-user-01` /
+`test-func-<role>-role-only-user-01`, now created by the eval-personas Job, ADR-0630; unchanged `@zuno-demo.internal` emails) -
 one pair per built agent's own security checks. No username, email or
 job title in `realm-zuno.json` identifies a real person, and no password
 is stored in Git (the initialization default is Vault-seeded, ADR-0349
