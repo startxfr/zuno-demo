@@ -1,6 +1,6 @@
 # WP-333: Name the test accounts `test-<type>-<name>` and give each type its marker group
 
-- **State:** Repo work in review (2026-11-23: the chart, the scripts and the pages are changed here; nothing is applied to a cluster yet)
+- **State:** Done (applied to demo333 on 2026-11-23)
 - **ADRs:** [ADR-0630](../../adr/0630-name-every-test-account-test-type-and-give-each-type-its-marker-group.md)
 - **Depends on:** none
 - **Target:** v0.18
@@ -29,4 +29,7 @@ groups, and the harnesses sign in as the new accounts.
 
 ## Review evidence
 
-None yet: nothing is applied.
+2026-11-23, demo333: the Keycloak Job created 33 accounts and 212 memberships; three of them signed in with the personas value.
+The ai-gateway runs with `QUOTA_LOADTEST_GROUP=test-stress` and `EVALUATION_GROUP=test-eval`. `make d2 check agents`: 18/19
+scenarios, 14/14 security checks, 5/5 gate checks. `make d3 stresstest PROFILE=smoke` through AAP (job 1658): 13/13 rows
+passed as the `test-stress-*` accounts. The `mutating` profile has not run under the `loadtest` class yet.
