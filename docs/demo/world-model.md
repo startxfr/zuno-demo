@@ -334,10 +334,10 @@ The decisions this page rests on:
 
 > **Status:** Rehearsed on 2026-11-15 through `make demo rehearse world-model`: the 5-minute version PASS at 10:50 (12
 > units, 22 s), 1 skipped (`install`); the 15-minute version PASS at 10:52 (21 units, 32 s), 1 skipped (`install`).
-> Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md). This PASS is not
-> show-ready: the demo is switched off (`zuno_world_model_enabled` is `false`), there is no GPU node and the application
-> is not installed, so `check` passed on the dashboard and on a probe that reports the demo as `roadmap`, not on a
-> world. It proves the files and the page play, not the demo. Prerequisites checked read-only on demo333 on 2026-11-12:
+> Evidence: [WP-279](../roadmap/evidence/wp-279-blender-world-model-rehearsals-2026-11-15.md). That PASS was not
+> show-ready: the demo was switched off (`zuno_world_model_enabled` was `false`), there was no GPU node and the application
+> was not installed, so `check` passed on the dashboard and on a probe that reports the demo as `roadmap`, not on a
+> world. It proved that the files and the page play, not the demo. Prerequisites checked read-only on demo333 on 2026-11-12:
 > namespace
 > `zuno-world-model` present with no pods and no world-model Application installed (quota `requests.nvidia.com/gpu`
 > 0/1, SecretStore `vault` Valid); no world-model GPU node. The six world-model MachineSets (g7e.2xlarge, g7e.4xlarge
@@ -352,9 +352,14 @@ The decisions this page rests on:
 > a g7e.8xlarge node in eu-central-1b was ready at 17:21 UTC after a 45-minute capacity search, the runtime image was
 > rebuilt at 18:06 UTC (the internal registry no longer held the one of 2026-11-09), the install was green at 18:08 UTC
 > and the golden-path probe `world-model` passed (a world created, 460 frames, `waypoint-1.5-1b`, `nvenc`, an edit
-> applied in 1.2 s). No rehearsal through `make demo rehearse` is recorded since. The switch goes back to `false` and
+> applied in 1.2 s). The golden path was 15 out of 15 at 18:15 UTC, this probe included. `make demo rehearse world-model 5` at
+> 18:19 UTC on the installed demo: PASS in 41 s (`status` and `check` PASS; the steps 0:00 to 4:00 are done in the
+> browser and have nothing to run; `install` skipped, the owner creates the GPU node by hand; `uninstall` lists the
+> owner's manual steps and changes nothing). The 15-minute version was not rehearsed on the installed demo. The switch goes back to `false` and
 > the node is uninstalled after the demonstration; it bills until then.
 > **Show-ready ([ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> not show-ready: the GPU node is off.
+> yes since 2026-11-23, for the demonstration of 2026-11-24, golden-path probe `world-model`: the owner decided
+> "rehearse, then show-ready" and the rehearsal above passed. It holds while the GPU node is on. The way back is the
+> Uninstall section of this page; once the node is removed the page is not show-ready again.
 > **Personas:** see [Personas](#personas).
-> **Used in workshops:** none while it is not show-ready.
+> **Used in workshops:** none.
