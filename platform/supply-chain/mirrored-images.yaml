@@ -38,7 +38,7 @@ images:
     tag: "1.29.3"
     pin: digest
     signature: none
-    reason: Dify (gitops/charts/dify)
+    reason: Dify (gitops/charts/dify) and the demo guide (gitops/charts/demo-guide)
   - source: docker.io/library/python
     digest: sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
     tag: "3.12-slim"

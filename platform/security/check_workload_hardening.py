@@ -48,6 +48,8 @@ DEPLOYMENT_CHARTS = [
     "mcp-aap",
     # ADR-0604/WP-235: the world-model experience (the GPU runtime, the web tier, the front door).
     "world-model",
+    # WP-330/ADR-0627: the demo guide (nginx serving a page from a ConfigMap).
+    "demo-guide",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;

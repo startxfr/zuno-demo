@@ -1,0 +1,50 @@
+# nginx for restricted-v2: port 8080, every writable path under /tmp (an emptyDir), the root filesystem read-only.
+# The Content-Security-Policy admits only this origin and the one that serves the animations. `style-src 'unsafe-inline'`
+# is needed: the page sets one custom property (a layer colour) through a style attribute; it carries no user content.
+# `expires` (not add_header) sets Cache-Control, so the server-level headers stay inherited by every location.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-guide-nginx
+  labels:
+    app.kubernetes.io/name: demo-guide
+    zuno.io/managed-by: argocd
+data:
+  nginx.conf: |
+    worker_processes 1;
+    error_log /dev/stderr warn;
+    pid /tmp/nginx.pid;
+    events { worker_connections 256; }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      access_log /dev/stdout;
+      sendfile on;
+      server_tokens off;
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path /tmp/proxy_temp;
+      fastcgi_temp_path /tmp/fastcgi_temp;
+      uwsgi_temp_path /tmp/uwsgi_temp;
+      scgi_temp_path /tmp/scgi_temp;
+      server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/guide;
+        index index.html;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self'; img-src 'self' {{ .Values.gifOrigin }} data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" always;
+        location = /healthz {
+          access_log off;
+          default_type text/plain;
+          return 200 "ok\n";
+        }
+        location = /data.json { expires -1; }
+        location = /index.html { expires -1; }
+        location / {
+          expires 5m;
+          try_files $uri $uri/ =404;
+        }
+      }
+    }

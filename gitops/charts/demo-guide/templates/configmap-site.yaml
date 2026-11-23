@@ -1,0 +1,12 @@
+# The page: index.html, app.css, app.js, qrcode.min.js and data.json (files/, written by platform/demo/guide.py).
+# Mounted as a directory (no subPath) so that a new version of this ConfigMap reaches the running pod within about a
+# minute, with no restart. The whole object stays well under the 1 MiB a ConfigMap holds (the generator refuses 700 KB).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-guide-site
+  labels:
+    app.kubernetes.io/name: demo-guide
+    zuno.io/managed-by: argocd
+data:
+{{ (.Files.Glob "files/*").AsConfig | indent 2 }}

@@ -1,0 +1,1672 @@
+{
+ "domain": "apps.demo333.startx.fr",
+ "repo": "startxfr/zuno-demo",
+ "ref": "devel",
+ "layers": [
+  {
+   "id": "ui",
+   "title": "UI",
+   "blurb": "What the audience sees: chat, agent studios and assistants.",
+   "links": [
+    {
+     "name": "Open WebUI",
+     "url": "https://open-webui.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Continue with Keycloak",
+     "account": "sale-01 or consultant-02",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "UnifAI",
+     "url": "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Keycloak",
+     "account": "consultant-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Dify",
+     "url": "https://dify.apps.demo333.startx.fr",
+     "auth": "local",
+     "login": "Dify's own form",
+     "account": "dify-admin@zuno.local",
+     "secret": "Vault zuno/dify/admin"
+    },
+    {
+     "name": "kagent",
+     "url": "https://kagent.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Keycloak, through the front door",
+     "account": "ai-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "OpenClaw, consultant-02",
+     "url": "https://assistant-zuno-claw-consultant-02.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Keycloak",
+     "account": "consultant-02",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "OpenClaw, sale-01",
+     "url": "https://assistant-zuno-claw-sale-01.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Keycloak",
+     "account": "sale-01",
+     "secret": "Vault keycloak/demo-personas"
+    }
+   ]
+  },
+  {
+   "id": "gateway",
+   "title": "AI gateway",
+   "blurb": "The governed entry points to models and agents: quotas, identity, routing.",
+   "links": [
+    {
+     "name": "MaaS",
+     "url": "https://maas.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call with a key from the MaaS portal",
+     "account": "",
+     "secret": "No password: a key per user"
+    },
+    {
+     "name": "ai-gateway",
+     "url": "https://ai-gateway.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call with an access token",
+     "account": "",
+     "secret": "Never displayed"
+    },
+    {
+     "name": "Praxis",
+     "url": "https://praxis.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call with an access token",
+     "account": "",
+     "secret": "Never displayed"
+    },
+    {
+     "name": "Quota demo, Arkos",
+     "url": "https://arkos-quota-demo.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call",
+     "account": "",
+     "secret": "Never displayed"
+    },
+    {
+     "name": "Quota demo, Comage",
+     "url": "https://comage-quota-demo.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call",
+     "account": "",
+     "secret": "Never displayed"
+    },
+    {
+     "name": "Quota demo, Tekos",
+     "url": "https://tekos-quota-demo.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "API call",
+     "account": "",
+     "secret": "Never displayed"
+    },
+    {
+     "name": "Data Science Gateway",
+     "url": "https://rh-ai.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in, which is Keycloak",
+     "account": "ai-dev-01 or paas-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "EvalHub",
+     "url": "https://zuno-evalhub-zuno-ai-run.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "No form: an OpenShift token (oc whoami -t) in an Authorization header, otherwise 401 or 403",
+     "account": "",
+     "secret": "No password: a token"
+    },
+    {
+     "name": "Guardrails smoke test",
+     "url": "https://zuno-guardrails-smoke-built-in-zuno-ai-run.apps.demo333.startx.fr",
+     "auth": "none",
+     "login": "No sign-in seen on the deployments (not tried in a browser)",
+     "account": "",
+     "secret": "None"
+    }
+   ]
+  },
+  {
+   "id": "mlops",
+   "title": "MLOps and inference",
+   "blurb": "Where models are catalogued, trained, evaluated and stored.",
+   "links": [
+    {
+     "name": "OpenShift AI dashboard",
+     "url": "https://rhods-dashboard-redhat-ods-applications.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in, which is Keycloak",
+     "account": "ai-dev-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Model catalog",
+     "url": "https://model-catalog.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in, which is Keycloak",
+     "account": "ai-dev-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "MLOps pipelines (API)",
+     "url": "https://ds-pipeline-mlops-dspa-zuno-mlops.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "No sign-in page: an OpenShift token for the API; use the OpenShift AI dashboard for the UI",
+     "account": "",
+     "secret": "No password: a token"
+    },
+    {
+     "name": "Quay registry",
+     "url": "https://quay-quay-zuno-registry.apps.demo333.startx.fr",
+     "auth": "local",
+     "login": "Local superuser",
+     "account": "quayadmin",
+     "secret": "Vault zuno/registry/quay-admin (username, password, token)"
+    }
+   ]
+  },
+  {
+   "id": "infra",
+   "title": "Infrastructure",
+   "blurb": "The platform underneath: cluster, identity, automation, observability, trust.",
+   "links": [
+    {
+     "name": "OpenShift console",
+     "url": "https://console-openshift-console.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in, which is Keycloak (an htpasswd provider is the fallback)",
+     "account": "paas-ops-01 (cluster-admin)",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Argo CD",
+     "url": "https://openshift-gitops-server-openshift-gitops.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "Log in with OpenShift",
+     "account": "paas-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Keycloak admin",
+     "url": "https://keycloak.apps.demo333.startx.fr",
+     "auth": "local",
+     "login": "Administration console, realm master",
+     "account": "admin",
+     "secret": "Secret zuno-auth/keycloak-admin, key password"
+    },
+    {
+     "name": "AAP",
+     "url": "https://aap.apps.demo333.startx.fr",
+     "auth": "keycloak",
+     "login": "Keycloak. The local admin is a break-glass account: never on stage",
+     "account": "paas-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Grafana",
+     "url": "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "SSO only (the login form is off); access follows the ocp-* groups",
+     "account": "ai-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Tempo (Jaeger UI)",
+     "url": "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in behind an oauth-proxy",
+     "account": "paas-ops-01 (cluster-admin)",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Kiali",
+     "url": "https://kiali-zuno-mesh.apps.demo333.startx.fr",
+     "auth": "openshift",
+     "login": "OpenShift sign-in",
+     "account": "paas-ops-01 or ai-ops-01",
+     "secret": "Vault keycloak/demo-personas"
+    },
+    {
+     "name": "Trusted Artifact Signer console",
+     "url": "https://console-ui-zuno-rhtas.apps.demo333.startx.fr",
+     "auth": "none",
+     "login": "No sign-in seen on the deployments (not tried in a browser)",
+     "account": "",
+     "secret": "None"
+    },
+    {
+     "name": "Vault",
+     "url": "https://vault-zuno-vault.apps.demo333.startx.fr",
+     "auth": "unconfirmed",
+     "login": "Not confirmed: the root token is revoked and access goes through Kubernetes and AppRole. Ask the owner",
+     "account": "",
+     "secret": "Not confirmed"
+    }
+   ]
+  }
+ ],
+ "personas": [
+  {
+   "name": "sale-01",
+   "role": "Salesperson",
+   "where": "Open WebUI, OpenClaw"
+  },
+  {
+   "name": "consultant-01",
+   "role": "Consultant and architect",
+   "where": "UnifAI"
+  },
+  {
+   "name": "consultant-02",
+   "role": "Consultant and architect",
+   "where": "Open WebUI, Dify, OpenClaw, Lightspeed"
+  },
+  {
+   "name": "ai-dev-01",
+   "role": "AI developer",
+   "where": "OpenShift AI, MaaS keys"
+  },
+  {
+   "name": "ai-ops-01",
+   "role": "AI platform operator",
+   "where": "kagent, Grafana, Tempo"
+  },
+  {
+   "name": "paas-ops-01",
+   "role": "Platform operator, cluster-admin",
+   "where": "OpenShift console, Argo CD, AAP"
+  }
+ ],
+ "passwords_note": "All personas share one password, kept in Vault at keycloak/demo-personas. It is never written in this page.",
+ "groups": [
+  {
+   "id": "experiences",
+   "title": "Experiences",
+   "demos": [
+    {
+     "id": "claude-code-sovereign",
+     "title": "Claude Code on sovereign models - a coding agent that stays in the cluster",
+     "kind": "scenario",
+     "shows": "Claude Code on the presenter's workstation, signed in by Keycloak device code, its calls translated by the alternative gateway for a local model, each tool approved on the laptop, the trace and the firewall as proof that no model call leaves the cluster",
+     "message": "A coding agent on the developer's laptop, on our own models, under the developer's own identity. The model calls never go to a SaaS provider.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer. Group ocp-ai-dev.",
+       "role": "Signs in on the workstation and codes in both versions."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops.",
+       "role": "Shows the trace and the metrics."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal, in the 15-minute version."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://ai-gateway.apps.demo333.startx.fr",
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/claude-code-sovereign.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/claude-code-sovereign.md"
+    },
+    {
+     "id": "dify",
+     "title": "Dify - a no-code canvas on the governed backend",
+     "kind": "scenario",
+     "shows": "The three imported apps (agent, chatflow, workflow), the External Knowledge adapter, every call made as consultant-02 through the token proxy",
+     "message": "Business users can draw their own AI apps. The models, tools, documents and budget behind them stay the platform's.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with six Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces)…",
+       "role": "Signs in through the front door in both versions and runs the three applications."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the dashboard in the 15-minute version."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal: the probe before the session and the terminal step of the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://dify.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/dify.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/dify.md"
+    },
+    {
+     "id": "kagent",
+     "title": "kagent - a read-only cluster operations assistant",
+     "kind": "scenario",
+     "shows": "Cluster diagnosis with five governed read-only tools, a Secret read refused, acting as ai-ops-01 through the token proxy",
+     "message": "An operations assistant may read the cluster through the same gateway, identity and audit as every other tool. It never sees a secret and cannot change anything.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included), agent_tekos, openwebui_admin.",
+       "role": "Signs in to kagent in both versions. Shows the dashboard in the 15-minute version."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal: the probe before the session and the terminal steps of the 15-minute version."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with its Confluence subgroups, agent_tekos, agent_arkos, aap_ops.",
+       "role": "Optional contrast in the 15-minute version: the refusal at the door."
+      }
+     ],
+     "urls": [
+      "https://kagent.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/kagent.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/kagent.md"
+    },
+    {
+     "id": "lightspeed",
+     "title": "OpenShift Lightspeed - the console assistant served by MaaS",
+     "kind": "scenario",
+     "shows": "The console assistant on a local model through MaaS, cluster reads with the user's own rights, Zuno tools through the mcp-gateway",
+     "message": "The console's own assistant runs on our model, on our GPUs, within a budget, and it sees only what the person asking may see.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. OpenShift groups, synced from Keycloak at sign-in: consultant and its six Confluence subgroups, agent_tekos…",
+       "role": "Asks the questions of both versions."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Group sales.",
+       "role": "The contrast of the 15-minute version. On 2026-11-12 it had never signed in to OpenShift on demo333 (no user, no sales group)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version. On 2026-11-12 it had never signed in to OpenShift on demo333 either; kube:admin with a token works too."
+      }
+     ],
+     "urls": [
+      "https://console-openshift-console.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/lightspeed.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/lightspeed.md"
+    },
+    {
+     "id": "open-webui",
+     "title": "Open WebUI - a familiar chat on governed models and tools",
+     "kind": "scenario",
+     "shows": "SSO, \"Zuno\" and \"Zuno Code\" models, tools by group",
+     "message": "Bring any chat UI you like: identity, models, tools and budget stay governed by the platform.",
+     "personas": [
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The everyday employee of the 5-minute version: signs in, chats, switches to Zuno Code, opens the Integrations menu, where the connection Zuno tools is on. Its three tools are said, not shown."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with its Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces)…",
+       "role": "The contrast of the 15-minute version: the same screen and the same connection, a wider tool set that is said, not shown, and an answer built from Confluence with the consultant's own rights."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces), openwebui_admin.",
+       "role": "Shows the dashboards in the 15-minute version: which model served each turn, the tool calls, the shared budget."
+      }
+     ],
+     "urls": [
+      "https://open-webui.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/open-webui.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/open-webui.md"
+    },
+    {
+     "id": "openclaw",
+     "title": "OpenClaw - one personal assistant per persona",
+     "kind": "scenario",
+     "shows": "One assistant per persona, two sign-ins, token injected by the egress proxy, Confluence for consultant-02 and not for sale-01",
+     "message": "Everyone can have their own AI assistant. It holds no key, it cannot reach the internet, and the platform decides which models and tools it may use.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with six Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces)…",
+       "role": "The owner of the 5-minute version: signs in twice and asks its assistant for the onboarding pages in Confluence. Asks a code question in the 15-minute version."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The contrast of the 15-minute version: same software, fewer tools, and refused at consultant-02's front door."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the dashboard of the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://assistant-zuno-claw-consultant-02.apps.demo333.startx.fr",
+      "https://assistant-zuno-claw-sale-01.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/openclaw.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/openclaw.md"
+    },
+    {
+     "id": "unifai-agents",
+     "title": "UnifAI - governed agents in team and personal workspaces",
+     "kind": "scenario",
+     "shows": "Workspaces from Keycloak groups, Tekos from the signed release, cluster tools for ai-ops-01 only, starters and templates",
+     "message": "Agents are published from a signed release, and what an agent may do follows the person who asks. UnifAI holds no model key and no tool credential.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant (with its Confluence subgroups), agent_tekos, agent_arkos, aap_ops.",
+       "role": "Main persona of the 5-minute version: sees its workspaces, asks Tekos, gets a generic answer to a cluster question. Shows the consultant team examples in the 15-minute version."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces), agent_tekos, openwebui_admin.",
+       "role": "The contrast of the 5-minute version: same agent, same question, an answer from the live cluster. Shows the starters, the catalog, the built-ins and Grafana in the 15-minute version."
+      },
+      {
+       "name": "consultant-01, sale-01",
+       "profile": "Consultant (front office) and salesperson (front office).",
+       "role": "Named only. The UnifAI live RAG scenario signs them in."
+      }
+     ],
+     "urls": [
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/unifai-agents.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/experiences/unifai-agents.md"
+    },
+    {
+     "id": "unifai-live-rag",
+     "title": "UnifAI - live RAG on your own documents",
+     "kind": "scenario",
+     "shows": "Upload (docling, qwen3-embedding, Qdrant), cited answers, isolation from team workflows and from another persona, optional Confluence resync",
+     "message": "A document you upload is answered from a minute later, with its source. It stays yours: neither a colleague's assistant nor your team's sees it.",
+     "personas": [
+      {
+       "name": "consultant-01",
+       "profile": "Consultant and architect, front office. Group consultant with six Confluence subgroups (build, run and architecture Satellite; architecture OpenShift…",
+       "role": "The presenter's account in both versions: uploads the files, asks the questions, shows the team contrast and the Confluence answer."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The isolation contrast of the 15-minute version: same question, nothing from consultant-01's uploads."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Grafana in the 15-minute version. Does not sign in to UnifAI here."
+      }
+     ],
+     "urls": [
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/unifai-live-rag.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/unifai-live-rag.md"
+    },
+    {
+     "id": "blender-3d",
+     "title": "Blender add-on - a sentence becomes editable 3D objects on a local model",
+     "kind": "scenario",
+     "shows": "A sentence becomes editable Blender objects on a local model, behind the workstation entry and the C3 client floor",
+     "message": "A 3D artist gets editable objects from a sentence. The prompt, the code and the scene never leave the company, and the call is governed like every other experience.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "The 3D artist of both versions. Signs in to the add-on by the device flow at the preflight, then generates and runs the scripts on stage."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the client=\"blender\" series in Grafana in the 15-minute version, from a separate browser profile."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://keycloak.apps.demo333.startx.fr/realms/zuno/protocol/openid-connect/logout",
+      "https://keycloak.apps.demo333.startx.fr/realms/zuno"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/blender-3d.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/blender-3d.md"
+    },
+    {
+     "id": "world-model",
+     "title": "World model - walk into a generated world on an on-demand GPU",
+     "kind": "scenario",
+     "shows": "Walk into a generated world and change it, prompts screened, on an on-demand GPU node",
+     "message": "Generative AI can build a world you walk into and change. The platform keeps it governed: who may use it, what may be asked, what it costs, and a GPU that exists only while it is used.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included), agent_tekos, openwebui_admin.",
+       "role": "The presenter's browser in both versions."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The second visitor and the oc terminal of the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://world-model.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/world-model.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/world-model.md"
+    }
+   ]
+  },
+  {
+   "id": "governance",
+   "title": "Governance",
+   "demos": [
+    {
+     "id": "a2a-delegation-approval",
+     "title": "a2a-gateway - agent-to-agent delegation with a human approval",
+     "kind": "scenario",
+     "shows": "Arkos asks Tekos for a cluster audit with consultant-02's identity, a human approves in UnifAI, the AAP job link, expiry, limits on depth, cycles and budget, the trace",
+     "message": "An agent can ask another agent for help, but never with more rights than the person who asked. And before anything is executed, that person decides.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant (with its Confluence subgroups), agent_arkos, agent_tekos, aap_ops.",
+       "role": "The person who asks Arkos and approves Tekos's request, in both versions. Opens the AAP job in the 15-minute version."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the trace of the delegated call in the 15-minute version."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "Named only, as the counter-example."
+      }
+     ],
+     "urls": [
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://aap.apps.demo333.startx.fr/#/jobs/playbook/<id",
+      "https://aap.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/a2a-delegation-approval.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/a2a-delegation-approval.md"
+    },
+    {
+     "id": "agents-alt-gateway",
+     "title": "Agents on an alternative gateway - one setting, no code change",
+     "kind": "scenario",
+     "shows": "A kagent agent and a Dify app move to the alternative gateway by one setting, no code change; the gateway sees the proxy's identity",
+     "message": "An agent changes gateway with one setting and no code. What it gains is a choice of road. What it loses, we can name.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops, agent_tekos, openwebui_admin.",
+       "role": "Signs in to kagent and to Grafana."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant.",
+       "role": "Signs in to Dify and switches the app's model."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://ai-gateway.apps.demo333.startx.fr",
+      "https://praxis.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/agents-alt-gateway.md"
+    },
+    {
+     "id": "ai-gateway-routing",
+     "title": "ai-gateway - model routing and fallback",
+     "kind": "scenario",
+     "shows": "\"Zuno Code\" to Codestral first, preferred and fallback lists per task, local_only_for, unready models skipped with an immediate 503, the routing decision API",
+     "message": "The platform picks the model for each task, falls back when a model is down, and never waits on a model that is not there.",
+     "personas": [
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The everyday employee of the 5-minute version: asks a code question with Zuno Code."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows which provider served each call (5-minute version), the skipped candidates and the trace (15-minute version)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://open-webui.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/ai-gateway-routing.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/ai-gateway-routing.md"
+    },
+    {
+     "id": "ai-gateway-sovereignty",
+     "title": "ai-gateway - data classification keeps sovereign data on local models",
+     "kind": "scenario",
+     "shows": "C1/C2/C3, the C3 floor keeps Arkos on local models, fail closed, the trace",
+     "message": "Sensitive data stays in the cluster even if the caller says otherwise. When no local model can answer, Zuno refuses rather than leaking.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in both versions: runs the probe and the oc get steps."
+      },
+      {
+       "name": "eval-consultant-01",
+       "profile": "Evaluation copy of consultant-01: group consultant, entitled to Arkos (agent_arkos) and Tekos. Used by the probes only.",
+       "role": "Never on stage."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the trace of the call and the skipped candidates in the 15-minute version."
+      },
+      {
+       "name": "consultant-01, consultant-02",
+       "profile": "Consultants and architects, front office. Entitled to Arkos; consultant-01 also to Tekos.",
+       "role": "consultant-01 is the \"caller who lies\" of the 5-minute version: the result line is what the audience sees. Both are the real users whose client data the C3 floor protects. Not signed in during this scenario."
+      }
+     ],
+     "urls": [
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/ai-gateway-sovereignty.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/ai-gateway-sovereignty.md"
+    },
+    {
+     "id": "guardrails",
+     "title": "ai-gateway - guardrails on every model call",
+     "kind": "scenario",
+     "shows": "A prompt injection detected in observe mode through Dify, the TrustyAI dashboard, the mode per classification level, what blocking would do",
+     "message": "Every experience gets the same guardrails, in one place. Today they watch and record; blocking is a policy switch, turned on with evidence.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with six Confluence subgroups, agent_tekos, agent_arkos, aap_ops.",
+       "role": "Sends the injection prompt in Dify in the 5-minute version."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the guardrails panel (5-minute version), the TrustyAI dashboard and the trace (15-minute version)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://dify.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/guardrails.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/guardrails.md"
+    },
+    {
+     "id": "identity-personas",
+     "title": "Keycloak - one identity, groups drive every entitlement",
+     "kind": "scenario",
+     "shows": "One Keycloak account, three group dimensions, the same group opening a workspace and a tool set, OpenShift groups at first sign-in, service accounts, negative fixtures",
+     "message": "One company account, and its groups decide everything: which agents, which tools and data, which cluster rights, in every application.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant with six Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces)…",
+       "role": "Profile 1, in both versions: the person the groups open doors for."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "Profile 2, in the 5-minute version: the same screens with other groups."
+      },
+      {
+       "name": "ai-dev-01, ai-ops-01, paas-dev-01",
+       "profile": "AI developer, AI platform operator, platform developer, back office. Groups ocp-ai-dev, ocp-ai-ops, ocp-paas-dev, each with agent_tekos.",
+       "role": "Named in the 15-minute version: the cluster-access dimension."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      },
+      {
+       "name": "tekos-entitlement-only-user-01, consultant-role-only-user-01",
+       "profile": "Negative fixtures of the rule that separates agent entitlement from business role: agent_tekos only, consultant only. Similar fixtures exist for Arkos, Comage…",
+       "role": "Named in the 15-minute version. Never signed in on stage."
+      }
+     ],
+     "urls": [
+      "https://keycloak.apps.demo333.startx.fr/realms/zuno",
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://open-webui.apps.demo333.startx.fr",
+      "https://console-openshift-console.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/identity-personas.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/identity-personas.md"
+    },
+    {
+     "id": "mcp-tools-by-group",
+     "title": "mcp-gateway - the same tools for every experience, filtered by who you are",
+     "kind": "scenario",
+     "shows": "The same question from two personas, two tool sets, the five checks, signed markers, the delegated-credential refusal, one audit",
+     "message": "Same question, different person, different tools. Who you are decides which tools you get, in every experience, and every call is recorded in one place.",
+     "personas": [
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "Browser profile 1 of the 5-minute version: asks the Confluence question and gets no Confluence tool."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant with six Confluence subgroups (build OpenShift and OpenShift AI, the four architecture spaces)…",
+       "role": "Browser profile 2 of the 5-minute version: the same question, answered from Confluence."
+      },
+      {
+       "name": "finance-01",
+       "profile": "Finance, middle office. Groups finance, agent_finage.",
+       "role": "Optional browser profile 3 of the 15-minute version: a narrower list, and a delegated-credential refusal."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the audit panels in the 15-minute version."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin). Must have signed in to OpenShift once.",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://open-webui.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/mcp-tools-by-group.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/mcp-tools-by-group.md"
+    },
+    {
+     "id": "multi-gateway",
+     "title": "Multi-gateway - the same clients on the default gateway and on an alternative one",
+     "kind": "scenario",
+     "shows": "The same clients on the default gateway and on an alternative one: Open WebUI and kagent in 5 minutes, every wired client in 15, the traces side by side, what the alternative road does not enforce",
+     "message": "The same client, the same sign-in, two gateways. The default one governs everything; the alternative one is a choice we make with open eyes, and we say what it does not enforce.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops, agent_tekos, openwebui_admin.",
+       "role": "Signs in to both clients in both versions, and shows the traces and the dashboard."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal, in the 15-minute version."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Group consultant.",
+       "role": "Named in the 15-minute version, for the clients that cannot forward the user's token."
+      },
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer. Group ocp-ai-dev.",
+       "role": "Named in the 15-minute version, for the clients that run on the workstation."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://ai-gateway.apps.demo333.startx.fr",
+      "https://praxis.apps.demo333.startx.fr",
+      "https://maas.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/multi-gateway.md"
+    },
+    {
+     "id": "quotas",
+     "title": "ai-gateway - one token budget per persona across the experiences",
+     "kind": "scenario",
+     "shows": "One token budget per persona across the experiences, the 2026-11-03 evidence, MaaS budgets versus persona budgets, fail-closed classes, the per-turn ceiling",
+     "message": "One person, one budget, whatever the screen. Spending it in one experience spends it in all of them.",
+     "personas": [
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The persona of the 2026-11-03 proof, quoted in the 5-minute version. Signs in to Open WebUI and UnifAI in the optional replay."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the budget panel (5-minute version) and the persona on the trace (15-minute version)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      },
+      {
+       "name": "eval-consultant-01 and the other eval-* accounts",
+       "profile": "Evaluation copies of the personas, in the group zuno-evaluation. Never signed in on stage.",
+       "role": "Named only, in the limits."
+      }
+     ],
+     "urls": [
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/quotas.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/governance/quotas.md"
+    }
+   ]
+  },
+  {
+   "id": "rhoai",
+   "title": "OpenShift AI and models",
+   "demos": [
+    {
+     "id": "evaluation-trustyai-evalhub",
+     "title": "RHOAI TrustyAI - evaluating models and agents before they change",
+     "kind": "scenario",
+     "shows": "RAGAS and Garak scores on the TrustyAI dashboard, 20 scenarios per agent at 75%, EvalHub and its RBAC, Kueue admitting the evaluation Jobs, LMEvalJobs off on 3.6 EA",
+     "message": "Models and agents are measured before they change: a benchmark, the quality of the RAG answers, jailbreak resistance, and twenty scenarios per agent with a 75% bar. The results stay visible, failures included.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included), agent_tekos, openwebui_admin.",
+       "role": "Shows the TrustyAI dashboard in the 5-minute version."
+      },
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "Shows the Evaluations page in the 15-minute version. Does not start a run."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://rh-ai.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/evaluation-trustyai-evalhub.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/evaluation-trustyai-evalhub.md"
+    },
+    {
+     "id": "external-models",
+     "title": "RHOAI external models - SaaS models published through MaaS, callable by the router only",
+     "kind": "scenario",
+     "shows": "Mistral Large and OVHcloud gpt-oss-120b published as ExternalModels, subscribed by the ai-gateway only, the ipp-managed label trap, C1/C2 eligibility, SaaS still called directly by the gateway",
+     "message": "SaaS models are governed like our own: one catalogue, and one caller allowed, the platform's router. Nobody sends data to a SaaS model without the classification check.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions. In the 15-minute version its own OpenShift token is refused on a SaaS model."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows in the 15-minute version which SaaS providers served calls."
+      },
+      {
+       "name": "finance-01",
+       "profile": "Finance, middle office. Groups finance, agent_finage.",
+       "role": "Named only."
+      },
+      {
+       "name": "consultant-01",
+       "profile": "Consultant and architect, front office. Group consultant and its Confluence subgroups.",
+       "role": "Named only: asked the question of the Codestral-down drill of 2026-11-05."
+      }
+     ],
+     "urls": [
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/external-models.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/external-models.md"
+    },
+    {
+     "id": "genai-playground",
+     "title": "RHOAI GenAI playground - chat, a cited document and governed MCP tools",
+     "kind": "scenario",
+     "shows": "The ready-made playground: chat on gpt-oss-20b through MaaS, a document answered with a citation, MCP tools with the user's own OpenShift token (9 tools for ocp-ai-ops, 0 for ocp-ai-dev)",
+     "message": "Developers and operators try our models, their own documents and our tools in Red Hat's playground. The platform still decides which model budget and which tools each person gets.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces, zuno-playground included), agent_tekos, openwebui_admin.",
+       "role": "The operator of the 5-minute version: chats, connects the tools, has the cluster read. Uploads the document in the 15-minute version."
+      },
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "The contrast of the 15-minute version: same playground, same model, zero tools."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal/",
+      "https://oauth-openshift.apps.demo333.startx.fr/oauth/token/request"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/genai-playground.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/genai-playground.md"
+    },
+    {
+     "id": "lora-pipeline-mlflow-kueue",
+     "title": "RHOAI pipelines - from a dataset to a fine-tuned LoRA adapter",
+     "kind": "scenario",
+     "shows": "A past pipeline run, the TrainJob on a scale-from-zero GPU node, MLflow tracking, the adapter registered and served (recorded evidence), the packed LoRA module trap",
+     "message": "A fine-tuned model is a build artefact like any other. A pipeline trains it, MLflow records it, the agent's own tests gate it, and it is served only after a human approves the change in Git.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces, zuno-mlops included), agent_tekos.",
+       "role": "Shows the pipeline, the training job and the experiment in the RHOAI dashboard (5-minute version)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://rh-ai.apps.demo333.startx.fr",
+      "https://rh-ai.apps.demo333.startx.fr/mlflow"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/lora-pipeline-mlflow-kueue.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/lora-pipeline-mlflow-kueue.md"
+    },
+    {
+     "id": "maas-portal-api-keys",
+     "title": "RHOAI Models-as-a-Service - a self-service API key with a governed budget",
+     "kind": "scenario",
+     "shows": "A self-service key on a group subscription, token limits, revocation",
+     "message": "A developer gets a governed model key in one minute, without a ticket. The platform still decides which models, how many tokens per hour, and can revoke it.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Group ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "The developer of the 5-minute version: signs in to the portal, creates a key, calls the model from a terminal."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included).",
+       "role": "Shows the Mesh & gateway dashboard in the 15-minute version. Can replace ai-dev-01 as the key creator."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal for the subscription and policy steps of the 15-minute version."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Group sales.",
+       "role": "Named only, as the contrast of budgets by group. Not signed in during this scenario."
+      }
+     ],
+     "urls": [
+      "https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal/",
+      "https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/maas-portal-api-keys.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/maas-portal-api-keys.md"
+    },
+    {
+     "id": "model-catalog-registry",
+     "title": "RHOAI model catalog and model registry - from a curated model to a recorded version",
+     "kind": "scenario",
+     "shows": "Red Hat's curated catalog, the dashboard route trap, a registry gated on the evaluation",
+     "message": "A developer starts from a curated catalog. A trained model is recorded with its version and its artifact, and it serves only after a reviewed change.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "The developer of the 5-minute version: signs in to the dashboard and browses the catalog."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal in the 15-minute version."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, and on rhoai-model-registries).",
+       "role": "Can replace ai-dev-01 in the browser."
+      }
+     ],
+     "urls": [
+      "https://rh-ai.apps.demo333.startx.fr/",
+      "https://model-catalog.apps.demo333.startx.fr/api/model_catalog/v1alpha1/sources",
+      "https://rhods-dashboard-redhat-ods-applications.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/model-catalog-registry.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/model-catalog-registry.md"
+    },
+    {
+     "id": "model-serving-llmd-mig",
+     "title": "KServe and llm-d - local models on MIG GPU slices",
+     "kind": "scenario",
+     "shows": "Five models on MIG slices of two 96 GB cards, the GPU quota and its wedged rollouts, hardware profiles, autoscaling, the scale-from-zero training node, the failover drill",
+     "message": "Five models run on two GPUs we own. Each is declared in Git, sized to a GPU slice and capped by a quota.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces, zuno-ai-run and zuno-monitoring included), agent_tekos, openwebui_admin.",
+       "role": "Shows the vLLM throughput panel (5-minute version) and the GPU panels (15-minute version). Can run the zuno-ai-run steps if the paas-ops-01 terminal fails."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "Named only: the failover drill asks Comage a question as sale-01."
+      },
+      {
+       "name": "consultant-01",
+       "profile": "Consultant and architect, front office. Group consultant, agent_tekos, among others.",
+       "role": "Named only: the drill's control question to Tekos."
+      }
+     ],
+     "urls": [
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://console-openshift-console.apps.demo333.startx.fr",
+      "https://maas.apps.demo333.startx.fr/zuno-ai-run/<name"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/model-serving-llmd-mig.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/rhoai/model-serving-llmd-mig.md"
+    }
+   ]
+  },
+  {
+   "id": "foundation",
+   "title": "Foundation and trust",
+   "demos": [
+    {
+     "id": "aap-audited-operations",
+     "title": "Ansible Automation Platform - audited operations",
+     "kind": "scenario",
+     "shows": "Job templates and workflows from Git, reader versus ops rights in the AAP UI, a check job and its pod, the agents' audit tools and their rate limit",
+     "message": "Our operations run as jobs defined in Git, and each job is recorded with who launched it. People get the rights of their group. An agent may read that history and launch one read-only audit, nothing more.",
+     "personas": [
+      {
+       "name": "consultant-03",
+       "profile": "Consultant (run), front office. Groups consultant with Confluence run OpenShift and Keycloak, agent_tekos, aap_reader.",
+       "role": "Signs in to AAP in the 5-minute version."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant with its Confluence subgroups, agent_tekos, agent_arkos, aap_ops.",
+       "role": "Launches zuno-day0-check in the 15-minute version."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in the 15-minute version. Does not sign in to AAP on stage."
+      },
+      {
+       "name": "consultant-01",
+       "profile": "Consultant and architect, front office. Groups consultant with six Confluence subgroups, four agent_* groups, aap_admin.",
+       "role": "Named only: a business persona with superuser rights in AAP."
+      },
+      {
+       "name": "paas-dev-01",
+       "profile": "Platform developer, back office. Groups ocp-paas-dev (cluster-reader), agent_tekos, aap_ops.",
+       "role": "Named only: the persona the ops tier was tested with."
+      }
+     ],
+     "urls": [
+      "https://aap.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/aap-audited-operations.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/aap-audited-operations.md"
+    },
+    {
+     "id": "gitops-day0-3",
+     "title": "GitOps and Day 0-3 - the install and operations contract",
+     "kind": "scenario",
+     "shows": "make dN verb component and its four days, which verbs are read-only, the Argo CD Applications on devel, the known-good and drift checks, the golden path, freeze and canary rules",
+     "message": "The platform is the repository. One command installs or checks any piece of it, Argo CD keeps the cluster equal to Git, and before any live session we prove each moment with a real answer.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions; the Argo CD UI, optional, in the 15-minute version."
+      },
+      {
+       "name": "paas-dev-01",
+       "profile": "Platform developer, back office. Groups ocp-paas-dev (cluster-reader), agent_tekos, aap_ops.",
+       "role": "Named only: a developer may resync an Application, never change what it deploys."
+      }
+     ],
+     "urls": [
+      "https://openshift-gitops-server-openshift-gitops.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/gitops-day0-3.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/gitops-day0-3.md"
+    },
+    {
+     "id": "image-signing-admission",
+     "title": "Supply chain - signed images, admission policy and the internal Quay",
+     "kind": "scenario",
+     "shows": "RHTAS in the cluster, image policies in enforce mode, images pinned by digest and pulled from Quay through mirror sets, the verify Job and the release ledger, the mirror-set drain trap",
+     "message": "What runs here is signed, and the signer is named. In the namespaces that opted in, the cluster refuses an image whose signature does not match, and it reads images and signatures from our own registry.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://console-ui-zuno-rhtas.apps.demo333.startx.fr",
+      "https://quay-quay-zuno-registry.apps.demo333.startx.fr"
+     ],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/image-signing-admission.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/image-signing-admission.md"
+    },
+    {
+     "id": "observability-trace",
+     "title": "Observability - one turn traced, every call counted",
+     "kind": "scenario",
+     "shows": "A Tekos turn found in Tempo with its span tags, the Run Trace dashboard, usage and cost per experience, the collector pipeline, two counting traps, Perses in the console",
+     "message": "Every model and tool call leaves a count and a trace: who asked, from which experience, which agent and model, and what it cost.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant (with its Confluence subgroups), agent_tekos, agent_arkos, aap_ops: ten Keycloak groups in all.",
+       "role": "Browser profile 1, 5-minute version: asks Tekos one question. That turn is the run traced in both versions."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Groups ocp-ai-ops (admin on the Zuno namespaces, zuno-monitoring included, RoleBinding zuno-ocp-ai-ops-admin), agent_tekos…",
+       "role": "Browser profile 2, both versions: finds the trace, then opens the Run Trace and Usage & cost dashboards."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal and OpenShift console in the 15-minute version. Must have signed in to OpenShift once: on 2026-11-13 the group ocp-paas-ops did not exist on demo333."
+      },
+      {
+       "name": "eval-consultant-01",
+       "profile": "Evaluation copy of consultant-01. Never signed in on stage.",
+       "role": "Named only: the identity behind the probe result."
+      }
+     ],
+     "urls": [
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://tempo-jaegerui-zuno-monitoring.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr",
+      "https://console-openshift-console.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/observability-trace.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/observability-trace.md"
+    },
+    {
+     "id": "okf-signed-agent-release",
+     "title": "OKF agents release - agents signed in their own repository, admitted by digest",
+     "kind": "scenario",
+     "shows": "An agent's sheet in its own repository, one digest in agents.lock, okf-fetch VERIFIED from the internal Quay, offline admission, promotion by pull request, revocation",
+     "message": "Agents run only from a signed release, owned by the business, chosen by digest and reviewed like code. If the signature does not verify, the component does not start.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on the Zuno namespaces).",
+       "role": "Named only. Not signed in."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant, agent_tekos, agent_arkos.",
+       "role": "Named only: the user whose agents come from this release. Not signed in."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://quay-quay-zuno-registry.apps.demo333.startx.fr",
+      "https://console-ui-zuno-rhtas.apps.demo333.startx.fr",
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr"
+     ],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/okf-signed-agent-release.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/okf-signed-agent-release.md"
+    },
+    {
+     "id": "service-mesh-kiali",
+     "title": "Service mesh - mutual TLS, workload identity and the Kiali graph",
+     "kind": "scenario",
+     "shows": "STRICT mTLS, short-lived SPIFFE identities from Vault PKI, injection versus allowlist, the MaaS gateway on the same mesh, the Kiali graph",
+     "message": "Inside Zuno, the services that hold data, identities and models accept only mutual TLS, and each proves who it is with a one-hour certificate from our own PKI.",
+     "personas": [
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on 18 namespaces, zuno-ai-run and zuno-monitoring included; no rights in zuno-mesh, zuno-auth…",
+       "role": "Opens Kiali (3:15, 5:00) and Grafana (6:30)."
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Group ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions, and the Kiali graph of 5:00."
+      }
+     ],
+     "urls": [
+      "https://kiali-zuno-mesh.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/service-mesh-kiali.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/service-mesh-kiali.md"
+    },
+    {
+     "id": "vault-pki",
+     "title": "Vault and PKI - secrets and certificates without static credentials",
+     "kind": "scenario",
+     "shows": "Vault on Raft with KMS auto-unseal and TLS, ExternalSecrets in every namespace, Let's Encrypt and Vault-issued certificates, Transit signing for the gateways",
+     "message": "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the cluster does not hold, and its signing keys never leave it.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The presenter's oc terminal in both versions."
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on 18 namespaces, zuno-ai-run included; no rights in zuno-vault or zuno-mesh), agent_tekos…",
+       "role": "Fallback terminal for the zuno-ai-run steps. Named in the 15-minute version (6:00)."
+      },
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "role": "Named only: the 2026-11-06 finding that made per-namespace stores necessary."
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://vault-zuno-vault.apps.demo333.startx.fr",
+      "https://kiali-zuno-mesh.apps.demo333.startx.fr"
+     ],
+     "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/vault-pki.gif",
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/foundation/vault-pki.md"
+    }
+   ]
+  },
+  {
+   "id": "resilience",
+   "title": "Resilience",
+   "demos": [
+    {
+     "id": "chaos-infrastructure",
+     "title": "Chaos engineering - the cluster keeps serving",
+     "kind": "scenario",
+     "shows": "The health signal, a chaos run approved in AAP, one Prometheus, one router and one API server pod deleted and replaced, the ClusterOperators still Available; in 15 minutes, CPU, memory and network pressure on one infra node",
+     "message": "we break parts of the cluster on purpose, with a person's approval, and the cluster heals by itself while it keeps serving.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "The only persona on stage, in both versions: the OpenShift console, the oc terminal and the approval in AAP."
+      }
+     ],
+     "urls": [
+      "https://aap.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/resilience/chaos-infrastructure.md"
+    },
+    {
+     "id": "chaos-platform",
+     "title": "Chaos engineering - the AI platform keeps answering",
+     "kind": "scenario",
+     "shows": "A person keeps chatting in Open WebUI while one pod of each gateway is killed after an approval in AAP; in 15 minutes, Open WebUI, UnifAI, Keycloak, the OpenShift AI controllers, a cut to the SaaS provider and, optional, the gpt-oss-20b model pod",
+     "message": "we kill parts of the AI platform on purpose, with a person's approval, and people keep getting answers while it heals.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
+       "role": "Launches and approves the chaos runs, and reads the cluster, in both versions: the OpenShift console, the oc terminal and AAP."
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. Groups sales, agent_comage, agent_finage.",
+       "role": "The everyday employee: keeps chatting in Open WebUI while the platform is broken, in both versions."
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Groups consultant with its Confluence subgroups, agent_tekos, agent_arkos, aap_ops.",
+       "role": "Chats with Tekos in UnifAI while its back end restarts, in the 15-minute version."
+      }
+     ],
+     "urls": [
+      "https://aap.apps.demo333.startx.fr",
+      "https://open-webui.apps.demo333.startx.fr",
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/scenarios/resilience/chaos-platform.md"
+    }
+   ]
+  },
+  {
+   "id": "workshops",
+   "title": "Workshops",
+   "demos": [
+    {
+     "id": "three-experiences",
+     "title": "One backend, three experiences",
+     "kind": "workshop",
+     "shows": "UnifAI, Open WebUI, OpenClaw, then one dashboard block (backend, routing, one budget)",
+     "message": "Three very different screens, one platform behind them: the UI is a choice, the rules are not.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Confluence subgroups, agent_tekos, agent_arkos.",
+       "role": "UnifAI, OpenClaw (its own assistant, with Confluence)"
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. sales, agent_comage, agent_finage.",
+       "role": "Open WebUI, the OpenClaw contrast (no Confluence tool)"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops.",
+       "role": "The UnifAI contrast (Tekos with cluster tools), Grafana"
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://open-webui.apps.demo333.startx.fr",
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://dify.apps.demo333.startx.fr",
+      "https://kagent.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/three-experiences.md"
+    },
+    {
+     "id": "five-experiences",
+     "title": "One governed backend, many experiences",
+     "kind": "workshop",
+     "shows": "UnifAI, Open WebUI, OpenClaw, Dify, kagent, Lightspeed, Blender, then one dashboard block (backend, routing, guardrails, tools, budget)",
+     "message": "Pick the experience your users like. Identity, models, tools, guardrails and budget stay the same, because one governed backend serves all of them.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Confluence subgroups, agent_tekos, agent_arkos.",
+       "role": "UnifAI, OpenClaw (its own assistant, with Confluence), Dify (through the token proxy), Lightspeed"
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. sales, agent_comage, agent_finage.",
+       "role": "Open WebUI, the OpenClaw contrast (its assistant has no Confluence tool)"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops (admin on the Zuno namespaces).",
+       "role": "The UnifAI contrast (Tekos with cluster tools), kagent (through the token proxy), Grafana"
+      },
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. ocp-ai-dev.",
+       "role": "Blender, on the presenter's workstation"
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal: probes and checks before the session"
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://open-webui.apps.demo333.startx.fr",
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://dify.apps.demo333.startx.fr",
+      "https://kagent.apps.demo333.startx.fr",
+      "https://assistant-zuno-claw-consultant-02.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/five-experiences.md"
+    },
+    {
+     "id": "agentic-ai",
+     "title": "Agentic AI",
+     "kind": "workshop",
+     "shows": "UnifAI agents, MCP tools, live RAG, delegation with approval (15-minute version), kagent, the signed agents release, sovereignty",
+     "message": "Agents act with the user's identity, under the user's rights, through governed tools. They delegate only when a human approves, and they run only from a signed release.",
+     "personas": [
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Confluence subgroups, agent_tekos, agent_arkos, aap_ops.",
+       "role": "UnifAI agents, MCP tools (the wider tool set), delegation with approval"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops.",
+       "role": "The UnifAI contrast (Tekos with cluster tools), kagent, Grafana and Tempo"
+      },
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. sales.",
+       "role": "The MCP tools contrast, the RAG isolation check"
+      },
+      {
+       "name": "consultant-01",
+       "profile": "Consultant and architect, front office.",
+       "role": "The live RAG upload"
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal, the signed release block"
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://unifai-ui-zuno-unifai.apps.demo333.startx.fr",
+      "https://kagent.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/workshops/agentic-ai.md"
+    },
+    {
+     "id": "rhoai-end-to-end",
+     "title": "RHOAI end to end",
+     "kind": "workshop",
+     "shows": "Catalog, serving, external models, MaaS key, playground, LoRA pipeline, evaluation",
+     "message": "One platform takes a model from the catalog to a governed, fine-tuned and evaluated service, on GPUs you share and control.",
+     "personas": [
+      {
+       "name": "ai-dev-01",
+       "profile": "AI developer, back office. ocp-ai-dev (edit on the Zuno namespaces), MaaS subscription on gpt-oss-20b.",
+       "role": "Catalog and registry, MaaS key, the playground (no tools), the pipeline and its runs, evaluation"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops (admin on the Zuno namespaces).",
+       "role": "The playground with nine tools, Grafana and the console dashboards"
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal: serving, external models, subscriptions"
+      }
+     ],
+     "urls": [
+      "https://rh-ai.apps.demo333.startx.fr"
+     ],
+     "related": [],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/workshops/rhoai-end-to-end.md"
+    },
+    {
+     "id": "sovereign-governed-ai",
+     "title": "Sovereign and governed AI",
+     "kind": "workshop",
+     "shows": "Identity, tools, sovereignty, routing, guardrails, budget, then the trace",
+     "message": "Every AI request on Zuno is checked for who sends it, where its data may go, which model may answer, what it contains and what it costs, and leaves a trace you can show an auditor.",
+     "personas": [
+      {
+       "name": "sale-01",
+       "profile": "Salesperson, front office. sales.",
+       "role": "Identity, tools (three tools), routing, budget"
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant and architect, front office. Confluence subgroups, agent_tekos, agent_arkos.",
+       "role": "Identity, tools (six tools), guardrails (through Dify)"
+      },
+      {
+       "name": "finance-01",
+       "profile": "Finance, middle office. finance.",
+       "role": "Tools (two tools)"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops (admin on zuno-monitoring).",
+       "role": "Grafana and Tempo in every block that shows a dashboard or a trace"
+      },
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. ocp-paas-ops (cluster-admin).",
+       "role": "The presenter's oc terminal: the sovereignty probe and the configuration steps"
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://ai-gateway.apps.demo333.startx.fr",
+      "https://maas.apps.demo333.startx.fr",
+      "https://grafana-route-zuno-monitoring.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/workshops/sovereign-governed-ai.md"
+    },
+    {
+     "id": "trusted-platform-ops",
+     "title": "Trusted platform and operations",
+     "kind": "workshop",
+     "shows": "GitOps, signed images, signed agents, Vault, mesh, observability (15-minute version), AAP",
+     "message": "What runs is declared, signed and verified. Secrets come from Vault, traffic is encrypted, and every request and operation leaves a trace. The platform can show this, not just claim it.",
+     "personas": [
+      {
+       "name": "paas-ops-01",
+       "profile": "Platform operator, back office. ocp-paas-ops (cluster-admin), aap_admin.",
+       "role": "The presenter's oc terminal in every block"
+      },
+      {
+       "name": "ai-ops-01",
+       "profile": "AI platform operator, back office. ocp-ai-ops (admin on the Zuno namespaces).",
+       "role": "Grafana, Tempo and the mesh dashboards"
+      },
+      {
+       "name": "consultant-02",
+       "profile": "Consultant, front office. aap_ops.",
+       "role": "The AAP block. Its chat in UnifAI also produces the run traced in the observability block."
+      },
+      {
+       "name": "consultant-03",
+       "profile": "Consultant (run), front office. aap_reader.",
+       "role": "The AAP contrast: same screen, read-only rights"
+      }
+     ],
+     "urls": [],
+     "related": [
+      "https://openshift-gitops-server-openshift-gitops.apps.demo333.startx.fr",
+      "https://aap.apps.demo333.startx.fr",
+      "https://console-ui-zuno-rhtas.apps.demo333.startx.fr"
+     ],
+     "gif": null,
+     "page": "https://github.com/startxfr/zuno-demo/blob/devel/docs/demo/workshops/trusted-platform-ops.md"
+    }
+   ]
+  }
+ ]
+}

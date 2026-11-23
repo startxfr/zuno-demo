@@ -1,0 +1,83 @@
+{
+  "_comment": "Curated console links of the demo guide (platform/demo/guide.py). A secret is NEVER written here: `secret` names where the password is kept (a Vault path or a Kubernetes Secret). `sub` is the route's subdomain; the apps domain is a parameter of the generator. `auth`: keycloak | openshift | local | token | none | unconfirmed. Verified on demo333 on 2026-11-23 from the routes and the deployments; a row marked `unconfirmed` was not verified and shows no account.",
+  "layers": [
+    {
+      "id": "ui",
+      "title": "UI",
+      "blurb": "What the audience sees: chat, agent studios and assistants.",
+      "links": [
+        {"name": "Open WebUI", "sub": "open-webui", "auth": "keycloak", "login": "Continue with Keycloak", "account": "sale-01 or consultant-02", "secret": "Vault keycloak/demo-personas"},
+        {"name": "UnifAI", "sub": "unifai-ui-zuno-unifai", "auth": "keycloak", "login": "Keycloak", "account": "consultant-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Dify", "sub": "dify", "auth": "local", "login": "Dify's own form", "account": "dify-admin@zuno.local", "secret": "Vault zuno/dify/admin"},
+        {"name": "kagent", "sub": "kagent", "auth": "keycloak", "login": "Keycloak, through the front door", "account": "ai-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "OpenClaw, consultant-02", "sub": "assistant-zuno-claw-consultant-02", "auth": "keycloak", "login": "Keycloak", "account": "consultant-02", "secret": "Vault keycloak/demo-personas"},
+        {"name": "OpenClaw, sale-01", "sub": "assistant-zuno-claw-sale-01", "auth": "keycloak", "login": "Keycloak", "account": "sale-01", "secret": "Vault keycloak/demo-personas"}
+      ]
+    },
+    {
+      "id": "gateway",
+      "title": "AI gateway",
+      "blurb": "The governed entry points to models and agents: quotas, identity, routing.",
+      "links": [
+        {"name": "MaaS", "sub": "maas", "auth": "token", "login": "API call with a key from the MaaS portal", "account": "", "secret": "No password: a key per user"},
+        {"name": "ai-gateway", "sub": "ai-gateway", "auth": "token", "login": "API call with an access token", "account": "", "secret": "Never displayed"},
+        {"name": "Praxis", "sub": "praxis", "auth": "token", "login": "API call with an access token", "account": "", "secret": "Never displayed"},
+        {"name": "Quota demo, Arkos", "sub": "arkos-quota-demo", "auth": "token", "login": "API call", "account": "", "secret": "Never displayed"},
+        {"name": "Quota demo, Comage", "sub": "comage-quota-demo", "auth": "token", "login": "API call", "account": "", "secret": "Never displayed"},
+        {"name": "Quota demo, Tekos", "sub": "tekos-quota-demo", "auth": "token", "login": "API call", "account": "", "secret": "Never displayed"},
+        {"name": "Data Science Gateway", "sub": "rh-ai", "auth": "openshift", "login": "OpenShift sign-in, which is Keycloak", "account": "ai-dev-01 or paas-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "EvalHub", "sub": "zuno-evalhub-zuno-ai-run", "auth": "token", "login": "No form: an OpenShift token (oc whoami -t) in an Authorization header, otherwise 401 or 403", "account": "", "secret": "No password: a token"},
+        {"name": "Guardrails smoke test", "sub": "zuno-guardrails-smoke-built-in-zuno-ai-run", "auth": "none", "login": "No sign-in seen on the deployments (not tried in a browser)", "account": "", "secret": "None"}
+      ]
+    },
+    {
+      "id": "mlops",
+      "title": "MLOps and inference",
+      "blurb": "Where models are catalogued, trained, evaluated and stored.",
+      "links": [
+        {"name": "OpenShift AI dashboard", "sub": "rhods-dashboard-redhat-ods-applications", "auth": "openshift", "login": "OpenShift sign-in, which is Keycloak", "account": "ai-dev-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Model catalog", "sub": "model-catalog", "auth": "openshift", "login": "OpenShift sign-in, which is Keycloak", "account": "ai-dev-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "MLOps pipelines (API)", "sub": "ds-pipeline-mlops-dspa-zuno-mlops", "auth": "token", "login": "No sign-in page: an OpenShift token for the API; use the OpenShift AI dashboard for the UI", "account": "", "secret": "No password: a token"},
+        {"name": "Quay registry", "sub": "quay-quay-zuno-registry", "auth": "local", "login": "Local superuser", "account": "quayadmin", "secret": "Vault zuno/registry/quay-admin (username, password, token)"}
+      ]
+    },
+    {
+      "id": "infra",
+      "title": "Infrastructure",
+      "blurb": "The platform underneath: cluster, identity, automation, observability, trust.",
+      "links": [
+        {"name": "OpenShift console", "sub": "console-openshift-console", "auth": "openshift", "login": "OpenShift sign-in, which is Keycloak (an htpasswd provider is the fallback)", "account": "paas-ops-01 (cluster-admin)", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Argo CD", "sub": "openshift-gitops-server-openshift-gitops", "auth": "openshift", "login": "Log in with OpenShift", "account": "paas-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Keycloak admin", "sub": "keycloak", "auth": "local", "login": "Administration console, realm master", "account": "admin", "secret": "Secret zuno-auth/keycloak-admin, key password"},
+        {"name": "AAP", "sub": "aap", "auth": "keycloak", "login": "Keycloak. The local admin is a break-glass account: never on stage", "account": "paas-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Grafana", "sub": "grafana-route-zuno-monitoring", "auth": "openshift", "login": "SSO only (the login form is off); access follows the ocp-* groups", "account": "ai-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Tempo (Jaeger UI)", "sub": "tempo-jaegerui-zuno-monitoring", "auth": "openshift", "login": "OpenShift sign-in behind an oauth-proxy", "account": "paas-ops-01 (cluster-admin)", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Kiali", "sub": "kiali-zuno-mesh", "auth": "openshift", "login": "OpenShift sign-in", "account": "paas-ops-01 or ai-ops-01", "secret": "Vault keycloak/demo-personas"},
+        {"name": "Trusted Artifact Signer console", "sub": "console-ui-zuno-rhtas", "auth": "none", "login": "No sign-in seen on the deployments (not tried in a browser)", "account": "", "secret": "None"},
+        {"name": "Vault", "sub": "vault-zuno-vault", "auth": "unconfirmed", "login": "Not confirmed: the root token is revoked and access goes through Kubernetes and AppRole. Ask the owner", "account": "", "secret": "Not confirmed"}
+      ]
+    }
+  ],
+  "demo_related": {
+    "claude-code-sovereign": ["ai-gateway", "tempo-jaegerui-zuno-monitoring"],
+    "agents-alt-gateway": ["ai-gateway", "praxis"],
+    "multi-gateway": ["ai-gateway", "praxis", "maas"],
+    "image-signing-admission": ["console-ui-zuno-rhtas", "quay-quay-zuno-registry"],
+    "okf-signed-agent-release": ["quay-quay-zuno-registry", "console-ui-zuno-rhtas", "unifai-ui-zuno-unifai"],
+    "vault-pki": ["vault-zuno-vault", "kiali-zuno-mesh"],
+    "three-experiences": ["open-webui", "unifai-ui-zuno-unifai", "dify", "kagent"],
+    "five-experiences": ["open-webui", "unifai-ui-zuno-unifai", "dify", "kagent", "assistant-zuno-claw-consultant-02"],
+    "agentic-ai": ["unifai-ui-zuno-unifai", "kagent"],
+    "sovereign-governed-ai": ["ai-gateway", "maas", "grafana-route-zuno-monitoring"],
+    "trusted-platform-ops": ["openshift-gitops-server-openshift-gitops", "aap", "console-ui-zuno-rhtas"]
+  },
+  "personas": [
+    {"name": "sale-01", "role": "Salesperson", "where": "Open WebUI, OpenClaw"},
+    {"name": "consultant-01", "role": "Consultant and architect", "where": "UnifAI"},
+    {"name": "consultant-02", "role": "Consultant and architect", "where": "Open WebUI, Dify, OpenClaw, Lightspeed"},
+    {"name": "ai-dev-01", "role": "AI developer", "where": "OpenShift AI, MaaS keys"},
+    {"name": "ai-ops-01", "role": "AI platform operator", "where": "kagent, Grafana, Tempo"},
+    {"name": "paas-ops-01", "role": "Platform operator, cluster-admin", "where": "OpenShift console, Argo CD, AAP"}
+  ],
+  "passwords_note": "All personas share one password, kept in Vault at keycloak/demo-personas. It is never written in this page."
+}

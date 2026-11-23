@@ -49,6 +49,8 @@
       # Chaos engineering (gitops/charts/chaos): follows zuno_chaos_enabled, a no-op while it is off. Last: cerberus
       # watches the namespaces of everything above, and nothing runs at install (`make d3 chaos` starts a run).
       - chaos
+      # WP-330/ADR-0627: the demo guide, a page of the console links and the demos; follows zuno_demo_guide_enabled.
+      - demo_guide
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

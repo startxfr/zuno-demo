@@ -1,0 +1,6 @@
+apiVersion: v2
+name: demo-guide
+description: The demo guide (WP-330, ADR-0627) - a static page of the console links and the demo catalogue, served by nginx from a ConfigMap.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -793,6 +793,14 @@ platformNamespaces:
     allowedFromNamespaces: []
     allowApiServerWebhooks: true
 
+  # WP-330 / ADR-0627: the demo guide (gitops/charts/demo-guide), one nginx replica serving a static page from a
+  # ConfigMap. Not meshed, no quota, no Kueue label. NOT zuno.io/managed: the page holds no secret and nobody needs
+  # `edit` here. Only the router calls in (the baseline admits it).
+  - name: zuno-demo-guide
+    displayName: Zuno Demo Guide
+    description: The demo guide, a static page of the console links and the demo catalogue.
+    allowedFromNamespaces: []
+
   # ADR-0535/WP-110: rhtas-operator's CSV supports AllNamespaces only (no
   # OwnNamespace/SingleNamespace/MultiNamespace - confirmed live against
   # this cluster's PackageManifest), so unlike openshift-lightspeed below

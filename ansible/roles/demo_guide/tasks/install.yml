@@ -1,0 +1,74 @@
+---
+# `make d2 install demo-guide`. Follows ONE switch, zuno_demo_guide_enabled (defaults/main.yml). On: the namespace
+# (gitops/charts/namespaces) must exist, then the Application. Off: removes what is left, so `make d2 install all` costs
+# nothing on a cluster that did not ask for the guide. The page itself is not built here: it is the ConfigMap of the
+# chart, written by `make demo guide` and committed; a new version reaches the pod through Argo CD alone.
+- name: "demo_guide | load the switch"
+  ansible.builtin.include_tasks: load_vars.yml
+
+# ---------------------------------------------------------------- switch off
+- name: "demo_guide | switch off: converge to no application"
+  when: not (zuno_demo_guide_enabled | bool)
+  block:
+    - name: "demo_guide | look up the Application"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+        name: "{{ demo_guide_app_name }}"
+      register: _demo_guide_app
+
+    - name: "demo_guide | remove what is left"
+      ansible.builtin.include_tasks: uninstall.yml
+      when: (_demo_guide_app.resources | default([])) | length > 0
+
+    - name: "demo_guide | say what the switch means"
+      ansible.builtin.debug:
+        msg: >-
+          zuno_demo_guide_enabled is false: the demo guide is not installed. Set it to true in
+          ansible/inventories/<cluster>/cluster.yml, then `make d2 install demo-guide`.
+
+# ----------------------------------------------------------------- switch on
+- name: "demo_guide | switch on: install the component"
+  when: zuno_demo_guide_enabled | bool
+  block:
+    - name: "demo_guide | the namespace exists (gitops/charts/namespaces)"
+      kubernetes.core.k8s_info:
+        kind: Namespace
+        name: "{{ demo_guide_namespace }}"
+      register: _demo_guide_ns
+      failed_when: (_demo_guide_ns.resources | default([]) | length) == 0
+
+    - name: "demo_guide | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    # The dict REPLACES the Application's values (check_gitops_values_clobber): every key of
+    # gitops/apps/demo-guide/application-d1.yaml is written here.
+    - name: "demo_guide | apply the Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+      vars:
+        gitops_component_name: "demo-guide"
+        gitops_app_phase: "d1"
+        gitops_app_name: "{{ demo_guide_app_name }}"
+        gitops_app_wait_retries: "{{ demo_guide_wait_retries }}"
+        gitops_app_wait_delay: "{{ demo_guide_wait_delay }}"
+        gitops_app_extra_helm_values:
+          global:
+            zuno:
+              routeHost: "{{ demo_guide_route_subdomain }}.{{ cluster_base_domain }}"
+
+    - name: "demo_guide | wait for nginx to be available"
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ demo_guide_namespace }}"
+        name: "{{ demo_guide_deployment }}"
+      register: _demo_guide_deploy
+      until: >-
+        (_demo_guide_deploy.resources | default([]) | length) > 0
+        and (_demo_guide_deploy.resources[0].status.availableReplicas | default(0)) >= 1
+      retries: "{{ demo_guide_wait_retries }}"
+      delay: "{{ demo_guide_wait_delay }}"
+
+    - name: "demo_guide | say where the guide is"
+      ansible.builtin.debug:
+        msg: "The demo guide is at https://{{ demo_guide_route_subdomain }}.{{ cluster_base_domain }}/"

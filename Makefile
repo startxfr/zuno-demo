@@ -89,7 +89,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # "chaos" (gitops/charts/chaos: cerberus and the krkn Tekton pipelines)
 # follows zuno_chaos_enabled like praxis, and installs nothing that runs:
 # a run is the Day 3 verb `make d3 chaos infra|platform`.
-DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model praxis chaos
+DAY2_RUN_COMPONENTS := namespaces llm models quay-registry mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model praxis chaos demo-guide
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model praxis
 DAY2_VERBS := check install build uninstall reconcile all reinstall
@@ -168,7 +168,7 @@ DAY3_VERBS := test stresstest stresstest-collect backup restore check admit run 
 # ADR-0617/WP-284: record and gif take a demo's 5-minute version in a browser
 # and cut its GIF under ~/.cache/zuno/demo/recordings/, locally, never AAP;
 # scout (ADR-0618/WP-286) is the sign-in-only run a take needs first.
-DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse scout record gif golden-path browser
+DEMO_VERBS := list use status check install start stop uninstall step freeze rehearse scout record gif guide golden-path browser
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -305,6 +305,7 @@ help:
 	  '  make demo record <id>                Record the 5-minute version in a browser, then cut its GIF in ~/.cache (ADR-0617)' \
 	  '  make demo record <id> [render]       A terminal demo: capture and check as text; render films it after the transcript is read (ADR-0618)' \
 	  '  make demo gif <id>                   Cut the newest recording again, offline; never copies into the repository' \
+	  '  make demo guide [check]              Write the demo guide page (console links, every demo) for the demo-guide chart (WP-330)' \
 	  '  make demo golden-path|browser        The catalogue-wide checks (ADR-0605, ADR-0606); ONLY=a,b limits them' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \

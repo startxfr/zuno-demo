@@ -49,6 +49,8 @@
       # Chaos engineering: the Application, the Tasks and Pipelines, the cerberus signal (tasks/check.yml; its
       # precheck.yml is the pre-check of a chaos run, not a state check).
       - chaos
+      # WP-330/ADR-0627: the demo guide (the Application and a ready nginx replica).
+      - demo_guide
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

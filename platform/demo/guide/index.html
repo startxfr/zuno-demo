@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zuno demo guide</title>
+<meta name="description" content="Console links, sign-in accounts and the demo catalogue of the Zuno platform.">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <div class="brand">Zuno demo guide <small id="domain"></small></div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#consoles">Consoles</a>
+      <a href="#demos">Demos</a>
+    </nav>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search a console, a demo, a user" aria-label="Search" autocomplete="off">
+    </div>
+    <button id="theme" class="icon-btn" type="button" aria-label="Switch light and dark" title="Switch light and dark">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>Every console and every demo of the platform, in one place</h1>
+    <p>Open a console from the layer it belongs to, scan its QR code from a phone, or pick a demo to see its card: what it shows, the URLs, the accounts to sign in with and its animation.</p>
+    <div class="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <p id="pw">All personas share one password, kept in Vault at keycloak/demo-personas. It is never written in this page.</p>
+    </div>
+  </div>
+
+  <section class="block" id="consoles" aria-labelledby="h-consoles">
+    <h2 id="h-consoles">Consoles</h2>
+    <p class="lead">Grouped by layer. The sign-in column says how to log in and where its password is kept.</p>
+    <div id="layers"><p class="skeleton">Loading the consoles…</p></div>
+  </section>
+
+  <section class="block" id="demos" aria-labelledby="h-demos">
+    <h2 id="h-demos">Demos</h2>
+    <p class="lead" id="demos-lead">Click a demo to open its card.</p>
+    <div id="groups"><p class="skeleton">Loading the demos…</p></div>
+    <p class="empty" id="none" hidden>Nothing matches this search.</p>
+  </section>
+  <noscript><p class="empty">This page needs JavaScript to list the consoles and the demos.</p></noscript>
+</main>
+
+<dialog id="card" aria-labelledby="card-title"></dialog>
+<dialog id="qr" class="qr" aria-label="QR code"></dialog>
+<div id="toast" class="toast" popover="manual" role="status" aria-live="polite"></div>
+
+<script src="qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

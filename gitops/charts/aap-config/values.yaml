@@ -120,7 +120,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos, supply-chain]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos, demo-guide, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -131,7 +131,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos]
+    surveyComponents: [namespaces, llm, models, quay-registry, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, praxis, chaos, demo-guide]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -397,7 +397,7 @@ workflowTemplates:
       # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
       # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos, demo-guide]
       # ADR-0587 (WP-179): the experience clients, independent branches
       # so one track's failure never blocks the other (Dify and kagent: WP-202).
       - id: open-webui
@@ -416,6 +416,9 @@ workflowTemplates:
         successNodes: []
       # Chaos engineering: a no-op while zuno_chaos_enabled is false; an independent leaf (nothing depends on it).
       - id: chaos
+        successNodes: []
+      # WP-330/ADR-0627: the demo guide, a no-op while zuno_demo_guide_enabled is false; an independent leaf.
+      - id: demo-guide
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -446,7 +449,7 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos, supply-chain]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, praxis, chaos, demo-guide, supply-chain]
       # ADR-0587 (WP-179): experience clients, independent leaves.
       - id: open-webui
         successNodes: []
@@ -461,6 +464,8 @@ workflowTemplates:
       - id: praxis
         successNodes: []
       - id: chaos
+        successNodes: []
+      - id: demo-guide
         successNodes: []
       - id: supply-chain
         successNodes: []

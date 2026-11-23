@@ -1,6 +1,6 @@
 # Demo catalogue
 
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 This directory holds the demonstrations of the Zuno platform:
 
@@ -50,6 +50,7 @@ you start" checklist by hand.
 | `make demo freeze on\|off` | Marks a freeze on this workstation: `install`, `uninstall` and `rehearse` refuse |
 | `make demo rehearse <id> 5\|15` | The whole sequence without pauses, with a report. It never runs a changing unit that is declared `not_rehearsed`, and skips an optional or mutating step. When the sequence queues golden-path probes or browser checks, it lists them and asks you to type the demo id (or `DEMO_CONFIRM=<id>` without a terminal): they call the models and spend the probe personas' budgets |
 | `make demo golden-path`, `make demo browser` | The catalogue-wide checks ([golden-path.md](golden-path.md)) |
+| `make demo guide`, `make demo guide check` | Writes the demo guide page (every console by layer, every demo as a card with its URLs, users and animation) into `gitops/charts/demo-guide/files/`, or checks that the committed copy is up to date. It is served on `demo-guide.<apps domain>` once the component is installed (`make d2 install demo-guide`, [ADR-0627](../adr/0627-serve-the-demo-guide-as-a-generated-page-from-a-configmap.md)) |
 
 A rehearsal that runs probes asks for the demo id even when no unit changes the cluster (the decision of 2026-11-15, after
 an unattended workshop rehearsal started by mistake): one prompt covers the changing units and the probes. A rehearsal

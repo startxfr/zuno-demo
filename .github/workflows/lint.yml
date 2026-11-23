@@ -124,6 +124,12 @@ jobs:
           home="$(mktemp -d)"
           HOME="$home" make demo list
           HOME="$home" make demo use guardrails 15
+      # WP-330/ADR-0627: the demo guide page is generated from the demo pages and guide-links.json. A page or a link
+      # changed without `make demo guide` leaves gitops/charts/demo-guide/files/ stale: this step fails and says so.
+      - name: Demo guide page is up to date (WP-330)
+        run: |
+          python3 platform/demo/tests/test_guide.py
+          python3 platform/demo/guide.py --check
       # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
       # tests skip until the conformance cases ship in the admitted release
       # (zuno-demo-agents/conformance/cases, WP-51 part A).

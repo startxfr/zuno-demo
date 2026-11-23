@@ -37,6 +37,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import catalogue  # noqa: E402
 import gif  # noqa: E402
 import guard  # noqa: E402
+import guide  # noqa: E402
 import rehearse  # noqa: E402
 import render  # noqa: E402
 import session  # noqa: E402
@@ -50,7 +51,7 @@ except ImportError:  # pragma: no cover - PyYAML ships with Ansible
     yaml = None
 
 VERBS = ("list", "use", "status", "check", "install", "start", "stop", "uninstall", "step", "freeze", "rehearse",
-         "scout", "record", "gif", "golden-path", "browser")
+         "scout", "record", "gif", "guide", "golden-path", "browser")
 ACTIONS = catalogue.LIFECYCLE_ACTIONS
 VERSIONS = ("5", "15")
 QUIET_ACTIONS = ("status",)
@@ -77,6 +78,8 @@ Usage: make demo <verb> [arguments]
   record <id> [render]       A terminal demo: capture the session and check it as text; `render` films the checked
                              session and cuts its GIF, after the transcript is read
   gif <id>                   Cut the newest recording again, offline (the GIF is published only on the owner's go)
+  guide [check]              Write the demo guide page (console links and every demo) into gitops/charts/demo-guide/files;
+                             `check` only verifies the committed copy (WP-330, ADR-0627)
   golden-path                One real call per demonstration moment (ADR-0605); ONLY=a,b limits the probes
   browser                    One browser check per experience (ADR-0606); ONLY=a,b limits the checks
 
@@ -1000,6 +1003,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             return cmd_record(args)
         if verb == "gif":
             return cmd_gif(args)
+        if verb == "guide":
+            # `make demo guide check`: make takes a leading `--` for its own option, so the word stands for --check.
+            return guide.main(["--check" if a == "check" else a for a in args])
         if verb in ("golden-path", "browser"):
             raise UsageError(f"`{verb}` is run by the Makefile: make demo {verb}")
         raise UsageError(f"Unsupported demo verb: '{verb}' (expected one of: {' '.join(VERBS)})")

@@ -1,0 +1,15 @@
+---
+# Day 2 component demo-guide (gitops/charts/demo-guide, WP-330, ADR-0627): one nginx replica serving a static page of the
+# console links and the demo catalogue from a ConfigMap. ONE switch, set in ansible/inventories/<cluster>/cluster.yml
+# (committed: AAP reads the SCM); ansible/confidential.yml may override it.
+zuno_demo_guide_enabled: false
+
+demo_guide_namespace: zuno-demo-guide
+demo_guide_app_name: zuno-demo-guide-d1
+demo_guide_deployment: demo-guide
+# The Route host is demo-guide.<cluster_base_domain>.
+demo_guide_route_subdomain: demo-guide
+
+# Install: nginx pulls its image (a mirrored, digest-pinned stock image) and becomes Available.
+demo_guide_wait_retries: 30
+demo_guide_wait_delay: 10

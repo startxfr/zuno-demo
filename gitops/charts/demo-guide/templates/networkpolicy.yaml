@@ -1,0 +1,23 @@
+# The router is the only client: traffic from namespaces labelled policy-group.network.openshift.io/ingress, on 8080.
+# The namespace baseline (gitops/charts/namespaces) already denies the other namespaces; this names the one way in.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: demo-guide
+  labels:
+    app.kubernetes.io/name: demo-guide
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: demo-guide
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+      ports:
+        - protocol: TCP
+          port: 8080

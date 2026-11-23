@@ -1,0 +1,28 @@
+# The demo guide (WP-330, ADR-0627): ONE nginx replica serving the files of files/ from a ConfigMap. No image is built.
+# files/ is written by `make demo guide` (platform/demo/guide.py); CI refuses a committed copy that is out of date.
+#
+# The Application of gitops/apps/demo-guide passes global.zuno.routeHost (the role of ansible/roles/demo_guide writes
+# every key below that the cluster decides). A dict passed that way REPLACES spec.source.helm.values.
+global:
+  zuno:
+    routeHost: demo-guide.apps.mycluster.example.com
+
+replicas: 1
+
+# Stock nginx, pinned by digest like the one of gitops/charts/dify: the ImageDigestMirrorSet of the cluster redirects
+# digest pulls only, and platform/supply-chain/mirrored-images.yaml lists this digest.
+image:
+  repository: docker.io/library/nginx
+  tag: "1.29.3"
+  digest: sha256:2f4e10193b0c4f61472245e9d26cea78e7df7af266c7e7cf5e67353ee2731b51
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+# The page loads its animations from this origin (the repository is public). It is the only external origin the
+# Content-Security-Policy admits, next to 'self'.
+gifOrigin: https://raw.githubusercontent.com

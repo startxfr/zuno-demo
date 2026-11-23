@@ -1,0 +1,36 @@
+---
+# WP-330 / ADR-0627: the demo guide in zuno-demo-guide (namespace and baseline from gitops/charts/namespaces). One nginx
+# replica serves a page held in a ConfigMap; no image is built. No operator, so no d0.
+# Applied and deleted ONLY by ansible/roles/demo_guide, which follows zuno_demo_guide_enabled and passes the cluster's
+# route host: a dict passed that way REPLACES spec.source.helm.values, so every key below is also written by the role.
+# ServerSideApply: the ConfigMap approaches 150 KB, and the client-side apply would copy it whole into the
+# last-applied-configuration annotation of the object.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-demo-guide-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-54"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/demo-guide
+    helm:
+      releaseName: zuno-demo-guide-d1
+      values: |
+        global:
+          zuno:
+            routeHost: demo-guide.apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-demo-guide
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

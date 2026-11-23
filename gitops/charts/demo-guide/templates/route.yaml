@@ -1,0 +1,20 @@
+# One Route: the host comes from the cluster's apps domain (demo-guide.<domain>); TLS from the router's ACME wildcard
+# certificate (cert-manager, router-wildcard-tls), as for the other experiences. Open: no sign-in (the page holds URLs,
+# account names and Vault paths, never a secret value).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: demo-guide
+  labels:
+    app.kubernetes.io/name: demo-guide
+    zuno.io/managed-by: argocd
+spec:
+  host: {{ .Values.global.zuno.routeHost }}
+  to:
+    kind: Service
+    name: demo-guide
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
