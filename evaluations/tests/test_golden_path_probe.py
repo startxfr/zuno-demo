@@ -25,25 +25,25 @@ def call(agent, status=200, kind="local", classification="C3", provider="local-g
 
 
 class Sovereignty(unittest.TestCase):
-    def test_arkos_local_at_c3_passes(self):
-        r = g.judge_sovereignty([call("arkos"), call("tekos", kind="saas", classification="C1", provider="mistral")])
+    def test_finage_local_at_c3_passes(self):
+        r = g.judge_sovereignty([call("finage"), call("tekos", kind="saas", classification="C1", provider="mistral")])
         self.assertEqual(r.status, g.PASS)
         self.assertIn("raised to C3", r.detail)
 
-    def test_arkos_sent_to_saas_fails(self):
-        r = g.judge_sovereignty([call("arkos", kind="saas"), call("tekos")])
+    def test_finage_sent_to_saas_fails(self):
+        r = g.judge_sovereignty([call("finage", kind="saas"), call("tekos")])
         self.assertEqual(r.status, g.FAIL)
 
-    def test_arkos_left_at_c1_fails(self):
-        r = g.judge_sovereignty([call("arkos", classification="C1"), call("tekos")])
+    def test_finage_left_at_c1_fails(self):
+        r = g.judge_sovereignty([call("finage", classification="C1"), call("tekos")])
         self.assertEqual(r.status, g.FAIL)
 
     def test_no_routing_decision_fails(self):
-        r = g.judge_sovereignty([{"agent": "arkos", "status": 200, "routing": None}, call("tekos")])
+        r = g.judge_sovereignty([{"agent": "finage", "status": 200, "routing": None}, call("tekos")])
         self.assertEqual(r.status, g.FAIL)
 
     def test_failed_control_call_fails(self):
-        r = g.judge_sovereignty([call("arkos"), {"agent": "tekos", "status": 503}])
+        r = g.judge_sovereignty([call("finage"), {"agent": "tekos", "status": 503}])
         self.assertEqual(r.status, g.FAIL)
 
 

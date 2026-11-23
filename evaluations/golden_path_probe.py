@@ -4,7 +4,7 @@
 One probe per demonstration moment, each a real call that must get a real answer:
 
   unifai-tekos         a Tekos turn in UnifAI, signed in as a persona through the UI route
-  sovereignty          two ai-gateway calls from inside the gateway pod: Arkos (floor C3) must be routed to a local
+  sovereignty          two ai-gateway calls from inside the gateway pod: Finage (floor C3, since agents v1.2.5) must be routed to a local
                        model at C3, a Tekos control call stays at its header level
   delegation-approval  Arkos delegates to Tekos, the approval request appears and is rejected, so nothing runs
                        (evaluations/arkos/approval_proof.py reject), then the a2a-gateway's access line for the call to
@@ -201,7 +201,7 @@ _GATEWAY_SNIPPET = r'''
 import json, sys, uuid, httpx
 token = sys.stdin.read().strip()
 out = []
-for level, agent, task in (("C1", "arkos", "draft-architecture-testimonial"), ("C1", "tekos", "answer-technical-question")):
+for level, agent, task in (("C1", "finage", "answer-finance-question"), ("C1", "tekos", "answer-technical-question")):
     rid = "golden-" + uuid.uuid4().hex[:10]
     h = {"Authorization": "Bearer " + token, "X-Zuno-Request-Id": rid, "X-Zuno-Data-Classification": level,
          "X-Zuno-Agent": agent, "X-Zuno-Task": task}
@@ -218,19 +218,19 @@ print(json.dumps({"calls": out}))
 
 
 def judge_sovereignty(calls: List[Dict]) -> Result:
-    """Arkos (floor C3) must answer from a local model at C3; the Tekos control call must answer too."""
+    """Finage (floor C3) must answer from a local model at C3; the Tekos control call (floor C2) must answer too."""
     by_agent = {c.get("agent"): c for c in calls}
-    arkos, tekos = by_agent.get("arkos") or {}, by_agent.get("tekos") or {}
+    arkos, tekos = by_agent.get("finage") or {}, by_agent.get("tekos") or {}
     r_ark = arkos.get("routing") or {}
     if arkos.get("status") != 200:
-        return Result("sovereignty", FAIL, f"Arkos call: HTTP {arkos.get('status')} {arkos.get('error', '')}")
+        return Result("sovereignty", FAIL, f"Finage call: HTTP {arkos.get('status')} {arkos.get('error', '')}")
     if r_ark.get("kind") != "local" or r_ark.get("classification") != "C3":
-        return Result("sovereignty", FAIL, f"Arkos was not kept local at C3: {r_ark or 'no routing decision'}")
+        return Result("sovereignty", FAIL, f"Finage was not kept local at C3: {r_ark or 'no routing decision'}")
     if tekos.get("status") != 200:
         return Result("sovereignty", FAIL, f"Tekos control call: HTTP {tekos.get('status')} {tekos.get('error', '')}")
     r_tek = tekos.get("routing") or {}
     return Result("sovereignty", PASS,
-                  f"Arkos C1 raised to C3 -> {r_ark.get('provider')}/{r_ark.get('model')} (local); "
+                  f"Finage C1 raised to C3 -> {r_ark.get('provider')}/{r_ark.get('model')} (local); "
                   f"Tekos control at {r_tek.get('classification')} -> {r_tek.get('provider')}")
 
 
