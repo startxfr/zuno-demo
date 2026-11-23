@@ -688,7 +688,8 @@
             },
             "groups": [
                 "/ocp-ai-dev",
-                "/agent_tekos"
+                "/agent_tekos",
+                "/aap_reader"
             ],
             "credentials": [
                 {
@@ -713,7 +714,8 @@
             "groups": [
                 "/ocp-ai-ops",
                 "/agent_tekos",
-                "/openwebui_admin"
+                "/openwebui_admin",
+                "/aap_ops"
             ],
             "credentials": [
                 {
@@ -1061,9 +1063,7 @@
             "enabled": true,
             "serviceAccountClientId": "kagent",
             "groups": [
-                "/ocp-ai-ops",
-                "/agent_tekos",
-                "/openwebui_admin"
+                "/ocp-ai-ops"
             ]
         },
         {

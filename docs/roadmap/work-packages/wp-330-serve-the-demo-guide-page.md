@@ -1,6 +1,6 @@
 # WP-330: Serve the demo guide page
 
-- **State:** Repo work in review (2026-11-23: written on the local branch `demo-guide`, nothing pushed; nothing installed on a cluster)
+- **State:** Done (2026-11-23: merged into devel, installed on demo333, the page answers 200, the three Applications Synced and Healthy)
 - **ADRs:** [ADR-0627](../../adr/0627-serve-the-demo-guide-as-a-generated-page-from-a-configmap.md)
 - **Depends on:** none
 - **Related:** [WP-270](wp-270-build-the-make-demo-lifecycle-engine.md) (the catalogue parser it reuses), [WP-285](wp-285-give-the-demo-pages-a-presenters-shape.md) (the page shape it reads)
