@@ -21,6 +21,8 @@ gateway makes that decision is in [Appendix B](#appendix-b---lld).
 **The message:** "Sensitive data stays in the cluster even if the caller says otherwise. When no local model can
 answer, Zuno refuses rather than leaking."
 
+The recording was made before agents v1.2.5, when Arkos was the C3 agent. Since v1.2.5 the C3 agent is Finage (finance), Arkos is C2, and the live probe and the script below call Finage.
+
 ![The 5-minute version of the data sovereignty demo, recorded live in a terminal: the data classes each provider may serve, a real call to Arkos labelled C1 that the gateway raises to C3 and a local model answers, then each agent's classification floor. The provider list and the floors are the files in Git, not the live configuration.](../../../assets/img/demo/ai-gateway-sovereignty.gif)
 
 ## Personas
@@ -44,7 +46,7 @@ has run, and says what is left to the presenter. No action of this demo changes 
 ### Status
 
 Nothing to do. The file reads the Applications `zuno-ai-gateway-d0`/`-d1`, the Deployment `ai-gateway`, the ConfigMap
-`ai-gateway-classification-floors` (Arkos C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C1), the gateway environment
+`ai-gateway-classification-floors` (Finage C3 on its 4 tasks, Cognos C3, Comage C2, Tekos C2), the gateway environment
 (`CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`, `MODEL_READINESS_ENABLED`, `CIRCUIT_BREAKER_ENABLED`), the pod `tempo-tempo-0` and the
 `LLMInferenceService` models in `zuno-ai-run` (and how many are Ready). If one is missing or not Healthy, stop and tell the platform owner:
 this demo installs nothing. At least one local model must be `Ready=True` for a C3 answer. On 2026-11-12 the local
@@ -91,9 +93,9 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | `git show HEAD:platform/ai-gateway/provider-routing.yaml \| awk '/^  - name:/{n=$3} /^    eligible_for:/{print n, $2, $3, $4}'` | "Every request gets a level. C3 is data that must never leave our infrastructure: finance, HR, sovereign projects. Each provider lists the levels it may serve: only our own models carry C3." | One line per provider. The local models (`local-maas`, `local`, `local-gpt-oss-maas`, ...) `[C1, C2, C3]`; `openai`, `anthropic`, `mistral-codestral` and `ovhcloud-gpt-oss-120b` `[C1, C2]`; `gemini` and `mistral` `[C1]`. No SaaS provider carries C3. |
-| 1:00 | Run `ONLY=sovereignty make demo golden-path` | "I call Arkos, our architecture agent, and I lie: I label the request C1, public. Arkos works on client architectures, so its signed sheet says C3." | The probe runs. A local model may take a few seconds. |
-| 2:30 | Read the result line | "The platform ignored my label and raised it to C3. The answer came from a model running on our GPUs." | `PASS sovereignty ... Arkos C1 raised to C3 -> <provider>/<model> (local)`, then `RESULT: PASS`. |
-| 3:30 | `git show HEAD:gitops/charts/ai-gateway/files/classification-floors.generated.yaml \| awk '/^  [a-z]+:$/{a=$1} /^    floor:/{print a, $2}'` | "Contrast: every agent has a floor, declared by its owner. Tekos is at C1: its public questions may go to a SaaS model of the C1 list, such as Mistral Codestral. Arkos is at C3: never. The level decides, not the application." | One line per agent: `arkos: C3`, `cognos: C3`, `tekos: C1`, `naveo: C1`, and `C2` for `advantage`, `comage`, `finage` and `soursage`. This is the file in Git that the gateway mounts; the live ConfigMap is shown at 6:00 of the 15-minute version. |
+| 1:00 | Run `ONLY=sovereignty make demo golden-path` | "I call Finage, our finance agent, and I lie: I label the request C1, public. Finance data is never public, so its signed sheet says C3." | The probe runs. A local model may take a few seconds. |
+| 2:30 | Read the result line | "The platform ignored my label and raised it to C3. The answer came from a model running on our GPUs." | `PASS sovereignty ... Finage C1 raised to C3 -> <provider>/<model> (local)`, then `RESULT: PASS`. |
+| 3:30 | `git show HEAD:gitops/charts/ai-gateway/files/classification-floors.generated.yaml \| awk '/^  [a-z]+:$/{a=$1} /^    floor:/{print a, $2}'` | "Contrast: every agent has a floor, declared by its owner. Tekos is at C2: its questions may go to a SaaS model of the C1 and C2 list, such as Mistral Codestral, unless its tool keeps them local. Finage is at C3: never. The level decides, not the application." | One line per agent: `finage: C3`, `cognos: C3`, `tekos: C2`, `arkos: C2`, `naveo: C1`, and `C2` for `advantage`, `comage` and `soursage`. This is the file in Git that the gateway mounts; the live ConfigMap is shown at 6:00 of the 15-minute version. |
 | 4:15 | Close | "Sensitive data stays here even if the caller says otherwise. And if no local model is ready, Zuno refuses: it never falls back to the cloud." | |
 
 ## 15-minute version
@@ -102,8 +104,8 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | Open Arkos's OKF sheet in the agents release: `preferred_classification: C3` | "The level is declared by the agent's owner in a signed release, not by the platform team." | `preferred_classification: C3` in the `model` block. |
-| 6:00 | `oc get configmap ai-gateway-classification-floors -n zuno-ai-run -o yaml` | "The gateway turns the sheets into floors per agent and per task." | `arkos` at C3 on its four tasks, `cognos` C3, `comage` C2, `tekos` C1. |
+| 5:00 | Open Finage's OKF sheet in the agents release: `preferred_classification: C3` | "The level is declared by the agent's owner in a signed release, not by the platform team." | `preferred_classification: C3` in the `model` block. |
+| 6:00 | `oc get configmap ai-gateway-classification-floors -n zuno-ai-run -o yaml` | "The gateway turns the sheets into floors per agent and per task." | `finage` at C3 on its four tasks, `cognos` C3, `comage` C2, `tekos` C2, `arkos` C2. |
 | 7:30 | Open [`platform/ai-gateway/provider-routing.yaml`](../../../../platform/ai-gateway/provider-routing.yaml) | "Each provider declares the levels it may serve. At C3 only the local models remain." | Local providers eligible C1, C2 and C3. `mistral` C1 only. `mistral-codestral`, `openai`, `anthropic` and `ovhcloud-gpt-oss-120b` C1 and C2. |
 | 9:00 | Explain the three ways the level rises | "The caller's header can raise it, never lower it. The agent's floor raises it. A tool result raises it: in Open WebUI, Dify, kagent or OpenClaw, any turn that used a company tool is treated as C2 and kept local." | |
 | 10:30 | Tempo search UI: service `ai-gateway`, operation `model_call`, tags `zuno.classification=C3`, last 15 minutes | "Each model call is traced with its level and where it went." | The probe's span with `zuno.classification=C3`, `zuno.model_kind=local`, `zuno.provider`, `zuno.model`, `zuno.task=draft-architecture-testimonial`, `zuno.request_id=golden-...`. |
@@ -115,7 +117,7 @@ Run the 5-minute version, then:
 
 | Symptom | Fallback | Say |
 |---|---|---|
-| The probe prints `FAIL sovereignty Arkos call: HTTP 503` | Show the line. No local model was ready, so the gateway refused. | "This is the rule at work: no local model, no answer. It will not send C3 data to the cloud to be helpful." |
+| The probe prints `FAIL sovereignty Finage call: HTTP 503` | Show the line. No local model was ready, so the gateway refused. | "This is the rule at work: no local model, no answer. It will not send C3 data to the cloud to be helpful." |
 | `FAIL sovereignty ... was not kept local at C3` | Stop the scenario and say so. This is a real defect; do not improvise. | "The check caught it before you did: this is what the check is for." |
 | The probe hangs for minutes | A local model is cold or restarting. Show the configuration steps (15-minute steps 5:00 to 9:00) while it runs. | |
 | The probe cannot `exec` into the gateway pod | The terminal is not logged in as **paas-ops-01**, or `oc` lost its session. Log in again before the session; on stage, switch to the configuration steps. | |
@@ -129,8 +131,8 @@ Run the 5-minute version, then:
   (the known gap of ADR-0565).
 - **Dashboards show providers, not levels.** No `zuno_model_*` metric carries a classification label. The level is on
   the trace span and in the routing decision only.
-- **The probe is a synthetic call** ("Say OK." with a forged C1 header). It is not a real Arkos conversation in UnifAI.
-- **Arkos writes code locally.** Its `write-code` task is floored at C3 and, since agents v1.0.1, runs on the local
+- **The probe is a synthetic call** ("Say OK." with a forged C1 header). It is not a real Finage conversation in UnifAI.
+- **Arkos writes code locally.** Its `write-code` task keeps `local_only_for` at every level (the ceiling of Arkos is C2 since v1.2.5) and, since agents v1.0.1, runs on the local
   models only, gpt-oss-20b first. Codestral is never a candidate for it. The same request to Tekos `write-code` (C1)
   goes to Codestral: see the coding pair in the [routing scenario](./ai-gateway-routing.md#the-coding-pair-c1-and-c3).
 - **Guardrails run in observe mode at every level.** They record; they do not block.

@@ -81,8 +81,8 @@ class RealPages(unittest.TestCase):
     def test_step_counts(self):
         k5 = sum(len(p.steps("5")) for p in self.pages.values())
         k15_own = sum(len(p.steps15_own) for p in self.pages.values())
-        self.assertEqual(k5, 193)   # claude-code-sovereign: 8 rows after its rehearsal (2026-11-19), was 6; +14 the chaos pages
-        self.assertEqual(k15_own, 325)   # +21 the chaos pages (2026-11-21)
+        self.assertEqual(k5, 194)   # claude-code-sovereign: 8 rows after its rehearsal (2026-11-19), was 6; +14 the chaos pages; +1 the vault-pki Vault UI step (2026-11-23)
+        self.assertEqual(k15_own, 328)   # +21 the chaos pages (2026-11-21); +3 the vault-pki Vault UI steps (2026-11-23)
 
     def test_fifteen_minute_version_is_cumulative(self):
         for page in self.pages.values():

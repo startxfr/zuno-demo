@@ -99,6 +99,10 @@ preferences:
   - local-wesh
   - local-qwen35-maas
   - local-qwen35
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: comage
   task: check-deal-status
   preferred:

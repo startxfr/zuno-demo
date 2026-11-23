@@ -19,7 +19,7 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 | Moment | What passes |
 |---|---|
 | `unifai-tekos` | A Tekos answer in the `agent-tekos` team workspace, signed in as `eval-consultant-01`; the session is deleted |
-| `sovereignty` | Arkos (floor C3) called with a `C1` header is routed to a local model and recorded at `C3`; a Tekos control call answers |
+| `sovereignty` | Finage (floor C3 since agents v1.2.5; it was Arkos before) called with a `C1` header is routed to a local model and recorded at `C3`; a Tekos control call (floor C2) answers |
 | `delegation-approval` | Arkos delegates to Tekos, the approval request appears and is rejected (nothing runs); the gateway logs show the delegated call |
 | `open-webui` | One answer from the Zuno model through Open WebUI's API, signed in through Keycloak |
 | `zuno-code` | One answer from the `zuno-code` model through Open WebUI (Codestral first) |
