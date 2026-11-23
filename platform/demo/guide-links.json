@@ -54,7 +54,7 @@
         {"name": "Tempo (Jaeger UI)", "sub": "tempo-jaegerui-zuno-monitoring", "auth": "openshift", "login": "OpenShift sign-in behind an oauth-proxy", "account": "paas-ops-01 (cluster-admin)", "secret": "Vault keycloak/demo-personas"},
         {"name": "Kiali", "sub": "kiali-zuno-mesh", "auth": "openshift", "login": "OpenShift sign-in", "account": "paas-ops-01 or ai-ops-01", "secret": "Vault keycloak/demo-personas"},
         {"name": "Trusted Artifact Signer console", "sub": "console-ui-zuno-rhtas", "auth": "none", "login": "No sign-in seen on the deployments (not tried in a browser)", "account": "", "secret": "None"},
-        {"name": "Vault", "sub": "vault-zuno-vault", "auth": "unconfirmed", "login": "Not confirmed: the root token is revoked and access goes through Kubernetes and AppRole. Ask the owner", "account": "", "secret": "Not confirmed"}
+        {"name": "Vault", "sub": "vault", "auth": "token", "login": "Method Token: a read-only 30-minute token minted by platform/vault/demo_token.sh (role demo-reader), pasted from the clipboard", "account": "", "secret": "No password: a token, never displayed"}
       ]
     }
   ],
@@ -64,7 +64,7 @@
     "multi-gateway": ["ai-gateway", "praxis", "maas"],
     "image-signing-admission": ["console-ui-zuno-rhtas", "quay-quay-zuno-registry"],
     "okf-signed-agent-release": ["quay-quay-zuno-registry", "console-ui-zuno-rhtas", "unifai-ui-zuno-unifai"],
-    "vault-pki": ["vault-zuno-vault", "kiali-zuno-mesh"],
+    "vault-pki": ["vault", "kiali-zuno-mesh"],
     "three-experiences": ["open-webui", "unifai-ui-zuno-unifai", "dify", "kagent"],
     "five-experiences": ["open-webui", "unifai-ui-zuno-unifai", "dify", "kagent", "assistant-zuno-claw-consultant-02"],
     "agentic-ai": ["unifai-ui-zuno-unifai", "kagent"],

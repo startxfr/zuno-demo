@@ -1,0 +1,5 @@
+---
+# vault-pki 1:45 (5-minute version). Vault web UI: Access, Kubernetes auth, its roles (one ns-<namespace> per namespace, the signers, demo-reader)
+# ADR-0628, WP-331 (2026-11-23). Nothing to run: the browser shows it.
+- name: "vault-pki 1:45 | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"

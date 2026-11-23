@@ -1,0 +1,9 @@
+---
+# vault-pki 5:45 (15-minute version): the ExternalSecrets, synced. It was row 1:00 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 5:45 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get externalsecrets -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c"
+      - "oc get externalsecrets -n zuno-ai-run"

@@ -1,0 +1,5 @@
+---
+# vault-pki 0:45 (5-minute version). Vault web UI: sign in with the token, then Secrets, engine zuno/: names and versions only
+# ADR-0628, WP-331 (2026-11-23). Nothing to run: the browser shows it.
+- name: "vault-pki 0:45 | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"

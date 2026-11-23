@@ -1,0 +1,9 @@
+---
+# vault-pki 6:30 (15-minute version): one SecretStore per namespace. It was row 2:15 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 6:30 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get secretstores -A"
+      - "oc get clustersecretstores"

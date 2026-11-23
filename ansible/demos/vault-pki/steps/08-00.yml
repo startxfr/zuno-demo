@@ -1,0 +1,8 @@
+---
+# vault-pki 8:00 (15-minute version): one ExternalSecret, the ai-gateway's Mistral key. It was row 7:15 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 8:00 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get externalsecret llm-provider-mistral -n zuno-ai-run -o jsonpath='{.spec.secretStoreRef.kind}/{.spec.secretStoreRef.name}{\"  \"}{.spec.data[*].remoteRef.key}{\"  \"}{.status.refreshTime}{\"\\n\"}'"

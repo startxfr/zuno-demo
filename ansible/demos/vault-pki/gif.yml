@@ -1,21 +1,26 @@
 ---
-# vault-pki: the cut list of its GIF (ADR-0618, WP-287), read by platform/demo/gif.py.
-# `make demo record vault-pki` captures the 5-minute version as a real terminal session and checks it as text;
-# `make demo record vault-pki render` replays it in xterm.js and films it, then cuts it with this list. The GIF stays
-# in ~/.cache/zuno/demo/recordings/ until the owner's "go vault-pki".
-# Markers written by the replay: start, then per row <MM-SS>-typed and <MM-SS>-done, then end. A typed..done span
-# holds the row's commands and their output; `fit` sets its length in the GIF whatever the cluster's answer time.
-# Each row is cut from the previous row's `done` (or `start`), so its screen clear and its typing are shown; tuned on
-# the take of 2026-11-15 so that no still stretch lasts more than about 5 s (the end still follows a 1 s hold).
-record_notice: >-
-  a real terminal session on the cluster with your oc login: six read-only `oc get` commands, names and states
-  only, no Secret value
+# vault-pki: the cut list of its GIF (ADR-0618, ADR-0628, WP-331), read by platform/demo/gif.py with
+# `make demo gif vault-pki`. An ASSEMBLED take (owner's decision, 2026-11-23): no recorder run by `make demo record`.
+# It is assembled by hand in the cache, never in git, from two real takes of the same day, each listed in
+# markers.json `source` with its SHA-256 (gif.py checks them before it cuts):
+#   token   a still of a real terminal run of platform/vault/demo_token.sh, captured and rendered with the terminal-take
+#           tools (platform/demo/session.py, render.py): the line "Vault token copied to the clipboard: role
+#           demo-reader, policies demo-reader, valid 30 min." The token is never printed, so no frame holds it.
+#           An altered source (one frame of the rendered video).
+#   the rest  the browser take of evaluations/browser/walkthroughs/vault-pki.mjs (record.sh, VAULT_DEMO_TOKEN typed
+#           into the masked token field): its marker PNGs and recording.webm.
+# Privacy review (ADR-0618 clause 9) before the owner's "go vault-pki": every still, and the frames of every motion
+# moment by number. Nothing may show a token, a secret value or a password: the token field shows dots, and the
+# token's policy cannot read a value. Timings are first estimates, tuned on the take.
 target_seconds: [40, 60]
 width: 960
 fps: 10
 moments:
-  - {from: start, to: 00-00-done, fit: 5, hold: 3, step: "0:00", caption: "0:00  Vault unseals itself: no key typed, none stored"}
-  - {from: 00-00-done, to: 01-00-done, fit: 8, hold: 4, step: "1:00", caption: "1:00  Every workload secret comes from Vault, synced"}
-  - {from: 01-00-done, to: 02-15-done, fit: 6, hold: 3, step: "2:15", caption: "2:15  One store per namespace, its own keys only"}
-  - {from: 02-15-done, to: 03-15-done, fit: 8, hold: 1, step: "3:15", caption: "3:15  Public certificates and the Vault PKI issuer"}
+  - {still: token, hold: 5, step: "0:00", caption: "0:00  A read-only Vault token, 30 min, never on screen"}
+  - {still: login, hold: 3, step: "0:45", caption: "0:45  Vault's own web UI, signed in with that token"}
+  - {still: secrets, hold: 6, step: "0:45", caption: "0:45  Secret names and versions only, never a value"}
+  - {from: secrets, to: access, fit: 6, hold: 3, step: "1:45", caption: "1:45  One Kubernetes role per namespace"}
+  - {from: access, to: policy, fit: 6, hold: 4, step: "2:45", caption: "2:45  A namespace's policy: 18 paths, read only"}
+  - {from: policy, to: transit, fit: 5, hold: 4, step: "3:30", caption: "3:30  Transit signing keys never leave Vault"}
+  - {from: transit, to: pki, fit: 5, hold: 4, step: "3:30", caption: "3:30  Vault's PKI: the mesh's certificate authority"}
   - {still: end, hold: 4, step: "4:15", caption: "Vault holds every credential, each namespace its own"}

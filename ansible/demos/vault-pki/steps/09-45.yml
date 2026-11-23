@@ -1,0 +1,8 @@
+---
+# vault-pki 9:45 (15-minute version): the a2a-gateway Transit role. It was row 9:30 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 9:45 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get cm vault-configure-script -n zuno-vault -o jsonpath='{.data.configure\\.sh}' | grep -A4 'auth/kubernetes/role/a2a-gateway'"

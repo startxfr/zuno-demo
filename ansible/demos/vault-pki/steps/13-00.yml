@@ -1,0 +1,10 @@
+---
+# vault-pki 13:00 (15-minute version): backups and the audit device. It was row 12:30 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 13:00 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get cronjobs -n zuno-vault"
+      - "oc get volumesnapshot -n zuno-vault"
+      - "oc get cm vault-configure-script -n zuno-vault -o jsonpath='{.data.configure\\.sh}' | grep 'audit enable'"

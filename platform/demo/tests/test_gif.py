@@ -533,10 +533,11 @@ class Verbs(unittest.TestCase):
             self.assertIn("open-webui", out.split(), verb)
             self.assertNotIn("dify", out.split(), verb)                   # no cut list
         rc, out, _ = self.run_main("--complete", "scout")
-        self.assertNotIn("vault-pki", out.split())                         # a terminal demo is not scouted
-        rc, _, err = self.run_main("scout", "vault-pki")
+        self.assertNotIn("image-signing-admission", out.split())           # a terminal demo is not scouted
+        rc, _, err = self.run_main("scout", "image-signing-admission")
         self.assertEqual(rc, 2)
         self.assertIn("is a terminal demo", err)
+        self.assertNotIn("vault-pki", out.split())                         # nor an assembled one (ADR-0628)
 
 
 class SeveralTakes(unittest.TestCase):

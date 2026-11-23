@@ -247,11 +247,11 @@
     },
     {
      "name": "Vault",
-     "url": "https://vault-zuno-vault.apps.demo333.startx.fr",
-     "auth": "unconfirmed",
-     "login": "Not confirmed: the root token is revoked and access goes through Kubernetes and AppRole. Ask the owner",
+     "url": "https://vault.apps.demo333.startx.fr",
+     "auth": "token",
+     "login": "Method Token: a read-only 30-minute token minted by platform/vault/demo_token.sh (role demo-reader), pasted from the clipboard",
      "account": "",
-     "secret": "Not confirmed"
+     "secret": "No password: a token, never displayed"
     }
    ]
   }
@@ -1354,12 +1354,12 @@
       {
        "name": "paas-ops-01",
        "profile": "Platform operator, back office. Groups ocp-paas-ops (cluster-admin), agent_tekos, aap_admin, openwebui_admin.",
-       "role": "The presenter's oc terminal in both versions."
+       "role": "The presenter's oc terminal in both versions; mints the token the browser uses."
       },
       {
        "name": "ai-ops-01",
        "profile": "AI platform operator, back office. Group ocp-ai-ops (admin on 18 namespaces, zuno-ai-run included; no rights in zuno-vault or zuno-mesh), agent_tekos…",
-       "role": "Fallback terminal for the zuno-ai-run steps. Named in the 15-minute version (6:00)."
+       "role": "Fallback terminal for the zuno-ai-run steps. Named in both versions (2:45)."
       },
       {
        "name": "ai-dev-01",
@@ -1367,9 +1367,10 @@
        "role": "Named only: the 2026-11-06 finding that made per-namespace stores necessary."
       }
      ],
-     "urls": [],
+     "urls": [
+      "https://vault.apps.demo333.startx.fr/ui/"
+     ],
      "related": [
-      "https://vault-zuno-vault.apps.demo333.startx.fr",
       "https://kiali-zuno-mesh.apps.demo333.startx.fr"
      ],
      "gif": "https://raw.githubusercontent.com/startxfr/zuno-demo/devel/docs/assets/img/demo/vault-pki.gif",

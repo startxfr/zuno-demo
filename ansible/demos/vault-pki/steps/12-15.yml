@@ -1,0 +1,9 @@
+---
+# vault-pki 12:15 (15-minute version): the router and the API server certificates. It was row 11:30 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 12:15 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get ingresscontroller default -n openshift-ingress-operator -o jsonpath='{.spec.defaultCertificate}{\"\\n\"}'"
+      - "oc get apiserver cluster -o jsonpath='{.spec.servingCerts.namedCertificates}{\"\\n\"}'"

@@ -9,11 +9,11 @@ browser: []
 # (ADR-0616 clause 7). Add `infra: true` for a GPU node or a MachineSet.
 mutations: {}
 steps: {}
-# The GIF take (ADR-0618, WP-287): a real terminal session, captured, checked as text, then filmed. Every Do command
-# of the 5-minute version passes the read-only allowlist, so `allow` is empty. The window is 136x30: on the take of
-# 2026-11-15 the widest output line was 134 columns (the certificates table) and the tallest screen 29 lines.
+# The GIF take (ADR-0618 update of 2026-11-17, ADR-0628): ASSEMBLED by hand in the cache from two real takes of
+# 2026-11-23 (owner's decision): a terminal still of platform/vault/demo_token.sh's output (role and TTL, never the
+# token) and the browser take of the Vault UI tour (evaluations/browser/walkthroughs/vault-pki.mjs, run by
+# evaluations/browser/record.sh with VAULT_DEMO_TOKEN). `make demo scout` and `make demo record` refuse this kind;
+# `make demo gif vault-pki` cuts it from the sources markers.json lists with their SHA-256. The token script only
+# reads and mints a 30-minute read-only token: nothing to declare in `mutations`.
 record:
-  kind: terminal
-  allow: []
-  cols: 136
-  rows: 30
+  kind: assembled

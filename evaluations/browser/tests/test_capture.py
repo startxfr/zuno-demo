@@ -179,26 +179,26 @@ class WhatMayBeTyped(unittest.TestCase):
         import io
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
-            code = capture.main(["vault-pki", "--plan"])
+            code = capture.main(["image-signing-admission", "--plan"])   # vault-pki became an assembled take (ADR-0628)
         self.assertEqual(code, 0)
         lines = printed.getvalue().splitlines()
-        self.assertEqual(lines[0], "0:00  $ oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version")
-        self.assertEqual(len(lines), 6)
+        self.assertEqual(lines[0], "0:00  $ oc get securesign -n zuno-rhtas")
+        self.assertEqual(len(lines), 4)
 
     def test_a_demo_that_needs_the_cluster_domain_does_not_plan_without_it(self):
         import shutil
         import subprocess as sp
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            for rel in ("docs/demo", "ansible/demos/vault-pki", "platform/demo"):
+            for rel in ("docs/demo", "ansible/demos/image-signing-admission", "platform/demo"):
                 shutil.copytree(ROOT / rel, root / rel)
-            manifest = root / "ansible/demos/vault-pki/demo.yml"
+            manifest = root / "ansible/demos/image-signing-admission/demo.yml"
             manifest.write_text(manifest.read_text() + 'env: {VAULT_URL: "https://vault.{{ cluster_base_domain }}"}\n')
             real = sp.run
             capture.subprocess.run = lambda *a, **k: sp.CompletedProcess(a, 1, "", "")   # oc gives nothing
             try:
                 with self.assertRaises(capture.NoDomain):
-                    capture.demo_steps("vault-pki", root)
+                    capture.demo_steps("image-signing-admission", root)
             finally:
                 capture.subprocess.run = real
 
@@ -221,34 +221,35 @@ class WhatMayBeTyped(unittest.TestCase):
         import shutil
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            for rel in ("docs/demo", "ansible/demos/vault-pki", "platform/demo"):
+            for rel in ("docs/demo", "ansible/demos/image-signing-admission", "platform/demo"):
                 shutil.copytree(ROOT / rel, root / rel)
-            manifest = root / "ansible/demos/vault-pki/demo.yml"
-            manifest.write_text(manifest.read_text() + '  skip: {"2:15": "a reason in one phrase"}\n')
-            rows, _, problems = capture.demo_steps("vault-pki", root)
+            manifest = root / "ansible/demos/image-signing-admission/demo.yml"
+            manifest.write_text(manifest.read_text() + '  skip: {"2:30": "a reason in one phrase"}\n')
+            rows, _, problems = capture.demo_steps("image-signing-admission", root)
             self.assertEqual(problems, [])
-            self.assertEqual([row.time for row in rows], ["0:00", "1:00", "3:15"])
-            self.assertEqual(capture.demo_skips("vault-pki", root), ({"2:15": "a reason in one phrase"}, []))
+            self.assertEqual([row.time for row in rows], ["0:00", "1:15", "3:15"])
+            self.assertEqual(capture.demo_skips("image-signing-admission", root), ({"2:30": "a reason in one phrase"}, []))
             # A skipped row is not checked: a refused command there does not stop the take.
-            page = next((root / "docs/demo").rglob("vault-pki.md"))
+            page = next((root / "docs/demo").rglob("image-signing-admission.md"))
             text = page.read_text()
-            start = text.index("| 2:15 | ")
-            page.write_text(text[:start] + "| 2:15 | `oc delete pod x -n zuno-vault` | \"x\" | x |\n"
+            start = text.index("| 2:30 | ")
+            page.write_text(text[:start] + "| 2:30 | `oc delete pod x -n zuno-rhtas` | \"x\" | x |\n"
                             + text[text.index("\n", start) + 1:])
-            rows, _, problems = capture.demo_steps("vault-pki", root)
-            self.assertEqual((problems, [row.time for row in rows]), ([], ["0:00", "1:00", "3:15"]))
-            manifest.write_text(manifest.read_text().replace('"2:15"', '"2:16"'))
-            problems = capture.demo_steps("vault-pki", root)[2]
-            self.assertTrue(any("names 2:16, which is not a time" in p for p in problems), problems)
-            self.assertTrue(any("`oc delete pod x -n zuno-vault` is refused" in p for p in problems), problems)
+            rows, _, problems = capture.demo_steps("image-signing-admission", root)
+            self.assertEqual((problems, [row.time for row in rows]), ([], ["0:00", "1:15", "3:15"]))
+            manifest.write_text(manifest.read_text().replace('"2:30"', '"2:31"'))
+            problems = capture.demo_steps("image-signing-admission", root)[2]
+            self.assertTrue(any("names 2:31, which is not a time" in p for p in problems), problems)
+            self.assertTrue(any("`oc delete pod x -n zuno-rhtas` is refused" in p for p in problems), problems)
 
     def test_the_first_terminal_demo_plans_offline(self):
-        rows, variables, problems = capture.demo_steps("vault-pki", ROOT)
+        # vault-pki, the first terminal demo, became an assembled take on 2026-11-23 (ADR-0628): image-signing-admission
+        # stands in for it.
+        rows, variables, problems = capture.demo_steps("image-signing-admission", ROOT)
         self.assertEqual(problems, [])
-        self.assertEqual([row.time for row in rows], ["0:00", "1:00", "2:15", "3:15"])
-        self.assertEqual(rows[0].commands[0].cmd, "oc get pods -n zuno-vault -L vault-sealed,vault-active,vault-version")
-        self.assertEqual(len(rows[1].commands), 2)
-
+        self.assertEqual([row.time for row in rows], ["0:00", "1:15", "2:30", "3:15"])
+        self.assertEqual(rows[0].commands[0].cmd, "oc get securesign -n zuno-rhtas")
+        self.assertEqual(len(rows[1].commands), 1)
 
 if __name__ == "__main__":
     unittest.main()

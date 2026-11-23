@@ -1,0 +1,8 @@
+---
+# vault-pki 8:45 (15-minute version): the two gateways sign with Vault Transit. It was row 8:15 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 8:45 | run the step's reads"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/run_reads.yml"
+  vars:
+    run_reads:
+      - "oc get deploy a2a-gateway mcp-gateway -n zuno-ai-run -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"}{range .spec.template.spec.containers[0].env[*]}{\"  \"}{.name}={.value}{\"\\n\"}{end}{end}' | grep -E 'gateway$|SIGNER|VAULT_(AUTH_ROLE|TRANSIT_KEY|ADDR)'"

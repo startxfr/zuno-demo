@@ -1,0 +1,5 @@
+---
+# vault-pki 13:45 (15-minute version): the demo and hardened profiles (words). It was row 13:30 before the Vault web UI
+# took the 5-minute version (ADR-0628, WP-331, 2026-11-23).
+- name: "vault-pki 13:45 | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"

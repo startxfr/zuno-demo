@@ -1,0 +1,5 @@
+---
+# vault-pki 3:30 (5-minute version). Vault web UI: Secrets, transit/ (the signing keys), then pki/ (the root and its roles)
+# ADR-0628, WP-331 (2026-11-23). Nothing to run: the browser shows it.
+- name: "vault-pki 3:30 | nothing to run"
+  ansible.builtin.include_tasks: "{{ demo_lib }}/nothing_to_run.yml"
