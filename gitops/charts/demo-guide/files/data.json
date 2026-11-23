@@ -1348,7 +1348,7 @@
      "id": "vault-pki",
      "title": "Vault and PKI - secrets and certificates without static credentials",
      "kind": "scenario",
-     "shows": "Vault on Raft with KMS auto-unseal and TLS, ExternalSecrets in every namespace, Let's Encrypt and Vault-issued certificates, Transit signing for the gateways",
+     "shows": "Vault's own web UI, entered with a read-only token that lasts 30 minutes, showing the names of the secrets, the Kubernetes auth roles, one namespace's policy, the Transit keys and the PKI roles; in 15 minutes, KMS auto-unseal, ExternalSecrets, Let's Encrypt and Vault-issued certificates from the terminal",
      "message": "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the cluster does not hold, and its signing keys never leave it.",
      "personas": [
       {
@@ -1363,7 +1363,7 @@
       },
       {
        "name": "ai-dev-01",
-       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos.",
+       "profile": "AI developer, back office. Groups ocp-ai-dev (edit on the Zuno namespaces), agent_tekos, aap_reader.",
        "role": "Named only: the 2026-11-06 finding that made per-namespace stores necessary."
       }
      ],

@@ -1,32 +1,35 @@
 # Scenario: Chaos engineering - the AI platform keeps answering
 
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-23
 
 ## Introduction
 
 Chaos engineering means breaking parts of a system on purpose, in a controlled way, to prove that it heals. In this
 scenario we break parts of the Zuno AI platform while a person keeps chatting with it. The tool is krkn. Each
-experiment is a step of the OpenShift Pipeline `chaos-application`, in the namespace `zuno-chaos`. The parts we may
+experiment is a step of the OpenShift Pipeline `chaos-application`, in the namespace `zuno-chaos` (the provider cut
+has its own pipeline, `zuno-chaos-provider-cut`). The parts we may
 break come from a closed list of targets, kept in Git. A target is one pod of one application, or one cut to an
 external model provider. Nobody starts a run alone: the run is an Ansible Automation Platform (AAP) workflow, and a
 person must approve it in AAP before anything breaks.
 
-| Target | What breaks | Replicas | What the design expects | Version |
+| Target | What breaks | Replicas | What to expect | Version |
 |---|---|---|---|---|
-| `pod-ai-gateway`, `pod-mcp-gateway` | one pod of the AI gateway, then one pod of the tools gateway | 2 each | no cut: the other pod answers | 5 minutes |
-| `pod-a2a-gateway` | the pod of the agent-to-agent gateway | 1 | delegation between agents stops for a short time, then comes back | 5 minutes |
-| `pod-open-webui` | the Open WebUI pod | 1 | the page is unavailable for a short time | 15 minutes |
-| `pod-unifai` | the UnifAI back end, `unifai-multiagent-be` | 1 | live answers stop streaming and the UI reconnects; the agent's run goes on in its worker; a pending approval is kept, but an approval click sent during the restart fails and must be sent again | 15 minutes |
-| `pod-keycloak` | the Keycloak pod | 1 | for about one to two minutes, new sign-ins and token refreshes fail; tokens already issued keep working until they expire | 15 minutes |
-| `pod-kserve-controller`, `pod-rhoai-operator` | the model-serving controller, then the OpenShift AI operator | 1 each | the models already served keep answering | 15 minutes |
-| `provider-cut-mistral` | the SaaS provider Mistral is unreachable for 120 s | - | "Zuno Code" answers from a local model | 15 minutes |
-| `pod-model-gpt-oss` | the pod of the local model gpt-oss-20b | 1 | the gateway answers from another local model while the model reloads, for up to 15 minutes | 15 minutes, optional |
+| `pod-ai-gateway`, `pod-mcp-gateway` | one pod of the AI gateway, then one pod of the tools gateway | 2 each | no cut: the other pod answers (mcp-gateway: 0 s seen on 2026-11-22) | 5 minutes |
+| `pod-a2a-gateway` | the pod of the agent-to-agent gateway | 1 | delegation between agents stops for a short time, then comes back (41.5 s on 2026-11-22) | 5 minutes |
+| `pod-open-webui` | the Open WebUI pod | 1 | the page is unavailable for a short time (59.7 s on 2026-11-22) | 15 minutes |
+| `pod-unifai` | the UnifAI back end, `unifai-multiagent-be` | 2 on demo333 since 2026-11-22 | no cut: the other pod answers (0 s seen on 2026-11-22; with one pod the cut was 90.6 s). On 2026-11-23 a pod was deleted during an open approval card and the conversation went on with no error | 15 minutes |
+| `pod-keycloak` | the Keycloak pod | 1 | for about one to two minutes (the design figure, no measure recorded), new sign-ins and token refreshes fail; tokens already issued keep working until they expire | 15 minutes |
+| `pod-kserve-controller`, `pod-rhoai-operator` | the model-serving controller, then the OpenShift AI operator | 1 and 3 | the models already served keep answering. The operator runs 3 pods with one leader: if the deleted pod is not the leader, nothing is disrupted | 15 minutes |
+| `provider-cut-mistral` | the SaaS provider Mistral is unreachable for 120 s | - | "Zuno Code" answers from a local model (qwen3.6-27b-instruct on 2026-11-22) | 15 minutes |
+| `pod-model-gpt-oss` | the pod of the local model gpt-oss-20b | 1 | the gateway answers from another local model while the model reloads, for up to 15 minutes. Never run | 15 minutes, optional |
 
 The gateways are the highlighted boxes of the platform map (see [Appendix A](#appendix-a---hld)). The pipeline, the
 approval and the health signal are in [Appendix B](#appendix-b---lld).
 
-This scenario is new. It has not run on a cluster yet. Its first live run is planned for 2026-11-22. Every "You should
-see" cell below says what the design should show, not what was seen.
+This scenario is new. Its targets ran on demo333 on 2026-11-22, one at a time, through the approval in AAP; the
+measures are in the table above and in [the demo-day page](../../demo-day-2026-11-24.md). No result is recorded for
+Keycloak and the two controllers, the gpt-oss-20b target never ran, and the page itself has not been rehearsed row by
+row: where a "You should see" cell has no measure, it says what the design should show.
 
 **The message:** we kill parts of the AI platform on purpose, with a person's approval, and people keep getting
 answers while it heals.
@@ -75,10 +78,13 @@ Nothing to do. The chaos component is part of the shared platform: the file only
 ### Start
 
 The file launches the AAP workflow `zuno-day3-chaos-platform-workflow` with the targets `pod-ai-gateway`,
-`pod-mcp-gateway` and `pod-a2a-gateway`, and returns at once. It is a changing unit: `make demo start` asks you to type
+`pod-mcp-gateway` and `pod-a2a-gateway`, and returns at once. A run takes its targets in alphabetical order, so the
+agent-to-agent gateway goes first. It is a changing unit: `make demo start` asks you to type
 the demo id (`DEMO_CONFIRM`). The workflow runs its pre-check (health signal `True`, the cluster healthy, no other chaos
 run active), then waits at its approval step. Nothing is broken before you approve. Run it just before the session:
-the pre-check reads the cluster at that moment.
+the pre-check reads the cluster at that moment, and the approval expires one hour after it. If Start ran more than an
+hour before the 1:30 row, run it again. Start launches a chaos run: inside a demo freeze it needs the platform owner's
+go.
 
 What only a person does:
 
@@ -113,9 +119,9 @@ Nothing to do.
 |---|---|---|---|
 | 0:00 | Profile **sale-01**, Open WebUI, model **Zuno**. Ask: `In one short sentence, say what you can help me with.` | "Here is an employee using our AI platform. While she works, we are going to break parts of the platform under her." | An answer in a few seconds. |
 | 0:45 | Profile **paas-ops-01**, console: **Pipelines**, project `zuno-chaos`, pipeline `chaos-application`. Terminal: `oc get pipelines -n zuno-chaos` | "Each experiment is a pipeline, declared in Git. It may only break what a closed list allows: one pod at a time, of a named application." | The Pipelines `chaos-infra`, `chaos-application` and `zuno-chaos-provider-cut`. |
-| 1:30 | AAP: **Automation Execution**, **Jobs**, the running `zuno-day3-chaos-platform-workflow`, its approval node, **Approve** | "Nobody breaks the platform alone. The run waits here until a person approves it, and AAP records who did. This run kills one pod of the AI gateway, one of the tools gateway, then the agent-to-agent gateway." | The pre-check node is green. After **Approve**, the approval node turns green and the run node starts. |
-| 2:15 | Profile **sale-01**: ask the same question again, then once more a minute later | "The AI gateway runs two copies. We just killed one of them. She does not notice." | Each answer arrives, as at 0:00. No error in the chat. |
-| 3:00 | Console: **Pipelines**, **PipelineRuns**, the new run of `chaos-application`. Terminal: `oc get pipelineruns -n zuno-chaos` | "The pipeline checks the health first, then runs one task per target, and waits each time for the platform to heal. It ends with the same health check." | One `chaos-application-` run: the gate, then `pod-ai-gateway`, `pod-mcp-gateway`, `pod-a2a-gateway`, then the final check, each green as it ends. The run takes a few minutes; talk over the wait. |
+| 1:30 | AAP: **Automation Execution**, **Jobs**, the running `zuno-day3-chaos-platform-workflow`, its approval node, **Approve** | "Nobody breaks the platform alone. The run waits here until a person approves it, and AAP records who did. This run kills the agent-to-agent gateway, then one pod of the AI gateway, then one of the tools gateway." | The pre-check node is green. After **Approve**, the approval node turns green and the run node starts. |
+| 2:15 | Profile **sale-01**: ask the same question again, then once more a minute later | "The AI gateway and the tools gateway run two copies each. The run kills one of each. She does not notice." | Each answer arrives, as at 0:00. No error in the chat. |
+| 3:00 | Console: **Pipelines**, **PipelineRuns**, the new run of `chaos-application`. Terminal: `oc get pipelineruns -n zuno-chaos` | "The pipeline checks the health first, then runs one task per target, and waits each time for the platform to heal. It ends with the same health check." | One `chaos-platform-` run of the pipeline `chaos-application`: the gate, then `pod-a2a-gateway`, `pod-ai-gateway`, `pod-mcp-gateway` (alphabetical order), then the final check, each green as it ends. The tasks of the targets that were not asked for show as skipped. The run takes a few minutes; talk over the wait. |
 | 3:45 | `oc get pods -n zuno-ai-run -l app.kubernetes.io/name=a2a-gateway` | "The agent-to-agent gateway has a single copy by design. Delegation between agents stopped for a short time, then the platform started a new pod. The chat does not use it." | One pod, Running and Ready, only a few minutes old (column AGE). |
 | 4:30 | Close | "We kill parts of the AI platform on purpose, with a person's approval, and people keep getting answers while it heals." | |
 
@@ -125,17 +131,17 @@ Run the 5-minute version, then:
 
 | Time | Do | Say | You should see |
 |---|---|---|---|
-| 5:00 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the first run has ended, second terminal: `make d3 chaos platform TARGETS=pod-open-webui,pod-unifai CHAOS_CONFIRM=platform`, then approve the new workflow in AAP | "Now the applications people see. They run one copy each, so this time people will notice, for a short time." | The command waits. In AAP, a new `zuno-day3-chaos-platform-workflow` waits at its approval node; after **Approve**, a new `chaos-application-` PipelineRun starts. If the first run has not ended yet, the pre-check refuses: one chaos run at a time. |
-| 6:00 | Profile **sale-01**: reload Open WebUI while the run deletes its pod, then ask: `In one short sentence, say what you can help me with.` | "Open WebUI restarts. Her conversations are kept in the platform's database, not in the pod." | For a short time the page does not load, then it comes back with the conversation list. Whether she must sign in again is not known yet: check it at the first rehearsal. Then an answer. |
-| 7:00 | Profile **consultant-02**, UnifAI, session on `tekos`. Ask: `In one short sentence, say what you can help me with.`, while the run deletes the UnifAI back-end pod, `unifai-multiagent-be` | "UnifAI's back end restarts too. The live stream of the answer is cut, but the agent's run goes on in a separate worker, and the page reconnects." | The answer stops streaming, the page reconnects, then the answer is there. If an approval card is open, it is still there after the restart. |
-| 8:00 | `oc get pods -n zuno-openwebui`, then `oc get pods -n zuno-unifai` | "Both pods are new. Nothing was restarted by hand." | In each list, the pod the run deleted is replaced by one only a few minutes old, Running and Ready. |
-| 9:00 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the previous run has ended: `make d3 chaos platform TARGETS=pod-keycloak CHAOS_CONFIRM=platform`, then approve in AAP | "Now the identity provider. Keycloak runs one copy." | A new workflow waits at its approval node; after **Approve**, a new `chaos-application-` PipelineRun starts. |
-| 9:45 | A private window: sign in to Open WebUI as **sale-01**. Then profile **sale-01**: ask the same question | "While Keycloak restarts, nobody new can sign in, and no token can be refreshed. People already signed in keep working: their tokens stay valid until they expire." | In the private window, the sign-in fails for about one to two minutes, then works. In profile **sale-01**, the answer arrives. |
-| 10:45 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the previous run has ended: `make d3 chaos platform TARGETS=pod-kserve-controller,pod-rhoai-operator CHAOS_CONFIRM=platform`, approve in AAP; when it has ended, `make d3 chaos platform TARGETS=provider-cut-mistral CHAOS_CONFIRM=platform` (a provider cut always runs alone), approve again | "Now the model platform's controllers, and then the SaaS provider: for two minutes, our gateway cannot reach Mistral." | A new workflow waits at its approval node; after **Approve**, a new `chaos-application-` PipelineRun starts. |
+| 5:00 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the first run has ended, second terminal: `make d3 chaos platform TARGETS=pod-open-webui,pod-unifai CHAOS_CONFIRM=platform`, then approve the new workflow in AAP | "Now the applications people see. Open WebUI runs one copy, so this time people will notice, for a short time. UnifAI runs two." | The command waits. In AAP, a new `zuno-day3-chaos-platform-workflow` waits at its approval node; after **Approve**, a new `chaos-platform-` PipelineRun starts. If the first run has not ended yet, the pre-check refuses: one chaos run at a time. |
+| 6:00 | Profile **sale-01**: reload Open WebUI while the run deletes its pod, then ask: `In one short sentence, say what you can help me with.` | "Open WebUI restarts. Her conversations are kept in the platform's database, not in the pod." | For a short time the page does not load (59.7 s on 2026-11-22), then it comes back with the conversation list. Whether she must sign in again was not recorded: check it at the rehearsal. Then an answer. |
+| 7:00 | Profile **consultant-02**, UnifAI, session on `tekos`. Ask: `In one short sentence, say what you can help me with.`, while the run deletes the UnifAI back-end pod, `unifai-multiagent-be` | "UnifAI's back end runs two pods since Sunday's test, when a single pod meant a cut of a minute and a half. We kill one: the conversation goes on." | The answer arrives with no error (seen on 2026-11-22 and 2026-11-23 with two pods). If an approval card is open, it is still there. |
+| 8:00 | `oc get pods -n zuno-openwebui`, then `oc get pods -n zuno-unifai` | "Both pods are new. Nothing was restarted by hand." | In each list, the pod the run deleted is replaced by one only a few minutes old, Running and Ready. UnifAI shows two `unifai-multiagent-be` pods, one of them new. |
+| 9:00 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the previous run has ended: `make d3 chaos platform TARGETS=pod-keycloak CHAOS_CONFIRM=platform`, then approve in AAP | "Now the identity provider. Keycloak runs one copy." | A new workflow waits at its approval node; after **Approve**, a new `chaos-platform-` PipelineRun starts. |
+| 9:45 | A private window: sign in to Open WebUI as **sale-01**. Then profile **sale-01**: ask the same question | "While Keycloak restarts, nobody new can sign in, and no token can be refreshed. People already signed in keep working: their tokens stay valid until they expire." | In the private window, the sign-in fails for about one to two minutes (the design figure, not measured), then works. In profile **sale-01**, the answer arrives. |
+| 10:45 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the previous run has ended: `make d3 chaos platform TARGETS=pod-kserve-controller,pod-rhoai-operator CHAOS_CONFIRM=platform`, approve in AAP; when it has ended, `make d3 chaos platform TARGETS=provider-cut-mistral CHAOS_CONFIRM=platform` (a provider cut always runs alone), approve again | "Now the model platform's controllers, and then the SaaS provider: for two minutes, our gateway cannot reach Mistral." | Two workflows, one after the other, each with its own pre-check and approval: allow about 5 minutes each (the three single-target runs of 2026-11-22 took 16 minutes together). After each **Approve**, a new `chaos-platform-` PipelineRun starts; the second one runs the pipeline `zuno-chaos-provider-cut`. |
 | 11:30 | `oc get llminferenceservices -n zuno-ai-run`, then profile **sale-01**: ask the same question | "The controllers manage the models; they do not serve them. While they restart, the models already running keep answering." | Every model `READY True`, and an answer. |
-| 12:30 | Profile **sale-01**: switch to **Zuno Code** and ask: `write Python code that checks the format of an email address` | "Code questions normally go to Mistral Codestral. Mistral is unreachable right now, so the gateway falls back to a model on our own GPUs." | A Python function with a regular expression, served by a local model. Grafana or the trace would name it; not shown here. A run from a workstation checks it on its own (`zuno-code-fallback`, asked 70 s into the cut); from AAP, run `python3 evaluations/golden_path_probe.py --only zuno-code-fallback` during the cut. |
-| 13:15 | `oc get pipelineruns -n zuno-chaos` | "Every run is recorded: what was broken, when, and whether the platform healed in time." | Every `chaos-application-` run `Succeeded`. |
-| 13:45 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it. The long one: up to 15 minutes.** Only when the session goes on after the close: `make d3 chaos platform TARGETS=pod-model-gpt-oss CHAOS_CONFIRM=platform`, then approve in AAP | "Last, we can kill a model itself. The gateway answers from another local model while it reloads, which takes up to fifteen minutes." | A new workflow waits at its approval node; after **Approve**, the gpt-oss-20b pod is deleted. Answers keep coming from another local model. `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` shows `READY True` again within 15 minutes. |
+| 12:30 | Profile **sale-01**: switch to **Zuno Code** and ask: `write Python code that checks the format of an email address` | "Code questions normally go to Mistral Codestral. Mistral is unreachable right now, so the gateway falls back to a model on our own GPUs." | A Python function with a regular expression, served by a local model (qwen3.6-27b-instruct on 2026-11-22). Ask within the 120 s of the cut, which starts shortly after the approval. Grafana or the trace would name the model; not shown here. On demo333 the run goes through AAP, where nothing checks the fallback for you: run `python3 evaluations/golden_path_probe.py --only zuno-code-fallback` yourself during the cut. |
+| 13:15 | `oc get pipelineruns -n zuno-chaos` | "Every run is recorded: what was broken, when, and whether the platform healed in time." | Every `chaos-platform-` run `Succeeded`. |
+| 13:45 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it. The long one: up to 15 minutes. It restarts a model, which the demo-day page forbids inside the freeze, and it has never run.** Only when the session goes on after the close: `make d3 chaos platform TARGETS=pod-model-gpt-oss CHAOS_CONFIRM=platform`, then approve in AAP | "Last, we can kill a model itself. The gateway answers from another local model while it reloads, which takes up to fifteen minutes." | A new workflow waits at its approval node; after **Approve**, the gpt-oss-20b pod is deleted. Answers keep coming from another local model. `oc get llminferenceservice gpt-oss-20b -n zuno-ai-run` shows `READY True` again within 15 minutes. |
 | 14:15 | Close | Repeat the message. | |
 
 ## If something goes wrong
@@ -143,32 +149,38 @@ Run the 5-minute version, then:
 | Symptom | Fallback | Say |
 |---|---|---|
 | `make demo start`, a `make d3 chaos` command, or the pre-check node in AAP fails because another chaos run is active | Read `oc get pipelineruns -n zuno-chaos`: a run is Running. Wait for its end, then launch again. If there is no time, skip the row. | "One chaos run at a time: the platform refuses a second one." |
-| The health signal answers `False`, or the pre-check or the pipeline's gate is red, before anything was broken | Do not approve and do not launch. Show what is unhealthy: `oc get clusteroperators`, then `make d3 check recovery`. Deny the approval in AAP. | "The platform is not healthy right now, so it refuses to be broken more. This refusal is part of the design." |
+| The health signal answers `False`, or the pre-check or the pipeline's gate is red, before anything was broken | Do not approve and do not launch. Just after a run that deleted Open WebUI or Keycloak, wait: the signal also watches their URLs and reads `False` until they are back. Show what is unhealthy: `oc get clusteroperators`, then `make d3 check recovery`. Deny the approval in AAP. | "The platform is not healthy right now, so it refuses to be broken more. This refusal is part of the design." |
 | A target is not back within its time limit: its task or the final check of the PipelineRun is red | Stop the sequence: launch nothing more. Run `make d3 check recovery` and read its next step. Tell the platform owner. | "This is what chaos engineering is for: it found something that does not heal in time." |
-| The approval stays unanswered (nobody approved, or the session ended) | Nothing breaks while it waits. Deny it in AAP. `make demo stop` gives up after 20 minutes and says so. | |
+| The approval stays unanswered (nobody approved, or the session ended) | Nothing breaks while it waits. Deny it in AAP. The approval expires by itself after one hour. `make demo stop` gives up after 20 minutes and says so. | |
 | sale-01 gets an error in the chat during the 5-minute version | Ask again. Note the time: with two copies of each gateway, the design expects no error. Report it after the session. | "A short error, and the next question works: the platform healed." |
-| In UnifAI, an approval click sent while the back end restarts fails | Click again once the page has reconnected. The pending approval itself is kept. In UnifAI 0.1.74 the reason typed with it is lost: type it again. To reject, click **Reject**, then **Reject** next to **Cancel**. | |
+| In UnifAI, an approval click fails while a back-end pod restarts | Click again: since UnifAI 0.1.78 the card can be retried after a failed decision. The pending approval itself is kept. To reject, click **Reject**, then **Reject** next to **Cancel**. | |
 | Sign-ins still fail more than two minutes after the Keycloak pod was deleted | Read `oc get pods -n zuno-auth`. Stop the sequence and tell the platform owner. Sessions already open go on. | |
 | The gpt-oss-20b model is not Ready 15 minutes after its pod was deleted | Run `make d2 check models`. Tell the platform owner. The gateway keeps answering from the other local models. | |
 
 ## Limits
 
-- **Not proven on a cluster yet.** The charts `chaos-cerberus` and `chaos-pipeline` 21.3.391 are prerelease. On
-  2026-11-21 they had passed an admission dry-run on demo333 and had never run. The first live run is planned for
-  2026-11-22.
+- **Proven in part.** The charts are prerelease: `chaos-cerberus` 21.3.398 and `chaos-pipeline` 21.3.400. On
+  2026-11-22 the targets ran on demo333 one at a time. The 5-minute run of the three gateways in one PipelineRun, the
+  Keycloak and controller targets and the gpt-oss-20b target have no recorded result.
+- **The 15-minute version takes longer than 15 minutes.** Each `make d3 chaos` command is a whole workflow (pre-check,
+  approval, run, post-check), about 5 minutes on 2026-11-22. With its four extra workflows, plan 25 to 30 minutes, or
+  drop targets.
+- **A run is a change to the cluster.** Inside a demo freeze, Start and every `make d3 chaos` row need the platform
+  owner's go.
 - **One pod at a time, from a closed list of targets.** The targets are named in `platform/chaos/targets.yaml`, each
   with its namespace, its selector and the time it has to recover. Nothing outside the list can be broken: no
   namespace, no Deployment, no node.
 - **Never etcd, never a control-plane node, no node reboot.**
 - **One chaos run at a time.** The pre-check refuses a run while another one is active, so the 15-minute rows wait for
   the end of the previous run.
-- **The provider cut is a network policy** created for 120 s and always removed at the end, even when the run fails.
+- **The provider cut is a cluster-wide AdminNetworkPolicy** created for 120 s and always removed at the end, even when
+  the run fails. `oc get networkpolicy` does not list it.
 - **The model target is long.** gpt-oss-20b may take up to 15 minutes to be Ready again. During that time the gateway
   answers from another local model, which may be slower or less precise.
-- **The UnifAI approval click is lost during the restart** and must be sent again; in 0.1.74 the reason typed with it
-  is lost too.
-- **The health signal is coarse.** cerberus answers `False` when a ClusterOperator is Degraded or a pod of a watched
-  namespace is not Running, wherever it is.
+- **UnifAI is no longer a visible cut on demo333**: with two back-end pods, deleting one cuts nothing. A cluster with
+  one pod would show the cut of 2026-11-22 (90.6 s).
+- **The health signal is coarse.** cerberus answers `False` when a ClusterOperator is Degraded, a pod of a watched
+  namespace is not Running, or one of three watched URLs (Keycloak, Open WebUI, UnifAI) does not answer.
 - **No recorded walkthrough and no GIF yet.**
 
 ## Appendix A - HLD
@@ -247,8 +259,7 @@ flowchart TB
 The path of one chaos run, from the approval in AAP to the final check, and the targets it may reach. Drawn from the
 design of the chaos component (the pipeline chart `chaos-pipeline`, the health chart `chaos-cerberus`, the Zuno task
 of the provider cut, the target catalogue `platform/chaos/targets.yaml`, the AAP workflows of the `aap-config` chart)
-and from the demo files under `ansible/demos/chaos-platform/`. The component's own files are written in parallel with
-this page: compare the diagram with them once they are merged.
+and from the demo files under `ansible/demos/chaos-platform/`. Compared with the merged component on 2026-11-23.
 
 ```mermaid
 flowchart LR
@@ -267,12 +278,12 @@ flowchart LR
   subgraph NS["namespace zuno-chaos"]
     CER["cerberus<br/>Service port 8080: True or False"]
     PR["PipelineRun of chaos-application<br/>ServiceAccount chaos-pipeline"]
-    TASKS["gate, then one task per target,<br/>in order, then the final check"]
-    CUT["pipeline zuno-chaos-provider-cut<br/>network policy for 120 s, always removed"]
+    TASKS["gate, then one task per target,<br/>in alphabetical order, then the final check"]
+    CUT["PipelineRun of zuno-chaos-provider-cut<br/>AdminNetworkPolicy for 120 s, always removed"]
   end
   subgraph TGT["targets: one pod each"]
     GW["zuno-ai-run: ai-gateway, mcp-gateway (2 replicas),<br/>a2a-gateway (1), gpt-oss-20b"]
-    EXPS["zuno-openwebui: open-webui<br/>zuno-unifai: back end"]
+    EXPS["zuno-openwebui: open-webui (1)<br/>zuno-unifai: back end (2)"]
     KC["zuno-auth: Keycloak"]
     RHOAI["OpenShift AI: kserve controller,<br/>operator"]
   end
@@ -281,9 +292,9 @@ flowchart LR
   MK --> WF --> PRE --> APR --> RUN --> POST
   RUN --> PR --> TASKS
   TASKS -->|"delete one pod"| GW & EXPS & KC & RHOAI
-  TASKS --> CUT
+  RUN --> CUT
   CUT -. "denies egress of the ai-gateway pods" .-> MISTRAL
-  TASKS -. reads .-> CER
+  TASKS & CUT -. reads .-> CER
   USR --> EXPS --> GW
 ```
 
@@ -308,18 +319,22 @@ The decisions this page rests on:
 Evidence:
 
 - [WP-316](../../../roadmap/work-packages/wp-316-run-chaos-pipelines-and-the-two-chaos-demos.md): the chaos component
-  and the two chaos demos; its live evidence is planned for 2026-11-22.
+  and the two chaos demos.
+- [The demo-day page of 2026-11-24](../../demo-day-2026-11-24.md): what ran on 2026-11-22 and 2026-11-23, with the
+  measures quoted on this page.
 - [WP-311](../../../roadmap/work-packages/wp-311-inflict-bounded-disruptions-beside-the-stress-load.md): the first list
   of bounded disruptions, written for the stresstest and never run live; its targets moved to the chaos catalogue.
 
 ## Page status
 
-> **Status:** Written from the design on 2026-11-21; not rehearsed yet. Nothing on this page has run on a cluster:
-> the chaos component was not installed on demo333 on 2026-11-21, and every "You should see" cell describes what the
-> design should show. The first live validation is planned for 2026-11-22, step by step on the platform owner's go.
+> **Status:** Written from the design on 2026-11-21; not rehearsed yet as a page. The chaos component is installed on
+> demo333 since 2026-11-22, and that day the platform targets ran one at a time through AAP (a2a-gateway cut 41.5 s,
+> Open WebUI 59.7 s, UnifAI 90.6 s with one pod then 0 s with two, mcp-gateway 0 s, the Mistral cut absorbed and Zuno
+> Code answered by qwen3.6-27b-instruct). No result is recorded for Keycloak, the two controllers or the 5-minute run of
+> the three gateways together; the gpt-oss-20b target never ran. Corrected against the merged component on 2026-11-23.
 > The timings of the rows are estimates, not measures.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
-> No. No golden-path probe covers this page, and it has never run. Rehearse it before showing it to an audience. A
+> No. No golden-path probe covers this page, and it has not been rehearsed. Rehearse it before showing it to an audience. A
 > rehearsal needs a person to approve the workflow in AAP while it runs.
 > **Personas:** see [Personas](#personas).
 > **Used in workshops:** none yet. A workshop agenda has no optional row, and a chaos run would change the timing of

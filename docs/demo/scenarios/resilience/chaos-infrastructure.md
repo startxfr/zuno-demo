@@ -23,8 +23,10 @@ node. It runs Argo CD, the image registry, Alertmanager and the Thanos querier, 
 the box "OpenShift, Service Mesh, GPU nodes" of the platform map (see [Appendix A](#appendix-a---hld)). Its pipeline,
 its approval and its health signal are in [Appendix B](#appendix-b---lld).
 
-This scenario is new. It has not run on a cluster yet. Its first live run is planned for 2026-11-22. Every "You should
-see" cell below says what the design should show, not what was seen.
+This scenario is new. The chaos component is installed on demo333 since 2026-11-22, and the platform pipeline of
+[the other chaos scenario](chaos-platform.md) ran that day. No run of the `chaos-infra` pipeline is recorded: the
+infrastructure tiers were left out of that day. Every "You should see" cell below says what the design should show, not
+what was seen.
 
 **The message:** we break parts of the cluster on purpose, with a person's approval, and the cluster heals by itself
 while it keeps serving.
@@ -72,7 +74,10 @@ Nothing to do. The chaos component is part of the shared platform: the file only
 The file launches the AAP workflow `zuno-day3-chaos-infra-workflow` with the tier `pods`, and returns at once. It is a
 changing unit: `make demo start` asks you to type the demo id (`DEMO_CONFIRM`). The workflow runs its pre-check
 (health signal `True`, the cluster healthy, no other chaos run active), then waits at its approval step. Nothing is
-broken before you approve. Run it just before the session: the pre-check reads the cluster at that moment.
+broken before you approve. Run it just before the session: the pre-check reads the cluster at that moment, and the
+approval expires one hour after it. If Start ran more than an hour before the 1:30 row, run it again. Start launches a
+chaos run: inside a demo freeze it needs the platform owner's go. If the other chaos demo was started too, approve one
+run at a time: a second run started while the first is going fails.
 
 What only a person does:
 
@@ -121,7 +126,7 @@ Run the 5-minute version, then:
 | 5:00 | `oc get nodes -l zuno.io/chaos-target=true` | "Now we put load on one node. Only one node carries this label. It is an infra node, never a GPU node and never a control-plane node." | One node, `Ready`; its ROLES column names `infra`. |
 | 5:45 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** Second terminal: `make d3 chaos infra TIER=hog CHAOS_CONFIRM=infra`, then approve the new workflow in AAP | "The second tier puts pressure on that node: first its CPU, then its memory, about one minute each." | The command waits. In AAP, a new `zuno-day3-chaos-infra-workflow` waits at its approval node; after **Approve**, a new `chaos-infra-` PipelineRun starts. If the first run has not ended yet, the pre-check refuses: one chaos run at a time. |
 | 7:15 | Console: **Compute**, **Nodes**, the labelled node, **Metrics**. Terminal: `oc adm top node -l zuno.io/chaos-target=true` | "Here is the pressure: the CPU near 80 %, then half of the memory taken. This node runs Argo CD and part of the monitoring, so those screens may slow down. The AI applications do not run here." | The CPU graph climbs, then the memory graph, then both fall back. The console's monitoring views may be slow for about a minute. |
-| 8:15 | `oc get pods -n zuno-chaos`, then `oc get pods -n zuno-ai-run` | "The load comes from small helper pods in our chaos namespace, and they are removed at the end. The AI workloads stay Ready." | In `zuno-chaos`, helper pods while the tier runs, then none. In `zuno-ai-run`, every pod Running and Ready. |
+| 8:15 | `oc get pods -n zuno-chaos`, then `oc get pods -n zuno-ai-run` | "The load comes from small helper pods in our chaos namespace, and they are removed at the end. The AI workloads stay Ready." | In `zuno-chaos`, helper pods while the tier runs; afterwards only the `cerberus` pod and the Completed task pods of the runs. In `zuno-ai-run`, every pod Running and Ready. |
 | 9:15 | **Optional cluster change, run by hand, outside a freeze only. The step never runs it.** When the `hog` run has ended: `make d3 chaos infra TIER=latency CHAOS_CONFIRM=infra`, then approve in AAP | "The third tier makes the network of the same node slow and lossy: 50 milliseconds more on every packet, and 2 % of the packets lost, for one minute." | A new workflow waits at its approval node; after **Approve**, a new `chaos-infra-` PipelineRun starts and ends after a few minutes. |
 | 10:45 | `oc get pipelineruns -n zuno-chaos` | "Each run ends with the same final check as it started with. If the cluster had not healed in time, the run would be red, and AAP would show it." | The `pods`, `hog` and `latency` runs, each `Succeeded`. |
 | 11:45 | Name the worker reboot scenario | "krkn can also reboot a whole worker. We have it, but it is off: it needs cloud credentials, and we do not reboot nodes in a demo." | |
@@ -135,15 +140,18 @@ Run the 5-minute version, then:
 | `make demo start`, or the pre-check node in AAP, fails because another chaos run is active | Read `oc get pipelineruns -n zuno-chaos`: a run is Running. Wait for its end, then run `make demo start` again. If there is no time, present the 5-minute version from the last run's PipelineRun. | "One chaos run at a time: the platform refuses a second one." |
 | The health signal answers `False`, or the pre-check or the pipeline's gate is red, before anything was broken | Do not approve and do not launch. Show what is unhealthy: `oc get clusteroperators`, then `make d3 check recovery`. Deny the approval in AAP. | "The cluster is not healthy right now, so the platform refuses to break it more. This refusal is part of the design." |
 | A pod is not back within its time limit: the final check of the PipelineRun is red | Stop the sequence: launch nothing more. Run `make d3 check recovery` and read its next step. Tell the platform owner. | "This is what chaos engineering is for: it found something that does not heal in time." |
-| The approval stays unanswered (nobody approved, or the session ended) | Nothing breaks while it waits. Deny it in AAP. `make demo stop` gives up after 20 minutes and says so. | |
+| The approval stays unanswered (nobody approved, or the session ended) | Nothing breaks while it waits. Deny it in AAP. The approval expires by itself after one hour. `make demo stop` gives up after 20 minutes and says so. | |
 | The console's monitoring views or Argo CD are slow during `hog` or `latency` | Expected: they run on the infra node under load. Show the terminal instead; they recover a minute later. | "We loaded the node that hosts them. The AI applications run elsewhere." |
 | **paas-ops-01** cannot sign in to AAP, or sees no approval | Approve as an AAP admin outside the screen, or skip the AAP rows and show the PipelineRun. | |
 
 ## Limits
 
-- **Not proven on a cluster yet.** The charts `chaos-cerberus` and `chaos-pipeline` 21.3.391 are prerelease. On
-  2026-11-21 they had passed an admission dry-run on demo333 and had never run. The first live run is planned for
-  2026-11-22.
+- **Not proven on a cluster yet.** The charts are prerelease: `chaos-cerberus` 21.3.398 and `chaos-pipeline` 21.3.400.
+  The component is installed on demo333 since 2026-11-22, but no run of `chaos-infra` is recorded for any of its three
+  tiers. A run on stage would be the first one.
+- **A run is a change to the cluster.** Inside a demo freeze, Start and every `make d3 chaos` row need the platform
+  owner's go. Each `make d3 chaos` command is a whole workflow (pre-check, approval, run, post-check): the platform
+  workflows took about 5 minutes each on 2026-11-22, so the 15-minute version may take longer.
 - **One pod at a time, from a closed list.** The pipeline deletes the pods its values name, nothing else: no
   namespace, no Deployment, no node.
 - **Never etcd and never a control-plane node.** The `pods` tier deletes an `openshift-apiserver` pod, which runs on
@@ -233,8 +241,7 @@ flowchart TB
 
 The path of one chaos run, from the approval in AAP to the final check. Drawn from the design of the chaos component
 (the pipeline chart `chaos-pipeline`, the health chart `chaos-cerberus`, the AAP workflows of the `aap-config` chart and
-the demo files under `ansible/demos/chaos-infrastructure/`). The component's own files are written in parallel with
-this page: compare the diagram with them once they are merged.
+the demo files under `ansible/demos/chaos-infrastructure/`). Compared with the merged component on 2026-11-23, not with a run.
 
 ```mermaid
 flowchart LR
@@ -289,13 +296,16 @@ The decisions this page rests on:
 Evidence:
 
 - [WP-316](../../../roadmap/work-packages/wp-316-run-chaos-pipelines-and-the-two-chaos-demos.md): the chaos component
-  and the two chaos demos; its live evidence is planned for 2026-11-22.
+  and the two chaos demos.
+- [The demo-day page of 2026-11-24](../../demo-day-2026-11-24.md): what ran on 2026-11-22, and that the infrastructure
+  tiers did not.
 
 ## Page status
 
-> **Status:** Written from the design on 2026-11-21; not rehearsed yet. Nothing on this page has run on a cluster:
-> the chaos component was not installed on demo333 on 2026-11-21, and every "You should see" cell describes what the
-> design should show. The first live validation is planned for 2026-11-22, step by step on the platform owner's go.
+> **Status:** Written from the design on 2026-11-21; not rehearsed yet. The chaos component is installed on demo333
+> since 2026-11-22, but no run of the `chaos-infra` pipeline is recorded: the infrastructure tiers were left out of the
+> validation of that day. Every "You should see" cell describes what the design should show. Whether the infra node
+> still carries the label `zuno.io/chaos-target=true` was not read again.
 > The timings of the rows are estimates, not measures.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > No. No golden-path probe covers this page, and it has never run. Rehearse it before showing it to an audience. A

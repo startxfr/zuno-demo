@@ -30,8 +30,8 @@ password, kept in Vault at `keycloak/demo-personas`. The [catalogue](../../READM
 | Persona | Profile | What it can do here | Role in this demo |
 |---|---|---|---|
 | **paas-ops-01** | Platform operator, back office. Groups `ocp-paas-ops` (cluster-admin), `agent_tekos`, `aap_admin`, `openwebui_admin`. | Lists ExternalSecrets, SecretStores, ClusterIssuers and Certificates in every namespace; reads the Vault ConfigMaps; mints the demo token (`oc create token` for `vault-demo-reader`, `oc exec` into the Vault pod). It could read Secrets: this page never does. | The presenter's `oc` terminal in both versions; mints the token the browser uses. |
-| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 18 namespaces, `zuno-ai-run` included; no rights in `zuno-vault` or `zuno-mesh`), `agent_tekos`, `openwebui_admin`. | Reads the objects of `zuno-ai-run`, not those of `zuno-vault`. May create an ExternalSecret in `zuno-ai-run`: the store of that namespace limits it to 18 Vault keys. Cannot list across namespaces. | Fallback terminal for the `zuno-ai-run` steps. Named in both versions (2:45). |
-| **ai-dev-01** | AI developer, back office. Groups `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`. | Same ExternalSecret right in `zuno-ai-run`. | Named only: the 2026-11-06 finding that made per-namespace stores necessary. |
+| **ai-ops-01** | AI platform operator, back office. Group `ocp-ai-ops` (admin on 18 namespaces, `zuno-ai-run` included; no rights in `zuno-vault` or `zuno-mesh`), `agent_tekos`, `openwebui_admin`, `aap_ops`. | Reads the objects of `zuno-ai-run`, not those of `zuno-vault`. May create an ExternalSecret in `zuno-ai-run`: the store of that namespace limits it to 18 Vault keys. Cannot list across namespaces. | Fallback terminal for the `zuno-ai-run` steps. Named in both versions (2:45). |
+| **ai-dev-01** | AI developer, back office. Groups `ocp-ai-dev` (edit on the Zuno namespaces), `agent_tekos`, `aap_reader`. | Same ExternalSecret right in `zuno-ai-run`. | Named only: the 2026-11-06 finding that made per-namespace stores necessary. |
 
 Other identities. One signs in on stage:
 - **demo-reader**, the Vault UI identity of this demo: a token minted by `platform/vault/demo_token.sh` from the
@@ -89,8 +89,9 @@ Nothing is prepared by the file. What only a person does:
 - [ ] Open the "What changed" table of the [migration runbook](../../../platform/vault-kms-raft-migration.md#what-changed).
 - [ ] A browser with `https://vault.apps.demo333.startx.fr/ui/` open on the sign-in page, method **Token**, large zoom.
   No other Vault tab, no saved token.
-- [ ] `wl-copy` (package `wl-clipboard`) or `xclip` on the workstation: the script copies the token there and never
-  prints it.
+- [ ] `wl-copy` (package `wl-clipboard`) or `xclip` on the workstation, in a terminal of the graphical session
+  (`WAYLAND_DISPLAY` or `DISPLAY` set; a plain SSH session has none and the script mints nothing): the script copies
+  the token there and never prints it.
 - [ ] Mint the token at most a few minutes before 0:00 if you rehearse: it expires 30 minutes after it is minted.
 - [ ] This page shows no `vault` command. Never run one that reads a value in front of an audience, and never open a
   secret in the UI: the token is refused anyway, and the refusal is not the message.
@@ -102,7 +103,8 @@ Nothing is prepared by the file. What only a person does:
 
 ### Stop
 
-Nothing to do. Close the terminal and the runbook tab.
+Sign out of the Vault UI and close its tab, copy anything else to the clipboard so the token is no longer there, then
+close the terminal and the runbook tab. The token expires by itself 30 minutes after it was minted.
 
 ### Uninstall
 
@@ -113,8 +115,8 @@ Nothing to do.
 | Time | Do | Say | You should see |
 |---|---|---|---|
 | 0:00 | Terminal: `platform/vault/demo_token.sh` | "Every credential of the platform lives in one Vault. To show it, I ask the cluster for a token of a read-only Vault role: it lives 30 minutes, it can read names and settings, never a secret value. It goes to the clipboard, never on screen." | `Vault token copied to the clipboard: role demo-reader, policies demo-reader, valid 30 min.` and the hint to sign in with the method Token. No token on screen. |
-| 0:45 | Browser, Vault sign-in, method **Token**: paste, **Sign in**. Then **Secrets**, engine `zuno/` | "This is Vault's own interface. No application gets a credential from Git: each one is stored here once, under a path. What you see are names and versions. The values stay in Vault, and this token cannot read them." | The token field shows dots. Then the list of the KV engine `zuno/`: folders in alphabetical order, from `a2a/` and `aap/` to `keycloak/`, `providers/` and `smtp/`. No value anywhere. |
-| 1:45 | **Access**, **kubernetes**, **Roles** | "Who may read what. Each of the 21 namespaces logs in as its own role, `ns-` and its name, with a ServiceAccount of its own. The cert-manager issuers, the two gateways that sign, the backup and this demo each have their own role too." | 21 roles `ns-<namespace>` (from `ns-zuno-ai-run` to the other platform namespaces), `a2a-gateway`, `mcp-gateway`, `cert-manager-issuer`, `istio-issuer`, `raft-snapshot`, `demo-reader` and the configuration roles. |
+| 0:45 | Browser, Vault sign-in, method **Token**: paste, **Sign in**. Then **Secrets**, engine `zuno/` | "This is Vault's own interface. No application gets a credential from Git: each one is stored here once, under a path. What you see are names and versions. The values stay in Vault, and this token cannot read them." | The token field shows dots. Then the list of the KV engine `zuno/`: about 35 folders in alphabetical order, starting with `a2a/` and `aap/`; among them `keycloak/`, `providers/` and `smtp/`. No value anywhere. |
+| 1:45 | **Access**, **kubernetes**, **Roles** | "Who may read what. Each of the 21 namespaces logs in as its own role, `ns-` and its name, with a ServiceAccount of its own. The cert-manager issuers, the two gateways that sign, the backup and this demo each have their own role too." | 21 roles `ns-<namespace>` (`ns-zuno-ai-run` among them), `a2a-gateway`, `mcp-gateway`, `cert-manager-issuer`, `istio-issuer`, `mariadb-issuer`, `platform-signer`, `raft-snapshot`, `demo-reader`, and the configuration roles `vault-configurator` and `ansible-seeder`. If the list is paginated, use its filter box. |
 | 2:45 | **Policies**, `ns-zuno-ai-run` | "This is all the namespace of the AI gateways may read: 18 paths, read only. It is generated from one table in Git, and the build fails if an application asks for a key the table does not list. ai-ops-01 and ai-dev-01 may create ExternalSecrets in that namespace, so this list is all they could ever pull." | The policy in an editor box that scrolls: `# Rendered from platform/vault/secret-access.yaml`, then 18 `path "zuno/data/..."` blocks with `capabilities = ["read"]`, from `zuno/data/aap/mcp-token` to `zuno/data/smtp/technical`. Paths only. |
 | 3:30 | **Secrets**, `transit/`, then `pki/`, **Roles** | "Two kinds of keys never leave Vault. Transit signs for the gateways: the agent chain of a delegation and every tool call. The PKI is the cluster's own certificate authority: the service mesh gets its certificates from it, one hour at a time." | Transit keys `agent-chain`, `mcp-call-assertion`, `zuno-platform-signer`. PKI roles `cert-manager`, `istio`, `mariadb`. |
 | 4:15 | Close | "Vault holds every credential and gives each namespace only its own. It unseals itself with a key the cluster does not hold, and its signing keys never leave it." | Close the Vault tab: the token expires by itself. |
@@ -159,7 +161,8 @@ Run the 5-minute version, then:
   made by hand on 2026-11-17). It is permanent and has no IP allow-list by the owner's decision: anyone who reaches it
   sees the sign-in page. Access still needs a Vault token; the demo token reads no value and expires in 30 minutes.
 - **The UI tour stops where `sudo` starts.** The audit device and the Raft configuration need `sudo` in Vault, which the
-  demo token does not have: the 15-minute version shows them from the terminal (13:00).
+  demo token does not have: the 15-minute version shows them from the terminal (7:15 for the Raft storage, 13:00 for the
+  audit device and the snapshots).
 - **No `vault` command is shown.** The token script runs the Vault login inside the Vault pod and prints only the role
   and the TTL. The seal state comes from the labels Vault writes on its own pod. `vault status` runs only inside
   `make d0 check vault`, before the session.
@@ -361,9 +364,11 @@ The decisions this page rests on:
 ## Page status
 
 > **Changed on 2026-11-23** (ADR-0628, WP-331): the 5-minute version is now the Vault web UI tour after the token; the
-> terminal rows moved to the 15-minute version. Not rehearsed yet in this shape: rehearse it before showing it.
+> terminal rows moved to the 15-minute version. Not rehearsed yet in this shape: rehearse it before showing it. The UI
+> tour was played once by the recorder on 2026-11-23 for the GIF, opening each page by its address, not by the menu
+> clicks of the Do column: click through once with a fresh token before the session.
 >
-> **Status:** Rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
+> **Status:** Before the rework of 2026-11-23 (the terminal-only shape): rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
 > units, 35 s); the 15-minute version PASS at 10:06 (21 units, 53 s). Evidence:
 > [WP-278](../../../roadmap/evidence/wp-278-foundation-rehearsals-2026-11-15.md). Prerequisites checked read-only on
 > demo333 on 2026-11-13 (about 00:20 UTC):
@@ -372,7 +377,7 @@ The decisions this page rests on:
 > `vault-initialized=true`. The pod was recreated at 21:27:55Z on 2026-11-12, during the master cordon, and came back
 > unsealed with no human step: four readiness-probe timeouts between 21:35Z and 22:38Z, Ready since 22:38Z. Its rendered
 > configuration has `storage "raft"`, `seal "awskms"` (region eu-central-1) and a TLS listener. No Route in
-> `zuno-vault`. CronJobs `vault-backup` and `vault-raft-snapshot` last ran 20 h and 19 h earlier (Complete); seven
+> `zuno-vault` on that date (since 2026-11-23: the chart's Route `zuno-vault`). CronJobs `vault-backup` and `vault-raft-snapshot` last ran 20 h and 19 h earlier (Complete); seven
 > daily VolumeSnapshots plus `vault-pre-kms-raft-20261107092607`. 97 ExternalSecrets in 19 namespaces, all
 > `SecretSynced`: 95 on a namespace `SecretStore` `vault`, 2 generator-only. 20 SecretStores `vault`, all Valid and
 > Ready; no ClusterSecretStore. ClusterIssuers `letsencrypt-route53`, `letsencrypt-route53-staging`, `vault-issuer`
