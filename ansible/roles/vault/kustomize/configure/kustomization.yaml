@@ -18,3 +18,4 @@ configMapGenerator:
       - vault-configurator.hcl
       - ansible-seeder.hcl
       - raft-snapshot.hcl
+      - vault-demo-reader.hcl

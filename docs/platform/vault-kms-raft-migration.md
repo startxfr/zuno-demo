@@ -18,7 +18,7 @@ WP-223 is migrated with `ansible/playbooks/vault_migrate_kms_raft.yml`.
 | Ansible seed tasks | root token | `ansible/tasks/vault_login.yml`: role `ansible-seeder`, 1h token |
 | External Secrets | one `eso-reader` role, read `zuno/data/*` | one `ns-<namespace>` role per namespace from `platform/vault/secret-access.yaml` |
 | Listener | `http`, `tls_disable = true` | `https`, certificate from the OpenShift service CA (Secret `vault-tls`) |
-| Route | always on, edge | off by default; reencrypt, optional `ip_whitelist` |
+| Route | always on, edge | off by default; reencrypt, optional `ip_whitelist`. On demo333 on since 2026-11-23 (ADR-0628): Route `zuno-vault`, entered with the read-only `demo-reader` token |
 | Backups | CSI VolumeSnapshot | CSI VolumeSnapshot + `vault operator raft snapshot` CronJob |
 
 Clients moved to `https://zuno-vault.zuno-vault.svc:8200`: the three

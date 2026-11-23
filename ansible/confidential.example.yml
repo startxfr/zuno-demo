@@ -450,9 +450,10 @@ zuno_vault_kms_region: "xxxxxx"            # e.g. eu-west-1 (the key's region)
 zuno_vault_kms_access_key_id: "xxxxxx"
 zuno_vault_kms_secret_access_key: "xxxxxx"
 #
-# Optional: expose the Vault UI on a reencrypt Route for a session (off by
-# default; nothing in the platform uses it). Restrict it to your source
-# addresses with a space-separated CIDR list.
+# Optional: expose the Vault UI on a reencrypt Route (off by default). demo333
+# sets it in ansible/inventories/demo333/cluster.yml for the vault-pki demo,
+# entered with a read-only token (ADR-0628); a value here overrides that.
+# Restrict it to your source addresses with a space-separated CIDR list.
 # zuno_vault_route_enabled: false
 # zuno_vault_route_ip_whitelist: "203.0.113.10/32 198.51.100.0/24"
 

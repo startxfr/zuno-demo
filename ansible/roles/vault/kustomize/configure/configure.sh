@@ -63,6 +63,18 @@ vault write auth/kubernetes/role/ansible-seeder \
   ttl=1h \
   max_ttl=2h
 
+# ADR-0628 / WP-331: the presenter's read-only identity for the Vault web UI
+# (platform/vault/demo_token.sh). Names, versions and metadata only, no
+# zuno/data/*, no write, no sudo (vault-demo-reader.hcl); 30 minutes, no
+# renewal past that.
+vault policy write demo-reader /policies/vault-demo-reader.hcl
+vault write auth/kubernetes/role/demo-reader \
+  bound_service_account_names=vault-demo-reader \
+  bound_service_account_namespaces=zuno-vault \
+  policies=demo-reader \
+  ttl=30m \
+  max_ttl=30m
+
 # gitops/charts/vault templates/cronjob-raft-snapshot.yaml.
 vault policy write raft-snapshot /policies/raft-snapshot.hcl
 vault write auth/kubernetes/role/raft-snapshot \
@@ -71,7 +83,7 @@ vault write auth/kubernetes/role/raft-snapshot \
   policies=raft-snapshot \
   ttl=15m
 
-echo "Configurator, seeder and raft-snapshot identities configured."
+echo "Configurator, seeder, demo-reader and raft-snapshot identities configured."
 
 # ADR-0602 clause 2 / WP-223: one policy and one role per namespace, from
 # platform/vault/secret-access.yaml. ansible/roles/vault renders that file

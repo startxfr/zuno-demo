@@ -31,7 +31,7 @@ state are not restated here.
 | v0.15 | `v0.15.0` | 2026-11-11 | demo-ready band closed: the classification floor (ADR-0565, WP-209) and the golden-path check and freeze window (ADR-0605, WP-238); also carries everything merged since `v0.14.5` (WP-247 Vault Transit signing, WP-224 zuno-unifai firewall, WP-221 revocation rehearsed, WP-211 role fixes, ADR-0408 and ADR-0501 Implemented, ADR-0404/0405/0407 Deprecated); cut from `devel` 24ffd733 after a passing golden-path run (13/13, world model shown as roadmap), merged to `main` 96e66ab3; 8 first-party images rebuilt beforehand so all 12 `:latest` images are signed through the built-in Keycloak (supply-chain check 12/12); in-cluster ledger run 2026-11-11, 12 components in 35 min |
 | v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
 | v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557); Blender 3D objects from text on a local model (ADR-0610); alternative AI gateways next to the Zuno ai-gateway, Praxis AI first (ADR-0619 to ADR-0623) |
-| v0.18 | planned | | chaos engineering with krkn and Tekton pipelines, approved in AAP (ADR-0626), its two demos, and the stress tool and platform limits found on 2026-11-21 (WP-316 to WP-318); the demo guide page (ADR-0627, WP-330) |
+| v0.18 | planned | | chaos engineering with krkn and Tekton pipelines, approved in AAP (ADR-0626), its two demos, and the stress tool and platform limits found on 2026-11-21 (WP-316 to WP-318); the demo guide page (ADR-0627, WP-330); the Vault UI in the vault-pki demo (ADR-0628, WP-331) |
 | v0.19 | planned | | proposal under review: sovereignty profiles, data and model governance, and a Core / Enterprise / Labs split, qualified by evidence (ADR-0625, Proposed; WP-319 to WP-329) |
 
 ## MVP / v0
@@ -360,10 +360,11 @@ the startx charts `chaos-cerberus` and `chaos-pipeline` pinned in a wrapper char
 from a closed list, and starts only through an AAP workflow that a person approves (ADR-0626). Two demos of the
 catalogue's resilience layer show it: chaos on the cluster's infrastructure and chaos on the AI platform. The same band
 carries the changes to the stress tool and the platform limits found by the stress campaign of 2026-11-21, and the demo
-guide (added 2026-11-23): one generated page of every console and demo, served from a ConfigMap (ADR-0627).
+guide (added 2026-11-23): one generated page of every console and demo, served from a ConfigMap (ADR-0627), and the
+Vault web UI shown in the vault-pki demo with a read-only 30-minute token (added 2026-11-23, ADR-0628).
 
-**2 ADRs: ADR-0626 and ADR-0627, both `Proposed`.** Open work packages: WP-316 (the chaos component and the two demos), WP-317 (the stress
-tool), WP-318 (quotas, memory, batch queue, metrics) (Phase 59), WP-330 (the demo guide page). Nothing had run on a cluster on 2026-11-21; the first
+**3 ADRs: ADR-0626, ADR-0627 and ADR-0628, all `Proposed`.** Open work packages: WP-316 (the chaos component and the two demos), WP-317 (the stress
+tool), WP-318 (quotas, memory, batch queue, metrics) (Phase 59), WP-330 (the demo guide page), WP-331 (the Vault UI in the vault-pki demo). Nothing had run on a cluster on 2026-11-21; the first
 live validation is planned for 2026-11-22.
 
 ## v0.19

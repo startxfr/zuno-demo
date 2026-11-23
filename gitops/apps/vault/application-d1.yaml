@@ -27,8 +27,10 @@ spec:
       # inherit "zuno-vault-d1" and break the chart's fixed-release-name
       # assumption.
       releaseName: zuno-vault
-      # route.enabled false (ADR-0602 clause 1): the Vault UI is not exposed
-      # unless an operator sets zuno_vault_route_enabled for a session.
+      # route.enabled false here, the chart's default (ADR-0602 clause 1).
+      # ansible/roles/vault overrides it from zuno_vault_route_enabled: on
+      # demo333 the inventory sets it true (ADR-0628, the presenter's
+      # read-only Vault UI).
       values: |
         route:
           enabled: false

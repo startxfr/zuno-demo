@@ -24,6 +24,12 @@
 # by job 1482, six more from worktrees). Also the branch the aap_config role points the AAP Project at. A property of
 # the cluster, not of the branch: this line is the same on devel and main. Change it only to move demo333 to main.
 zuno_gitops_target_revision: devel
+# ADR-0628 / WP-331 (owner, 2026-11-23): the Vault web UI is published by the chart on a reencrypt Route
+# (zuno-vault, host vault.<apps domain>, the router's Let's Encrypt wildcard), permanent and with no IP allow-list.
+# The presenter enters it with a 30-minute read-only token (platform/vault/demo_token.sh, role demo-reader). It
+# replaced the passthrough Route `vault` made by hand on 2026-11-17. Applied by `make d0 install vault`
+# (ansible/roles/vault/tasks/apply_vault_app.yml). A value in confidential.yml still overrides this one.
+zuno_vault_route_enabled: true
 zuno_models_s3_bucket: "zuno-demo-sources"
 zuno_models_s3_prefix: "models"
 # zuno_models_tekos_lora_source_s3_uri deliberately unset: a from-scratch

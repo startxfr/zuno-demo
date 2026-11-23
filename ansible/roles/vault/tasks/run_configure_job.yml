@@ -7,11 +7,11 @@
 #
 # Inputs: cluster_base_domain (resolved by the caller).
 
-# The two identities Vault's Kubernetes auth roles are bound to. Their
+# The three identities Vault's Kubernetes auth roles are bound to here. Their
 # tokens are the credential: vault-configure is mounted by the Job below,
-# ansible-seeder is used by ansible/tasks/vault_login.yml. Neither gets any
-# Kubernetes RBAC.
-- name: "vault | ensure the vault-configure and ansible-seeder ServiceAccounts exist"
+# ansible-seeder is used by ansible/tasks/vault_login.yml, vault-demo-reader by
+# platform/vault/demo_token.sh (ADR-0628). None gets any Kubernetes RBAC.
+- name: "vault | ensure the vault-configure, ansible-seeder and vault-demo-reader ServiceAccounts exist"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -25,6 +25,9 @@
   loop:
     - vault-configure
     - ansible-seeder
+    # ADR-0628 / WP-331: the presenter's read-only Vault UI identity
+    # (platform/vault/demo_token.sh mints its token with `oc create token`).
+    - vault-demo-reader
   loop_control:
     loop_var: _vault_identity_sa
 

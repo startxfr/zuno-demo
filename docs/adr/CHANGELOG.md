@@ -9,6 +9,12 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition and partial supersession (2026-11-23) - ADR-0628 in v0.18
+
+ADR-0628 (the Vault UI on a chart-owned reencrypt Route, entered with a read-only 30-minute token, WP-331) supersedes
+the "UI Route off" part of ADR-0602 clause 1 and of ADR-0603 M8 for demo333 only. The chart default stays off, and the
+htpasswd break-glass of M8 is unchanged. ADR-0602 and ADR-0603 keep their status.
+
 ## Addition and new band (2026-11-21) - ADR-0626, v0.18 created
 
 The stress campaign of 2026-11-21 and the startx chaos charts 21.3.391 released the same day led to ADR-0626 (chaos

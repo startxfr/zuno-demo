@@ -258,6 +258,8 @@ jobs:
         run: |
           python3 platform/vault/check_secret_access.py
           python3 platform/vault/tests/test_check_secret_access.py
+          python3 platform/vault/tests/test_demo_reader_policy.py
+          python3 platform/vault/tests/test_demo_token.py
       # ADR-0602 / WP-224: PeerAuthentications only in zuno-data, zuno-auth and
       # zuno-ai-run, every plaintext port exception justified, and a deny-all
       # EgressFirewall ending in Deny 0.0.0.0/0 in zuno-ai-run and zuno-unifai.

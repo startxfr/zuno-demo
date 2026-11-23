@@ -44,6 +44,15 @@ which Vault's PKI role would otherwise reject as out of domain.
   1h TTL).
 - **raft-snapshot** (ServiceAccount `vault-raft-snapshot`): the chart's raft
   snapshot CronJob.
+- **demo-reader** (ServiceAccount `vault-demo-reader`, ADR-0628): the
+  presenter's Vault UI identity. `platform/vault/demo_token.sh` mints a
+  30-minute token: read and list on names, versions and settings, never
+  `zuno/data/*`, no write, no `sudo` (`vault-demo-reader.hcl`).
+
+**UI Route**: off by default (`zuno_vault_route_enabled`). demo333 sets it in
+`ansible/inventories/demo333/cluster.yml` (ADR-0628): the chart's reencrypt
+Route `zuno-vault`, with no IP allow-list unless `zuno_vault_route_ip_whitelist`
+is set.
 
 A Vault initialized before WP-223 (file storage, Shamir key and root token
 in `vault-bootstrap-credentials`) is refused by `install.yml`; migrate it

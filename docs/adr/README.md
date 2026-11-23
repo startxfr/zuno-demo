@@ -412,6 +412,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0626](0626-chaos-engineering-with-krkn-and-tekton-pipelines.md) | Proposed | Chaos engineering with krkn and Tekton pipelines |
 | [ADR-0627](0627-serve-the-demo-guide-as-a-generated-page-from-a-configmap.md) | Proposed | Serve the demo guide as a generated page from a ConfigMap |
+| [ADR-0628](0628-publish-the-vault-ui-on-a-route-entered-with-a-read-only-demo-token.md) | Proposed | Publish the Vault UI on a Route, entered with a read-only demo token |
 
 ## v0.19
 
