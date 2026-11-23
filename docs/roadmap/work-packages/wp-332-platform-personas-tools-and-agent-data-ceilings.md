@@ -29,5 +29,11 @@ ceilings are Arkos C2, Finage C3, Tekos C2, Soursage C2, Naveo C1, Comage and Ad
 2026-11-23, demo333: zuno-demo-agents v1.2.5 released (PR #94), promoted here (PR #74), mirrored and rolled (mcp, a2a, unifai, the
 Keycloak memberships, ai-gateway image 64adab9f). `ai-dev-01` holds `aap_reader` and `ai-ops-01` holds `aap_ops`, read back from
 Keycloak. The gateway floors give Arkos C2, Finage C3 and Tekos C2. `make d2 check agents`: 18/19 scenarios (scenario 11, the
-Red Hat documentation citation, fails as before), 14/14 security checks, 5/5 gate checks. Not exercised: a token of each of the
-four platform personas calling the cluster and AAP tools through Tekos.
+Red Hat documentation citation, fails as before), 14/14 security checks, 5/5 gate checks. 
+
+Tool access of the four platform personas, a real token of each through the mcp-gateway (2026-11-23, evening):
+`k8s.resource.list` and `aap.platform.audit` answer 200 for all four; `k8s.logs.read` passes the policy for all four (the
+call then failed on a pod name that does not exist, HTTP 502 from the k8s server, so no log was read). `aap.cluster.audit`,
+the write, is refused with 403 to `ai-dev-01` and `paas-dev-01`; it was not called for `ai-ops-01` and `paas-ops-01`, whose
+tokens hold `ocp-ai-ops` and `ocp-paas-ops` (a call launches a Day 0 check). The job templates AAP shows to each persona
+were not looked at.
