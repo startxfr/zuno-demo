@@ -365,8 +365,10 @@ The decisions this page rests on:
 
 > **Changed on 2026-11-23** (ADR-0628, WP-331): the 5-minute version is now the Vault web UI tour after the token; the
 > terminal rows moved to the 15-minute version. Not rehearsed yet in this shape: rehearse it before showing it. The UI
-> tour was played once by the recorder on 2026-11-23 for the GIF, opening each page by its address, not by the menu
-> clicks of the Do column: click through once with a fresh token before the session.
+> tour was played once by the recorder on 2026-11-23 for the GIF, opening each page by its address. The same day the
+> platform owner clicked through the menus by hand with a fresh token and found no page of the tour refused. The
+> configuration pages next to them (the auth method's configuration, the PKI issuers) may answer "permission denied":
+> they are not part of the tour.
 >
 > **Status:** Before the rework of 2026-11-23 (the terminal-only shape): rehearsed on 2026-11-15 through `make demo rehearse vault-pki`: the 5-minute version PASS at 10:03 (11
 > units, 35 s); the 15-minute version PASS at 10:06 (21 units, 53 s). Evidence:

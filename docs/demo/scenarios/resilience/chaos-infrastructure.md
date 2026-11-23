@@ -149,6 +149,8 @@ Run the 5-minute version, then:
 - **Not proven on a cluster yet.** The charts are prerelease: `chaos-cerberus` 21.3.398 and `chaos-pipeline` 21.3.400.
   The component is installed on demo333 since 2026-11-22, but no run of `chaos-infra` is recorded for any of its three
   tiers. A run on stage would be the first one.
+- **The node tiers need a labelled node.** On 2026-11-23 no node carried `zuno.io/chaos-target=true`: the rows of the
+  tiers `hog` and `latency` are refused by the pre-check until the platform owner labels the infra node.
 - **A run is a change to the cluster.** Inside a demo freeze, Start and every `make d3 chaos` row need the platform
   owner's go. Each `make d3 chaos` command is a whole workflow (pre-check, approval, run, post-check): the platform
   workflows took about 5 minutes each on 2026-11-22, so the 15-minute version may take longer.
@@ -304,8 +306,9 @@ Evidence:
 
 > **Status:** Written from the design on 2026-11-21; not rehearsed yet. The chaos component is installed on demo333
 > since 2026-11-22, but no run of the `chaos-infra` pipeline is recorded: the infrastructure tiers were left out of the
-> validation of that day. Every "You should see" cell describes what the design should show. Whether the infra node
-> still carries the label `zuno.io/chaos-target=true` was not read again.
+> validation of that day. Every "You should see" cell describes what the design should show. Read on 2026-11-23: no
+> node carries the label `zuno.io/chaos-target=true`, so the pre-check refuses the tiers `hog` and `latency` until the
+> platform owner labels the infra node again; that node runs no router.
 > The timings of the rows are estimates, not measures.
 > **Show-ready ([ADR-0606](../../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)):**
 > No. No golden-path probe covers this page, and it has never run. Rehearse it before showing it to an audience. A
