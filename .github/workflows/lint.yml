@@ -30,10 +30,10 @@ jobs:
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+      - uses: oras-project/setup-oras@ac735097e22fe643015b0d19645f7c9a69942128 # v2.0.4
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -269,10 +269,10 @@ jobs:
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+      - uses: oras-project/setup-oras@ac735097e22fe643015b0d19645f7c9a69942128 # v2.0.4
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -526,10 +526,10 @@ jobs:
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
       # platform/okf/release_cache.py (needs cosign and oras).
-      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+      - uses: oras-project/setup-oras@ac735097e22fe643015b0d19645f7c9a69942128 # v2.0.4
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
         with:
           cosign-release: v2.4.1
       - name: Extract the locked agents release
@@ -628,10 +628,10 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml
-      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+      - uses: oras-project/setup-oras@ac735097e22fe643015b0d19645f7c9a69942128 # v2.0.4
         with:
           version: 1.2.2
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
         with:
           cosign-release: v2.4.1
       - name: Verify and validate the locked agents release
