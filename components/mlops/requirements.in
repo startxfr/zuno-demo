@@ -1,7 +1,7 @@
-boto3>=1.40,<2
-psycopg[binary]>=3.2,<4
-requests>=2.32,<3
-PyYAML>=6.0,<7
+boto3>=1.44.11,<2
+psycopg[binary]>=3.3.9,<4
+requests>=2.34.2,<3
+PyYAML>=6.0.4,<7
 httpx>=0.28,<0.29
 # GPU/training-only - imported lazily inside _run_lora_training so every
 # other stage (and this component's own unit tests) never need these
@@ -20,8 +20,8 @@ torch>=2.4,<3
 # before bumping: AutoTokenizer/Trainer/TrainingArguments/AutoModelFor*
 # all still exist, every TrainingArguments parameter this component passes
 # is still accepted, and peft imports cleanly against it.
-transformers>=5.16,<6
-peft>=0.13,<1
+transformers>=5.24.1,<6
+peft>=0.22.0,<1
 datasets>=2.21,<3
 # >=1.1, not <1. transformers 5.x refuses to build TrainingArguments
 # without it - "Using the `Trainer` with `PyTorch` requires
@@ -34,7 +34,7 @@ datasets>=2.21,<3
 # same time rather than bumped speculatively: torch 2.13, peft 0.20 and
 # datasets 2.21 all resolve and work with transformers 5.16.1 (accelerate
 # lands on 1.14), and TrainingArguments/Trainer/Dataset all construct.
-accelerate>=1.1,<2
+accelerate>=1.16.0,<2
 # The acceptance gate's scenario 19 imports the Kubernetes client
 # directly (evaluations/tekos/run_scenarios.py). Pinned to the same major
 # the gate's own requirements.txt pins, so the image and the standalone
